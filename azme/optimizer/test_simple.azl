@@ -1,0 +1,40 @@
+# Simple test to understand AZL event parameter access
+
+# Test basic event parameter access
+on azme.test_simple with ::task ::path ::reward:
+  set task_value = task
+  set path_value = path
+  set reward_value = reward
+  
+  emit azme.test_result with task_value path_value reward_value
+
+# Test object parameter access
+on azme.test_object with ::data:
+  set task = data.task
+  set path = data.path
+  set reward = data.reward
+  
+  emit azme.object_result with task path reward
+
+# Test global variable access
+on azme.test_global:
+  set ::test_global = "working"
+  set local_value = ::test_global
+  
+  emit azme.global_result with local_value
+
+# Test conditional logic
+on azme.test_conditional with ::value:
+  set result = "low"
+  if value > 5:
+    set result = "high"
+  
+  emit azme.conditional_result with value result
+
+# Test array operations
+on azme.test_array with ::array:
+  set has_items = "no"
+  if array != []:
+    set has_items = "yes"
+  
+  emit azme.array_result with has_items 

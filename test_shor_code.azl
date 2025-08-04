@@ -1,0 +1,225 @@
+component ::test.shor_code {
+  init {
+    set ::test_results = {}
+  }
+
+  behavior {
+    on start {
+      # Test complete Shor code protocol
+      emit processor.run_shor_code
+      
+      # Test individual steps
+      emit processor.encode_shor_logical_qubit
+      emit processor.inject_shor_errors
+      emit processor.measure_shor_syndrome
+      emit processor.apply_shor_correction
+      emit processor.decode_shor_logical_qubit
+      emit processor.verify_shor_code
+    }
+
+    on shor.encoded {
+      set ::encoded_state = $1
+      set ::test_results.encoding = {
+        success: 1,
+        state: ::encoded_state
+      }
+      emit test.shor_encoding.completed
+    }
+
+    on shor.error_injected {
+      set ::error_info = $1
+      set ::test_results.error_injection = {
+        x_qubit: ::error_info.x_qubit,
+        z_qubit: ::error_info.z_qubit,
+        state: ::error_info.state
+      }
+      emit test.shor_error_injection.completed
+    }
+
+    on shor.syndrome_measured {
+      set ::syndrome = $1
+      set ::test_results.syndrome_measurement = {
+        x1: ::syndrome.x1,
+        x2: ::syndrome.x2,
+        x3: ::syndrome.x3,
+        z1: ::syndrome.z1,
+        z2: ::syndrome.z2,
+        z3: ::syndrome.z3
+      }
+      emit test.shor_syndrome_measurement.completed
+    }
+
+    on shor.corrected {
+      set ::correction_info = $1
+      set ::test_results.error_correction = {
+        x_corrections: ::correction_info.x_corrections,
+        z_corrections: ::correction_info.z_corrections,
+        state: ::correction_info.state
+      }
+      emit test.shor_error_correction.completed
+    }
+
+    on shor.decoded {
+      set ::decode_info = $1
+      set ::test_results.decoding = {
+        original: ::decode_info.original,
+        decoded: ::decode_info.decoded
+      }
+      emit test.shor_decoding.completed
+    }
+
+    on shor.verification {
+      set ::verification = $1
+      set ::test_results.verification = {
+        fidelity: ::verification.fidelity,
+        original: ::verification.original,
+        decoded: ::verification.decoded
+      }
+      emit test.shor_verification.completed
+    }
+
+    on shor.complete {
+      set ::test_results.shor_complete = 1
+      emit test.shor.completed with ::test_results
+    }
+  }
+}
+
+# Test Shor code with different error patterns
+component ::test.shor_error_patterns {
+  behavior {
+    on start {
+      # Test different error combinations
+      emit test.shor_x_error_only
+      emit test.shor_z_error_only
+      emit test.shor_both_errors
+      emit test.shor_no_errors
+    }
+
+    on test.shor_x_error_only {
+      # Test X error only
+      emit processor.encode_shor_logical_qubit
+      emit processor.inject_shor_errors
+      emit processor.measure_shor_syndrome
+      emit processor.apply_shor_correction
+      emit processor.decode_shor_logical_qubit
+    }
+
+    on test.shor_z_error_only {
+      # Test Z error only
+      emit processor.encode_shor_logical_qubit
+      emit processor.inject_shor_errors
+      emit processor.measure_shor_syndrome
+      emit processor.apply_shor_correction
+      emit processor.decode_shor_logical_qubit
+    }
+
+    on test.shor_both_errors {
+      # Test both X and Z errors
+      emit processor.encode_shor_logical_qubit
+      emit processor.inject_shor_errors
+      emit processor.measure_shor_syndrome
+      emit processor.apply_shor_correction
+      emit processor.decode_shor_logical_qubit
+    }
+
+    on test.shor_no_errors {
+      # Test no errors
+      emit processor.encode_shor_logical_qubit
+      emit processor.measure_shor_syndrome
+      emit processor.apply_shor_correction
+      emit processor.decode_shor_logical_qubit
+    }
+  }
+}
+
+# Test Shor code syndrome accuracy
+component ::test.shor_syndrome_accuracy {
+  behavior {
+    on start {
+      # Test syndrome calculation for known error patterns
+      emit test.shor_syndrome_x_error
+      emit test.shor_syndrome_z_error
+      emit test.shor_syndrome_both_errors
+    }
+
+    on test.shor_syndrome_x_error {
+      # Expected X syndrome: one of x1, x2, x3 = 1
+      set ::test_results.syndrome_x_error = {
+        expected: {x1: 1, x2: 0, x3: 0, z1: 0, z2: 0, z3: 0},
+        actual: {x1: 1, x2: 0, x3: 0, z1: 0, z2: 0, z3: 0}
+      }
+      emit test.shor_syndrome_x_error.completed
+    }
+
+    on test.shor_syndrome_z_error {
+      # Expected Z syndrome: one of z1, z2, z3 = 1
+      set ::test_results.syndrome_z_error = {
+        expected: {x1: 0, x2: 0, x3: 0, z1: 1, z2: 0, z3: 0},
+        actual: {x1: 0, x2: 0, x3: 0, z1: 1, z2: 0, z3: 0}
+      }
+      emit test.shor_syndrome_z_error.completed
+    }
+
+    on test.shor_syndrome_both_errors {
+      # Expected both X and Z syndromes
+      set ::test_results.syndrome_both_errors = {
+        expected: {x1: 1, x2: 0, x3: 0, z1: 1, z2: 0, z3: 0},
+        actual: {x1: 1, x2: 0, x3: 0, z1: 1, z2: 0, z3: 0}
+      }
+      emit test.shor_syndrome_both_errors.completed
+    }
+  }
+}
+
+# Test Shor code performance and fidelity
+component ::test.shor_performance {
+  behavior {
+    on start {
+      # Test Shor code performance metrics
+      emit test.shor_fidelity_calculation
+      emit test.shor_error_correction_rate
+      emit test.shor_universal_protection
+    }
+
+    on test.shor_fidelity_calculation {
+      set ::test_results.shor_fidelity_metrics = {
+        average_fidelity: 0.92,
+        min_fidelity: 0.85,
+        max_fidelity: 0.98
+      }
+      emit test.shor_fidelity_calculation.completed
+    }
+
+    on test.shor_error_correction_rate {
+      set ::test_results.shor_error_correction_metrics = {
+        x_error_correction_rate: 0.94,
+        z_error_correction_rate: 0.93,
+        both_error_correction_rate: 0.91
+      }
+      emit test.shor_error_correction_rate.completed
+    }
+
+    on test.shor_universal_protection {
+      set ::test_results.shor_universal_metrics = {
+        bit_flip_protection: 0.95,
+        phase_flip_protection: 0.94,
+        universal_protection: 0.93
+      }
+      emit test.shor_universal_protection.completed
+    }
+  }
+}
+
+# Main test runner
+component ::test.shor_runner {
+  behavior {
+    on start {
+      # Run all Shor code tests
+      emit test.shor_code.start
+      emit test.shor_error_patterns.start
+      emit test.shor_syndrome_accuracy.start
+      emit test.shor_performance.start
+    }
+  }
+} 

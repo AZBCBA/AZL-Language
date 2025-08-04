@@ -1,0 +1,90 @@
+component ::aba.prompt_manager {
+  init {
+    set ::current_prompt_level = 0
+    set ::prompt_hierarchy = [
+      "independent",
+      "gestural",
+      "partial_physical",
+      "full_physical"
+    ]
+    set ::prompt_fade_history = []
+    set ::prompt_effectiveness = {}
+  }
+
+  behavior {
+    listen for "prompt_level_changed" then {
+      store ::prompt_fade_history from record_prompt_change(::new_prompt_level)
+      update_prompt_effectiveness()
+    }
+
+    listen for "prompt_fade_triggered" then {
+      let fade_data = {
+        skill: ::skill_name,
+        accuracy: ::accuracy,
+        threshold: ::threshold,
+        new_level: ::new_prompt_level,
+        timestamp: now()
+      }
+      
+      store ::prompt_fade_history from add_prompt_fade_record(fade_data)
+      emit "prompt_fade_recorded" with fade_data
+    }
+
+    listen for "accuracy_improved" then {
+      branch when ::accuracy > ::prompt_fade_threshold {
+        decrement ::current_prompt_level
+        emit "prompt_level_changed" with ::current_prompt_level
+      }
+    }
+  }
+
+  memory {
+    current_prompt_level
+    prompt_hierarchy
+    prompt_fade_history
+    prompt_effectiveness
+  }
+
+  interface {
+    get_current_prompt_level
+    adjust_prompt_level using ::new_level
+    get_prompt_effectiveness
+    record_prompt_change using ::new_level
+  }
+}
+
+function record_prompt_change(new_level) {
+  let history = ::prompt_fade_history
+  history.push({
+    previous_level: ::current_prompt_level,
+    new_level: new_level,
+    timestamp: now(),
+    reason: "manual_adjustment"
+  })
+  return history
+}
+
+function update_prompt_effectiveness() {
+  let effectiveness = ::prompt_effectiveness
+  let current_level = ::current_prompt_level
+  
+  branch when effectiveness[current_level] == null {
+    set effectiveness[current_level] = {
+      trials: 0,
+      successes: 0,
+      effectiveness_rate: 0.0
+    }
+  }
+  
+  increment effectiveness[current_level].trials
+}
+
+function add_prompt_fade_record(fade_data) {
+  let history = ::prompt_fade_history
+  history.push({
+    type: "automatic_fade",
+    data: fade_data,
+    timestamp: now()
+  })
+  return history
+} 

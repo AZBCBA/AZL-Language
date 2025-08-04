@@ -1,0 +1,15 @@
+// Test basic while loop
+say "Testing while loop:";
+let i = 0;
+while (i < 5) {
+    say i;
+    i = i + 1;
+}
+
+// Test basic for loop
+say "Testing for loop:";
+for (let j = 0; j < 3; j = j + 1) {
+    say j;
+}
+
+say "Loop tests complete!"; 

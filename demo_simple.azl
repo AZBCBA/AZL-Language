@@ -1,0 +1,80 @@
+say "🚀 AZL v2 - Simple Demo";
+say "=====================";
+
+// Basic variables
+let message = "Hello from AZL v2!";
+let version = 2.0;
+let is_advanced = true;
+
+say "Message:";
+say message;
+say "Version:";
+say version;
+say "Is Advanced:";
+say is_advanced;
+
+// Arrays
+let numbers = [1, 2, 3, 4, 5];
+say "Numbers array:";
+say numbers;
+
+// Standard Library - Math
+say "=== Math Functions ===";
+let sin_result = math.sin(3.14159);
+say "sin(π):";
+say sin_result;
+
+let sqrt_result = math.sqrt(16);
+say "sqrt(16):";
+say sqrt_result;
+
+let pow_result = math.pow(2, 8);
+say "2^8:";
+say pow_result;
+
+// Standard Library - String
+say "=== String Functions ===";
+let test_string = "Hello World";
+let length = string.length(test_string);
+say "String length:";
+say length;
+
+let upper = string.upper(test_string);
+say "Uppercase:";
+say upper;
+
+// Standard Library - Array
+say "=== Array Functions ===";
+let array_length = array.length(numbers);
+say "Array length:";
+say array_length;
+
+// AI Primitives
+say "=== AI Primitives ===";
+let memory_result = memory.lha3.store("test", "value");
+say "Memory store result:";
+say memory_result;
+
+let quantum_result = quantum.superposition(0.5, 0.5);
+say "Quantum superposition:";
+say quantum_result;
+
+let neural_result = neural.activate(0.5);
+say "Neural activation:";
+say neural_result;
+
+// Event System
+say "=== Event System ===";
+emit "test_event" with "test_data";
+say "Event emitted successfully";
+
+// Component System
+say "=== Component System ===";
+component TestComponent {
+    method test_method() {
+        say "Component method called";
+    }
+}
+say "Component defined successfully";
+
+say "✅ AZL v2 Demo Complete!"; 

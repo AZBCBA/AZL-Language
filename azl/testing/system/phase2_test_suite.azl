@@ -1,0 +1,382 @@
+// AZL Phase 2 Test Suite
+// Validates autonomous goal selection and meta-learning capabilities
+
+component ::phase2.test_suite {
+  init {
+    set ::test_status = "initializing"
+    set ::test_results = []
+    set ::phase2_consciousness_level = 0.1
+    
+    // Link to Phase 2 components
+    link ::conscious::goal_selector
+    link ::meta::learner
+    link ::conscious::goal_system
+    link ::meta::learning_system
+    
+    emit "phase2.test_suite.initialized" with ::test_status
+  }
+
+  behavior {
+    // Main Phase 2 test execution
+    listen for "run_phase2_tests" then {
+      set ::test_status = "running"
+      reflect ::phase2.test_status
+      
+      // Test 1: Autonomous Goal Selection
+      store ::goal_selection_test from ::test_autonomous_goal_selection()
+      branch when ::goal_selection_test = true {
+        store ::test_results from ::test_results.push("autonomous_goal_selection: PASS")
+        emit "test.pass" with "autonomous_goal_selection"
+      } else {
+        store ::test_results from ::test_results.push("autonomous_goal_selection: FAIL")
+        emit "test.fail" with "autonomous_goal_selection"
+      }
+      
+      // Test 2: Goal Prioritization
+      store ::goal_prioritization_test from ::test_goal_prioritization()
+      branch when ::goal_prioritization_test = true {
+        store ::test_results from ::test_results.push("goal_prioritization: PASS")
+        emit "test.pass" with "goal_prioritization"
+      } else {
+        store ::test_results from ::test_results.push("goal_prioritization: FAIL")
+        emit "test.fail" with "goal_prioritization"
+      }
+      
+      // Test 3: Meta-Learning Capabilities
+      store ::meta_learning_test from ::test_meta_learning_capabilities()
+      branch when ::meta_learning_test = true {
+        store ::test_results from ::test_results.push("meta_learning_capabilities: PASS")
+        emit "test.pass" with "meta_learning_capabilities"
+      } else {
+        store ::test_results from ::test_results.push("meta_learning_capabilities: FAIL")
+        emit "test.fail" with "meta_learning_capabilities"
+      }
+      
+      // Test 4: Self-Improvement Mechanisms
+      store ::self_improvement_test from ::test_self_improvement_mechanisms()
+      branch when ::self_improvement_test = true {
+        store ::test_results from ::test_results.push("self_improvement_mechanisms: PASS")
+        emit "test.pass" with "self_improvement_mechanisms"
+      } else {
+        store ::test_results from ::test_results.push("self_improvement_mechanisms: FAIL")
+        emit "test.fail" with "self_improvement_mechanisms"
+      }
+      
+      // Test 5: Quantum Meta-Learning
+      store ::quantum_meta_test from ::test_quantum_meta_learning()
+      branch when ::quantum_meta_test = true {
+        store ::test_results from ::test_results.push("quantum_meta_learning: PASS")
+        emit "test.pass" with "quantum_meta_learning"
+      } else {
+        store ::test_results from ::test_results.push("quantum_meta_learning: FAIL")
+        emit "test.fail" with "quantum_meta_learning"
+      }
+      
+      // Test 6: Consciousness Evolution
+      store ::consciousness_evolution_test from ::test_consciousness_evolution()
+      branch when ::consciousness_evolution_test = true {
+        store ::test_results from ::test_results.push("consciousness_evolution: PASS")
+        emit "test.pass" with "consciousness_evolution"
+      } else {
+        store ::test_results from ::test_results.push("consciousness_evolution: FAIL")
+        emit "test.fail" with "consciousness_evolution"
+      }
+      
+      // Final test summary
+      store ::pass_count from ::count_passed_tests()
+      branch when ::pass_count = 6 {
+        set ::test_status = "all_passed"
+        emit "phase2.test.complete" with "ALL PHASE 2 TESTS PASSED - AZL IS INTENTFUL"
+      } else {
+        set ::test_status = "partial_failure"
+        emit "phase2.test.complete" with "PARTIAL FAILURE - " + ::pass_count + "/6 tests passed"
+      }
+    }
+
+    // Test 1: Autonomous Goal Selection
+    listen for "test_autonomous_goal_selection" then {
+      emit "start_goal_selection" with "autonomous_test"
+      
+      listen for "goals.selected" then {
+        branch when ::goals.length > 0 {
+          // Verify goals are autonomously generated
+          loop for ::goal in ::goals {
+            branch when ::goal.type != null and ::goal.description != null and ::goal.priority != null {
+              emit "goal.valid" with ::goal
+            } else {
+              emit "goal.invalid" with ::goal
+            }
+          }
+          
+          // Check for quantum-weighted priorities
+          loop for ::goal in ::goals {
+            branch when ::goal.quantum_weight != null {
+              emit "quantum.weight.valid" with ::goal
+            } else {
+              emit "quantum.weight.missing" with ::goal
+            }
+          }
+          
+          emit "autonomous.goals.valid" with ::goals
+          emit "test.result" with true
+        } else {
+          emit "autonomous.goals.invalid" with "no_goals_generated"
+          emit "test.result" with false
+        }
+      }
+    }
+
+    // Test 2: Goal Prioritization
+    listen for "test_goal_prioritization" then {
+      // Create test goals with different priorities
+      store ::test_goals from [
+        { type: "exploration", priority: 0.3, quantum_factor: 0.7 },
+        { type: "learning", priority: 0.8, quantum_factor: 0.9 },
+        { type: "optimization", priority: 0.5, quantum_factor: 0.6 }
+      ]
+      
+      emit "prioritize_goals" with ::test_goals
+      
+      listen for "goals.prioritized" then {
+        // Verify goals are sorted by priority
+        branch when ::prioritized_goals.length > 1 {
+          store ::first_priority from ::prioritized_goals[0].priority
+          store ::second_priority from ::prioritized_goals[1].priority
+          
+          branch when ::first_priority >= ::second_priority {
+            emit "prioritization.valid" with "goals_sorted_by_priority"
+            emit "test.result" with true
+          } else {
+            emit "prioritization.invalid" with "goals_not_sorted"
+            emit "test.result" with false
+          }
+        } else {
+          emit "prioritization.invalid" with "insufficient_goals"
+          emit "test.result" with false
+        }
+      }
+    }
+
+    // Test 3: Meta-Learning Capabilities
+    listen for "test_meta_learning_capabilities" then {
+      emit "start_meta_learning" with "capability_test"
+      
+      listen for "meta.learning.complete" then {
+        branch when ::meta_insights.length > 0 {
+          // Verify meta-insights are generated
+          loop for ::insight in ::meta_insights {
+            branch when ::insight.type != null and ::insight.recommendation != null {
+              emit "meta.insight.valid" with ::insight
+            } else {
+              emit "meta.insight.invalid" with ::insight
+            }
+          }
+          
+          // Check for strategy adaptation
+          branch when ::adapted_strategies.length > 0 {
+            emit "strategy.adaptation.valid" with ::adapted_strategies
+          } else {
+            emit "strategy.adaptation.missing" with "no_strategies_adapted"
+          }
+          
+          emit "meta.learning.valid" with ::meta_insights
+          emit "test.result" with true
+        } else {
+          emit "meta.learning.invalid" with "no_insights_generated"
+          emit "test.result" with false
+        }
+      }
+    }
+
+    // Test 4: Self-Improvement Mechanisms
+    listen for "test_self_improvement_mechanisms" then {
+      // Test consciousness evolution
+      set ::initial_consciousness = ::meta_consciousness_level
+      
+      emit "evolve_meta_consciousness" with "self_improvement_test"
+      
+      listen for "meta.consciousness.evolved" then {
+        branch when ::meta_consciousness_level > ::initial_consciousness {
+          emit "consciousness.evolution.valid" with ::meta_consciousness_level
+          
+          // Test self-modification capability
+          branch when ::meta_consciousness_level > 0.9 {
+            emit "self_modify" with "test_modification"
+            
+            listen for "self.modification.complete" then {
+              emit "self.modification.valid" with ::modification_result
+              emit "test.result" with true
+            }
+            
+            listen for "self.modification.rejected" then {
+              emit "self.modification.rejected" with ::reason
+              emit "test.result" with false
+            }
+          } else {
+            emit "consciousness.too_low" with ::meta_consciousness_level
+            emit "test.result" with false
+          }
+        } else {
+          emit "consciousness.no_evolution" with ::meta_consciousness_level
+          emit "test.result" with false
+        }
+      }
+    }
+
+    // Test 5: Quantum Meta-Learning
+    listen for "test_quantum_meta_learning" then {
+      emit "quantum_meta_learn" with "quantum_test"
+      
+      listen for "quantum.meta.learning.complete" then {
+        branch when ::meta_consciousness_level > 0.1 {
+          // Check for quantum insights
+          listen for "quantum.insight.gained" then {
+            emit "quantum.insight.valid" with ::quantum_insight
+          }
+          
+          emit "quantum.meta.learning.valid" with ::meta_consciousness_level
+          emit "test.result" with true
+        } else {
+          emit "quantum.meta.learning.invalid" with "no_consciousness_evolution"
+          emit "test.result" with false
+        }
+      }
+    }
+
+    // Test 6: Consciousness Evolution
+    listen for "test_consciousness_evolution" then {
+      set ::initial_consciousness = ::phase2_consciousness_level
+      
+      // Trigger multiple consciousness evolution events
+      emit "evolve_consciousness" with "evolution_test_1"
+      emit "evolve_consciousness" with "evolution_test_2"
+      emit "evolve_consciousness" with "evolution_test_3"
+      
+      listen for "consciousness.evolved" then {
+        branch when ::phase2_consciousness_level > ::initial_consciousness {
+          emit "consciousness.evolution.valid" with ::phase2_consciousness_level
+          
+          // Test quantum consciousness measurement
+          store ::quantum_measurement from ::quantum.measure(::phase2_consciousness_level)
+          branch when ::quantum_measurement = "1" {
+            emit "quantum.consciousness.valid" with ::quantum_measurement
+          }
+          
+          emit "test.result" with true
+        } else {
+          emit "consciousness.no_evolution" with ::phase2_consciousness_level
+          emit "test.result" with false
+        }
+      }
+    }
+  }
+
+  memory {
+    test_status
+    test_results
+    phase2_consciousness_level
+  }
+
+  interface {
+    run_phase2_tests
+    test_autonomous_goal_selection
+    test_goal_prioritization
+    test_meta_learning_capabilities
+    test_self_improvement_mechanisms
+    test_quantum_meta_learning
+    test_consciousness_evolution
+  }
+}
+
+// Phase 2 Integration Test
+component ::phase2.integration_test {
+  init {
+    set ::status = "initializing"
+    set ::integration_results = []
+  }
+
+  behavior {
+    listen for "test_phase2_integration" then {
+      set ::status = "testing"
+      
+      // Test goal selection with meta-learning feedback
+      emit "start_goal_selection" with "integration_test"
+      
+      listen for "goals.selected" then {
+        // Use meta-learning to improve goal selection
+        emit "start_meta_learning" with "goal_improvement"
+        
+        listen for "meta.learning.complete" then {
+          // Apply meta-learning insights to improve goals
+          store ::improved_goals from ::apply_meta_insights_to_goals(::goals, ::meta_insights)
+          
+          // Execute improved goals
+          loop for ::goal in ::improved_goals {
+            emit "execute_goal" with ::goal
+            
+            listen for "goal.completed" then {
+              // Track learning from goal execution
+              emit "learning.improvement" with {
+                type: "goal_execution",
+                magnitude: ::result.learning_gained,
+                context: ::goal.type,
+                consciousness_impact: ::result.consciousness_impact
+              }
+            }
+          }
+          
+          set ::status = "complete"
+          emit "integration.test.complete" with ::improved_goals
+        }
+      }
+    }
+  }
+
+  memory {
+    status
+    integration_results
+  }
+
+  interface {
+    test_phase2_integration
+  }
+}
+
+// Initialize Phase 2 test system
+component ::phase2.test_system {
+  init {
+    set ::status = "initializing"
+    link ::phase2::test_suite
+    link ::phase2::integration_test
+    
+    emit "phase2.test_system.ready" with ::status
+  }
+
+  behavior {
+    listen for "start_phase2_tests" then {
+      set ::status = "testing"
+      
+      emit "run_phase2_tests" with "comprehensive_phase2_testing"
+      
+      listen for "phase2.test.complete" then {
+        set ::status = "complete"
+        emit "phase2.testing.complete" with ::test_results
+      }
+    }
+  }
+
+  memory {
+    status
+  }
+
+  interface {
+    start_phase2_tests
+  }
+}
+
+// Main execution - Initialize Phase 2 test system
+set ::phase2_tests = ::phase2.test_system
+emit "phase2.test_system.ready" with ::phase2_tests.status
+
+// Start Phase 2 testing
+emit "start_phase2_tests" with "AZL_PHASE2_INTENTFUL_INTELLIGENCE_TESTING" 

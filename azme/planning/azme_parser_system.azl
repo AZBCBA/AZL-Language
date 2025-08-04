@@ -1,0 +1,845 @@
+// AZME Parser System in AZL
+// Moving AZL syntax parsing from Rust to AZL for AGI development
+
+print("=== AZME Parser System in AZL ===");
+print("AZL parsing should be in AZL, not Rust!");
+
+// Parser system configuration in AZL
+let parser_config = {
+    max_token_length: 1000,
+    max_expression_depth: 50,
+    allow_nested_functions: true,
+    strict_syntax: false,
+    error_recovery: true,
+    parse_timeout: 5000
+};
+
+// Parser system structure in AZL
+let parser_system = {
+    tokens: [],
+    ast_nodes: [],
+    parse_stack: [],
+    symbol_table: {},
+    error_log: [],
+    parse_history: [],
+    current_position: 0,
+    current_line: 1,
+    current_column: 1
+};
+
+// AZL Function: Initialize parser system
+function initialize_parser_system() {
+    print("Initializing parser system in AZL...");
+    
+    // Initialize parser structures
+    parser_system.tokens = [];
+    parser_system.ast_nodes = [];
+    parser_system.parse_stack = [];
+    parser_system.symbol_table = {};
+    parser_system.error_log = [];
+    parser_system.parse_history = [];
+    parser_system.current_position = 0;
+    parser_system.current_line = 1;
+    parser_system.current_column = 1;
+    
+    print("Parser system initialized with max token length: " + parser_config.max_token_length);
+}
+
+// AZL Function: Tokenize AZL code
+function tokenize_azl_code(source_code) {
+    print("Tokenizing AZL code in AZL...");
+    
+    let tokens = [];
+    let current_token = "";
+    let in_string = false;
+    let in_comment = false;
+    let string_delimiter = "";
+    
+    for i in 0..source_code.length {
+        let char = source_code[i];
+        
+        // Update position tracking
+        if char == "\n" {
+            parser_system.current_line += 1;
+            parser_system.current_column = 1;
+        } else {
+            parser_system.current_column += 1;
+        }
+        
+        // Handle comments
+        if char == "/" && i + 1 < source_code.length && source_code[i + 1] == "/" {
+            in_comment = true;
+            if current_token.length > 0 {
+                tokens.push(create_token(current_token, "identifier"));
+                current_token = "";
+            }
+            continue;
+        }
+        
+        if in_comment {
+            if char == "\n" {
+                in_comment = false;
+            }
+            continue;
+        }
+        
+        // Handle strings
+        if (char == "\"" || char == "'") && !in_string {
+            in_string = true;
+            string_delimiter = char;
+            if current_token.length > 0 {
+                tokens.push(create_token(current_token, "identifier"));
+                current_token = "";
+            }
+            current_token = char;
+            continue;
+        }
+        
+        if in_string {
+            current_token += char;
+            if char == string_delimiter {
+                in_string = false;
+                tokens.push(create_token(current_token, "string"));
+                current_token = "";
+            }
+            continue;
+        }
+        
+        // Handle whitespace
+        if char == " " || char == "\t" || char == "\n" || char == "\r" {
+            if current_token.length > 0 {
+                tokens.push(create_token(current_token, "identifier"));
+                current_token = "";
+            }
+            continue;
+        }
+        
+        // Handle special characters
+        if is_special_character(char) {
+            if current_token.length > 0 {
+                tokens.push(create_token(current_token, "identifier"));
+                current_token = "";
+            }
+            tokens.push(create_token(char, "operator"));
+            continue;
+        }
+        
+        // Build current token
+        current_token += char;
+    }
+    
+    // Add final token
+    if current_token.length > 0 {
+        tokens.push(create_token(current_token, "identifier"));
+    }
+    
+    // Classify tokens
+    for token in tokens {
+        classify_token(token);
+    }
+    
+    parser_system.tokens = tokens;
+    print("Tokenized " + tokens.length + " tokens");
+    return tokens;
+}
+
+// AZL Function: Create token
+function create_token(value, type) {
+    return {
+        value: value,
+        type: type,
+        line: parser_system.current_line,
+        column: parser_system.current_column,
+        position: parser_system.current_position
+    };
+}
+
+// AZL Function: Check if character is special
+function is_special_character(char) {
+    let special_chars = ["(", ")", "{", "}", "[", "]", ";", ",", ":", "=", "+", "-", "*", "/", "%", "!", "&", "|", "<", ">", "?"];
+    return special_chars.contains(char);
+}
+
+// AZL Function: Classify token
+function classify_token(token) {
+    let value = token.value;
+    
+    // Keywords
+    let keywords = ["let", "function", "if", "else", "for", "while", "return", "print", "true", "false", "null"];
+    if keywords.contains(value) {
+        token.type = "keyword";
+        return;
+    }
+    
+    // Numbers
+    if is_number(value) {
+        token.type = "number";
+        return;
+    }
+    
+    // Strings
+    if (value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'")) {
+        token.type = "string";
+        return;
+    }
+    
+    // Operators
+    let operators = ["+", "-", "*", "/", "=", "==", "!=", "<", ">", "<=", ">=", "&&", "||", "!", "&", "|"];
+    if operators.contains(value) {
+        token.type = "operator";
+        return;
+    }
+    
+    // Default to identifier
+    token.type = "identifier";
+}
+
+// AZL Function: Check if string is number
+function is_number(str) {
+    if str.length == 0 {
+        return false;
+    }
+    
+    let has_digit = false;
+    let has_decimal = false;
+    
+    for i in 0..str.length {
+        let char = str[i];
+        
+        if char >= "0" && char <= "9" {
+            has_digit = true;
+        } else if char == "." && !has_decimal {
+            has_decimal = true;
+        } else if char == "-" && i == 0 {
+            // Allow negative sign at start
+        } else {
+            return false;
+        }
+    }
+    
+    return has_digit;
+}
+
+// AZL Function: Parse AZL code into AST
+function parse_azl_code(source_code) {
+    print("Parsing AZL code in AZL...");
+    
+    // Tokenize the code
+    let tokens = tokenize_azl_code(source_code);
+    
+    // Parse into AST
+    let ast = parse_expression_list(tokens);
+    
+    parser_system.ast_nodes = ast;
+    print("Parsed into " + ast.length + " AST nodes");
+    return ast;
+}
+
+// AZL Function: Parse expression list
+function parse_expression_list(tokens) {
+    let expressions = [];
+    let i = 0;
+    
+    while i < tokens.length {
+        let expression = parse_expression(tokens, i);
+        if expression {
+            expressions.push(expression.node);
+            i = expression.next_position;
+        } else {
+            i += 1;
+        }
+    }
+    
+    return expressions;
+}
+
+// AZL Function: Parse expression
+function parse_expression(tokens, position) {
+    if position >= tokens.length {
+        return null;
+    }
+    
+    let token = tokens[position];
+    
+    // Parse variable declaration
+    if token.type == "keyword" && token.value == "let" {
+        return parse_variable_declaration(tokens, position);
+    }
+    
+    // Parse function definition
+    if token.type == "keyword" && token.value == "function" {
+        return parse_function_definition(tokens, position);
+    }
+    
+    // Parse if statement
+    if token.type == "keyword" && token.value == "if" {
+        return parse_if_statement(tokens, position);
+    }
+    
+    // Parse for loop
+    if token.type == "keyword" && token.value == "for" {
+        return parse_for_loop(tokens, position);
+    }
+    
+    // Parse while loop
+    if token.type == "keyword" && token.value == "while" {
+        return parse_while_loop(tokens, position);
+    }
+    
+    // Parse function call
+    if token.type == "identifier" && position + 1 < tokens.length && tokens[position + 1].value == "(" {
+        return parse_function_call(tokens, position);
+    }
+    
+    // Parse assignment
+    if token.type == "identifier" && position + 1 < tokens.length && tokens[position + 1].value == "=" {
+        return parse_assignment(tokens, position);
+    }
+    
+    // Parse simple expression
+    return parse_simple_expression(tokens, position);
+}
+
+// AZL Function: Parse variable declaration
+function parse_variable_declaration(tokens, position) {
+    let node = {
+        type: "variable_declaration",
+        name: "",
+        value: null,
+        line: tokens[position].line
+    };
+    
+    let i = position + 1;
+    
+    // Parse variable name
+    if i < tokens.length && tokens[i].type == "identifier" {
+        node.name = tokens[i].value;
+        i += 1;
+    } else {
+        log_parse_error("Expected variable name", tokens[position]);
+        return null;
+    }
+    
+    // Parse assignment
+    if i < tokens.length && tokens[i].value == "=" {
+        i += 1;
+        let value_result = parse_expression(tokens, i);
+        if value_result {
+            node.value = value_result.node;
+            i = value_result.next_position;
+        }
+    }
+    
+    return {
+        node: node,
+        next_position: i
+    };
+}
+
+// AZL Function: Parse function definition
+function parse_function_definition(tokens, position) {
+    let node = {
+        type: "function_definition",
+        name: "",
+        parameters: [],
+        body: [],
+        line: tokens[position].line
+    };
+    
+    let i = position + 1;
+    
+    // Parse function name
+    if i < tokens.length && tokens[i].type == "identifier" {
+        node.name = tokens[i].value;
+        i += 1;
+    } else {
+        log_parse_error("Expected function name", tokens[position]);
+        return null;
+    }
+    
+    // Parse parameters
+    if i < tokens.length && tokens[i].value == "(" {
+        i += 1;
+        while i < tokens.length && tokens[i].value != ")" {
+            if tokens[i].type == "identifier" {
+                node.parameters.push(tokens[i].value);
+            }
+            i += 1;
+        }
+        if i < tokens.length && tokens[i].value == ")" {
+            i += 1;
+        }
+    }
+    
+    // Parse function body
+    if i < tokens.length && tokens[i].value == "{" {
+        i += 1;
+        let body_result = parse_expression_list(tokens.slice(i));
+        node.body = body_result;
+        i += body_result.length;
+        
+        // Find closing brace
+        while i < tokens.length && tokens[i].value != "}" {
+            i += 1;
+        }
+        if i < tokens.length && tokens[i].value == "}" {
+            i += 1;
+        }
+    }
+    
+    return {
+        node: node,
+        next_position: i
+    };
+}
+
+// AZL Function: Parse if statement
+function parse_if_statement(tokens, position) {
+    let node = {
+        type: "if_statement",
+        condition: null,
+        then_body: [],
+        else_body: [],
+        line: tokens[position].line
+    };
+    
+    let i = position + 1;
+    
+    // Parse condition
+    if i < tokens.length && tokens[i].value == "(" {
+        i += 1;
+        let condition_result = parse_expression(tokens, i);
+        if condition_result {
+            node.condition = condition_result.node;
+            i = condition_result.next_position;
+        }
+        
+        // Find closing parenthesis
+        while i < tokens.length && tokens[i].value != ")" {
+            i += 1;
+        }
+        if i < tokens.length && tokens[i].value == ")" {
+            i += 1;
+        }
+    }
+    
+    // Parse then body
+    if i < tokens.length && tokens[i].value == "{" {
+        i += 1;
+        let then_result = parse_expression_list(tokens.slice(i));
+        node.then_body = then_result;
+        i += then_result.length;
+        
+        // Find closing brace
+        while i < tokens.length && tokens[i].value != "}" {
+            i += 1;
+        }
+        if i < tokens.length && tokens[i].value == "}" {
+            i += 1;
+        }
+    }
+    
+    // Parse else body
+    if i < tokens.length && tokens[i].value == "else" {
+        i += 1;
+        if i < tokens.length && tokens[i].value == "{" {
+            i += 1;
+            let else_result = parse_expression_list(tokens.slice(i));
+            node.else_body = else_result;
+            i += else_result.length;
+            
+            // Find closing brace
+            while i < tokens.length && tokens[i].value != "}" {
+                i += 1;
+            }
+            if i < tokens.length && tokens[i].value == "}" {
+                i += 1;
+            }
+        }
+    }
+    
+    return {
+        node: node,
+        next_position: i
+    };
+}
+
+// AZL Function: Parse for loop
+function parse_for_loop(tokens, position) {
+    let node = {
+        type: "for_loop",
+        initialization: null,
+        condition: null,
+        increment: null,
+        body: [],
+        line: tokens[position].line
+    };
+    
+    let i = position + 1;
+    
+    // Parse initialization
+    if i < tokens.length && tokens[i].value == "(" {
+        i += 1;
+        let init_result = parse_expression(tokens, i);
+        if init_result {
+            node.initialization = init_result.node;
+            i = init_result.next_position;
+        }
+    }
+    
+    // Parse condition
+    let condition_result = parse_expression(tokens, i);
+    if condition_result {
+        node.condition = condition_result.node;
+        i = condition_result.next_position;
+    }
+    
+    // Parse increment
+    let increment_result = parse_expression(tokens, i);
+    if increment_result {
+        node.increment = increment_result.node;
+        i = increment_result.next_position;
+    }
+    
+    // Find closing parenthesis
+    while i < tokens.length && tokens[i].value != ")" {
+        i += 1;
+    }
+    if i < tokens.length && tokens[i].value == ")" {
+        i += 1;
+    }
+    
+    // Parse body
+    if i < tokens.length && tokens[i].value == "{" {
+        i += 1;
+        let body_result = parse_expression_list(tokens.slice(i));
+        node.body = body_result;
+        i += body_result.length;
+        
+        // Find closing brace
+        while i < tokens.length && tokens[i].value != "}" {
+            i += 1;
+        }
+        if i < tokens.length && tokens[i].value == "}" {
+            i += 1;
+        }
+    }
+    
+    return {
+        node: node,
+        next_position: i
+    };
+}
+
+// AZL Function: Parse while loop
+function parse_while_loop(tokens, position) {
+    let node = {
+        type: "while_loop",
+        condition: null,
+        body: [],
+        line: tokens[position].line
+    };
+    
+    let i = position + 1;
+    
+    // Parse condition
+    if i < tokens.length && tokens[i].value == "(" {
+        i += 1;
+        let condition_result = parse_expression(tokens, i);
+        if condition_result {
+            node.condition = condition_result.node;
+            i = condition_result.next_position;
+        }
+        
+        // Find closing parenthesis
+        while i < tokens.length && tokens[i].value != ")" {
+            i += 1;
+        }
+        if i < tokens.length && tokens[i].value == ")" {
+            i += 1;
+        }
+    }
+    
+    // Parse body
+    if i < tokens.length && tokens[i].value == "{" {
+        i += 1;
+        let body_result = parse_expression_list(tokens.slice(i));
+        node.body = body_result;
+        i += body_result.length;
+        
+        // Find closing brace
+        while i < tokens.length && tokens[i].value != "}" {
+            i += 1;
+        }
+        if i < tokens.length && tokens[i].value == "}" {
+            i += 1;
+        }
+    }
+    
+    return {
+        node: node,
+        next_position: i
+    };
+}
+
+// AZL Function: Parse function call
+function parse_function_call(tokens, position) {
+    let node = {
+        type: "function_call",
+        name: tokens[position].value,
+        arguments: [],
+        line: tokens[position].line
+    };
+    
+    let i = position + 1;
+    
+    // Skip opening parenthesis
+    if i < tokens.length && tokens[i].value == "(" {
+        i += 1;
+    }
+    
+    // Parse arguments
+    while i < tokens.length && tokens[i].value != ")" {
+        let arg_result = parse_expression(tokens, i);
+        if arg_result {
+            node.arguments.push(arg_result.node);
+            i = arg_result.next_position;
+        } else {
+            i += 1;
+        }
+        
+        // Skip comma
+        if i < tokens.length && tokens[i].value == "," {
+            i += 1;
+        }
+    }
+    
+    // Skip closing parenthesis
+    if i < tokens.length && tokens[i].value == ")" {
+        i += 1;
+    }
+    
+    return {
+        node: node,
+        next_position: i
+    };
+}
+
+// AZL Function: Parse assignment
+function parse_assignment(tokens, position) {
+    let node = {
+        type: "assignment",
+        target: tokens[position].value,
+        value: null,
+        line: tokens[position].line
+    };
+    
+    let i = position + 2; // Skip identifier and "="
+    
+    let value_result = parse_expression(tokens, i);
+    if value_result {
+        node.value = value_result.node;
+        i = value_result.next_position;
+    }
+    
+    return {
+        node: node,
+        next_position: i
+    };
+}
+
+// AZL Function: Parse simple expression
+function parse_simple_expression(tokens, position) {
+    let token = tokens[position];
+    
+    if token.type == "number" {
+        return {
+            node: {
+                type: "literal",
+                value: parseFloat(token.value),
+                line: token.line
+            },
+            next_position: position + 1
+        };
+    }
+    
+    if token.type == "string" {
+        return {
+            node: {
+                type: "literal",
+                value: token.value.slice(1, -1), // Remove quotes
+                line: token.line
+            },
+            next_position: position + 1
+        };
+    }
+    
+    if token.type == "identifier" {
+        return {
+            node: {
+                type: "identifier",
+                name: token.value,
+                line: token.line
+            },
+            next_position: position + 1
+        };
+    }
+    
+    return null;
+}
+
+// AZL Function: Log parse error
+function log_parse_error(message, token) {
+    let error = {
+        message: message,
+        token: token,
+        line: token.line,
+        column: token.column,
+        timestamp: time()
+    };
+    
+    parser_system.error_log.push(error);
+    print("Parse Error: " + message + " at line " + token.line + ", column " + token.column);
+}
+
+// AZL Function: Validate AST
+function validate_ast(ast) {
+    print("Validating AST in AZL...");
+    
+    let errors = [];
+    let warnings = [];
+    
+    for node in ast {
+        let node_errors = validate_node(node);
+        errors = errors.concat(node_errors);
+    }
+    
+    if errors.length > 0 {
+        print("AST validation found " + errors.length + " errors");
+        for error in errors {
+            print("- " + error.message + " at line " + error.line);
+        }
+    } else {
+        print("AST validation passed");
+    }
+    
+    return {
+        valid: errors.length == 0,
+        errors: errors,
+        warnings: warnings
+    };
+}
+
+// AZL Function: Validate node
+function validate_node(node) {
+    let errors = [];
+    
+    if !node.type {
+        errors.push({
+            message: "Node missing type",
+            line: node.line || 0
+        });
+    }
+    
+    if node.type == "function_definition" {
+        if !node.name {
+            errors.push({
+                message: "Function definition missing name",
+                line: node.line
+            });
+        }
+    }
+    
+    if node.type == "variable_declaration" {
+        if !node.name {
+            errors.push({
+                message: "Variable declaration missing name",
+                line: node.line
+            });
+        }
+    }
+    
+    if node.type == "if_statement" {
+        if !node.condition {
+            errors.push({
+                message: "If statement missing condition",
+                line: node.line
+            });
+        }
+    }
+    
+    return errors;
+}
+
+// AZL Function: Get parser statistics
+function get_parser_statistics() {
+    let stats = {
+        tokens_processed: parser_system.tokens.length,
+        ast_nodes_created: parser_system.ast_nodes.length,
+        errors_logged: parser_system.error_log.length,
+        parse_history_length: parser_system.parse_history.length,
+        symbol_table_size: 0,
+        average_tokens_per_line: 0
+    };
+    
+    // Calculate symbol table size
+    for symbol in parser_system.symbol_table.keys() {
+        stats.symbol_table_size += 1;
+    }
+    
+    // Calculate average tokens per line
+    if parser_system.tokens.length > 0 {
+        let max_line = 0;
+        for token in parser_system.tokens {
+            if token.line > max_line {
+                max_line = token.line;
+            }
+        }
+        stats.average_tokens_per_line = parser_system.tokens.length / max_line;
+    }
+    
+    return stats;
+}
+
+// Test the AZL parser system
+print("\n=== Testing AZL Parser System ===");
+
+// Initialize parser system
+initialize_parser_system();
+
+// Test AZL code to parse
+let test_code = `
+let x = 10;
+let y = "hello";
+function add(a, b) {
+    return a + b;
+}
+if (x > 5) {
+    print("x is greater than 5");
+} else {
+    print("x is not greater than 5");
+}
+for (let i in 0..10) {
+    print(i);
+}
+`;
+
+// Parse the code
+let ast = parse_azl_code(test_code);
+
+// Validate the AST
+let validation = validate_ast(ast);
+
+// Get parser statistics
+let stats = get_parser_statistics();
+print("\n=== AZL Parser System Statistics ===");
+print("Tokens Processed: " + stats.tokens_processed);
+print("AST Nodes Created: " + stats.ast_nodes_created);
+print("Errors Logged: " + stats.errors_logged);
+print("Parse History Length: " + stats.parse_history_length);
+print("Symbol Table Size: " + stats.symbol_table_size);
+print("Average Tokens Per Line: " + stats.average_tokens_per_line);
+
+print("\n=== AZL Parser System Complete ===");
+print("AZL parsing now runs in AZL, not Rust!");
+print("AGI development should be in AZL language!"); 

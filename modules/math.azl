@@ -1,0 +1,36 @@
+module math {
+    pub const PI = 3.141592653589793;
+    
+    pub fn sin(x) {
+        // For now, just return a simple approximation
+        if x == 0 {
+            return 0;
+        } else if x == PI / 2 {
+            return 1;
+        } else {
+            return 0.5; // Placeholder
+        }
+    }
+    
+    pub fn cos(x) {
+        // Simple approximation
+        if x == 0 {
+            return 1;
+        } else if x == PI / 2 {
+            return 0;
+        } else {
+            return 0.5; // Placeholder
+        }
+    }
+    
+    // Private function
+    fn clamp(x, min, max) {
+        if x < min {
+            return min;
+        } else if x > max {
+            return max;
+        } else {
+            return x;
+        }
+    }
+} 

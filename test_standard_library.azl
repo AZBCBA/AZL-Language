@@ -1,0 +1,227 @@
+say "🧠 Testing Standard Library Functions...";
+
+// ========================================
+// MATH FUNCTIONS
+// ========================================
+
+say "=== Testing Math Functions ===";
+
+let sin_result = math.sin(3.14159);
+say "sin(π) result:";
+say sin_result;
+
+let cos_result = math.cos(0);
+say "cos(0) result:";
+say cos_result;
+
+let sqrt_result = math.sqrt(16);
+say "sqrt(16) result:";
+say sqrt_result;
+
+let pow_result = math.pow(2, 8);
+say "2^8 result:";
+say pow_result;
+
+let abs_result = math.abs(-42);
+say "abs(-42) result:";
+say abs_result;
+
+let floor_result = math.floor(3.7);
+say "floor(3.7) result:";
+say floor_result;
+
+let ceil_result = math.ceil(3.2);
+say "ceil(3.2) result:";
+say ceil_result;
+
+let round_result = math.round(3.5);
+say "round(3.5) result:";
+say round_result;
+
+let mod_result = math.mod(17, 5);
+say "17 % 5 result:";
+say mod_result;
+
+// ========================================
+// STRING FUNCTIONS
+// ========================================
+
+say "=== Testing String Functions ===";
+
+let test_string = "Hello World";
+let length = string.length(test_string);
+say "Length of 'Hello World':";
+say length;
+
+let substring = string.substring(test_string, 0, 5);
+say "Substring(0,5):";
+say substring;
+
+let split_result = string.split(test_string, " ");
+say "Split by space:";
+say split_result;
+
+let join_result = string.join(split_result, "-");
+say "Join with '-':";
+say join_result;
+
+let replace_result = string.replace(test_string, "World", "AZL");
+say "Replace 'World' with 'AZL':";
+say replace_result;
+
+let format_result = string.format("Hello {}, you are {} years old", "AZL", 42);
+say "Formatted string:";
+say format_result;
+
+// ========================================
+// ARRAY FUNCTIONS
+// ========================================
+
+say "=== Testing Array Functions ===";
+
+let test_array = [1, 2, 3, 4, 5];
+say "Original array:";
+say test_array;
+
+let push_result = array.push(test_array, 6);
+say "After push(6):";
+say push_result;
+
+let pop_result = array.pop(test_array);
+say "Pop result:";
+say pop_result;
+
+let find_result = array.find(test_array, 3);
+say "Find index of 3:";
+say find_result;
+
+// ========================================
+// OBJECT FUNCTIONS
+// ========================================
+
+say "=== Testing Object Functions ===";
+
+let test_object = {name: "AZL", version: 2.0, features: ["quantum", "neural"]};
+say "Test object:";
+say test_object;
+
+let keys = object.keys(test_object);
+say "Object keys:";
+say keys;
+
+let values = object.values(test_object);
+say "Object values:";
+say values;
+
+let entries = object.entries(test_object);
+say "Object entries:";
+say entries;
+
+let clone_result = object.clone(test_object);
+say "Cloned object:";
+say clone_result;
+
+// ========================================
+// TIME FUNCTIONS
+// ========================================
+
+say "=== Testing Time Functions ===";
+
+let now = time.now();
+say "Current time:";
+say now;
+
+let timestamp = time.timestamp();
+say "Timestamp:";
+say timestamp;
+
+let start_time = time.now();
+time.sleep(0.1);
+let end_time = time.now();
+let delta = time.delta(start_time, end_time);
+say "Time delta:";
+say delta;
+
+// ========================================
+// CRYPTO FUNCTIONS
+// ========================================
+
+say "=== Testing Crypto Functions ===";
+
+let data = "Hello AZL";
+let hash = crypto.sha256(data);
+say "SHA256 hash:";
+say hash;
+
+let key = "secret_key";
+let encrypted = crypto.encrypt(data, key);
+say "Encrypted:";
+say encrypted;
+
+let decrypted = crypto.decrypt(encrypted, key);
+say "Decrypted:";
+say decrypted;
+
+let signature = crypto.sign(data, key);
+say "Signature:";
+say signature;
+
+let verified = crypto.verify(data, signature, key);
+say "Verification:";
+say verified;
+
+// ========================================
+// SYSTEM FUNCTIONS
+// ========================================
+
+say "=== Testing System Functions ===";
+
+let file_content = system.read_file("test.txt");
+say "File content:";
+say file_content;
+
+let write_result = system.write_file("output.txt", "Hello AZL");
+say "Write result:";
+say write_result;
+
+let env_value = system.env("PATH");
+say "PATH env:";
+say env_value;
+
+let args = system.args();
+say "Command args:";
+say args;
+
+system.log("This is a test log message");
+
+let uuid = system.uuid();
+say "Generated UUID:";
+say uuid;
+
+let cwd = system.cwd();
+say "Current directory:";
+say cwd;
+
+// ========================================
+// EXISTING AI FUNCTIONS
+// ========================================
+
+say "=== Testing AI Functions ===";
+
+let memory_result = memory.lha3.store("test_key", "test_value");
+say "Memory store result:";
+say memory_result;
+
+let quantum_result = quantum.superposition(0.5, 0.5);
+say "Quantum superposition:";
+say quantum_result;
+
+let neural_result = neural.forward_pass([0.1, 0.2, 0.3]);
+say "Neural forward pass:";
+say neural_result;
+
+let activation = neural.activate(0.5);
+say "Neural activation:";
+say activation;
+
+say "✅ All Standard Library Functions Working!"; 

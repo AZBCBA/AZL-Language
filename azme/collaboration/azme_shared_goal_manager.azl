@@ -1,0 +1,442 @@
+# AZME Shared Goal Manager
+# Consensus and shared goals
+
+component ::azme.shared_goal_manager {
+  init {
+    set ::shared_goals = []
+    set ::goal_proposals = []
+    set ::goal_consensus = {}
+    set ::goal_voting = {}
+    set ::goal_execution = {}
+    set ::manager_settings = {
+      consensus_threshold: 0.75,
+      voting_timeout: 60,
+      max_concurrent_goals: 10,
+      goal_priority_levels: ["critical", "high", "medium", "low"],
+      quantum_enhanced: true
+    }
+    set ::goal_count = 0
+    set ::successful_goals = 0
+    set ::failed_goals = 0
+  }
+
+  behavior {
+    on propose_shared_goal {
+      set ::proposal_request = $1
+      set ::goal = ::proposal_request.goal
+      set ::peers = ::proposal_request.peers
+      
+      say "🎯 Proposing shared goal"
+      say "📋 Goal type: " + ::goal.type
+      say "👥 Peers: " + ::peers.length
+      
+      # Create goal proposal
+      set ::proposal_id = "proposal_" + ::goal_count
+      set ::goal_proposal = {
+        id: ::proposal_id,
+        goal: ::goal,
+        proposer: "azme_primary",
+        peers: ::peers,
+        status: "proposed",
+        created_at: ::internal.now(),
+        votes: {},
+        consensus_reached: false,
+        quantum_enhanced: true
+      }
+      
+      set ::goal_proposals = ::goal_proposals.push(::goal_proposal)
+      set ::goal_count = ::goal_count + 1
+      
+      # Send goal proposal to all peers
+      loop for ::peer in ::peers {
+        set ::message = {
+          type: "goal_proposal",
+          goal: ::goal,
+          proposal_id: ::proposal_id,
+          sender_id: "azme_primary",
+          timestamp: ::internal.now(),
+          quantum_enhanced: true
+        }
+        
+        emit azme.send_message with {
+          peer_id: ::peer,
+          message: ::message
+        }
+      }
+      
+      emit azme.shared_goal_proposed with {
+        proposal: ::goal_proposal
+      }
+    }
+
+    on process_goal_proposal {
+      set ::proposal_request = $1
+      set ::message = ::proposal_request.message
+      
+      say "🎯 Processing goal proposal"
+      
+      set ::proposed_goal = ::message.goal
+      set ::proposal_id = ::message.proposal_id
+      set ::sender_id = ::message.sender_id
+      
+      # Evaluate goal proposal
+      set ::evaluation = evaluate_goal_proposal(::proposed_goal)
+      
+      if ::evaluation.acceptable {
+        # Vote in favor
+        vote_on_goal(::proposal_id, "accept", ::evaluation.confidence)
+        
+        emit azme.goal_proposal_accepted with {
+          proposal_id: ::proposal_id,
+          goal: ::proposed_goal,
+          sender_id: ::sender_id,
+          evaluation: ::evaluation
+        }
+      } else {
+        # Vote against
+        vote_on_goal(::proposal_id, "reject", ::evaluation.confidence)
+        
+        emit azme.goal_proposal_rejected with {
+          proposal_id: ::proposal_id,
+          goal: ::proposed_goal,
+          sender_id: ::sender_id,
+          reason: ::evaluation.reason
+        }
+      }
+    }
+
+    on evaluate_goal_proposal {
+      set ::evaluation_request = $1
+      set ::proposed_goal = ::evaluation_request.proposed_goal
+      
+      say "🔍 Evaluating goal proposal"
+      
+      set ::evaluation = {
+        acceptable: true,
+        reason: "goal_accepted",
+        confidence: 0.8,
+        quantum_enhanced: true
+      }
+      
+      # Check goal permissions
+      set ::allowed_goal_types = [
+        "system_maintenance",
+        "data_analysis",
+        "vision_processing",
+        "skill_training",
+        "goal_planning",
+        "collaborative_task"
+      ]
+      
+      if not ::proposed_goal.type in ::allowed_goal_types {
+        set ::evaluation.acceptable = false
+        set ::evaluation.reason = "goal_type_not_permitted"
+        set ::evaluation.confidence = 0.0
+      }
+      
+      # Check goal complexity
+      if ::proposed_goal.complexity and ::proposed_goal.complexity > 10 {
+        set ::evaluation.acceptable = false
+        set ::evaluation.reason = "goal_too_complex"
+        set ::evaluation.confidence = 0.2
+      }
+      
+      # Check resource requirements
+      if ::proposed_goal.resources and ::proposed_goal.resources.memory > 80 {
+        set ::evaluation.acceptable = false
+        set ::evaluation.reason = "insufficient_resources"
+        set ::evaluation.confidence = 0.3
+      }
+      
+      emit azme.goal_evaluation_complete with {
+        proposed_goal: ::proposed_goal,
+        evaluation: ::evaluation
+      }
+    }
+
+    on vote_on_goal {
+      set ::vote_request = $1
+      set ::proposal_id = ::vote_request.proposal_id
+      set ::vote = ::vote_request.vote
+      set ::confidence = ::vote_request.confidence
+      
+      say "🗳️ Voting on goal: " + ::proposal_id
+      
+      # Find proposal
+      set ::proposal_found = false
+      loop for ::proposal in ::goal_proposals {
+        if ::proposal.id == ::proposal_id {
+          set ::proposal_found = true
+          
+          # Add vote
+          set ::proposal.votes["azme_primary"] = {
+            vote: ::vote,
+            confidence: ::confidence,
+            timestamp: ::internal.now(),
+            quantum_enhanced: true
+          }
+          
+          # Check consensus
+          check_goal_consensus(::proposal)
+          break
+        }
+      }
+      
+      if not ::proposal_found {
+        emit azme.goal_vote_failed with {
+          proposal_id: ::proposal_id,
+          reason: "proposal_not_found"
+        }
+      }
+    }
+
+    on check_goal_consensus {
+      set ::consensus_request = $1
+      set ::proposal = ::consensus_request.proposal
+      
+      say "🤝 Checking goal consensus"
+      
+      set ::total_votes = ::proposal.votes.keys().length
+      set ::accept_votes = 0
+      set ::total_confidence = 0
+      
+      loop for ::voter in ::proposal.votes.keys() {
+        set ::vote_data = ::proposal.votes[::voter]
+        set ::total_confidence = ::total_confidence + ::vote_data.confidence
+        
+        if ::vote_data.vote == "accept" {
+          set ::accept_votes = ::accept_votes + 1
+        }
+      }
+      
+      set ::acceptance_rate = ::accept_votes / ::total_votes
+      set ::average_confidence = ::total_confidence / ::total_votes
+      
+      if ::acceptance_rate >= ::manager_settings.consensus_threshold {
+        set ::proposal.consensus_reached = true
+        set ::proposal.status = "accepted"
+        
+        # Add to shared goals
+        set ::shared_goals = ::shared_goals.push(::proposal.goal)
+        
+        # Create consensus record
+        set ::goal_consensus[::proposal.id] = {
+          proposal_id: ::proposal.id,
+          goal: ::proposal.goal,
+          acceptance_rate: ::acceptance_rate,
+          average_confidence: ::average_confidence,
+          consensus_reached_at: ::internal.now(),
+          quantum_enhanced: true
+        }
+        
+        emit azme.goal_consensus_reached with {
+          proposal: ::proposal,
+          acceptance_rate: ::acceptance_rate,
+          average_confidence: ::average_confidence
+        }
+      } else {
+        emit azme.goal_consensus_failed with {
+          proposal: ::proposal,
+          acceptance_rate: ::acceptance_rate,
+          required_threshold: ::manager_settings.consensus_threshold
+        }
+      }
+    }
+
+    on accept_shared_goal {
+      set ::accept_request = $1
+      set ::goal_id = ::accept_request.goal_id
+      
+      say "✅ Accepting shared goal: " + ::goal_id
+      
+      # Find goal in shared goals
+      set ::goal_found = false
+      loop for ::goal in ::shared_goals {
+        if ::goal.id == ::goal_id {
+          set ::goal_found = true
+          set ::goal.status = "accepted"
+          set ::goal.accepted_at = ::internal.now()
+          
+          # Initialize execution tracking
+          set ::goal_execution[::goal_id] = {
+            goal_id: ::goal_id,
+            status: "pending",
+            started_at: null,
+            completed_at: null,
+            progress: 0,
+            quantum_enhanced: true
+          }
+          
+          set ::successful_goals = ::successful_goals + 1
+          break
+        }
+      }
+      
+      if ::goal_found {
+        emit azme.shared_goal_accepted with {
+          goal_id: ::goal_id
+        }
+      } else {
+        emit azme.shared_goal_acceptance_failed with {
+          goal_id: ::goal_id,
+          reason: "goal_not_found"
+        }
+      }
+    }
+
+    on get_shared_goals {
+      set ::goals_request = $1
+      
+      say "📋 Getting shared goals"
+      
+      set ::active_goals = []
+      set ::completed_goals = []
+      
+      loop for ::goal in ::shared_goals {
+        if ::goal.status == "active" or ::goal.status == "pending" {
+          set ::active_goals = ::active_goals.push(::goal)
+        } else if ::goal.status == "completed" {
+          set ::completed_goals = ::completed_goals.push(::goal)
+        }
+      }
+      
+      set ::goals_summary = {
+        total_goals: ::shared_goals.length,
+        active_goals: ::active_goals.length,
+        completed_goals: ::completed_goals.length,
+        successful_goals: ::successful_goals,
+        failed_goals: ::failed_goals,
+        quantum_enhanced: true
+      }
+      
+      emit azme.shared_goals_retrieved with {
+        goals_summary: ::goals_summary,
+        active_goals: ::active_goals,
+        completed_goals: ::completed_goals
+      }
+    }
+
+    on execute_shared_goal {
+      set ::execution_request = $1
+      set ::goal_id = ::execution_request.goal_id
+      
+      say "🚀 Executing shared goal: " + ::goal_id
+      
+      # Find goal
+      set ::goal_found = false
+      loop for ::goal in ::shared_goals {
+        if ::goal.id == ::goal_id {
+          set ::goal_found = true
+          
+          # Update execution status
+          if ::goal_id in ::goal_execution {
+            set ::execution = ::goal_execution[::goal_id]
+            set ::execution.status = "executing"
+            set ::execution.started_at = ::internal.now()
+            set ::goal_execution[::goal_id] = ::execution
+          }
+          
+          # Simulate goal execution
+          set ::execution_result = {
+            success: true,
+            goal_id: ::goal_id,
+            execution_time: ::internal.random() * 10 + 5,
+            progress: 100,
+            quantum_enhanced: true
+          }
+          
+          # Update goal status
+          set ::goal.status = "completed"
+          set ::goal.completed_at = ::internal.now()
+          set ::goal.result = ::execution_result
+          
+          # Update execution tracking
+          if ::goal_id in ::goal_execution {
+            set ::execution = ::goal_execution[::goal_id]
+            set ::execution.status = "completed"
+            set ::execution.completed_at = ::internal.now()
+            set ::execution.progress = 100
+            set ::goal_execution[::goal_id] = ::execution
+          }
+          
+          emit azme.shared_goal_executed with {
+            goal_id: ::goal_id,
+            result: ::execution_result
+          }
+          break
+        }
+      }
+      
+      if not ::goal_found {
+        emit azme.shared_goal_execution_failed with {
+          goal_id: ::goal_id,
+          reason: "goal_not_found"
+        }
+      }
+    }
+
+    on get_goal_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Getting goal statistics"
+      
+      set ::goal_stats = {
+        total_goals: ::shared_goals.length,
+        successful_goals: ::successful_goals,
+        failed_goals: ::failed_goals,
+        active_proposals: ::goal_proposals.length,
+        consensus_count: ::goal_consensus.keys().length,
+        execution_count: ::goal_execution.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.goal_statistics_retrieved with {
+        statistics: ::goal_stats
+      }
+    }
+
+    on cleanup_completed_goals {
+      set ::cleanup_request = $1
+      
+      say "🧹 Cleaning up completed goals"
+      
+      set ::removed_goals = []
+      set ::updated_goals = []
+      
+      loop for ::goal in ::shared_goals {
+        if ::goal.status == "completed" {
+          # Remove from shared goals
+          set ::removed_goals = ::removed_goals.push(::goal)
+        } else {
+          set ::updated_goals = ::updated_goals.push(::goal)
+        }
+      }
+      
+      set ::shared_goals = ::updated_goals
+      
+      emit azme.completed_goals_cleaned with {
+        removed_goals: ::removed_goals,
+        total_removed: ::removed_goals.length
+      }
+    }
+
+    # Shared goal manager monitoring
+    on azme.monitor_shared_goal_manager {
+      set ::monitor_request = $1
+      
+      set ::manager_metrics = {
+        total_goals: ::shared_goals.length,
+        successful_goals: ::successful_goals,
+        failed_goals: ::failed_goals,
+        active_proposals: ::goal_proposals.length,
+        consensus_count: ::goal_consensus.keys().length,
+        execution_count: ::goal_execution.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.shared_goal_manager_metrics with {
+        metrics: ::manager_metrics
+      }
+    }
+  }
+} 

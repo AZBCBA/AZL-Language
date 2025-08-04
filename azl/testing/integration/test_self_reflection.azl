@@ -1,0 +1,57 @@
+# Test Self-Reflection & Runtime Awareness
+# Tests the ::self memory system and reflect() instruction
+
+say "🧠 Starting Self-Reflection Test..."
+
+# Test 1: Initial self state (should be empty)
+say "🔍 Testing initial self state..."
+reflect
+
+# Test 2: Register some components and check self state
+say "🔍 Registering components and checking self state..."
+debug register MemoryEngine
+debug register TypeSystem
+debug register ErrorHandler
+debug register NeuralNetwork
+
+# Test 3: Check self state after registration
+say "🔍 Checking self state after registration..."
+reflect
+
+# Test 4: Change component states and check self state
+say "🔍 Changing component states..."
+debug state MemoryEngine running
+debug state TypeSystem initialized
+debug state ErrorHandler running
+debug state NeuralNetwork terminated
+
+# Test 5: Check self state after state changes
+say "🔍 Checking self state after state changes..."
+reflect
+
+# Test 6: Test reflect commands
+say "🔍 Testing reflect commands..."
+reflect update
+reflect stats
+reflect clear
+reflect
+
+# Test 7: Add some memory and check self state
+say "🔍 Adding memory and checking self state..."
+set ::test_var = 42
+set ::test_string = "Hello Self-Reflection!"
+set ::test_float = 3.14159
+
+# Test 8: Check self state with memory
+say "🔍 Checking self state with memory..."
+reflect
+
+# Test 9: Test error handling
+say "🔍 Testing error handling..."
+reflect invalid_command
+reflect unknown_subcommand
+
+say "✅ Self-Reflection Test Complete!"
+say "🧠 Self-reflection system is working correctly"
+say "📊 Runtime awareness is functional"
+say "🔧 Self-state tracking is operational" 

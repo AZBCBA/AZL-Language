@@ -1,0 +1,24 @@
+component ::test.single.line.nested {
+  init {
+    # Test single-line nested object
+    set ::single_line_nested = {outer: {inner: "value"}}
+    
+    # Test single-line complex nested object
+    set ::single_line_complex = {0: {0: {real: 0.707, imag: 0.0}, 1: {real: 0.707, imag: 0.0}}, 1: {0: {real: 0.707, imag: 0.0}, 1: {real: -0.707, imag: 0.0}}}
+    
+    # Test with variables
+    set ::var1 = 0.707
+    set ::var2 = 0.0
+    set ::single_line_variable = {key1: {nested: ::var1}, key2: {nested: ::var2}}
+  }
+
+  behavior {
+    on start {
+      emit test.single_line_nested_test
+    }
+
+    on test.single_line_nested_test {
+      emit test.single_line_nested.completed
+    }
+  }
+} 

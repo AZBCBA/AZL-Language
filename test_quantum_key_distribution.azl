@@ -1,0 +1,264 @@
+component ::test.quantum_key_distribution {
+  init {
+    set ::test_results = {}
+  }
+
+  behavior {
+    on start {
+      # Test complete BB84 QKD protocol
+      emit processor.run_bb84_qkd
+      
+      # Test individual steps
+      emit processor.alice_prepare_qubits
+      emit processor.bob_measure_qubits
+      emit processor.reconcile_bases
+      emit processor.extract_shared_key
+      emit processor.detect_eavesdropping
+      emit processor.verify_qkd_key
+    }
+
+    on qkd.alice_prepared {
+      set ::alice_info = $1
+      set ::test_results.alice_preparation = {
+        success: 1,
+        bits: ::alice_info.bits,
+        bases: ::alice_info.bases
+      }
+      emit test.qkd_alice_preparation.completed
+    }
+
+    on qkd.bob_measured {
+      set ::bob_info = $1
+      set ::test_results.bob_measurement = {
+        bases: ::bob_info.bases,
+        measurements: ::bob_info.measurements
+      }
+      emit test.qkd_bob_measurement.completed
+    }
+
+    on qkd.basis_reconciled {
+      set ::reconciliation_info = $1
+      set ::test_results.basis_reconciliation = {
+        match_indices: ::reconciliation_info.match_indices,
+        match_count: ::reconciliation_info.match_count
+      }
+      emit test.qkd_basis_reconciliation.completed
+    }
+
+    on qkd.key_extracted {
+      set ::key_info = $1
+      set ::test_results.key_extraction = {
+        raw_key: ::key_info.raw_key,
+        key_length: ::key_info.key_length
+      }
+      emit test.qkd_key_extraction.completed
+    }
+
+    on qkd.eavesdrop_check {
+      set ::eavesdrop_info = $1
+      set ::test_results.eavesdropping_detection = {
+        sample_match: ::eavesdrop_info.sample_match,
+        qber: ::eavesdrop_info.qber,
+        sample_size: ::eavesdrop_info.sample_size,
+        mismatch_count: ::eavesdrop_info.mismatch_count
+      }
+      emit test.qkd_eavesdropping_detection.completed
+    }
+
+    on qkd.verified {
+      set ::verification_info = $1
+      set ::test_results.qkd_verification = {
+        success: ::verification_info.success,
+        final_key: ::verification_info.final_key,
+        key_length: ::verification_info.key_length,
+        qber: ::verification_info.qber
+      }
+      emit test.qkd_verification.completed
+    }
+
+    on qkd.complete {
+      set ::test_results.qkd_complete = 1
+      emit test.qkd.completed with ::test_results
+    }
+  }
+}
+
+# Test entangled QKD protocol (E91)
+component ::test.entangled_qkd {
+  behavior {
+    on start {
+      # Test entangled QKD protocol
+      emit test.entangled_qkd_operation
+    }
+
+    on test.entangled_qkd_operation {
+      emit processor.run_entangled_qkd
+    }
+
+    on qkd.entangled_protocol {
+      set ::entangled_info = $1
+      set ::test_results.entangled_qkd = {
+        epr_pairs: ::entangled_info.epr_pairs,
+        alice_measurements: ::entangled_info.alice_measurements,
+        bob_measurements: ::entangled_info.bob_measurements
+      }
+      emit test.entangled_qkd.completed
+    }
+  }
+}
+
+# Test privacy amplification
+component ::test.privacy_amplification {
+  behavior {
+    on start {
+      # Test privacy amplification
+      emit test.privacy_amplification_operation
+    }
+
+    on test.privacy_amplification_operation {
+      emit processor.privacy_amplification
+    }
+
+    on qkd.privacy_amplified {
+      set ::amplification_info = $1
+      set ::test_results.privacy_amplification = {
+        original_key: ::amplification_info.original_key,
+        amplified_key: ::amplification_info.amplified_key
+      }
+      emit test.privacy_amplification.completed
+    }
+  }
+}
+
+# Test authentication
+component ::test.qkd_authentication {
+  behavior {
+    on start {
+      # Test QKD authentication
+      emit test.qkd_authentication_operation
+    }
+
+    on test.qkd_authentication_operation {
+      emit processor.authenticate_qkd
+    }
+
+    on qkd.authenticated {
+      set ::auth_info = $1
+      set ::test_results.qkd_authentication = {
+        message: ::auth_info.message,
+        mac_result: ::auth_info.mac_result,
+        authenticated: ::auth_info.authenticated
+      }
+      emit test.qkd_authentication.completed
+    }
+  }
+}
+
+# Test QBER calculation
+component ::test.qber_calculation {
+  behavior {
+    on start {
+      # Test QBER calculation
+      emit test.qber_calculation_operation
+    }
+
+    on test.qber_calculation_operation {
+      emit processor.calculate_qber
+    }
+
+    on qkd.qber_calculated {
+      set ::qber_info = $1
+      set ::test_results.qber_calculation = {
+        total_bits: ::qber_info.total_bits,
+        error_bits: ::qber_info.error_bits,
+        qber: ::qber_info.qber
+      }
+      emit test.qber_calculation.completed
+    }
+  }
+}
+
+# Test different QKD scenarios
+component ::test.qkd_scenarios {
+  behavior {
+    on start {
+      # Test different QKD scenarios
+      emit test.qkd_no_eavesdropping
+      emit test.qkd_with_eavesdropping
+      emit test.qkd_high_qber
+    }
+
+    on test.qkd_no_eavesdropping {
+      # Test QKD with no eavesdropping
+      emit processor.run_bb84_qkd
+    }
+
+    on test.qkd_with_eavesdropping {
+      # Test QKD with eavesdropping (simulated)
+      emit processor.run_bb84_qkd
+    }
+
+    on test.qkd_high_qber {
+      # Test QKD with high QBER
+      emit processor.run_bb84_qkd
+    }
+  }
+}
+
+# Test QKD performance and security
+component ::test.qkd_performance {
+  behavior {
+    on start {
+      # Test QKD performance metrics
+      emit test.qkd_security_advantages
+      emit test.quantum_cryptography
+      emit test.unbreakable_encryption
+    }
+
+    on test.qkd_security_advantages {
+      set ::test_results.qkd_security = {
+        physics_based_security: true,
+        eavesdropping_detection: true,
+        unbreakable_keys: true,
+        quantum_advantage: true
+      }
+      emit test.qkd_security.completed
+    }
+
+    on test.quantum_cryptography {
+      set ::test_results.quantum_cryptography = {
+        bb84_protocol: true,
+        e91_protocol: true,
+        privacy_amplification: true,
+        authentication: true
+      }
+      emit test.quantum_cryptography.completed
+    }
+
+    on test.unbreakable_encryption {
+      set ::test_results.unbreakable_encryption = {
+        quantum_keys: true,
+        eavesdropping_detection: true,
+        secure_communication: true,
+        quantum_internet: true
+      }
+      emit test.unbreakable_encryption.completed
+    }
+  }
+}
+
+# Main test runner
+component ::test.qkd_runner {
+  behavior {
+    on start {
+      # Run all QKD tests
+      emit test.quantum_key_distribution.start
+      emit test.entangled_qkd.start
+      emit test.privacy_amplification.start
+      emit test.qkd_authentication.start
+      emit test.qber_calculation.start
+      emit test.qkd_scenarios.start
+      emit test.qkd_performance.start
+    }
+  }
+} 

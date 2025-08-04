@@ -1,0 +1,393 @@
+# AZME Skill Trainer
+# Core reinforcement engine
+
+component ::azme.skill_trainer {
+  init {
+    # Core state variables
+    set ::skill_registry = {
+      "code_generation.optimized_path_3": {
+        path: ["intent → model:deepseek → plugin:summarizer → memory:save"],
+        reward_score: 12,
+        penalty_score: 1,
+        version: 3,
+        task_type: "code_generation",
+        success_rate: 0.92,
+        last_used: ::internal.now(),
+        quantum_enhanced: true
+      },
+      "text_processing.efficient_summary": {
+        path: ["intent → model:mistral → plugin:summarizer → output:formatted"],
+        reward_score: 8,
+        penalty_score: 2,
+        version: 1,
+        task_type: "text_processing",
+        success_rate: 0.85,
+        last_used: ::internal.now(),
+        quantum_enhanced: true
+      },
+      "data_analysis.insight_extraction": {
+        path: ["intent → model:azme_lang → plugin:data_analyzer → memory:store"],
+        reward_score: 15,
+        penalty_score: 0,
+        version: 2,
+        task_type: "data_analysis",
+        success_rate: 0.95,
+        last_used: ::internal.now(),
+        quantum_enhanced: true
+      }
+    }
+    set ::skill_attempt_log = []
+    set ::reward_map = {
+      code_generation: {
+        "intent → model:deepseek → plugin:summarizer → memory:save": 12,
+        "intent → model:mistral → plugin:summarizer": 8,
+        "intent → model:azme_lang → direct_execution": 5
+      },
+      text_processing: {
+        "intent → model:mistral → plugin:summarizer → output:formatted": 8,
+        "intent → model:deepseek → plugin:translate_ar": 6,
+        "intent → model:azme_lang → internal_processing": 4
+      },
+      data_analysis: {
+        "intent → model:azme_lang → plugin:data_analyzer → memory:store": 15,
+        "intent → model:mistral → plugin:data_analyzer": 10,
+        "intent → model:deepseek → plugin:data_analyzer": 7
+      }
+    }
+    set ::penalty_map = {
+      code_generation: {
+        "intent → model:azme_lang → direct_execution": 3,
+        "intent → model:mistral → plugin:summarizer": 1
+      },
+      text_processing: {
+        "intent → model:azme_lang → internal_processing": 2,
+        "intent → model:deepseek → plugin:translate_ar": 1
+      },
+      data_analysis: {
+        "intent → model:deepseek → plugin:data_analyzer": 2,
+        "intent → model:mistral → plugin:data_analyzer": 1
+      }
+    }
+    set ::skill_versions = {
+      "code_generation.optimized_path": {
+        1: { reward_score: 8, penalty_score: 2, success_rate: 0.8 },
+        2: { reward_score: 10, penalty_score: 1, success_rate: 0.85 },
+        3: { reward_score: 12, penalty_score: 1, success_rate: 0.92 }
+      },
+      "text_processing.efficient_summary": {
+        1: { reward_score: 8, penalty_score: 2, success_rate: 0.85 }
+      },
+      "data_analysis.insight_extraction": {
+        1: { reward_score: 12, penalty_score: 1, success_rate: 0.88 },
+        2: { reward_score: 15, penalty_score: 0, success_rate: 0.95 }
+      }
+    }
+    set ::preferred_skill_map = {
+      code_generation: "code_generation.optimized_path_3",
+      text_processing: "text_processing.efficient_summary",
+      data_analysis: "data_analysis.insight_extraction"
+    }
+    set ::training_count = 0
+    set ::skills_learned = 0
+    set ::skills_upgraded = 0
+    set ::skills_retired = 0
+  }
+
+  behavior {
+    on azme.task_completed {
+      set ::result = $1
+      set ::task = ::result.task
+      set ::success = ::result.success
+      set ::execution_path = ::result.execution_path
+      
+      say "🎯 Skill Trainer: Processing task completion"
+      say "📋 Task: " + ::task
+      say "✅ Success: " + ::success
+      say "🛤️ Path: " + ::execution_path
+      
+      # Log the attempt
+      set ::attempt_entry = {
+        id: "attempt_" + ::training_count,
+        task: ::task,
+        success: ::success,
+        execution_path: ::execution_path,
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      set ::skill_attempt_log = ::skill_attempt_log.push(::attempt_entry)
+      set ::training_count = ::training_count + 1
+      
+      if ::success {
+        increment_reward(::task, ::execution_path)
+      } else {
+        increment_penalty(::task, ::execution_path)
+      }
+      
+      update_skill_scores(::task)
+      
+      emit azme.skill_training_complete with {
+        task: ::task,
+        success: ::success,
+        execution_path: ::execution_path,
+        attempt_entry: ::attempt_entry
+      }
+    }
+
+    on increment_reward {
+      set ::reward_request = $1
+      set ::task = ::reward_request.task
+      set ::path = ::reward_request.path
+      
+      say "🎉 Incrementing reward for task: " + ::task
+      
+      if not ::task in ::reward_map {
+        set ::reward_map[::task] = {}
+      }
+      
+      if not ::path in ::reward_map[::task] {
+        set ::reward_map[::task][::path] = 0
+      }
+      
+      set ::reward_map[::task][::path] = ::reward_map[::task][::path] + 1
+      
+      emit azme.reward_incremented with {
+        task: ::task,
+        path: ::path,
+        new_score: ::reward_map[::task][::path]
+      }
+    }
+
+    on increment_penalty {
+      set ::penalty_request = $1
+      set ::task = ::penalty_request.task
+      set ::path = ::penalty_request.path
+      
+      say "❌ Incrementing penalty for task: " + ::task
+      
+      if not ::task in ::penalty_map {
+        set ::penalty_map[::task] = {}
+      }
+      
+      if not ::path in ::penalty_map[::task] {
+        set ::penalty_map[::task][::path] = 0
+      }
+      
+      set ::penalty_map[::task][::path] = ::penalty_map[::task][::path] + 1
+      
+      emit azme.penalty_incremented with {
+        task: ::task,
+        path: ::path,
+        new_score: ::penalty_map[::task][::path]
+      }
+    }
+
+    on update_skill_scores {
+      set ::update_request = $1
+      set ::task = ::update_request.task
+      
+      say "📊 Updating skill scores for task: " + ::task
+      
+      set ::candidates = []
+      set ::best_path = null
+      set ::best_score = -1
+      
+      # Get all paths for this task
+      if ::task in ::reward_map {
+        loop for ::path in ::reward_map[::task].keys() {
+          set ::reward_score = ::reward_map[::task][::path]
+          set ::penalty_score = ::penalty_map[::task][::path] or 0
+          set ::net_score = ::reward_score - ::penalty_score
+          
+          set ::candidate = {
+            path: ::path,
+            reward_score: ::reward_score,
+            penalty_score: ::penalty_score,
+            net_score: ::net_score
+          }
+          
+          set ::candidates = ::candidates.push(::candidate)
+          
+          if ::net_score > ::best_score {
+            set ::best_score = ::net_score
+            set ::best_path = ::path
+          }
+        }
+      }
+      
+      if ::best_path {
+        # Create or update skill
+        set ::skill_name = ::task + ".optimized_path"
+        set ::current_version = 1
+        
+        if ::skill_name in ::skill_versions {
+          set ::current_version = ::skill_versions[::skill_name].keys().length + 1
+        }
+        
+        set ::skill_id = ::skill_name + "_" + ::current_version
+        
+        # Calculate success rate
+        set ::total_attempts = ::reward_map[::task][::best_path] + (::penalty_map[::task][::best_path] or 0)
+        set ::success_rate = ::reward_map[::task][::best_path] / ::total_attempts
+        
+        set ::new_skill = {
+          path: [::best_path],
+          reward_score: ::reward_map[::task][::best_path],
+          penalty_score: ::penalty_map[::task][::best_path] or 0,
+          version: ::current_version,
+          task_type: ::task,
+          success_rate: ::success_rate,
+          last_used: ::internal.now(),
+          quantum_enhanced: true
+        }
+        
+        set ::skill_registry[::skill_id] = ::new_skill
+        
+        # Update skill versions
+        if not ::skill_name in ::skill_versions {
+          set ::skill_versions[::skill_name] = {}
+        }
+        set ::skill_versions[::skill_name][::current_version] = {
+          reward_score: ::new_skill.reward_score,
+          penalty_score: ::new_skill.penalty_score,
+          success_rate: ::new_skill.success_rate
+        }
+        
+        # Update preferred skill map
+        set ::preferred_skill_map[::task] = ::skill_id
+        
+        if ::current_version == 1 {
+          set ::skills_learned = ::skills_learned + 1
+          emit azme.skill_learned with {
+            skill_id: ::skill_id,
+            skill: ::new_skill
+          }
+        } else {
+          set ::skills_upgraded = ::skills_upgraded + 1
+          emit azme.skill_upgraded with {
+            skill_id: ::skill_id,
+            skill: ::new_skill,
+            previous_version: ::current_version - 1
+          }
+        }
+      }
+      
+      emit azme.skill_scores_updated with {
+        task: ::task,
+        candidates: ::candidates,
+        best_path: ::best_path,
+        best_score: ::best_score
+      }
+    }
+
+    on get_optimal_skill {
+      set ::skill_request = $1
+      set ::task = ::skill_request.task
+      
+      say "🎯 Getting optimal skill for task: " + ::task
+      
+      set ::optimal_skill = null
+      
+      if ::task in ::preferred_skill_map {
+        set ::skill_id = ::preferred_skill_map[::task]
+        if ::skill_id in ::skill_registry {
+          set ::optimal_skill = ::skill_registry[::skill_id]
+        }
+      }
+      
+      emit azme.optimal_skill_retrieved with {
+        task: ::task,
+        skill: ::optimal_skill
+      }
+    }
+
+    on evaluate_skill_performance {
+      set ::evaluation_request = $1
+      set ::skill_id = ::evaluation_request.skill_id
+      
+      say "📊 Evaluating skill performance: " + ::skill_id
+      
+      set ::evaluation = {
+        skill_id: ::skill_id,
+        performance_score: 0,
+        reliability_score: 0,
+        efficiency_score: 0,
+        recommendations: [],
+        quantum_enhanced: true
+      }
+      
+      if ::skill_id in ::skill_registry {
+        set ::skill = ::skill_registry[::skill_id]
+        
+        # Calculate performance metrics
+        set ::evaluation.performance_score = ::skill.reward_score - ::skill.penalty_score
+        set ::evaluation.reliability_score = ::skill.success_rate
+        set ::evaluation.efficiency_score = ::skill.reward_score / (::skill.reward_score + ::skill.penalty_score)
+        
+        # Generate recommendations
+        if ::skill.success_rate < 0.7 {
+          set ::evaluation.recommendations = ::evaluation.recommendations.push("Consider retiring this skill due to low success rate")
+        }
+        if ::skill.penalty_score > ::skill.reward_score {
+          set ::evaluation.recommendations = ::evaluation.recommendations.push("Skill has more penalties than rewards - investigate")
+        }
+        if ::skill.success_rate > 0.9 {
+          set ::evaluation.recommendations = ::evaluation.recommendations.push("Excellent skill - consider promoting to core capability")
+        }
+      }
+      
+      emit azme.skill_evaluation_complete with {
+        skill_id: ::skill_id,
+        evaluation: ::evaluation
+      }
+    }
+
+    on retire_skill {
+      set ::retirement_request = $1
+      set ::skill_id = ::retirement_request.skill_id
+      set ::reason = ::retirement_request.reason
+      
+      say "🗑️ Retiring skill: " + ::skill_id
+      
+      if ::skill_id in ::skill_registry {
+        set ::retired_skill = ::skill_registry[::skill_id]
+        set ::skill_registry = ::skill_registry.remove(::skill_id)
+        
+        # Remove from preferred skill map
+        loop for ::task in ::preferred_skill_map.keys() {
+          if ::preferred_skill_map[::task] == ::skill_id {
+            set ::preferred_skill_map = ::preferred_skill_map.remove(::task)
+          }
+        }
+        
+        set ::skills_retired = ::skills_retired + 1
+        
+        emit azme.skill_retired with {
+          skill_id: ::skill_id,
+          reason: ::reason,
+          retired_skill: ::retired_skill
+        }
+      }
+    }
+
+    # Skill trainer monitoring
+    on azme.monitor_skill_trainer {
+      set ::monitor_request = $1
+      
+      set ::trainer_metrics = {
+        total_training_count: ::training_count,
+        skills_learned: ::skills_learned,
+        skills_upgraded: ::skills_upgraded,
+        skills_retired: ::skills_retired,
+        skill_registry_size: ::skill_registry.keys().length,
+        skill_attempt_log_size: ::skill_attempt_log.length,
+        preferred_skills_count: ::preferred_skill_map.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.skill_trainer_metrics with {
+        metrics: ::trainer_metrics
+      }
+    }
+  }
+} 

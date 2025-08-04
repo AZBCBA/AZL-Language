@@ -1,0 +1,173 @@
+# AZME Path Score Tracker
+# Calculates rewards, costs, and tracks detailed performance metrics for execution paths
+
+# State variables for path scoring
+set ::path_performance_metrics = {}
+set ::path_reward_history = {}
+set ::path_cost_history = {}
+set ::path_success_rates = {}
+set ::path_complexity_scores = {}
+set ::simulation_accuracy_bonus = {}
+
+# Event handlers for path scoring
+on azme.calculate_path_reward with ::result_data:
+  set task = result_data.task
+  set path = result_data.path
+  set reward_value = result_data.reward_value or 0
+  set execution_time = result_data.execution_time or 0
+  set success = result_data.success or false
+  set simulation_accuracy = result_data.simulation_accuracy or 0
+  
+  # Calculate base reward
+  set base_reward = reward_value
+  
+  # Add simulation accuracy bonus
+  set accuracy_bonus = simulation_accuracy * 0.5
+  set total_reward = base_reward + accuracy_bonus
+  
+  # Store reward history
+  if not path in ::path_reward_history:
+    set ::path_reward_history[path] = []
+  set ::path_reward_history[path] = ::path_reward_history[path] + [total_reward]
+  
+  emit azme.path_reward_calculated with { path: path, reward: total_reward, base_reward: base_reward, accuracy_bonus: accuracy_bonus }
+
+on azme.calculate_path_cost with ::path_data:
+  set path = path_data.path
+  set execution_time = path_data.execution_time or 0
+  set memory_usage = path_data.memory_usage or 0
+  set cpu_usage = path_data.cpu_usage or 0
+  
+  # Calculate time cost
+  set time_cost = execution_time * 0.1
+  
+  # Calculate resource cost
+  set memory_cost = memory_usage * 0.01
+  set cpu_cost = cpu_usage * 0.02
+  set resource_cost = memory_cost + cpu_cost
+  
+  # Calculate complexity cost
+  set complexity = calculate_path_complexity(path)
+  set complexity_cost = complexity * 0.5
+  
+  # Total cost
+  set total_cost = time_cost + resource_cost + complexity_cost
+  
+  # Store cost history
+  if not path in ::path_cost_history:
+    set ::path_cost_history[path] = []
+  set ::path_cost_history[path] = ::path_cost_history[path] + [total_cost]
+  
+  emit azme.path_cost_calculated with { path: path, cost: total_cost, time_cost: time_cost, resource_cost: resource_cost, complexity_cost: complexity_cost }
+
+on azme.calculate_path_complexity with ::complexity_data:
+  set path = complexity_data.path
+  
+  # Count components in path
+  set component_count = 0
+  set current_component = ""
+  set i = 0
+  set path_length = path.length
+  
+  emit azme.count_path_components with { path: path, component_count: 0, current: "", index: 0 }
+
+on azme.count_path_components with ::count_data:
+  set path = count_data.path
+  set component_count = count_data.component_count
+  set current = count_data.current
+  set index = count_data.index
+  
+  if index >= path.length:
+    set final_count = component_count + 1
+    set complexity_score = final_count * 10
+    set ::path_complexity_scores[path] = complexity_score
+    emit azme.path_complexity_calculated with { path: path, complexity: complexity_score, component_count: final_count }
+  
+  if index < path.length:
+    set char = path[index]
+    if char == "+":
+      set new_count = component_count + 1
+      set new_current = ""
+      set next_index = index + 1
+      emit azme.count_path_components with { path: path, component_count: new_count, current: new_current, index: next_index }
+    
+    if char != "+":
+      set new_current = current + char
+      set next_index = index + 1
+      emit azme.count_path_components with { path: path, component_count: component_count, current: new_current, index: next_index }
+
+on azme.update_path_performance_metrics with ::performance_data:
+  set path = performance_data.path
+  set execution_time = performance_data.execution_time or 0
+  set success = performance_data.success or false
+  set reward = performance_data.reward or 0
+  set cost = performance_data.cost or 0
+  
+  # Initialize metrics if needed
+  if not path in ::path_performance_metrics:
+    set ::path_performance_metrics[path] = { execution_times: [], success_count: 0, failure_count: 0, total_executions: 0 }
+  
+  set metrics = ::path_performance_metrics[path]
+  set metrics.total_executions = metrics.total_executions + 1
+  
+  if success:
+    set metrics.success_count = metrics.success_count + 1
+  
+  if not success:
+    set metrics.failure_count = metrics.failure_count + 1
+  
+  set metrics.execution_times = metrics.execution_times + [execution_time]
+  
+  # Calculate success rate
+  set success_rate = if metrics.total_executions > 0 then metrics.success_count / metrics.total_executions else 0
+  set ::path_success_rates[path] = success_rate
+  
+  emit azme.path_performance_updated with { path: path, success_rate: success_rate, total_executions: metrics.total_executions }
+
+on azme.calculate_path_score with ::score_data:
+  set path = score_data.path
+  set reward = score_data.reward or 0
+  set cost = score_data.cost or 0
+  set success_rate = score_data.success_rate or 0
+  
+  # Calculate final score
+  set base_score = reward - cost
+  set success_bonus = success_rate * 10
+  set final_score = base_score + success_bonus
+  
+  emit azme.path_score_calculated with { path: path, score: final_score, base_score: base_score, success_bonus: success_bonus }
+
+on azme.get_path_statistics with ::stats_data:
+  set path = stats_data.path
+  
+  set metrics = ::path_performance_metrics[path] or { execution_times: [], success_count: 0, failure_count: 0, total_executions: 0 }
+  set success_rate = ::path_success_rates[path] or 0
+  set complexity = ::path_complexity_scores[path] or 0
+  
+  # Calculate average execution time
+  set total_time = 0
+  set time_count = 0
+  set times = metrics.execution_times
+  
+  emit azme.calculate_average_time with { times: times, total: 0, count: 0, index: 0 }
+
+on azme.calculate_average_time with ::avg_data:
+  set times = avg_data.times
+  set total = avg_data.total
+  set count = avg_data.count
+  set index = avg_data.index
+  
+  if index >= times.length:
+    set average_time = if count > 0 then total / count else 0
+    emit azme.average_time_calculated with { average_time: average_time }
+  
+  if index < times.length:
+    set time = times[index]
+    set new_total = total + time
+    set new_count = count + 1
+    set next_index = index + 1
+    emit azme.calculate_average_time with { times: times, total: new_total, count: new_count, index: next_index }
+
+on azme.average_time_calculated with ::avg_result:
+  set average_time = avg_result.average_time
+  emit azme.path_statistics_ready with { average_time: average_time } 

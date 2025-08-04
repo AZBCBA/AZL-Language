@@ -1,0 +1,220 @@
+// AZME Proxy Server
+// This proxy bridges AnythingLLM with the AZME API
+
+// Configuration
+let AZME_API_URL = "http://localhost:8000"
+let ANYTHINGLLM_PORT = 3001
+
+// Health check endpoint
+function health() {
+    try {
+        // Check if AZME is running
+        let azme_response = http_get(AZME_API_URL + "/health")
+        if (azme_response.status == 200) {
+            return {"status": "healthy", "azme": "running"}
+        } else {
+            return {"status": "unhealthy", "azme": "not responding"}
+        }
+    } catch (error) {
+        return {"status": "unhealthy", "error": error.toString()}
+    }
+}
+
+// Proxy chat requests to AZME
+function chat(data) {
+    try {
+        let message = data.message || ""
+        let workspace_id = data.workspace_id || 1
+        
+        // Forward to AZME API using the correct endpoint
+        let azme_data = {
+            "prompt": message,
+            "temperature": 0.7,
+            "max_tokens": 4096,
+            "stream": false
+        }
+        
+        let response = http_post(
+            AZME_API_URL + "/generate",
+            json_stringify(azme_data),
+            {"Content-Type": "application/json"}
+        )
+        
+        if (response.status == 200) {
+            let azme_response = json_parse(response.body)
+            // Format response to match AnythingLLM expectations
+            return {
+                "response": azme_response.response || "No response from AZME",
+                "workspace_id": workspace_id,
+                "status": "success"
+            }
+        } else {
+            return {"error": "AZME API error", "status": response.status}
+        }
+    } catch (error) {
+        return {"error": "Proxy error: " + error.toString()}
+    }
+}
+
+// Return workspace information
+function workspaces() {
+    return {
+        "workspaces": [
+            {
+                "id": 1,
+                "name": "AZME Quantum AI",
+                "slug": "azme-quantum-ai",
+                "chatProvider": "azme-quantum-ai",
+                "chatModel": "azme-quantum-ai"
+            }
+        ]
+    }
+}
+
+// Get specific workspace
+function get_workspace(workspace_id) {
+    return {
+        "id": workspace_id,
+        "name": "AZME Quantum AI",
+        "slug": "azme-quantum-ai",
+        "chatProvider": "azme-quantum-ai",
+        "chatModel": "azme-quantum-ai",
+        "documents": []
+    }
+}
+
+// Handle workspace chat requests
+function workspace_chat(workspace_id, data) {
+    try {
+        let message = data.message || ""
+        
+        // Forward to AZME API
+        let azme_data = {
+            "prompt": message,
+            "temperature": 0.7,
+            "max_tokens": 4096,
+            "stream": false
+        }
+        
+        let response = http_post(
+            AZME_API_URL + "/generate",
+            json_stringify(azme_data),
+            {"Content-Type": "application/json"}
+        )
+        
+        if (response.status == 200) {
+            let azme_response = json_parse(response.body)
+            return {
+                "id": "chat-" + get_current_time(),
+                "type": "textResponse",
+                "textResponse": azme_response.response || "No response from AZME",
+                "sources": [],
+                "close": true,
+                "error": null
+            }
+        } else {
+            return {"error": "AZME API error", "status": response.status}
+        }
+    } catch (error) {
+        return {"error": "Proxy error: " + error.toString()}
+    }
+}
+
+// Return available LLM providers
+function llm_providers() {
+    return [
+        {
+            "name": "azme-quantum-ai",
+            "displayName": "AZME Quantum AI",
+            "description": "Advanced quantum AI system with 13 revolutionary quantum systems",
+            "models": ["azme-quantum-ai"]
+        }
+    ]
+}
+
+// Return system information
+function system_info() {
+    return {
+        "settings": {
+            "LLMProvider": "azme-quantum-ai",
+            "VectorDB": "lancedb",
+            "EmbeddingProvider": "local"
+        }
+    }
+}
+
+// Handle system environment updates
+function update_system_env() {
+    return {"newValues": {}, "error": null}
+}
+
+// Root endpoint
+function root() {
+    return {"message": "AZME Proxy Server", "status": "running"}
+}
+
+// Catch-all handler for other endpoints
+function catch_all(path, method, data) {
+    // Forward to AnythingLLM if it's not our specific endpoints
+    if (starts_with(path, "api/")) {
+        try {
+            let anythingllm_url = "http://localhost:" + ANYTHINGLLM_PORT + "/" + path
+            let response
+            
+            if (method == "GET") {
+                response = http_get(anythingllm_url)
+            } else if (method == "POST") {
+                response = http_post(anythingllm_url, json_stringify(data))
+            } else if (method == "PUT") {
+                response = http_put(anythingllm_url, json_stringify(data))
+            } else if (method == "DELETE") {
+                response = http_delete(anythingllm_url)
+            }
+            
+            return response
+        } catch (error) {
+            return {"error": "Forwarding error: " + error.toString()}
+        }
+    }
+    
+    return {"error": "Endpoint not found"}
+}
+
+// HTTP server routes
+let routes = {
+    "/health": {
+        "GET": health
+    },
+    "/chat": {
+        "POST": chat
+    },
+    "/workspaces": {
+        "GET": workspaces
+    },
+    "/api/llm-providers": {
+        "GET": llm_providers
+    },
+    "/api/system": {
+        "GET": system_info
+    },
+    "/api/system/update-env": {
+        "POST": update_system_env
+    },
+    "/": {
+        "GET": root
+    }
+}
+
+// Start HTTP server
+function start_proxy_server(port = 8080) {
+    print("🚀 Starting AZME Proxy Server...")
+    print("📡 AZME API: " + AZME_API_URL)
+    print("🌐 Proxy will run on port " + port)
+    print("✅ Ready to bridge AnythingLLM with AZME!")
+    
+    // Start HTTP server with routes
+    start_http_server(port, routes)
+}
+
+// Main execution
+start_proxy_server(8080) 

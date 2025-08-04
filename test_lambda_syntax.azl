@@ -1,0 +1,61 @@
+// Test Lambda Syntax Implementation
+
+// Single parameter lambda
+let increment = |x| x + 1;
+say "Single parameter lambda test:";
+say increment(5); // Should be 6
+
+// Multiple parameters lambda
+let add = |x, y| x + y;
+say "Multiple parameters lambda test:";
+say add(3, 4); // Should be 7
+
+// Lambda with complex expression
+let double_and_add = |x, y| x * 2 + y;
+say "Complex lambda test:";
+say double_and_add(3, 5); // Should be 11
+
+// Lambda in higher-order functions
+let numbers = [1, 2, 3, 4, 5];
+say "Lambda in map function:";
+let doubled = map(numbers, |x| x * 2);
+say doubled; // Should be [2, 4, 6, 8, 10]
+
+// Lambda in filter function
+say "Lambda in filter function:";
+let evens = filter(numbers, |x| (x / 2) * 2 == x);
+say evens; // Should be [2, 4]
+
+// Lambda in reduce function
+say "Lambda in reduce function:";
+let sum = reduce(numbers, |acc, x| acc + x, 0);
+say sum; // Should be 15
+
+// Nested lambda
+let make_adder = |x| |y| x + y;
+let add_five = make_adder(5);
+say "Nested lambda test:";
+say add_five(3); // Should be 8
+
+// Lambda with closure capture
+let multiplier = 10;
+let multiply_by = |x| x * multiplier;
+say "Lambda with closure capture:";
+say multiply_by(7); // Should be 70
+
+// Lambda with boolean expression
+let is_even = |x| (x / 2) * 2 == x;
+say "Boolean lambda test:";
+say is_even(4); // Should be true
+say is_even(7); // Should be false
+
+// Lambda with string concatenation
+let greet = |name| "Hello, " + name + "!";
+say "String lambda test:";
+say greet("AZL"); // Should be "Hello, AZL!"
+
+// Lambda with conditional expression
+let max = |a, b| a > b;
+say "Conditional lambda test:";
+say max(10, 20); // Should be 20
+say max(30, 15); // Should be 30 

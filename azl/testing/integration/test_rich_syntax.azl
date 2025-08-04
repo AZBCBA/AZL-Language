@@ -1,0 +1,122 @@
+# Test Rich AZL Syntax
+# Demonstrates enhanced syntax with proper blocks, conditionals, and control flow
+
+component ::test.rich_syntax {
+  init {
+    set ::status = "initializing"
+    set ::name = "AZL Rich Syntax"
+    set ::version = 3.0
+    set ::test_count = 0
+    set ::success_count = 0
+    
+    say "🚀 Initializing ::name v::version"
+    
+    link ::memory.core
+    link ::time.engine
+    
+    emit "test.rich.initialized"
+    
+    set ::status = "ready"
+    say "✅ ::name is ready!"
+  }
+
+  behavior {
+    listen for "test.rich.initialized" then {
+      say "🎉 Rich syntax test initialized"
+      emit "test.run_comprehensive_demo"
+    }
+    
+    listen for "test.run_comprehensive_demo" then {
+      say "🧪 Running comprehensive syntax demo..."
+      
+      # Test 1: String interpolation
+      set ::message = "Hello from ::name!"
+      say ::message
+      set ::test_count = ::test_count + 1
+      set ::success_count = ::success_count + 1
+      
+      # Test 2: Mathematical expressions
+      set ::a = 15
+      set ::b = 5
+      set ::sum = ::a + ::b
+      say "Sum of ::a + ::b = ::sum"
+      set ::test_count = ::test_count + 1
+      set ::success_count = ::success_count + 1
+      
+      # Test 3: If/else blocks
+      if ::sum > 15 then {
+        say "✅ Sum is greater than 15"
+        emit "test.condition.passed"
+        set ::test_count = ::test_count + 1
+        set ::success_count = ::success_count + 1
+      } else {
+        say "❌ Sum is not greater than 15"
+        emit "test.condition.failed"
+        set ::test_count = ::test_count + 1
+      }
+      
+      # Test 4: Another if/else test
+      if ::sum < 10 then {
+        say "❌ Sum is less than 10"
+        set ::test_count = ::test_count + 1
+      } else {
+        say "✅ Sum is not less than 10"
+        set ::test_count = ::test_count + 1
+        set ::success_count = ::success_count + 1
+      }
+      
+      # Test 5: While loop simulation
+      set ::counter = 0
+      while ::counter < 3 {
+        set ::counter = ::counter + 1
+        say "Counter: ::counter"
+        set ::test_count = ::test_count + 1
+        set ::success_count = ::success_count + 1
+      }
+      
+      # Test 6: Loop for simulation
+      set ::items = [1, 2, 3]
+      loop for ::item in ::items {
+        say "Processing item: ::item"
+        set ::test_count = ::test_count + 1
+        set ::success_count = ::success_count + 1
+      }
+      
+      # Test 7: Complex conditional
+      if ::success_count > ::test_count * 0.8 then {
+        say "🎊 High success rate achieved!"
+        emit "test.comprehensive.success"
+      } else {
+        say "⚠️ Success rate needs improvement"
+        emit "test.comprehensive.needs_improvement"
+      }
+      
+      say "🎯 Comprehensive demo completed!"
+      say "📊 Tests: ::test_count, Successes: ::success_count"
+    }
+    
+    listen for "test.condition.passed" then {
+      say "🎊 Condition test passed!"
+    }
+    
+    listen for "test.condition.failed" then {
+      say "⚠️ Condition test failed"
+    }
+    
+    listen for "test.comprehensive.success" then {
+      say "🏆 Comprehensive test suite successful!"
+    }
+    
+    listen for "test.comprehensive.needs_improvement" then {
+      say "📈 Comprehensive test needs improvement"
+    }
+  }
+
+  memory {
+    status: "ready",
+    test_count: 0,
+    success_count: 0,
+    success_rate: 1.0,
+    last_test: "rich_syntax"
+  }
+}

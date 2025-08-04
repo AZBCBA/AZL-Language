@@ -1,0 +1,33 @@
+# AZL Timing and Performance Measurement Commands
+# These commands provide timing functionality for benchmarks
+
+# Memory usage tracking
+track_memory_usage start
+track_memory_usage peak
+track_memory_usage end
+
+# CPU usage tracking  
+track_cpu_usage start
+track_cpu_usage peak
+track_cpu_usage end
+
+# Timing commands
+start_timer benchmark_name
+end_timer benchmark_name
+get_timer_result benchmark_name
+
+# Performance measurement
+measure_performance algorithm_name input_size
+measure_memory_usage algorithm_name input_size
+measure_cpu_usage algorithm_name input_size
+
+# Result output commands
+output_results_json benchmark_name
+output_timing_data benchmark_name
+output_memory_data benchmark_name
+output_cpu_data benchmark_name
+
+# Verification commands
+verify_correctness algorithm_name input_size expected_result
+verify_performance algorithm_name input_size max_time_ms
+verify_memory_usage algorithm_name input_size max_memory_mb 

@@ -1,0 +1,237 @@
+# AZME File Intent Resolver
+# Links goals to file actions
+
+component ::azme.file_intent_resolver {
+  init {
+    set ::intent_mappings = {
+      "save_memory": {
+        intent_type: "write_file",
+        path_template: "/azme/memory/{memory_type}.json",
+        operation: "write"
+      },
+      "load_memory": {
+        intent_type: "read_file",
+        path_template: "/azme/memory/{memory_type}.json",
+        operation: "read"
+      },
+      "archive_narrative": {
+        intent_type: "write_file",
+        path_template: "/azme/narratives/narrative_{timestamp}.json",
+        operation: "write"
+      },
+      "trace_goal": {
+        intent_type: "write_file",
+        path_template: "/azme/goals/goal_{timestamp}.json",
+        operation: "write"
+      },
+      "search_files": {
+        intent_type: "list_directory",
+        path_template: "/azme/{directory}",
+        operation: "list"
+      },
+      "append_log": {
+        intent_type: "append_file",
+        path_template: "/azme/logs/{log_type}.txt",
+        operation: "append"
+      }
+    }
+    set ::resolved_intents = []
+    set ::intent_count = 0
+    set ::successful_resolutions = 0
+    set ::failed_resolutions = 0
+  }
+
+  behavior {
+    on azme.goal_selected {
+      set ::goal = $1
+      
+      say "🎯 Resolving file intent for goal: " + ::goal.description
+      
+      # Determine file intent from goal
+      set ::file_intent = determine_file_intent(::goal)
+      
+      if ::file_intent {
+        emit azme.intent_resolved with {
+          type: ::file_intent.intent_type,
+          path: ::file_intent.path,
+          content: ::file_intent.content,
+          data: ::file_intent.data
+        }
+      }
+    }
+
+    on determine_file_intent {
+      set ::goal_request = $1
+      set ::goal = ::goal_request.goal
+      
+      set ::file_intent = null
+      
+      # Map goal description to file operations
+      if ::goal.description.contains("save") or ::goal.description.contains("store") {
+        set ::file_intent = {
+          intent_type: "write_file",
+          path: "/azme/memory/" + extract_memory_type(::goal.description) + ".json",
+          content: ::goal.data or {},
+          operation: "write",
+          quantum_enhanced: true
+        }
+      } else if ::goal.description.contains("load") or ::goal.description.contains("read") {
+        set ::file_intent = {
+          intent_type: "read_file",
+          path: "/azme/memory/" + extract_memory_type(::goal.description) + ".json",
+          operation: "read",
+          quantum_enhanced: true
+        }
+      } else if ::goal.description.contains("archive") or ::goal.description.contains("narrative") {
+        set ::file_intent = {
+          intent_type: "write_file",
+          path: "/azme/narratives/narrative_" + ::internal.now() + ".json",
+          content: ::goal.data or {},
+          operation: "write",
+          quantum_enhanced: true
+        }
+      } else if ::goal.description.contains("trace") or ::goal.description.contains("goal") {
+        set ::file_intent = {
+          intent_type: "write_file",
+          path: "/azme/goals/goal_" + ::internal.now() + ".json",
+          content: ::goal.data or {},
+          operation: "write",
+          quantum_enhanced: true
+        }
+      } else if ::goal.description.contains("search") or ::goal.description.contains("list") {
+        set ::file_intent = {
+          intent_type: "list_directory",
+          path: "/azme/" + extract_directory(::goal.description),
+          operation: "list",
+          quantum_enhanced: true
+        }
+      } else if ::goal.description.contains("log") or ::goal.description.contains("append") {
+        set ::file_intent = {
+          intent_type: "append_file",
+          path: "/azme/logs/" + extract_log_type(::goal.description) + ".txt",
+          data: ::goal.data or "",
+          operation: "append",
+          quantum_enhanced: true
+        }
+      }
+      
+      emit azme.file_intent_determined with {
+        goal: ::goal,
+        file_intent: ::file_intent
+      }
+    }
+
+    on azme.intent_resolved {
+      set ::intent = $1
+      
+      say "🔗 Resolving file intent: " + ::intent.type
+      
+      set ::resolution_entry = {
+        id: "intent_" + ::intent_count,
+        intent_type: ::intent.type,
+        path: ::intent.path,
+        timestamp: ::internal.now(),
+        success: true,
+        quantum_enhanced: true
+      }
+      
+      set ::resolved_intents = ::resolved_intents.push(::resolution_entry)
+      set ::intent_count = ::intent_count + 1
+      set ::successful_resolutions = ::successful_resolutions + 1
+      
+      emit azme.file_intent_resolved with {
+        intent: ::intent,
+        resolution: ::resolution_entry
+      }
+    }
+
+    # Extract memory type from goal description
+    on extract_memory_type {
+      set ::extraction_request = $1
+      set ::description = ::extraction_request.description
+      
+      set ::memory_type = "episodic_memory"
+      
+      if ::description.contains("emotional") or ::description.contains("emotion") {
+        set ::memory_type = "emotional_state"
+      } else if ::description.contains("belief") or ::description.contains("beliefs") {
+        set ::memory_type = "belief_continuity"
+      } else if ::description.contains("self") or ::description.contains("model") {
+        set ::memory_type = "self_model"
+      } else if ::description.contains("goal") or ::description.contains("goals") {
+        set ::memory_type = "goals"
+      } else if ::description.contains("narrative") or ::description.contains("story") {
+        set ::memory_type = "narrative_state"
+      }
+      
+      emit azme.memory_type_extracted with {
+        description: ::description,
+        memory_type: ::memory_type
+      }
+    }
+
+    # Extract directory from goal description
+    on extract_directory {
+      set ::extraction_request = $1
+      set ::description = ::extraction_request.description
+      
+      set ::directory = "memory"
+      
+      if ::description.contains("goal") or ::description.contains("goals") {
+        set ::directory = "goals"
+      } else if ::description.contains("narrative") or ::description.contains("narratives") {
+        set ::directory = "narratives"
+      } else if ::description.contains("log") or ::description.contains("logs") {
+        set ::directory = "logs"
+      } else if ::description.contains("config") or ::description.contains("configuration") {
+        set ::directory = "config"
+      }
+      
+      emit azme.directory_extracted with {
+        description: ::description,
+        directory: ::directory
+      }
+    }
+
+    # Extract log type from goal description
+    on extract_log_type {
+      set ::extraction_request = $1
+      set ::description = ::extraction_request.description
+      
+      set ::log_type = "general"
+      
+      if ::description.contains("error") or ::description.contains("errors") {
+        set ::log_type = "errors"
+      } else if ::description.contains("access") or ::description.contains("accesses") {
+        set ::log_type = "access"
+      } else if ::description.contains("security") or ::description.contains("violation") {
+        set ::log_type = "security"
+      } else if ::description.contains("operation") or ::description.contains("operations") {
+        set ::log_type = "operations"
+      }
+      
+      emit azme.log_type_extracted with {
+        description: ::description,
+        log_type: ::log_type
+      }
+    }
+
+    # Intent resolver monitoring
+    on azme.monitor_file_intent_resolver {
+      set ::monitor_request = $1
+      
+      set ::resolver_metrics = {
+        total_intents: ::intent_count,
+        successful_resolutions: ::successful_resolutions,
+        failed_resolutions: ::failed_resolutions,
+        resolved_intents_size: ::resolved_intents.length,
+        intent_mappings_count: ::intent_mappings.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.file_intent_resolver_metrics with {
+        metrics: ::resolver_metrics
+      }
+    }
+  }
+} 

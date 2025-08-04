@@ -1,0 +1,278 @@
+# AZME Web Sanitizer
+# Security + filters
+
+component ::azme.web_sanitizer {
+  init {
+    set ::security_violations = []
+    set ::blocked_domains = [
+      "malware.com",
+      "phishing.net",
+      "spam.org",
+      "evil.com",
+      "hack.net"
+    ]
+    set ::dangerous_patterns = [
+      "javascript:",
+      "data:text/html",
+      "vbscript:",
+      "onload=",
+      "onerror=",
+      "onclick=",
+      "eval(",
+      "document.cookie"
+    ]
+    set ::content_filters = {
+      max_content_length: 1000000,
+      max_links_per_page: 100,
+      max_images_per_page: 50,
+      allowed_content_types: [
+        "text/html",
+        "text/plain",
+        "application/json",
+        "application/xml"
+      ]
+    }
+    set ::violation_count = 0
+    set ::security_checks = 0
+    set ::blocked_requests = 0
+  }
+
+  behavior {
+    on is_allowed {
+      set ::check_request = $1
+      set ::url = ::check_request.url
+      
+      say "🔒 Security check for URL: " + ::url
+      
+      set ::security_result = {
+        allowed: false,
+        reason: "unknown",
+        url: ::url,
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      # Extract host from URL
+      set ::host = extract_host(::url)
+      
+      # Check if domain is blocked
+      set ::is_blocked = false
+      loop for ::blocked_domain in ::blocked_domains {
+        if ::host.contains(::blocked_domain) {
+          set ::is_blocked = true
+        }
+      }
+      
+      # Check if domain is allowed
+      set ::is_allowed = false
+      loop for ::allowed_domain in ::allowed_domains {
+        if ::host.contains(::allowed_domain) {
+          set ::is_allowed = true
+        }
+      }
+      
+      if ::is_blocked {
+        set ::security_result.allowed = false
+        set ::security_result.reason = "blocked_domain"
+        set ::blocked_requests = ::blocked_requests + 1
+      } else if ::is_allowed {
+        set ::security_result.allowed = true
+        set ::security_result.reason = "allowed_domain"
+      } else {
+        set ::security_result.allowed = false
+        set ::security_result.reason = "unauthorized_domain"
+      }
+      
+      set ::security_checks = ::security_checks + 1
+      
+      if not ::security_result.allowed {
+        set ::violation_entry = {
+          id: "violation_" + ::violation_count,
+          url: ::url,
+          host: ::host,
+          reason: ::security_result.reason,
+          timestamp: ::internal.now(),
+          quantum_enhanced: true
+        }
+        
+        set ::security_violations = ::security_violations.push(::violation_entry)
+        set ::violation_count = ::violation_count + 1
+        
+        emit azme.security_violation with {
+          violation: ::violation_entry
+        }
+      }
+      
+      emit azme.security_check_complete with {
+        result: ::security_result
+      }
+    }
+
+    on sanitize_content {
+      set ::sanitize_request = $1
+      set ::content = ::sanitize_request.content
+      set ::content_type = ::sanitize_request.content_type
+      
+      say "🧹 Sanitizing content"
+      
+      set ::sanitization_result = {
+        original_content: ::content,
+        sanitized_content: remove_dangerous_patterns(::content),
+        content_type: ::content_type,
+        sanitization_applied: true,
+        quantum_enhanced: true
+      }
+      
+      # Check content length
+      if ::content.length > ::content_filters.max_content_length {
+        set ::sanitization_result.content_too_large = true
+        set ::sanitization_result.reason = "content_exceeds_max_length"
+      }
+      
+      # Check content type
+      set ::content_type_allowed = false
+      loop for ::allowed_type in ::content_filters.allowed_content_types {
+        if ::content_type.contains(::allowed_type) {
+          set ::content_type_allowed = true
+        }
+      }
+      
+      if not ::content_type_allowed {
+        set ::sanitization_result.content_type_blocked = true
+        set ::sanitization_result.reason = "content_type_not_allowed"
+      }
+      
+      emit azme.content_sanitized with {
+        result: ::sanitization_result
+      }
+    }
+
+    on remove_dangerous_patterns {
+      set ::pattern_request = $1
+      set ::content = ::pattern_request.content
+      
+      set ::sanitized_content = ::content
+      
+      # Remove dangerous patterns
+      loop for ::pattern in ::dangerous_patterns {
+        if ::sanitized_content.contains(::pattern) {
+          set ::sanitized_content = ::sanitized_content.replace(::pattern, "[BLOCKED]")
+        }
+      }
+      
+      emit azme.dangerous_patterns_removed with {
+        original_content: ::content,
+        sanitized_content: ::sanitized_content
+      }
+    }
+
+    on extract_host {
+      set ::url_request = $1
+      set ::url = ::url_request.url
+      
+      set ::host = "example.com"
+      
+      # Simulate host extraction
+      if ::url.contains("://") {
+        set ::protocol_end = ::url.index_of("://") + 3
+        set ::host_start = ::protocol_end
+        set ::host_end = ::url.index_of("/", ::host_start)
+        if ::host_end == -1 {
+          set ::host_end = ::url.length
+        }
+        set ::host = ::url.substring(::host_start, ::host_end)
+      }
+      
+      emit azme.host_extracted with {
+        url: ::url,
+        host: ::host
+      }
+    }
+
+    on validate_robots_txt {
+      set ::validation_request = $1
+      set ::url = ::validation_request.url
+      
+      say "🤖 Checking robots.txt for: " + ::url
+      
+      # Simulate robots.txt check
+      set ::robots_result = {
+        allowed: true,
+        delay: 1,
+        user_agent: "AZME-WebScraper/1.0",
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      emit azme.robots_txt_validated with {
+        url: ::url,
+        result: ::robots_result
+      }
+    }
+
+    on check_rate_limits {
+      set ::rate_request = $1
+      set ::domain = ::rate_request.domain
+      
+      say "⏱️ Checking rate limits for: " + ::domain
+      
+      # Simulate rate limit check
+      set ::rate_limit_result = {
+        within_limits: true,
+        requests_per_minute: 2,
+        max_requests_per_minute: 10,
+        next_allowed_request: ::internal.now() + 30,
+        quantum_enhanced: true
+      }
+      
+      emit azme.rate_limits_checked with {
+        domain: ::domain,
+        result: ::rate_limit_result
+      }
+    }
+
+    on azme.web_scrape_blocked {
+      set ::blocked_info = $1
+      set ::url = ::blocked_info.url
+      set ::reason = ::blocked_info.reason
+      
+      say "🚨 Web scrape blocked: " + ::url
+      say "❌ Reason: " + ::reason
+      
+      set ::violation_entry = {
+        id: "violation_" + ::violation_count,
+        url: ::url,
+        reason: ::reason,
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      set ::security_violations = ::security_violations.push(::violation_entry)
+      set ::violation_count = ::violation_count + 1
+      set ::blocked_requests = ::blocked_requests + 1
+      
+      emit azme.security_violation_logged with {
+        violation: ::violation_entry
+      }
+    }
+
+    # Web sanitizer monitoring
+    on azme.monitor_web_sanitizer {
+      set ::monitor_request = $1
+      
+      set ::sanitizer_metrics = {
+        security_checks: ::security_checks,
+        blocked_requests: ::blocked_requests,
+        security_violations_size: ::security_violations.length,
+        blocked_domains_count: ::blocked_domains.length,
+        dangerous_patterns_count: ::dangerous_patterns.length,
+        content_filters_count: ::content_filters.allowed_content_types.length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.web_sanitizer_metrics with {
+        metrics: ::sanitizer_metrics
+      }
+    }
+  }
+} 

@@ -1,0 +1,80 @@
+# AZL Debug Event Logger
+# Traces all events in the AZL system for diagnosis
+
+component ::debug.event_logger {
+  init {
+    set ::status = "initializing"
+    set ::event_count = 0
+    set ::event_log = []
+    
+    say "🔍 Debug Event Logger initialized"
+    say "📊 Ready to trace all events"
+    
+    set ::status = "ready"
+  }
+
+  # Catch all events
+  on "*" {
+    set ::event_name = $1
+    set ::event_args = []
+    
+    # Collect all arguments
+    loop for ::i = 2; ::i <= $#; ::i++ {
+      set ::event_args.push($::i)
+    }
+    
+    # Log the event
+    set ::event_log.push({
+      timestamp: ::time.engine.now().epoch,
+      event_name: ::event_name,
+      args: ::event_args,
+      source: "debug_logger"
+    })
+    
+    set ::event_count = ::event_count + 1
+    
+    say "🧠 EVENT: ::event_name"
+    say "📊 Args count: ::event_args.length"
+    say "📈 Total events: ::event_count"
+    
+    # Log detailed args if available
+    if ::event_args.length > 0 {
+      say "📝 Args: ::event_args"
+    }
+  }
+
+  # Get event statistics
+  on debug.get_stats {
+    set ::stats = {
+      total_events: ::event_count,
+      event_log_length: ::event_log.length,
+      status: ::status
+    }
+    
+    emit debug.stats_ready with ::stats
+    
+    say "📊 Event Statistics:"
+    say "📈 Total events: ::event_count"
+    say "📋 Log entries: ::event_log.length"
+  }
+
+  # Clear event log
+  on debug.clear_log {
+    set ::event_log = []
+    set ::event_count = 0
+    
+    say "🧹 Event log cleared"
+  }
+
+  behavior {
+    on system.start {
+      say "🔍 Debug Event Logger ready to trace events"
+    }
+  }
+
+  memory {
+    ::status = "ready"
+    ::event_count = 0
+    ::event_log = []
+  }
+} 

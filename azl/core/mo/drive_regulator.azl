@@ -1,0 +1,400 @@
+// Drive Regulator - MO System Component
+// Resets drives based on user responses and reinforcement
+
+component ::drive.regulator {
+  init {
+    set ::regulation_history = []
+    set ::last_regulation = 0
+    set ::regulation_cooldown = 5
+    set ::hunger_reduction = 0.3
+    set ::interaction_reset = 1.0
+    set ::attention_reset = 1.0
+    set ::praise_reset = 1.0
+    
+    emit "drive.regulator.initialized" with { status: "ready" }
+  }
+
+  behavior {
+    // Handle user responses - reset drives
+    listen for "user.response" then {
+      set ::response_data = ::user.response_data
+      set ::current_time = now()
+      
+      // Check cooldown before regulating
+      branch when ::current_time - ::last_regulation > ::regulation_cooldown {
+        regulate_drives_from_response(::response_data)
+      }
+    }
+
+    // Handle reinforcement given - boost praise drive
+    listen for "reinforcement.given" then {
+      set ::reinforcement_data = ::reinforcement.given_data
+      set ::current_time = now()
+      
+      // Check cooldown before regulating
+      branch when ::current_time - ::last_regulation > ::regulation_cooldown {
+        regulate_drives_from_reinforcement(::reinforcement_data)
+      }
+    }
+
+    // Handle food provided - reduce hunger
+    listen for "food.provided" then {
+      set ::food_data = ::food.provided_data
+      set ::current_time = now()
+      
+      // Check cooldown before regulating
+      branch when ::current_time - ::last_regulation > ::regulation_cooldown {
+        regulate_drives_from_food(::food_data)
+      }
+    }
+
+    // Handle attention received - reset attention drive
+    listen for "attention.received" then {
+      set ::attention_data = ::attention.received_data
+      set ::current_time = now()
+      
+      // Check cooldown before regulating
+      branch when ::current_time - ::last_regulation > ::regulation_cooldown {
+        regulate_drives_from_attention(::attention_data)
+      }
+    }
+
+    // Handle interaction received - reset interaction drive
+    listen for "interaction.received" then {
+      set ::interaction_data = ::interaction.received_data
+      set ::current_time = now()
+      
+      // Check cooldown before regulating
+      branch when ::current_time - ::last_regulation > ::regulation_cooldown {
+        regulate_drives_from_interaction(::interaction_data)
+      }
+    }
+
+    // Handle praise received - reset praise drive
+    listen for "praise.received" then {
+      set ::praise_data = ::praise.received_data
+      set ::current_time = now()
+      
+      // Check cooldown before regulating
+      branch when ::current_time - ::last_regulation > ::regulation_cooldown {
+        regulate_drives_from_praise(::praise_data)
+      }
+    }
+
+    // Handle success events - boost motivation
+    listen for "success.achieved" then {
+      set ::success_data = ::success.achieved_data
+      set ::current_time = now()
+      
+      // Check cooldown before regulating
+      branch when ::current_time - ::last_regulation > ::regulation_cooldown {
+        regulate_drives_from_success(::success_data)
+      }
+    }
+
+    // Handle failure events - adjust drives accordingly
+    listen for "failure.occurred" then {
+      set ::failure_data = ::failure.occurred_data
+      set ::current_time = now()
+      
+      // Check cooldown before regulating
+      branch when ::current_time - ::last_regulation > ::regulation_cooldown {
+        regulate_drives_from_failure(::failure_data)
+      }
+    }
+
+    // Handle system idle - increase hunger gradually
+    listen for "system.idle" then {
+      set ::idle_data = ::system.idle_data
+      set ::current_time = now()
+      
+      // Check cooldown before regulating
+      branch when ::current_time - ::last_regulation > ::regulation_cooldown {
+        regulate_drives_from_idle(::idle_data)
+      }
+    }
+  }
+
+  memory {
+    regulation_history
+    last_regulation
+    regulation_cooldown
+    hunger_reduction
+    interaction_reset
+    attention_reset
+    praise_reset
+  }
+
+  interface {
+    get_regulation_history
+    set_regulation_cooldown
+    set_hunger_reduction
+    set_reset_values
+    clear_regulation_history
+  }
+}
+
+// Regulate drives based on user response
+function regulate_drives_from_response(response_data) {
+  set ::regulation_type = "user_response"
+  set ::regulation_time = now()
+  
+  // Reduce hunger level
+  set ::mo.tracker.hunger_level = ::mo.tracker.hunger_level - ::hunger_reduction
+  branch when ::mo.tracker.hunger_level < 0 {
+    set ::mo.tracker.hunger_level = 0
+  }
+  
+  // Reset interaction drive
+  set ::mo.tracker.value_map.interaction = ::interaction_reset
+  
+  // Reset attention drive
+  set ::mo.tracker.value_map.attention = ::attention_reset
+  
+  // Record regulation
+  store ::regulation_history from ::regulation_history.push({
+    type: ::regulation_type,
+    response: response_data,
+    hunger_reduction: ::hunger_reduction,
+    interaction_reset: ::interaction_reset,
+    attention_reset: ::attention_reset,
+    timestamp: ::regulation_time
+  })
+  
+  set ::last_regulation = ::regulation_time
+  emit "drive.regulated" with {
+    type: ::regulation_type,
+    hunger_level: ::mo.tracker.hunger_level,
+    interaction_value: ::mo.tracker.value_map.interaction,
+    attention_value: ::mo.tracker.value_map.attention,
+    timestamp: ::regulation_time
+  }
+}
+
+// Regulate drives based on reinforcement
+function regulate_drives_from_reinforcement(reinforcement_data) {
+  set ::regulation_type = "reinforcement"
+  set ::regulation_time = now()
+  
+  // Reset praise drive
+  set ::mo.tracker.value_map.praise = ::praise_reset
+  
+  // Record regulation
+  store ::regulation_history from ::regulation_history.push({
+    type: ::regulation_type,
+    reinforcement: reinforcement_data,
+    praise_reset: ::praise_reset,
+    timestamp: ::regulation_time
+  })
+  
+  set ::last_regulation = ::regulation_time
+  emit "drive.regulated" with {
+    type: ::regulation_type,
+    praise_value: ::mo.tracker.value_map.praise,
+    timestamp: ::regulation_time
+  }
+}
+
+// Regulate drives based on food provision
+function regulate_drives_from_food(food_data) {
+  set ::regulation_type = "food_provided"
+  set ::regulation_time = now()
+  
+  // Significantly reduce hunger
+  set ::mo.tracker.hunger_level = ::mo.tracker.hunger_level - (::hunger_reduction * 2)
+  branch when ::mo.tracker.hunger_level < 0 {
+    set ::mo.tracker.hunger_level = 0
+  }
+  
+  // Record regulation
+  store ::regulation_history from ::regulation_history.push({
+    type: ::regulation_type,
+    food: food_data,
+    hunger_reduction: ::hunger_reduction * 2,
+    timestamp: ::regulation_time
+  })
+  
+  set ::last_regulation = ::regulation_time
+  emit "drive.regulated" with {
+    type: ::regulation_type,
+    hunger_level: ::mo.tracker.hunger_level,
+    timestamp: ::regulation_time
+  }
+}
+
+// Regulate drives based on attention
+function regulate_drives_from_attention(attention_data) {
+  set ::regulation_type = "attention_received"
+  set ::regulation_time = now()
+  
+  // Reset attention drive
+  set ::mo.tracker.value_map.attention = ::attention_reset
+  
+  // Record regulation
+  store ::regulation_history from ::regulation_history.push({
+    type: ::regulation_type,
+    attention: attention_data,
+    attention_reset: ::attention_reset,
+    timestamp: ::regulation_time
+  })
+  
+  set ::last_regulation = ::regulation_time
+  emit "drive.regulated" with {
+    type: ::regulation_type,
+    attention_value: ::mo.tracker.value_map.attention,
+    timestamp: ::regulation_time
+  }
+}
+
+// Regulate drives based on interaction
+function regulate_drives_from_interaction(interaction_data) {
+  set ::regulation_type = "interaction_received"
+  set ::regulation_time = now()
+  
+  // Reset interaction drive
+  set ::mo.tracker.value_map.interaction = ::interaction_reset
+  
+  // Record regulation
+  store ::regulation_history from ::regulation_history.push({
+    type: ::regulation_type,
+    interaction: interaction_data,
+    interaction_reset: ::interaction_reset,
+    timestamp: ::regulation_time
+  })
+  
+  set ::last_regulation = ::regulation_time
+  emit "drive.regulated" with {
+    type: ::regulation_type,
+    interaction_value: ::mo.tracker.value_map.interaction,
+    timestamp: ::regulation_time
+  }
+}
+
+// Regulate drives based on praise
+function regulate_drives_from_praise(praise_data) {
+  set ::regulation_type = "praise_received"
+  set ::regulation_time = now()
+  
+  // Reset praise drive
+  set ::mo.tracker.value_map.praise = ::praise_reset
+  
+  // Record regulation
+  store ::regulation_history from ::regulation_history.push({
+    type: ::regulation_type,
+    praise: praise_data,
+    praise_reset: ::praise_reset,
+    timestamp: ::regulation_time
+  })
+  
+  set ::last_regulation = ::regulation_time
+  emit "drive.regulated" with {
+    type: ::regulation_type,
+    praise_value: ::mo.tracker.value_map.praise,
+    timestamp: ::regulation_time
+  }
+}
+
+// Regulate drives based on success
+function regulate_drives_from_success(success_data) {
+  set ::regulation_type = "success_achieved"
+  set ::regulation_time = now()
+  
+  // Boost all drives slightly
+  set ::mo.tracker.value_map.interaction = ::mo.tracker.value_map.interaction + 0.1
+  set ::mo.tracker.value_map.praise = ::mo.tracker.value_map.praise + 0.1
+  set ::mo.tracker.value_map.attention = ::mo.tracker.value_map.attention + 0.1
+  
+  // Ensure values don't exceed 1.0
+  branch when ::mo.tracker.value_map.interaction > 1.0 {
+    set ::mo.tracker.value_map.interaction = 1.0
+  }
+  branch when ::mo.tracker.value_map.praise > 1.0 {
+    set ::mo.tracker.value_map.praise = 1.0
+  }
+  branch when ::mo.tracker.value_map.attention > 1.0 {
+    set ::mo.tracker.value_map.attention = 1.0
+  }
+  
+  // Record regulation
+  store ::regulation_history from ::regulation_history.push({
+    type: ::regulation_type,
+    success: success_data,
+    boost_amount: 0.1,
+    timestamp: ::regulation_time
+  })
+  
+  set ::last_regulation = ::regulation_time
+  emit "drive.regulated" with {
+    type: ::regulation_type,
+    interaction_value: ::mo.tracker.value_map.interaction,
+    praise_value: ::mo.tracker.value_map.praise,
+    attention_value: ::mo.tracker.value_map.attention,
+    timestamp: ::regulation_time
+  }
+}
+
+// Regulate drives based on failure
+function regulate_drives_from_failure(failure_data) {
+  set ::regulation_type = "failure_occurred"
+  set ::regulation_time = now()
+  
+  // Slightly reduce drives
+  set ::mo.tracker.value_map.interaction = ::mo.tracker.value_map.interaction - 0.05
+  set ::mo.tracker.value_map.praise = ::mo.tracker.value_map.praise - 0.05
+  set ::mo.tracker.value_map.attention = ::mo.tracker.value_map.attention - 0.05
+  
+  // Ensure values don't go below 0
+  branch when ::mo.tracker.value_map.interaction < 0 {
+    set ::mo.tracker.value_map.interaction = 0
+  }
+  branch when ::mo.tracker.value_map.praise < 0 {
+    set ::mo.tracker.value_map.praise = 0
+  }
+  branch when ::mo.tracker.value_map.attention < 0 {
+    set ::mo.tracker.value_map.attention = 0
+  }
+  
+  // Record regulation
+  store ::regulation_history from ::regulation_history.push({
+    type: ::regulation_type,
+    failure: failure_data,
+    reduction_amount: 0.05,
+    timestamp: ::regulation_time
+  })
+  
+  set ::last_regulation = ::regulation_time
+  emit "drive.regulated" with {
+    type: ::regulation_type,
+    interaction_value: ::mo.tracker.value_map.interaction,
+    praise_value: ::mo.tracker.value_map.praise,
+    attention_value: ::mo.tracker.value_map.attention,
+    timestamp: ::regulation_time
+  }
+}
+
+// Regulate drives based on idle state
+function regulate_drives_from_idle(idle_data) {
+  set ::regulation_type = "system_idle"
+  set ::regulation_time = now()
+  
+  // Increase hunger gradually
+  set ::mo.tracker.hunger_level = ::mo.tracker.hunger_level + 0.1
+  branch when ::mo.tracker.hunger_level > 1.0 {
+    set ::mo.tracker.hunger_level = 1.0
+  }
+  
+  // Record regulation
+  store ::regulation_history from ::regulation_history.push({
+    type: ::regulation_type,
+    idle: idle_data,
+    hunger_increase: 0.1,
+    timestamp: ::regulation_time
+  })
+  
+  set ::last_regulation = ::regulation_time
+  emit "drive.regulated" with {
+    type: ::regulation_type,
+    hunger_level: ::mo.tracker.hunger_level,
+    timestamp: ::regulation_time
+  }
+} 

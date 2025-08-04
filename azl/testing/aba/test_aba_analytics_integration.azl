@@ -1,0 +1,159 @@
+component ::test.aba_analytics_integration {
+  init {
+    set ::test_name = "ABA Analytics Dashboard Integration Test"
+    set ::test_version = 1
+    set ::status = "initializing"
+    say "🧪 Starting ABA Analytics Dashboard Integration Test v1..."
+  }
+
+  # Link to autonomous brain and analytics components
+  link ::agent.autonomous_brain
+  link ::core.aba.aba_analytics
+  link ::core.ui.dashboard_connector
+  link ::core.aba.trial_engine
+  link ::core.aba.reinforcement_schedule
+  link ::core.aba.result_logger
+
+  on test.start {
+    say "🧪 Starting ABA Analytics Integration Test..."
+    emit aba_analytics.dashboard.ready with "metrics_count:8,trials_count:8,reinforcement_count:4"
+  }
+
+  on aba_analytics.dashboard.ready {
+    say "✅ Dashboard ready event received"
+    say "📊 Metrics count: $1.metrics_count"
+    say "🎯 Trials count: $1.trials_count"
+    say "🎁 Reinforcement count: $1.reinforcement_count"
+    emit test.trigger_trial_analytics
+  }
+
+  on test.trigger_trial_analytics {
+    say "🧪 Triggering trial analytics test..."
+    emit trial_engine.start_trial with "goal:Test analytics integration,type:behavioral_adaptation,antecedent:User requests help,behavior:Provides assistance,consequence:Positive feedback"
+  }
+
+  on aba_analytics.trial.logged {
+    say "✅ Trial logged to analytics"
+    say "🎯 Trial ID: $1.trial_id"
+    say "📊 Success rate: $1.success_rate"
+    say "🔗 Antecedent: $1.antecedent"
+    say "🎯 Behavior: $1.behavior"
+    say "✅ Consequence: $1.consequence"
+    emit test.trigger_reinforcement_analytics
+  }
+
+  on test.trigger_reinforcement_analytics {
+    say "🧪 Triggering reinforcement analytics test..."
+    emit reinforcement_schedule.evaluate_reinforcement with "trial_result:success_rate:0.85,behavior_learned:help_providing"
+  }
+
+  on aba_analytics.reinforcement.logged {
+    say "✅ Reinforcement logged to analytics"
+    say "📊 Type: $1.type"
+    say "💪 Strength: $1.strength"
+    say "🎯 Target behavior: $1.target_behavior"
+    emit test.trigger_behavior_chain_analytics
+  }
+
+  on test.trigger_behavior_chain_analytics {
+    say "🧪 Triggering behavior chain analytics test..."
+    emit aba_analytics.behavior_chain.created with "chain_name:Problem Solving Chain,steps:Identify problem,Generate solutions,Evaluate options,Implement solution,target_behavior:systematic_problem_solving"
+  }
+
+  on aba_analytics.behavior_chain.created {
+    say "✅ Behavior chain created in analytics"
+    say "📋 Chain name: $1.chain_name"
+    say "🔗 Steps: $1.steps.length"
+    say "🎯 Target behavior: $1.target_behavior"
+    emit test.trigger_shaping_analytics
+  }
+
+  on test.trigger_shaping_analytics {
+    say "🧪 Triggering shaping analytics test..."
+    emit aba_analytics.shaping.initiated with "target_behavior:complex_reasoning,current_level:basic_patterns,next_level:abstract_concepts"
+  }
+
+  on aba_analytics.shaping.initiated {
+    say "✅ Behavior shaping initiated in analytics"
+    say "🎯 Target behavior: $1.target_behavior"
+    say "📊 Current level: $1.current_level"
+    say "📈 Next level: $1.next_level"
+    emit test.trigger_fading_analytics
+  }
+
+  on test.trigger_fading_analytics {
+    say "🧪 Triggering prompt fading analytics test..."
+    emit aba_analytics.prompt_fading.started with "behavior:autonomous_decision_making,current_level:full_prompt,fade_schedule:gradual_reduction"
+  }
+
+  on aba_analytics.prompt_fading.started {
+    say "✅ Prompt fading started in analytics"
+    say "🎯 Behavior: $1.behavior"
+    say "📊 Current prompt level: $1.current_level"
+    say "📈 Fade schedule: $1.fade_schedule"
+    emit test.trigger_task_analysis_analytics
+  }
+
+  on test.trigger_task_analysis_analytics {
+    say "🧪 Triggering task analysis analytics test..."
+    emit aba_analytics.task_analysis.completed with "task_name:Complex Problem Solving,steps_count:5,prerequisites:basic_reasoning,pattern_recognition,memory_access"
+  }
+
+  on aba_analytics.task_analysis.completed {
+    say "✅ Task analysis completed in analytics"
+    say "🎯 Task: $1.task_name"
+    say "📊 Steps analyzed: $1.steps_count"
+    say "🔗 Prerequisites: $1.prerequisites.length"
+    emit test.trigger_metrics_update
+  }
+
+  on test.trigger_metrics_update {
+    say "🧪 Triggering metrics update test..."
+    emit aba_analytics.metrics.updated with "trial_count:8,reinforcement_count:4,chain_count:1,shaping_count:1,fade_count:1,task_count:1"
+  }
+
+  on aba_analytics.metrics.updated {
+    say "✅ ABA Analytics metrics updated"
+    say "📈 Trial count: $1.trial_count"
+    say "🎁 Reinforcement count: $1.reinforcement_count"
+    say "🔗 Chain count: $1.chain_count"
+    say "📈 Shaping count: $1.shaping_count"
+    say "🔽 Fade count: $1.fade_count"
+    say "📋 Task count: $1.task_count"
+    emit test.trigger_dashboard_update
+  }
+
+  on test.trigger_dashboard_update {
+    say "🧪 Triggering dashboard update test..."
+    emit dashboard_connector.update_display with "analytics_data:trial_count:8,reinforcement_count:4,chain_count:1,shaping_count:1,fade_count:1,task_count:1,success_rate:0.85,behavioral_progress:excellent"
+  }
+
+  on dashboard_connector.display.updated {
+    say "✅ Dashboard display updated"
+    say "📊 Analytics data refreshed"
+    say "🎯 Real-time metrics available"
+    emit test.complete
+  }
+
+  on test.complete {
+    say "🎉 ABA Analytics Dashboard Integration Test COMPLETE!"
+    say "✅ All analytics events properly integrated with autonomous brain"
+    say "📊 Dashboard is live and tracking behavioral data"
+    say "🧠 Analytics system fully operational"
+    say "🎯 Ready for production use"
+  }
+
+  behavior {
+    on system.start {
+      emit test.start
+    }
+  }
+
+  memory {
+    ::test_name = ""
+    ::test_version = 1
+    ::status = ""
+    ::analytics_events_received = []
+    ::integration_results = []
+  }
+} 

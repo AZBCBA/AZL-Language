@@ -1,0 +1,63 @@
+component ::test.variable_resolution {
+  init {
+    say "🧪 Testing variable resolution..."
+  }
+
+  on start {
+    say "🧪 Starting variable resolution tests..."
+    
+    # Test 1: Basic variable resolution
+    set ::num = 42
+    set ::text = "hello"
+    emit test.basic with ::text ::num "fixed"
+    
+    # Test 2: Math operations with variables
+    set ::a = 1
+    set ::b = 2
+    emit test.math with ::a ::b
+    
+    # Test 3: Mixed types
+    set ::float_val = 3.14
+    set ::string_val = "pi"
+    emit test.mixed with ::string_val ::float_val "constant"
+    
+    # Test 4: Undefined variable (should warn)
+    emit test.undefined with "defined" ::undefined_var "end"
+  }
+}
+
+component ::test.basic_handler {
+  on test.basic {
+    say "📥 Basic test received: $1 $2 $3"
+    say "📊 Expected: hello 42 fixed"
+    say "📊 Actual: $1 $2 $3"
+  }
+}
+
+component ::test.math_handler {
+  on test.math {
+    say "📥 Math test received: $1 $2"
+    say "📊 Expected: 1 2"
+    say "📊 Actual: $1 $2"
+    
+    # Test math operations with resolved values
+    set ::sum = $1 + $2
+    say "🧮 Sum: $1 + $2 = ::sum"
+  }
+}
+
+component ::test.mixed_handler {
+  on test.mixed {
+    say "📥 Mixed test received: $1 $2 $3"
+    say "📊 Expected: pi 3.14 constant"
+    say "📊 Actual: $1 $2 $3"
+  }
+}
+
+component ::test.undefined_handler {
+  on test.undefined {
+    say "📥 Undefined test received: $1 $2 $3"
+    say "📊 Expected: defined ::undefined_var end"
+    say "📊 Actual: $1 $2 $3"
+  }
+} 

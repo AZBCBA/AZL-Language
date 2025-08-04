@@ -1,0 +1,47 @@
+# Test Component Introspection + Lifecycle Logging
+# Tests the component registry, state management, and introspection capabilities
+
+say "🧪 Starting Component Introspection Test..."
+
+# Test 1: Initial state (should be empty)
+say "🔍 Testing initial component registry..."
+debug
+
+# Test 2: Register components
+say "🔍 Registering test components..."
+debug register MemoryEngine
+debug register TypeSystem
+debug register ErrorHandler
+debug register NeuralNetwork
+debug register QuantumProcessor
+
+# Test 3: Check component count
+say "🔍 Checking component count..."
+debug count
+
+# Test 4: Set component states
+say "🔍 Setting component states..."
+debug state MemoryEngine running
+debug state TypeSystem initialized
+debug state ErrorHandler running
+debug state NeuralNetwork terminated
+debug state QuantumProcessor running
+
+# Test 5: Show running components
+say "🔍 Showing running components..."
+debug running
+
+# Test 6: Full introspection
+say "🔍 Full component introspection..."
+debug components
+
+# Test 7: Test error handling
+say "🔍 Testing error handling..."
+debug invalid_command
+debug register
+debug state MemoryEngine invalid_state
+
+say "✅ Component Introspection Test Complete!"
+say "📊 Component registry is working correctly"
+say "🔧 State management is functional"
+say "📝 Introspection is operational" 

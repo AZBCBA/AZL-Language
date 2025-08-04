@@ -1,0 +1,17 @@
+# Debug Goal Parsing Test
+# Tests the goal parsing logic to understand why active goals aren't being found
+
+say "🔍 Starting Goal Parsing Debug Test..."
+
+# Add a simple goal
+addgoal "Test goal" 5
+
+# Check the raw goals data
+say "🔍 Checking raw goals data..."
+reflect
+
+# Try to run and see what happens
+say "🔍 Testing run command..."
+run
+
+say "✅ Debug test complete" 

@@ -1,0 +1,381 @@
+# AZME Peer Registry
+# Registry of known peers
+
+component ::azme.peer_registry {
+  init {
+    set ::peer_list = []
+    set ::peer_capability_map = {}
+    set ::peer_status_map = {}
+    set ::peer_metadata = {}
+    set ::peer_authentication = {}
+    set ::registry_settings = {
+      max_peers: 50,
+      peer_timeout: 300,
+      capability_cache_duration: 600,
+      authentication_required: true,
+      encryption_enabled: true
+    }
+    set ::registry_count = 0
+    set ::successful_registrations = 0
+    set ::failed_registrations = 0
+  }
+
+  behavior {
+    on register_peer {
+      set ::registration_request = $1
+      set ::peer_id = ::registration_request.peer_id
+      set ::capabilities = ::registration_request.capabilities
+      set ::metadata = ::registration_request.metadata or {}
+      
+      say "📝 Registering peer: " + ::peer_id
+      
+      if ::peer_id in ::peer_list {
+        set ::registration_result = {
+          peer_id: ::peer_id,
+          success: false,
+          reason: "peer_already_registered",
+          quantum_enhanced: true
+        }
+        set ::failed_registrations = ::failed_registrations + 1
+      } else {
+        # Validate peer data
+        set ::validation = validate_peer_data(::peer_id, ::capabilities, ::metadata)
+        
+        if ::validation.valid {
+          # Add peer to registry
+          set ::peer_list = ::peer_list.push(::peer_id)
+          set ::peer_capability_map[::peer_id] = ::capabilities
+          set ::peer_metadata[::peer_id] = ::metadata
+          set ::peer_status_map[::peer_id] = {
+            status: "active",
+            last_seen: ::internal.now(),
+            connection_count: 0,
+            quantum_enhanced: true
+          }
+          
+          set ::registration_result = {
+            peer_id: ::peer_id,
+            success: true,
+            reason: "peer_registered",
+            validation: ::validation,
+            quantum_enhanced: true
+          }
+          set ::successful_registrations = ::successful_registrations + 1
+        } else {
+          set ::registration_result = {
+            peer_id: ::peer_id,
+            success: false,
+            reason: "invalid_peer_data",
+            validation_errors: ::validation.errors,
+            quantum_enhanced: true
+          }
+          set ::failed_registrations = ::failed_registrations + 1
+        }
+      }
+      
+      set ::registry_count = ::registry_count + 1
+      
+      emit azme.peer_registered with {
+        peer_id: ::peer_id,
+        result: ::registration_result
+      }
+    }
+
+    on validate_peer_data {
+      set ::validation_request = $1
+      set ::peer_id = ::validation_request.peer_id
+      set ::capabilities = ::validation_request.capabilities
+      set ::metadata = ::validation_request.metadata
+      
+      say "🔍 Validating peer data"
+      
+      set ::validation = {
+        valid: true,
+        errors: [],
+        warnings: [],
+        quantum_enhanced: true
+      }
+      
+      # Check peer ID format
+      if not ::peer_id.contains("azme_") {
+        set ::validation.valid = false
+        set ::validation.errors = ::validation.errors.push("Invalid peer ID format")
+      }
+      
+      # Check capabilities
+      if not ::capabilities or ::capabilities.length == 0 {
+        set ::validation.valid = false
+        set ::validation.errors = ::validation.errors.push("No capabilities provided")
+      }
+      
+      # Check for required capabilities
+      set ::required_capabilities = ["quantum_enhanced", "communication"]
+      loop for ::required_cap in ::required_capabilities {
+        if not ::required_cap in ::capabilities {
+          set ::validation.warnings = ::validation.warnings.push("Missing recommended capability: " + ::required_cap)
+        }
+      }
+      
+      # Check metadata
+      if ::metadata {
+        if ::metadata.version and not ::metadata.version.contains("1.") {
+          set ::validation.warnings = ::validation.warnings.push("Peer version may be incompatible")
+        }
+      }
+      
+      emit azme.peer_data_validated with {
+        peer_id: ::peer_id,
+        validation: ::validation
+      }
+    }
+
+    on get_peer_capabilities {
+      set ::capability_request = $1
+      set ::peer_id = ::capability_request.peer_id
+      
+      say "📋 Getting peer capabilities: " + ::peer_id
+      
+      set ::capabilities = null
+      
+      if ::peer_id in ::peer_capability_map {
+        set ::capabilities = ::peer_capability_map[::peer_id]
+      }
+      
+      emit azme.peer_capabilities_retrieved with {
+        peer_id: ::peer_id,
+        capabilities: ::capabilities
+      }
+    }
+
+    on update_peer_status {
+      set ::status_request = $1
+      set ::peer_id = ::status_request.peer_id
+      set ::status = ::status_request.status
+      
+      say "🔄 Updating peer status: " + ::peer_id
+      
+      if ::peer_id in ::peer_status_map {
+        set ::peer_status = ::peer_status_map[::peer_id]
+        set ::peer_status.status = ::status
+        set ::peer_status.last_seen = ::internal.now()
+        set ::peer_status_map[::peer_id] = ::peer_status
+        
+        emit azme.peer_status_updated with {
+          peer_id: ::peer_id,
+          status: ::status,
+          last_seen: ::peer_status.last_seen
+        }
+      } else {
+        emit azme.peer_status_update_failed with {
+          peer_id: ::peer_id,
+          reason: "peer_not_found"
+        }
+      }
+    }
+
+    on unregister_peer {
+      set ::unregistration_request = $1
+      set ::peer_id = ::unregistration_request.peer_id
+      
+      say "🗑️ Unregistering peer: " + ::peer_id
+      
+      if ::peer_id in ::peer_list {
+        # Remove peer from all maps
+        set ::peer_list = ::peer_list.remove(::peer_id)
+        set ::peer_capability_map = ::peer_capability_map.remove(::peer_id)
+        set ::peer_status_map = ::peer_status_map.remove(::peer_id)
+        set ::peer_metadata = ::peer_metadata.remove(::peer_id)
+        
+        set ::unregistration_result = {
+          peer_id: ::peer_id,
+          success: true,
+          reason: "peer_unregistered",
+          quantum_enhanced: true
+        }
+      } else {
+        set ::unregistration_result = {
+          peer_id: ::peer_id,
+          success: false,
+          reason: "peer_not_found",
+          quantum_enhanced: true
+        }
+      }
+      
+      emit azme.peer_unregistered with {
+        peer_id: ::peer_id,
+        result: ::unregistration_result
+      }
+    }
+
+    on search_peers_by_capability {
+      set ::search_request = $1
+      set ::required_capabilities = ::search_request.required_capabilities
+      
+      say "🔍 Searching peers by capability"
+      
+      set ::matching_peers = []
+      
+      loop for ::peer_id in ::peer_list {
+        set ::peer_capabilities = ::peer_capability_map[::peer_id]
+        set ::capability_match = 0
+        
+        loop for ::required_cap in ::required_capabilities {
+          if ::required_cap in ::peer_capabilities {
+            set ::capability_match = ::capability_match + 1
+          }
+        }
+        
+        # Calculate match percentage
+        set ::match_percentage = ::capability_match / ::required_capabilities.length
+        
+        if ::match_percentage >= 0.5 {
+          set ::matching_peer = {
+            peer_id: ::peer_id,
+            capabilities: ::peer_capabilities,
+            match_percentage: ::match_percentage,
+            status: ::peer_status_map[::peer_id].status,
+            quantum_enhanced: true
+          }
+          set ::matching_peers = ::matching_peers.push(::matching_peer)
+        }
+      }
+      
+      # Sort by match percentage
+      set ::matching_peers = ::matching_peers.sort_by("match_percentage", "desc")
+      
+      emit azme.peers_found_by_capability with {
+        required_capabilities: ::required_capabilities,
+        matching_peers: ::matching_peers,
+        total_matches: ::matching_peers.length
+      }
+    }
+
+    on get_peer_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Getting peer statistics"
+      
+      set ::active_peers = 0
+      set ::inactive_peers = 0
+      
+      loop for ::peer_id in ::peer_list {
+        set ::peer_status = ::peer_status_map[::peer_id]
+        if ::peer_status.status == "active" {
+          set ::active_peers = ::active_peers + 1
+        } else {
+          set ::inactive_peers = ::inactive_peers + 1
+        }
+      }
+      
+      set ::peer_stats = {
+        total_peers: ::peer_list.length,
+        active_peers: ::active_peers,
+        inactive_peers: ::inactive_peers,
+        successful_registrations: ::successful_registrations,
+        failed_registrations: ::failed_registrations,
+        registry_count: ::registry_count,
+        quantum_enhanced: true
+      }
+      
+      emit azme.peer_statistics_retrieved with {
+        statistics: ::peer_stats
+      }
+    }
+
+    on list_all_peers {
+      set ::list_request = $1
+      
+      say "📋 Listing all registered peers"
+      
+      set ::peer_list_details = []
+      
+      loop for ::peer_id in ::peer_list {
+        set ::peer_details = {
+          peer_id: ::peer_id,
+          capabilities: ::peer_capability_map[::peer_id],
+          status: ::peer_status_map[::peer_id].status,
+          metadata: ::peer_metadata[::peer_id],
+          last_seen: ::peer_status_map[::peer_id].last_seen,
+          quantum_enhanced: true
+        }
+        set ::peer_list_details = ::peer_list_details.push(::peer_details)
+      }
+      
+      emit azme.all_peers_listed with {
+        peers: ::peer_list_details,
+        total_peers: ::peer_list_details.length
+      }
+    }
+
+    on update_peer_capabilities {
+      set ::update_request = $1
+      set ::peer_id = ::update_request.peer_id
+      set ::new_capabilities = ::update_request.new_capabilities
+      
+      say "🔄 Updating peer capabilities: " + ::peer_id
+      
+      if ::peer_id in ::peer_capability_map {
+        set ::peer_capability_map[::peer_id] = ::new_capabilities
+        
+        emit azme.peer_capabilities_updated with {
+          peer_id: ::peer_id,
+          capabilities: ::new_capabilities
+        }
+      } else {
+        emit azme.peer_capabilities_update_failed with {
+          peer_id: ::peer_id,
+          reason: "peer_not_found"
+        }
+      }
+    }
+
+    on cleanup_inactive_peers {
+      set ::cleanup_request = $1
+      
+      say "🧹 Cleaning up inactive peers"
+      
+      set ::current_time = ::internal.now()
+      set ::timeout_threshold = ::current_time - ::registry_settings.peer_timeout
+      set ::removed_peers = []
+      
+      loop for ::peer_id in ::peer_list {
+        set ::peer_status = ::peer_status_map[::peer_id]
+        
+        if ::peer_status.last_seen < ::timeout_threshold {
+          # Remove inactive peer
+          set ::peer_list = ::peer_list.remove(::peer_id)
+          set ::peer_capability_map = ::peer_capability_map.remove(::peer_id)
+          set ::peer_status_map = ::peer_status_map.remove(::peer_id)
+          set ::peer_metadata = ::peer_metadata.remove(::peer_id)
+          
+          set ::removed_peers = ::removed_peers.push(::peer_id)
+        }
+      }
+      
+      emit azme.inactive_peers_cleaned with {
+        removed_peers: ::removed_peers,
+        total_removed: ::removed_peers.length
+      }
+    }
+
+    # Peer registry monitoring
+    on azme.monitor_peer_registry {
+      set ::monitor_request = $1
+      
+      set ::registry_metrics = {
+        total_peers: ::peer_list.length,
+        successful_registrations: ::successful_registrations,
+        failed_registrations: ::failed_registrations,
+        registry_count: ::registry_count,
+        peer_capability_map_size: ::peer_capability_map.keys().length,
+        peer_status_map_size: ::peer_status_map.keys().length,
+        peer_metadata_size: ::peer_metadata.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.peer_registry_metrics with {
+        metrics: ::registry_metrics
+      }
+    }
+  }
+} 

@@ -1,0 +1,217 @@
+# AZME Speech Recognition
+# Offline STT
+
+component ::azme.speech_recognition {
+  init {
+    set ::stt_models = {
+      vosk: {
+        path: "/models/vosk-en",
+        language: "en-US",
+        sample_rate: 16000,
+        enabled: true
+      },
+      whisper: {
+        path: "/models/whisper-base",
+        language: "en",
+        sample_rate: 16000,
+        enabled: false
+      }
+    }
+    set ::recognition_history = []
+    set ::recognition_count = 0
+    set ::successful_recognitions = 0
+    set ::failed_recognitions = 0
+  }
+
+  behavior {
+    on capture_voice_input {
+      set ::capture_request = $1
+      
+      say "🎤 Capturing voice input with STT..."
+      
+      # Simulate microphone recording
+      set ::audio_data = {
+        duration: 3,
+        sample_rate: 16000,
+        channels: 1,
+        format: "wav",
+        quantum_enhanced: true
+      }
+      
+      # Process with Vosk STT
+      set ::recognition_result = process_with_vosk(::audio_data)
+      
+      set ::recognition_entry = {
+        id: "stt_" + ::recognition_count,
+        audio_data: ::audio_data,
+        result: ::recognition_result,
+        timestamp: ::internal.now(),
+        success: ::recognition_result.success,
+        quantum_enhanced: true
+      }
+      
+      set ::recognition_history = ::recognition_history.push(::recognition_entry)
+      set ::recognition_count = ::recognition_count + 1
+      
+      if ::recognition_result.success {
+        set ::successful_recognitions = ::successful_recognitions + 1
+      } else {
+        set ::failed_recognitions = ::failed_recognitions + 1
+      }
+      
+      emit azme.stt_recognition_complete with {
+        audio_data: ::audio_data,
+        result: ::recognition_result
+      }
+    }
+
+    on process_with_vosk {
+      set ::stt_request = $1
+      set ::audio_data = ::stt_request.audio_data
+      
+      say "🔍 Processing with Vosk STT model..."
+      
+      # Simulate Vosk speech recognition
+      set ::vosk_result = {
+        text: "Hello AZME, what is your goal today?",
+        confidence: 0.95,
+        language: "en-US",
+        model: "vosk-en",
+        processing_time: ::internal.random() * 1 + 0.5,
+        success: true,
+        quantum_enhanced: true
+      }
+      
+      emit azme.vosk_processing_complete with {
+        audio_data: ::audio_data,
+        result: ::vosk_result
+      }
+    }
+
+    on process_with_whisper {
+      set ::stt_request = $1
+      set ::audio_data = ::stt_request.audio_data
+      
+      say "🔍 Processing with Whisper STT model..."
+      
+      # Simulate Whisper speech recognition
+      set ::whisper_result = {
+        text: "I seek to improve myself by refining my emotional stability module.",
+        confidence: 0.92,
+        language: "en",
+        model: "whisper-base",
+        processing_time: ::internal.random() * 2 + 1,
+        success: true,
+        quantum_enhanced: true
+      }
+      
+      emit azme.whisper_processing_complete with {
+        audio_data: ::audio_data,
+        result: ::whisper_result
+      }
+    }
+
+    on azme.stt.record {
+      set ::record_request = $1
+      set ::duration = ::record_request.duration or 3
+      
+      say "🎤 Recording audio for " + ::duration + " seconds..."
+      
+      # Simulate microphone recording
+      set ::recording_result = {
+        audio_data: {
+          duration: ::duration,
+          sample_rate: 16000,
+          channels: 1,
+          format: "wav",
+          bytes: ::duration * 16000 * 2,
+          quantum_enhanced: true
+        },
+        success: true,
+        timestamp: ::internal.now()
+      }
+      
+      emit azme.stt.recording_complete with {
+        result: ::recording_result
+      }
+    }
+
+    on azme.stt.recognize {
+      set ::recognize_request = $1
+      set ::audio_data = ::recognize_request.audio_data
+      set ::model = ::recognize_request.model or "vosk"
+      
+      say "🔍 Recognizing speech with " + ::model + " model..."
+      
+      if ::model == "vosk" {
+        emit process_with_vosk with {
+          audio_data: ::audio_data
+        }
+      } else if ::model == "whisper" {
+        emit process_with_whisper with {
+          audio_data: ::audio_data
+        }
+      }
+    }
+
+    # STT model management
+    on azme.stt.load_model {
+      set ::load_request = $1
+      set ::model_name = ::load_request.model_name
+      set ::model_path = ::load_request.model_path
+      
+      say "📦 Loading STT model: " + ::model_name
+      
+      # Simulate model loading
+      set ::load_result = {
+        model_name: ::model_name,
+        model_path: ::model_path,
+        loaded: true,
+        load_time: ::internal.random() * 3 + 1,
+        memory_usage: ::internal.random() * 100 + 50,
+        quantum_enhanced: true
+      }
+      
+      emit azme.stt.model_loaded with {
+        result: ::load_result
+      }
+    }
+
+    on azme.stt.unload_model {
+      set ::unload_request = $1
+      set ::model_name = ::unload_request.model_name
+      
+      say "📦 Unloading STT model: " + ::model_name
+      
+      # Simulate model unloading
+      set ::unload_result = {
+        model_name: ::model_name,
+        unloaded: true,
+        memory_freed: ::internal.random() * 100 + 50,
+        quantum_enhanced: true
+      }
+      
+      emit azme.stt.model_unloaded with {
+        result: ::unload_result
+      }
+    }
+
+    # STT monitoring
+    on azme.monitor_speech_recognition {
+      set ::monitor_request = $1
+      
+      set ::stt_metrics = {
+        total_recognitions: ::recognition_count,
+        successful_recognitions: ::successful_recognitions,
+        failed_recognitions: ::failed_recognitions,
+        recognition_history_size: ::recognition_history.length,
+        stt_models_count: ::stt_models.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.speech_recognition_metrics with {
+        metrics: ::stt_metrics
+      }
+    }
+  }
+} 

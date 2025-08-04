@@ -1,0 +1,20 @@
+# AZL Sorting Benchmarks
+# This file contains AZL commands for quicksort and mergesort benchmarks
+
+# Generate test data for sorting benchmarks
+generate_array 100
+generate_array 1000  
+generate_array 10000
+
+# Run quicksort benchmarks
+quicksort_benchmark 100
+quicksort_benchmark 1000
+quicksort_benchmark 10000
+
+# Run mergesort benchmarks  
+mergesort_benchmark 100
+mergesort_benchmark 1000
+mergesort_benchmark 10000
+
+# Output benchmark results
+output_sorting_results 

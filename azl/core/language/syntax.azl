@@ -1,0 +1,98 @@
+# AZL Language Syntax - Syntax Definitions
+# This component defines the AZL language syntax
+
+component ::core.syntax {
+  init {
+    set ::status = "initializing"
+    set ::syntax_rules = {
+      keywords: [
+        "component", "init", "behavior", "memory", "on", "emit", "set", "say",
+        "if", "else", "loop", "for", "in", "while", "link", "interface"
+      ],
+      operators: [
+        "=", "+", "-", "*", "/", "==", "!=", ">", "<", ">=", "<="
+      ],
+      punctuation: [
+        "{", "}", "(", ")", "[", "]", ":", ";", ",", "."
+      ],
+      literals: [
+        "string", "number", "boolean", "null"
+      ]
+    }
+    
+    say "📝 AZL Language Syntax initializing..."
+    emit syntax.initializing
+  }
+
+  on validate_syntax {
+    set ::code = $1
+    set ::errors = []
+    set ::warnings = []
+    
+    say "📝 Validating AZL syntax..."
+    
+    # Check for balanced braces
+    emit check_balanced_braces with ::code
+    
+    # Check for valid keywords
+    emit check_valid_keywords with ::code
+    
+    # Check for valid operators
+    emit check_valid_operators with ::code
+    
+    # Check for valid punctuation
+    emit check_valid_punctuation with ::code
+    
+    emit syntax.validated with ::errors ::warnings
+  }
+
+  on check_balanced_braces {
+    set ::code = $1
+    set ::open_braces = 0
+    set ::open_parens = 0
+    set ::open_brackets = 0
+    
+    loop for ::char in ::code {
+      if ::char == "{" {
+        set ::open_braces = ::open_braces + 1
+      }
+      
+      if ::char == "}" {
+        set ::open_braces = ::open_braces - 1
+      }
+      
+      if ::char == "(" {
+        set ::open_parens = ::open_parens + 1
+      }
+      
+      if ::char == ")" {
+        set ::open_parens = ::open_parens - 1
+      }
+      
+      if ::char == "[" {
+        set ::open_brackets = ::open_brackets + 1
+      }
+      
+      if ::char == "]" {
+        set ::open_brackets = ::open_brackets - 1
+      }
+    }
+    
+    if ::open_braces != 0 {
+      say "⚠️ Unbalanced braces detected"
+    }
+    
+    if ::open_parens != 0 {
+      say "⚠️ Unbalanced parentheses detected"
+    }
+    
+    if ::open_brackets != 0 {
+      say "⚠️ Unbalanced brackets detected"
+    }
+  }
+
+  memory {
+    ::status = "ready"
+    ::syntax_rules = {}
+  }
+} 

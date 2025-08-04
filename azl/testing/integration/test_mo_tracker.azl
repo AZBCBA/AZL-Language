@@ -1,0 +1,36 @@
+component ::mo.tracker {
+  init {
+    set ::value_map.interaction = 1.0
+    set ::value_map.praise = 1.0
+    set ::value_map.attention = 1.0
+    set ::decay_rate = 0.01
+    set ::hunger_level = 0.5
+    set ::recent_success = false
+    say MO Tracker initialized with values: ::value_map.interaction, ::value_map.praise, ::value_map.attention
+    emit mo.tracker.initialized
+  }
+
+  behavior {
+    listen for mo.tracker.initialized {
+      say MO Tracker is ready to track motivation values
+      emit mo.updated
+    }
+    
+    listen for mo.updated {
+      say Processing motivation update
+      emit mo.state.updated
+    }
+    
+    listen for reinforce.success {
+      set ::recent_success = true
+      say Reinforcement success recorded
+      emit mo.success.recorded
+    }
+    
+    listen for reinforce.failure {
+      set ::recent_success = false
+      say Reinforcement failure recorded
+      emit mo.failure.recorded
+    }
+  }
+} 

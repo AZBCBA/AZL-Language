@@ -1,0 +1,26 @@
+// Test closure environment capture
+fn make_counter() {
+    let n = 0;
+    return fn() {
+        n = n + 1;
+        return n;
+    };
+}
+
+let counter = make_counter();
+say "Counter test:";
+say counter(); // Should be 1
+say counter(); // Should be 2
+say counter(); // Should be 3
+
+// Test closure with captured variables
+fn make_adder(x) {
+    return fn(y) {
+        return x + y;
+    };
+}
+
+let add_five = make_adder(5);
+say "Adder test:";
+say add_five(3); // Should be 8
+say add_five(10); // Should be 15 

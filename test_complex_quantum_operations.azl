@@ -1,0 +1,137 @@
+component ::test.complex_quantum {
+  init {
+    set ::test_results = {}
+  }
+
+  behavior {
+    on start {
+      # Test 1: Complex arithmetic
+      emit processor.complex_add with {a: {real: 1.0, imag: 2.0}, b: {real: 3.0, imag: 4.0}}
+      
+      # Test 2: Complex multiplication
+      emit processor.complex_multiply with {a: {real: 1.0, imag: 1.0}, b: {real: 1.0, imag: -1.0}}
+      
+      # Test 3: Phase rotation
+      emit processor.complex_phase_rotation with {angle: 0.7853981633974483}  # π/4
+      
+      # Test 4: Apply S gate (π/2 phase)
+      emit processor.apply_s_gate
+      
+      # Test 5: Apply T gate (π/4 phase)
+      emit processor.apply_t_gate
+      
+      # Test 6: Apply arbitrary phase gate
+      emit processor.apply_phase_gate with {theta: 1.5707963267948966}  # π/2
+      
+      # Test 7: Complex measurement
+      emit processor.measure_state
+    }
+
+    on math.complex_sum {
+      set ::sum = $1
+      set ::test_results.complex_addition = ::sum
+      emit test.complex_addition.completed with ::test_results
+    }
+
+    on math.complex_product {
+      set ::product = $1
+      set ::test_results.complex_multiplication = ::product
+      emit test.complex_multiplication.completed with ::test_results
+    }
+
+    on math.phase_rotation {
+      set ::rotation = $1
+      set ::test_results.phase_rotation = ::rotation
+      emit test.phase_rotation.completed with ::test_results
+    }
+
+    on processor.s_gate_applied {
+      set ::state = $1
+      set ::test_results.s_gate_state = ::state
+      emit test.s_gate.completed with ::test_results
+    }
+
+    on processor.t_gate_applied {
+      set ::state = $1
+      set ::test_results.t_gate_state = ::state
+      emit test.t_gate.completed with ::test_results
+    }
+
+    on processor.phase_gate_applied {
+      set ::theta = $1.theta
+      set ::state = $1.state
+      set ::test_results.phase_gate = {theta: ::theta, state: ::state}
+      emit test.phase_gate.completed with ::test_results
+    }
+
+    on processor.measured {
+      set ::result = $1.result
+      set ::p0 = $1.probability_0
+      set ::p1 = $1.probability_1
+      set ::test_results.measurement = {result: ::result, probability_0: ::p0, probability_1: ::p1}
+      emit test.complex_measurement.completed with ::test_results
+    }
+  }
+}
+
+# Test complex Bell state generation
+component ::test.complex_bell_state {
+  behavior {
+    on start {
+      # Generate Bell state with complex amplitudes
+      emit processor.generate_bell_state
+      
+      # Measure the complex Bell state
+      emit processor.measure_multi_qubit
+      
+      # Calculate complex entanglement fidelity
+      emit processor.calculate_real_entanglement_fidelity
+    }
+
+    on processor.bell_state_generated {
+      set ::bell_state = $1
+      set ::test_results.complex_bell_state = ::bell_state
+      emit test.complex_bell.completed with ::test_results
+    }
+
+    on processor.multi_qubit_measured {
+      set ::measurement_result = $1.result
+      set ::test_results.complex_measurement = ::measurement_result
+      emit test.complex_multi_measurement.completed with ::test_results
+    }
+
+    on processor.entanglement_fidelity {
+      set ::fidelity = $1.fidelity
+      set ::test_results.complex_fidelity = ::fidelity
+      emit test.complex_fidelity.completed with ::test_results
+    }
+  }
+}
+
+# Test quantum Fourier transform with complex numbers
+component ::test.complex_qft {
+  behavior {
+    on start {
+      # Apply quantum Fourier transform with complex arithmetic
+      emit processor.apply_quantum_fourier_transform
+    }
+
+    on processor.qft_completed {
+      set ::result = $1.result
+      set ::test_results.qft_result = ::result
+      emit test.complex_qft.completed with ::test_results
+    }
+  }
+}
+
+# Main test runner
+component ::test.complex_runner {
+  behavior {
+    on start {
+      # Run complex quantum tests
+      emit test.complex_quantum.start
+      emit test.complex_bell_state.start
+      emit test.complex_qft.start
+    }
+  }
+} 

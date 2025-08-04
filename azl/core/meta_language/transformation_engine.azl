@@ -1,0 +1,682 @@
+# AZL Transformation Engine
+# Handles code transformations, refactoring, and optimizations using universal AST
+
+component ::meta_language.transformation_engine {
+  init {
+    set ::status = "initializing"
+    set ::engine_version = "1.0"
+    set ::transformation_rules = {}
+    set ::refactoring_patterns = {}
+    set ::optimization_strategies = {}
+    set ::transformation_history = []
+    
+    # Link to core components
+    link ::meta_language.universal_ast
+    link ::reasoning.cognitive
+    link ::semantic.understanding
+    
+    # Initialize transformation rules
+    set ::transformation_rules = {
+      # Basic transformations
+      rename_identifier: {
+        pattern: { type: "Identifier" },
+        action: "rename",
+        validation: "identifier_valid",
+        description: "Rename variables, functions, or classes"
+      },
+      extract_function: {
+        pattern: { type: "BlockStatement", repeated: true },
+        action: "extract",
+        validation: "function_extractable",
+        description: "Extract repeated code into functions"
+      },
+      inline_function: {
+        pattern: { type: "FunctionDeclaration", simple: true },
+        action: "inline",
+        validation: "function_inlineable",
+        description: "Inline simple functions"
+      },
+      optimize_loop: {
+        pattern: { type: "ForStatement", nested: true },
+        action: "optimize",
+        validation: "loop_optimizable",
+        description: "Optimize nested loops"
+      },
+      add_logging: {
+        pattern: { type: "FunctionDeclaration" },
+        action: "add_logging",
+        validation: "function_loggable",
+        description: "Add logging to functions"
+      },
+      remove_unused: {
+        pattern: { type: "VariableDeclaration", unused: true },
+        action: "remove",
+        validation: "variable_removable",
+        description: "Remove unused variables"
+      },
+      simplify_expression: {
+        pattern: { type: "BinaryExpression", complex: true },
+        action: "simplify",
+        validation: "expression_simplifiable",
+        description: "Simplify complex expressions"
+      },
+      convert_loop: {
+        pattern: { type: "ForStatement", map_candidate: true },
+        action: "convert_to_map",
+        validation: "loop_convertible",
+        description: "Convert loops to functional style"
+      }
+    }
+    
+    # Refactoring patterns
+    set ::refactoring_patterns = {
+      # Code smell detection
+      long_function: {
+        pattern: { type: "FunctionDeclaration", lines: ">20" },
+        suggestion: "extract_methods",
+        priority: "high"
+      },
+      duplicate_code: {
+        pattern: { type: "BlockStatement", repeated: ">3" },
+        suggestion: "extract_function",
+        priority: "high"
+      },
+      complex_condition: {
+        pattern: { type: "IfStatement", condition_complexity: ">5" },
+        suggestion: "extract_condition",
+        priority: "medium"
+      },
+      nested_loops: {
+        pattern: { type: "ForStatement", nesting_depth: ">2" },
+        suggestion: "optimize_loops",
+        priority: "medium"
+      },
+      magic_numbers: {
+        pattern: { type: "Literal", magic_number: true },
+        suggestion: "extract_constant",
+        priority: "low"
+      }
+    }
+    
+    # Optimization strategies
+    set ::optimization_strategies = {
+      performance: {
+        loop_optimization: true,
+        expression_simplification: true,
+        dead_code_elimination: true,
+        constant_folding: true
+      },
+      readability: {
+        function_extraction: true,
+        variable_renaming: true,
+        comment_addition: true,
+        structure_improvement: true
+      },
+      maintainability: {
+        code_organization: true,
+        error_handling: true,
+        logging_addition: true,
+        documentation: true
+      }
+    }
+    
+    emit "transformation_engine.initialized" with {
+      status: ::status,
+      version: ::engine_version,
+      rules: ::transformation_rules.length,
+      patterns: ::refactoring_patterns.length,
+      strategies: ::optimization_strategies.length
+    }
+    
+    set ::status = "ready"
+    say "🔧 Transformation Engine initialized"
+    say "📊 Transformation rules: ::transformation_rules.length"
+    say "🔍 Refactoring patterns: ::refactoring_patterns.length"
+    say "⚡ Optimization strategies: ::optimization_strategies.length"
+  }
+
+  behavior {
+    # Analyze code for transformation opportunities
+    listen for "transform.analyze" then {
+      set ::ast_data = ::analyze_data.ast
+      set ::options = ::analyze_data.options || {}
+      set ::status = "analyzing"
+      
+      say "🔧 Analyzing code for transformation opportunities..."
+      
+      # Analyze AST for patterns
+      set ::analysis_result = ::analyze_ast_patterns(::ast_data)
+      
+      # Generate transformation suggestions
+      set ::suggestions = ::generate_transformation_suggestions(::analysis_result, ::options)
+      
+      # Apply semantic reasoning
+      emit "semantic.understanding.insight.ready" with { 
+        text: "Code analysis: " + ::suggestions.length + " transformation opportunities found" 
+      }
+      
+      emit "transform.analysis_complete" with {
+        ast: ::ast_data,
+        analysis: ::analysis_result,
+        suggestions: ::suggestions,
+        options: ::options
+      }
+      
+      set ::status = "ready"
+      say "✅ Code analysis complete"
+      say "💡 Suggestions: ::suggestions.length"
+    }
+    
+    # Apply transformation
+    listen for "transform.apply" then {
+      set ::transformation = ::transform_data
+      set ::ast_data = ::transform_data.ast
+      set ::status = "transforming"
+      
+      say "🔧 Applying transformation: ::transformation.type"
+      
+      # Validate transformation
+      set ::validation = ::validate_transformation(::transformation, ::ast_data)
+      
+      if ::validation.valid {
+        # Apply transformation
+        set ::transformed_ast = ::apply_transformation(::transformation, ::ast_data)
+        
+        # Record transformation
+        set ::transformation_history.push({
+          type: ::transformation.type,
+          ast_before: ::ast_data,
+          ast_after: ::transformed_ast,
+          timestamp: ::time.engine.now().epoch
+        })
+        
+        emit "transform.complete" with {
+          original: ::ast_data,
+          transformed: ::transformed_ast,
+          transformation: ::transformation,
+          validation: ::validation
+        }
+        
+        say "✅ Transformation applied successfully"
+      } else {
+        emit "transform.error" with {
+          transformation: ::transformation,
+          errors: ::validation.errors
+        }
+        
+        say "❌ Transformation failed: ::validation.errors[0]"
+      }
+      
+      set ::status = "ready"
+    }
+    
+    # Refactor code based on patterns
+    listen for "refactor.apply" then {
+      set ::refactor_data = ::refactor_data
+      set ::ast_data = ::refactor_data.ast
+      set ::strategy = ::refactor_data.strategy || "readability"
+      set ::status = "refactoring"
+      
+      say "🔧 Applying refactoring strategy: ::strategy"
+      
+      # Detect code smells
+      set ::code_smells = ::detect_code_smells(::ast_data)
+      
+      # Generate refactoring plan
+      set ::refactoring_plan = ::generate_refactoring_plan(::code_smells, ::strategy)
+      
+      # Apply refactoring
+      set ::refactored_ast = ::apply_refactoring_plan(::refactoring_plan, ::ast_data)
+      
+      emit "refactor.complete" with {
+        original: ::ast_data,
+        refactored: ::refactored_ast,
+        code_smells: ::code_smells,
+        plan: ::refactoring_plan,
+        strategy: ::strategy
+      }
+      
+      set ::status = "ready"
+      say "✅ Refactoring complete"
+      say "🔍 Code smells fixed: ::code_smells.length"
+    }
+    
+    # Optimize code
+    listen for "optimize.apply" then {
+      set ::optimize_data = ::optimize_data
+      set ::ast_data = ::optimize_data.ast
+      set ::optimization_type = ::optimize_data.type || "performance"
+      set ::status = "optimizing"
+      
+      say "⚡ Applying optimization: ::optimization_type"
+      
+      # Apply optimization strategies
+      set ::optimized_ast = ::apply_optimization(::ast_data, ::optimization_type)
+      
+      emit "optimize.complete" with {
+        original: ::ast_data,
+        optimized: ::optimized_ast,
+        optimization_type: ::optimization_type
+      }
+      
+      set ::status = "ready"
+      say "✅ Optimization complete"
+    }
+    
+    # Learn from transformation results
+    listen for "transform.learn" then {
+      set ::learning_data = ::learning_data
+      set ::transformation_result = ::learning_data.result
+      
+      say "🧠 Learning from transformation result..."
+      
+      # Update transformation rules based on results
+      set ::updated_rules = ::update_transformation_rules(::transformation_result)
+      
+      # Store learning outcome
+      emit "memory.core.store_memory" with {
+        id: "transformation.learning." + ::time.engine.now().epoch,
+        memory_type: "semantic",
+        content: {
+          transformation: ::transformation_result,
+          learning_outcome: ::updated_rules,
+          timestamp: ::time.engine.now().epoch
+        },
+        importance: 0.8,
+        confidence: 0.7,
+        emotional_valence: 0.5,
+        metadata: {
+          source: "transformation_engine",
+          learning_type: "transformation_improvement",
+          timestamp: ::time.engine.now().epoch
+        }
+      }
+      
+      emit "transform.learning_complete" with {
+        result: ::transformation_result,
+        updated_rules: ::updated_rules
+      }
+      
+      say "✅ Learning complete"
+    }
+  }
+
+  # Helper functions
+  function ::analyze_ast_patterns(ast) {
+    set ::patterns_found = []
+    set ::complexity_metrics = {}
+    
+    # Analyze function complexity
+    set ::function_nodes = ::query_ast_nodes({ type: "FunctionDeclaration" }, ::ast)
+    loop for ::function in ::function_nodes {
+      set ::complexity = ::calculate_function_complexity(::function)
+      set ::complexity_metrics[::function.name] = ::complexity
+      
+      if ::complexity.lines > 20 {
+        set ::patterns_found.push({
+          type: "long_function",
+          node: ::function,
+          complexity: ::complexity
+        })
+      }
+    }
+    
+    # Analyze duplicate code
+    set ::block_nodes = ::query_ast_nodes({ type: "BlockStatement" }, ::ast)
+    set ::duplicates = ::find_duplicate_blocks(::block_nodes)
+    loop for ::duplicate in ::duplicates {
+      set ::patterns_found.push({
+        type: "duplicate_code",
+        nodes: ::duplicate,
+        count: ::duplicate.length
+      })
+    }
+    
+    # Analyze loop complexity
+    set ::loop_nodes = ::query_ast_nodes({ type: "ForStatement" }, ::ast)
+    loop for ::loop in ::loop_nodes {
+      set ::nesting_depth = ::calculate_loop_nesting(::loop)
+      if ::nesting_depth > 2 {
+        set ::patterns_found.push({
+          type: "nested_loops",
+          node: ::loop,
+          nesting_depth: ::nesting_depth
+        })
+      }
+    }
+    
+    return {
+      patterns: ::patterns_found,
+      complexity: ::complexity_metrics,
+      total_functions: ::function_nodes.length,
+      total_loops: ::loop_nodes.length
+    }
+  }
+  
+  function ::generate_transformation_suggestions(analysis, options) {
+    set ::suggestions = []
+    
+    loop for ::pattern in ::analysis.patterns {
+      if ::pattern.type == "long_function" {
+        set ::suggestions.push({
+          type: "extract_function",
+          priority: "high",
+          description: "Extract methods from long function: " + ::pattern.node.name,
+          pattern: ::pattern
+        })
+      } else if ::pattern.type == "duplicate_code" {
+        set ::suggestions.push({
+          type: "extract_function",
+          priority: "high",
+          description: "Extract duplicate code into function",
+          pattern: ::pattern
+        })
+      } else if ::pattern.type == "nested_loops" {
+        set ::suggestions.push({
+          type: "optimize_loop",
+          priority: "medium",
+          description: "Optimize nested loops",
+          pattern: ::pattern
+        })
+      }
+    }
+    
+    # Add general improvements
+    if ::options.add_logging {
+      set ::suggestions.push({
+        type: "add_logging",
+        priority: "low",
+        description: "Add logging to functions",
+        pattern: null
+      })
+    }
+    
+    return ::suggestions
+  }
+  
+  function ::validate_transformation(transformation, ast) {
+    set ::errors = []
+    set ::valid = true
+    
+    # Check if transformation type exists
+    if not ::transformation_rules[::transformation.type] {
+      set ::errors.push("Unknown transformation type: " + ::transformation.type)
+      set ::valid = false
+    }
+    
+    # Validate transformation parameters
+    if ::transformation.type == "rename_identifier" {
+      if not ::transformation.new_name {
+        set ::errors.push("Missing new name for rename transformation")
+        set ::valid = false
+      }
+    }
+    
+    # Check if target nodes exist
+    if ::transformation.target_node {
+      set ::target_exists = ::find_node_in_ast(::transformation.target_node, ::ast)
+      if not ::target_exists {
+        set ::errors.push("Target node not found in AST")
+        set ::valid = false
+      }
+    }
+    
+    return { valid: ::valid, errors: ::errors }
+  }
+  
+  function ::apply_transformation(transformation, ast) {
+    set ::transformed_ast = ::ast
+    
+    if ::transformation.type == "rename_identifier" {
+      set ::transformed_ast = ::rename_identifier(::ast, ::transformation)
+    } else if ::transformation.type == "extract_function" {
+      set ::transformed_ast = ::extract_function(::ast, ::transformation)
+    } else if ::transformation.type == "optimize_loop" {
+      set ::transformed_ast = ::optimize_loop(::ast, ::transformation)
+    } else if ::transformation.type == "add_logging" {
+      set ::transformed_ast = ::add_logging(::ast, ::transformation)
+    } else if ::transformation.type == "remove_unused" {
+      set ::transformed_ast = ::remove_unused_variables(::ast, ::transformation)
+    }
+    
+    return ::transformed_ast
+  }
+  
+  function ::rename_identifier(ast, transformation) {
+    set ::new_name = ::transformation.new_name
+    set ::old_name = ::transformation.old_name
+    
+    # Find and replace all occurrences
+    set ::updated_ast = ::replace_identifiers(::ast, ::old_name, ::new_name)
+    
+    return ::updated_ast
+  }
+  
+  function ::extract_function(ast, transformation) {
+    set ::function_name = ::transformation.function_name || "extracted_function"
+    set ::code_blocks = ::transformation.pattern.nodes
+    
+    # Create new function from duplicate code
+    set ::new_function = {
+      type: "FunctionDeclaration",
+      name: ::function_name,
+      params: ::extract_parameters(::code_blocks),
+      body: ::code_blocks[0].body
+    }
+    
+    # Replace duplicate blocks with function calls
+    set ::updated_ast = ::replace_blocks_with_calls(::ast, ::code_blocks, ::function_name)
+    
+    # Add new function to AST
+    set ::updated_ast.body.unshift(::new_function)
+    
+    return ::updated_ast
+  }
+  
+  function ::optimize_loop(ast, transformation) {
+    set ::loop_node = ::transformation.pattern.node
+    
+    # Convert nested loops to more efficient structure
+    if ::loop_node.nesting_depth > 2 {
+      set ::optimized_loop = ::convert_nested_loops(::loop_node)
+      set ::updated_ast = ::replace_node_in_ast(::ast, ::loop_node, ::optimized_loop)
+      return ::updated_ast
+    }
+    
+    return ::ast
+  }
+  
+  function ::add_logging(ast, transformation) {
+    set ::function_nodes = ::query_ast_nodes({ type: "FunctionDeclaration" }, ::ast)
+    
+    loop for ::function in ::function_nodes {
+      set ::log_statement = {
+        type: "ExpressionStatement",
+        expression: {
+          type: "CallExpression",
+          callee: {
+            type: "Identifier",
+            name: "console.log"
+          },
+          arguments: [
+            {
+              type: "Literal",
+              value: "Function " + ::function.name + " called",
+              raw: "\"Function " + ::function.name + " called\""
+            }
+          ]
+        }
+      }
+      
+      set ::function.body.unshift(::log_statement)
+    }
+    
+    return ::ast
+  }
+  
+  function ::detect_code_smells(ast) {
+    set ::smells = []
+    
+    # Detect long functions
+    set ::function_nodes = ::query_ast_nodes({ type: "FunctionDeclaration" }, ::ast)
+    loop for ::function in ::function_nodes {
+      set ::complexity = ::calculate_function_complexity(::function)
+      if ::complexity.lines > 20 {
+        set ::smells.push({
+          type: "long_function",
+          node: ::function,
+          severity: "high",
+          description: "Function " + ::function.name + " is too long"
+        })
+      }
+    }
+    
+    # Detect magic numbers
+    set ::literal_nodes = ::query_ast_nodes({ type: "Literal" }, ::ast)
+    loop for ::literal in ::literal_nodes {
+      if ::is_magic_number(::literal.value) {
+        set ::smells.push({
+          type: "magic_number",
+          node: ::literal,
+          severity: "medium",
+          description: "Magic number detected: " + ::literal.value
+        })
+      }
+    }
+    
+    return ::smells
+  }
+  
+  function ::generate_refactoring_plan(smells, strategy) {
+    set ::plan = []
+    
+    loop for ::smell in ::smells {
+      if ::smell.type == "long_function" {
+        set ::plan.push({
+          action: "extract_methods",
+          target: ::smell.node,
+          priority: ::smell.severity,
+          description: ::smell.description
+        })
+      } else if ::smell.type == "magic_number" {
+        set ::plan.push({
+          action: "extract_constant",
+          target: ::smell.node,
+          priority: ::smell.severity,
+          description: ::smell.description
+        })
+      }
+    }
+    
+    return ::plan
+  }
+  
+  function ::apply_refactoring_plan(plan, ast) {
+    set ::refactored_ast = ::ast
+    
+    loop for ::action in ::plan {
+      if ::action.action == "extract_methods" {
+        set ::refactored_ast = ::extract_methods_from_function(::refactored_ast, ::action.target)
+      } else if ::action.action == "extract_constant" {
+        set ::refactored_ast = ::extract_constant(::refactored_ast, ::action.target)
+      }
+    }
+    
+    return ::refactored_ast
+  }
+  
+  function ::apply_optimization(ast, optimization_type) {
+    set ::optimized_ast = ::ast
+    
+    if ::optimization_type == "performance" {
+      set ::optimized_ast = ::apply_performance_optimizations(::ast)
+    } else if ::optimization_type == "readability" {
+      set ::optimized_ast = ::apply_readability_optimizations(::ast)
+    } else if ::optimization_type == "maintainability" {
+      set ::optimized_ast = ::apply_maintainability_optimizations(::ast)
+    }
+    
+    return ::optimized_ast
+  }
+  
+  function ::calculate_function_complexity(function) {
+    set ::lines = 0
+    set ::branches = 0
+    set ::expressions = 0
+    
+    # Count lines in function body
+    loop for ::statement in ::function.body {
+      set ::lines = ::lines + 1
+      
+      if ::statement.type == "IfStatement" {
+        set ::branches = ::branches + 1
+      }
+      
+      if ::statement.type == "ExpressionStatement" {
+        set ::expressions = ::expressions + 1
+      }
+    }
+    
+    return {
+      lines: ::lines,
+      branches: ::branches,
+      expressions: ::expressions,
+      complexity: ::lines + ::branches * 2
+    }
+  }
+  
+  function ::find_duplicate_blocks(blocks) {
+    set ::duplicates = []
+    set ::block_signatures = {}
+    
+    loop for ::block in ::blocks {
+      set ::signature = ::generate_block_signature(::block)
+      
+      if ::block_signatures[::signature] {
+        set ::block_signatures[::signature].push(::block)
+      } else {
+        set ::block_signatures[::signature] = [::block]
+      }
+    }
+    
+    loop for ::signature in ::block_signatures {
+      if ::block_signatures[::signature].length > 1 {
+        set ::duplicates.push(::block_signatures[::signature])
+      }
+    }
+    
+    return ::duplicates
+  }
+  
+  function ::generate_block_signature(block) {
+    # Generate a signature for code block comparison
+    set ::signature = ""
+    
+    loop for ::statement in ::block.body {
+      set ::signature = ::signature + ::statement.type + "|"
+    }
+    
+    return ::signature
+  }
+  
+  function ::is_magic_number(value) {
+    # Check if a number is a magic number (hardcoded constant)
+    if ::value.type == "number" {
+      set ::num = ::value.value
+      if ::num > 10 and ::num < 1000 {
+        return true
+      }
+    }
+    
+    return false
+  }
+
+  memory {
+    ::status = ""
+    ::engine_version = ""
+    ::transformation_rules = {}
+    ::refactoring_patterns = {}
+    ::optimization_strategies = {}
+    ::transformation_history = []
+  }
+} 

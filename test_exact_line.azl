@@ -1,0 +1,77 @@
+let message = "Hello from AZL v2 Standard Library!";
+write_file("demo_output.txt", message);
+let read_message = read_file("demo_output.txt");
+say "File content:";
+say read_message;
+
+# String operations
+let text = "apple,banana,cherry,date";
+let fruits = split(text, ",");
+say "Split fruits:";
+say stringify(fruits);
+
+let joined = join(fruits, " | ");
+say "Joined:";
+say joined;
+
+let replaced = replace(text, "banana", "orange");
+say "Replaced:";
+say replaced;
+
+# Array operations
+let numbers = [1, 2, 3, 4, 5];
+say "Original array:";
+say stringify(numbers);
+
+let pushed = push(numbers, 6);
+say "After push:";
+say stringify(pushed);
+
+let popped = pop(pushed);
+say "Popped value:";
+say stringify(popped);
+
+let sliced = slice(numbers, 1, 3);
+say "Sliced array:";
+say stringify(sliced);
+
+# Math operations
+let x = -5;
+say "Absolute value of -5:";
+say abs(x);
+
+let y = 16;
+say "Square root of 16:";
+say sqrt(y);
+
+let z = 2;
+say "2 to the power of 3:";
+say pow(z, 3);
+
+say "Sine of 0:";
+say sin(0);
+
+say "Cosine of 0:";
+say cos(0);
+
+say "Tangent of 0:";
+say tan(0);
+
+say "Natural log of 1:";
+say log(1);
+
+say "e to the power of 1:";
+say exp(1);
+
+say "Round 3.7:";
+say round(3.7);
+
+say "Minimum of 5 and 3:";
+say min(5, 3);
+
+say "Maximum of 5 and 3:";
+say max(5, 3);
+
+# Time operations
+say "Current timestamp:";
+say now(); 

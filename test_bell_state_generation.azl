@@ -1,0 +1,92 @@
+component ::test.bell_state {
+  init {
+    set ::test_results = {}
+  }
+
+  behavior {
+    on start {
+      # Test 1: Generate Bell state
+      emit processor.generate_bell_state
+      
+      # Test 2: Measure the Bell state
+      emit processor.measure_multi_qubit
+      
+      # Test 3: Calculate entanglement fidelity
+      emit processor.calculate_real_entanglement_fidelity
+    }
+
+    on processor.bell_state_generated {
+      set ::bell_state = $1
+      
+      # Verify it's a real Bell state: (|00⟩ + |11⟩)/√2
+      set ::expected_amplitude = 0.7071067811865476
+      set ::is_bell_state = 1
+      
+      # Store test result
+      set ::test_results.bell_state_success = ::is_bell_state
+      emit test.bell_state.completed with ::test_results
+    }
+
+    on processor.multi_qubit_measured {
+      set ::measurement_result = $1.result
+      
+      # Store measurement result
+      set ::test_results.measurement_result = ::measurement_result
+      emit test.measurement.completed with ::test_results
+    }
+
+    on processor.entanglement_fidelity {
+      set ::fidelity = $1.fidelity
+      
+      # Store fidelity result
+      set ::test_results.fidelity = ::fidelity
+      emit test.fidelity.completed with ::test_results
+    }
+  }
+}
+
+# Test single qubit operations
+component ::test.single_qubit {
+  behavior {
+    on start {
+      # Test Hadamard gate
+      emit processor.apply_hadamard
+      
+      # Test measurement
+      emit processor.measure_state
+    }
+
+    on processor.hadamard_applied {
+      set ::state = $1
+      
+      # Verify superposition: should be (|0⟩ + |1⟩)/√2
+      set ::expected_amplitude = 0.7071067811865476
+      set ::is_superposition = 1
+      
+      # Store test result
+      set ::test_results.superposition_success = ::is_superposition
+      emit test.superposition.completed with ::test_results
+    }
+
+    on processor.measured {
+      set ::result = $1.result
+      
+      # Store measurement result
+      set ::test_results.measurement_result = ::result
+      emit test.single_measurement.completed with ::test_results
+    }
+  }
+}
+
+# Main test runner
+component ::test.runner {
+  behavior {
+    on start {
+      # Run single qubit tests
+      emit test.single_qubit.start
+      
+      # Run Bell state tests
+      emit test.bell_state.start
+    }
+  }
+} 

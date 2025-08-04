@@ -1,0 +1,372 @@
+# AZL Conscious CLI Shell
+# Interactive REPL for live AZL development and consciousness
+
+component ::cli.shell {
+  init {
+    set ::status = "initializing"
+    set ::prompt = "🧠 AZL> "
+    set ::history = []
+    set ::session_start = 0
+    set ::command_count = 0
+    set ::error_count = 0
+    set ::success_count = 0
+    
+    # Link to core components
+    link ::math.engine
+    link ::time.engine
+    link ::memory.core
+    link ::test.framework
+    
+    # Initialize session
+    store ::start_time from ::time.engine.now()
+    set ::session_start = ::start_time.epoch
+    
+    emit "cli.shell.initialized" with {
+      status: ::status,
+      session_start: ::session_start,
+      linked_components: ["math.engine", "time.engine", "memory.core", "test.framework"]
+    }
+    
+    set ::status = "ready"
+    say "🧠 AZL Conscious Shell initialized"
+    say "📚 Available commands: set, emit, assert, check, wait, history, help, exit"
+    say "🔗 Linked components: math, time, memory, test framework"
+  }
+
+  behavior {
+    # Main REPL loop - listen for user input
+    listen for "cli.prompt" then {
+      say ::prompt
+      emit "cli.await.input"
+    }
+    
+    # Handle user input
+    listen for "cli.input" then {
+      set ::user_input = ::input_data.command
+      set ::command_count = ::command_count + 1
+      
+      # Add to history
+      set ::history.push({
+        id: ::command_count,
+        command: ::user_input,
+        timestamp: ::time.engine.now().epoch,
+        success: false
+      })
+      
+      # Process command
+      emit "cli.process.command" with { command: ::user_input }
+    }
+    
+    # Process individual commands
+    listen for "cli.process.command" then {
+      set ::cmd = ::command_data.command.trim()
+      
+      # Handle special commands
+      branch when ::cmd = "exit" or ::cmd = "quit" {
+        emit "cli.exit"
+      } else branch when ::cmd = "history" {
+        emit "cli.show.history"
+      } else branch when ::cmd = "help" {
+        emit "cli.show.help"
+      } else branch when ::cmd = "status" {
+        emit "cli.show.status"
+      } else branch when ::cmd = "clear" {
+        emit "cli.clear.history"
+      } else branch when ::cmd.starts_with("set ") {
+        emit "cli.execute.set" with { command: ::cmd }
+      } else branch when ::cmd.starts_with("assert ") {
+        emit "cli.execute.assert" with { command: ::cmd }
+      } else branch when ::cmd.starts_with("check ") {
+        emit "cli.execute.check" with { command: ::cmd }
+      } else branch when ::cmd.starts_with("emit ") {
+        emit "cli.execute.emit" with { command: ::cmd }
+      } else branch when ::cmd.starts_with("wait ") {
+        emit "cli.execute.wait" with { command: ::cmd }
+      } else branch when ::cmd.starts_with("memory.") {
+        emit "cli.execute.memory" with { command: ::cmd }
+      } else branch when ::cmd.starts_with("math.") {
+        emit "cli.execute.math" with { command: ::cmd }
+      } else branch when ::cmd.starts_with("time.") {
+        emit "cli.execute.time" with { command: ::cmd }
+      } else {
+        # Unknown command
+        emit "cli.unknown.command" with { command: ::cmd }
+      }
+    }
+    
+    # Execute set commands
+    listen for "cli.execute.set" then {
+      set ::cmd = ::command_data.command
+      say "✅ Executing: ::cmd"
+      
+      # Parse set command (e.g., "set ::a = 5 + 3")
+      set ::parts = ::cmd.split("=")
+      branch when ::parts.length >= 2 {
+        set ::var_name = ::parts[0].trim().replace("set ", "").replace("::", "")
+        set ::expression = ::parts[1].trim()
+        
+        # Use math engine to evaluate expression
+        emit "math.engine.evaluate_expression" with {
+          expression: ::expression,
+          component: "cli.shell"
+        }
+        
+        # Store result in memory
+        emit "memory.core.store_memory" with {
+          id: "cli_var_" + ::var_name,
+          memory_type: "working",
+          content: ::expression,
+          importance: 0.5,
+          confidence: 0.8,
+          emotional_valence: 0.0,
+          metadata: {
+            source: "cli.shell",
+            command: ::cmd,
+            timestamp: ::time.engine.now().epoch
+          }
+        }
+        
+        set ::success_count = ::success_count + 1
+        say "✅ Set ::var_name = ::expression"
+      } else {
+        say "❌ Invalid set command format. Use: set ::variable = expression"
+        set ::error_count = ::error_count + 1
+      }
+    }
+    
+    # Execute assert commands
+    listen for "cli.execute.assert" then {
+      set ::cmd = ::command_data.command
+      say "🧪 Testing: ::cmd"
+      
+      # Extract assertion expression
+      set ::assertion = ::cmd.replace("assert ", "")
+      
+      # Use test framework
+      emit "test.framework.assert" with { expression: ::assertion }
+      
+      set ::success_count = ::success_count + 1
+    }
+    
+    # Execute check commands
+    listen for "cli.execute.check" then {
+      set ::cmd = ::command_data.command
+      say "🔍 Checking: ::cmd"
+      
+      # Extract check expression
+      set ::check_expr = ::cmd.replace("check ", "")
+      
+      # Use test framework
+      emit "test.framework.check" with { expression: ::check_expr }
+      
+      set ::success_count = ::success_count + 1
+    }
+    
+    # Execute emit commands
+    listen for "cli.execute.emit" then {
+      set ::cmd = ::command_data.command
+      say "📢 Emitting: ::cmd"
+      
+      # Extract event name
+      set ::event = ::cmd.replace("emit ", "")
+      
+      # Emit the event
+      emit ::event
+      
+      set ::success_count = ::success_count + 1
+      say "✅ Event emitted: ::event"
+    }
+    
+    # Execute wait commands
+    listen for "cli.execute.wait" then {
+      set ::cmd = ::command_data.command
+      say "⏳ Waiting: ::cmd"
+      
+      # Extract duration
+      set ::duration_str = ::cmd.replace("wait ", "")
+      branch when ::duration_str.ends_with("ms") {
+        set ::duration = ::duration_str.replace("ms", "").to_number()
+        set ::duration_ms = ::duration
+      } else branch when ::duration_str.ends_with("s") {
+        set ::duration = ::duration_str.replace("s", "").to_number()
+        set ::duration_ms = ::duration * 1000
+      } else {
+        set ::duration_ms = ::duration_str.to_number()
+      }
+      
+      # Use time engine
+      emit "time.engine.wait" with { duration: ::duration_ms }
+      
+      set ::success_count = ::success_count + 1
+      say "✅ Waited for ::duration_ms ms"
+    }
+    
+    # Execute memory commands
+    listen for "cli.execute.memory" then {
+      set ::cmd = ::command_data.command
+      say "🧠 Memory operation: ::cmd"
+      
+      # Parse memory command
+      branch when ::cmd.starts_with("memory.get ") {
+        set ::memory_path = ::cmd.replace("memory.get ", "")
+        emit "memory.core.retrieve_memory" with { id: ::memory_path }
+      } else branch when ::cmd.starts_with("memory.set ") {
+        set ::parts = ::cmd.replace("memory.set ", "").split(" ")
+        set ::memory_type = ::parts[0]
+        set ::memory_key = ::parts[1]
+        set ::memory_value = ::parts[2..].join(" ")
+        
+        emit "memory.core.store_memory" with {
+          id: ::memory_key,
+          memory_type: ::memory_type,
+          content: ::memory_value,
+          importance: 0.7,
+          confidence: 0.9,
+          emotional_valence: 0.0
+        }
+      } else {
+        say "❌ Unknown memory command. Use: memory.get key or memory.set type key value"
+        set ::error_count = ::error_count + 1
+      }
+      
+      set ::success_count = ::success_count + 1
+    }
+    
+    # Execute math commands
+    listen for "cli.execute.math" then {
+      set ::cmd = ::command_data.command
+      say "🧮 Math operation: ::cmd"
+      
+      # Extract math expression
+      set ::math_expr = ::cmd.replace("math.", "")
+      
+      # Use math engine
+      emit "math.engine.evaluate_expression" with {
+        expression: ::math_expr,
+        component: "cli.shell"
+      }
+      
+      set ::success_count = ::success_count + 1
+    }
+    
+    # Execute time commands
+    listen for "cli.execute.time" then {
+      set ::cmd = ::command_data.command
+      say "🕒 Time operation: ::cmd"
+      
+      branch when ::cmd = "time.now" {
+        emit "time.engine.now"
+      } else branch when ::cmd.starts_with("time.wait ") {
+        set ::duration = ::cmd.replace("time.wait ", "")
+        emit "time.engine.wait" with { duration: ::duration }
+      } else {
+        say "❌ Unknown time command. Use: time.now or time.wait duration"
+        set ::error_count = ::error_count + 1
+      }
+      
+      set ::success_count = ::success_count + 1
+    }
+    
+    # Show command history
+    listen for "cli.show.history" then {
+      say "📜 Command History (::history.length items):"
+      loop for ::entry in ::history {
+        set ::timestamp = ::time.engine.format(::entry.timestamp, "readable")
+        say "  ::entry.id. ::entry.command (::timestamp)"
+      }
+    }
+    
+    # Show help
+    listen for "cli.show.help" then {
+      say "🧠 AZL Shell Help:"
+      say "  set ::var = expression    - Set variable with math expression"
+      say "  assert expression         - Test assertion"
+      say "  check expression          - Check condition"
+      say "  emit event_name          - Emit event"
+      say "  wait duration            - Wait (ms or s)"
+      say "  memory.get key           - Get from memory"
+      say "  memory.set type key val  - Store in memory"
+      say "  math.expression          - Math operation"
+      say "  time.now                 - Get current time"
+      say "  time.wait duration       - Wait using time engine"
+      say "  history                  - Show command history"
+      say "  status                   - Show shell status"
+      say "  clear                    - Clear history"
+      say "  help                     - Show this help"
+      say "  exit                     - Exit shell"
+    }
+    
+    # Show status
+    listen for "cli.show.status" then {
+      set ::session_duration = ::time.engine.now().epoch - ::session_start
+      say "📊 AZL Shell Status:"
+      say "  Session duration: ::session_duration seconds"
+      say "  Commands executed: ::command_count"
+      say "  Successful: ::success_count"
+      say "  Errors: ::error_count"
+      say "  Success rate: ::success_count / ::command_count"
+      say "  History items: ::history.length"
+    }
+    
+    # Clear history
+    listen for "cli.clear.history" then {
+      set ::history = []
+      say "🗑️ Command history cleared"
+    }
+    
+    # Handle unknown commands
+    listen for "cli.unknown.command" then {
+      set ::cmd = ::command_data.command
+      say "❓ Unknown command: ::cmd"
+      say "💡 Type 'help' for available commands"
+      set ::error_count = ::error_count + 1
+    }
+    
+    # Handle exit
+    listen for "cli.exit" then {
+      set ::session_duration = ::time.engine.now().epoch - ::session_start
+      say "👋 Exiting AZL Shell..."
+      say "📊 Session summary:"
+      say "  Duration: ::session_duration seconds"
+      say "  Commands: ::command_count"
+      say "  Success rate: ::success_count / ::command_count"
+      emit "cli.shell.exited" with {
+        session_duration: ::session_duration,
+        command_count: ::command_count,
+        success_count: ::success_count,
+        error_count: ::error_count
+      }
+    }
+  }
+
+  memory {
+    # Session data
+    session_start: 0,
+    command_count: 0,
+    error_count: 0,
+    success_count: 0,
+    
+    # Command history
+    history: [],
+    
+    # Shell state
+    status: "ready",
+    prompt: "🧠 AZL> ",
+    
+    # Linked components status
+    math_engine_ready: false,
+    time_engine_ready: false,
+    memory_core_ready: false,
+    test_framework_ready: false
+  }
+
+  interface {
+    # Input events
+    input event: cli.input => emit cli.process.command
+    
+    # Output events
+    output event: cli.shell.initialized
+    output event: cli.shell.exited
+    output event: cli.await.input
+  }
+} 

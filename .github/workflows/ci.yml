@@ -1,0 +1,94 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: 
+        toolchain: [stable, beta]
+        include:
+          - toolchain: stable
+            rustup: stable
+          - toolchain: beta
+            rustup: beta
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rustup }}
+          profile: minimal
+          components: clippy,rustfmt
+          
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+        
+      - name: Run clippy
+        run: cargo clippy --all-targets -- -D warnings
+        
+      - name: Run tests (debug)
+        run: cargo test --all -- --nocapture
+        
+      - name: Run tests (release)
+        run: cargo test --release --all -- --nocapture
+        
+      - name: Run property tests
+        run: cargo test --test property_tests -- --nocapture
+        
+      - name: Build release
+        run: cargo build --release
+        
+      - name: Test VM demo
+        run: cargo run --release -- vm
+        
+      - name: Test VM demo with tracing
+        run: cargo run --release -- vm --trace
+
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+        
+      - name: Run fuzz tests
+        run: |
+          cd fuzz
+          cargo fuzz run parse -- -runs=1000
+          cargo fuzz run fuzz_target_1 -- -runs=1000
+
+  nightly-checks:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Install nightly Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          components: miri
+          
+      - name: Run Miri (memory safety)
+        run: |
+          cargo miri test --test tests
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation 

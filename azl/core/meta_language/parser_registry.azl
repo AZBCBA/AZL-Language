@@ -1,0 +1,351 @@
+# AZL Parser Registry
+# Manages multiple language parsers and provides unified AST generation interface
+
+component ::meta_language.parser_registry {
+  init {
+    set ::status = "initializing"
+    set ::registry_version = "1.0"
+    set ::registered_parsers = {}
+    set ::parser_status = {}
+    set ::ast_cache = {}
+    set ::parse_queue = []
+    
+    # Link to universal AST schema
+    link ::meta_language.universal_ast
+    
+    # Initialize parser registry
+    set ::registered_parsers = {
+      python: {
+        component: "::meta_language.python_parser",
+        status: "active",
+        capabilities: ["functions", "classes", "imports", "control_flow", "expressions"],
+        supported_extensions: [".py", ".pyw"],
+        parser_type: "tree-sitter"
+      },
+      javascript: {
+        component: "::meta_language.javascript_parser",
+        status: "active",
+        capabilities: ["functions", "classes", "modules", "control_flow", "expressions"],
+        supported_extensions: [".js", ".jsx", ".mjs"],
+        parser_type: "tree-sitter-javascript"
+      },
+      rust: {
+        component: "::meta_language.rust_parser",
+        status: "active",
+        capabilities: ["functions", "structs", "traits", "modules", "control_flow"],
+        supported_extensions: [".rs"],
+        parser_type: "syn"
+      },
+      typescript: {
+        component: "::meta_language.typescript_parser",
+        status: "inactive",
+        capabilities: ["functions", "classes", "interfaces", "modules", "types"],
+        supported_extensions: [".ts", ".tsx"],
+        parser_type: "acorn"
+      },
+      lua: {
+        component: "::meta_language.lua_parser",
+        status: "inactive",
+        capabilities: ["functions", "tables", "modules", "control_flow"],
+        supported_extensions: [".lua"],
+        parser_type: "custom"
+      },
+      aba: {
+        component: "::meta_language.aba_parser",
+        status: "inactive",
+        capabilities: ["components", "behaviors", "events", "memory"],
+        supported_extensions: [".azl"],
+        parser_type: "custom"
+      }
+    }
+    
+    # Initialize parser status tracking
+    loop for ::language in ::registered_parsers {
+      set ::parser_status[::language] = {
+        active: ::registered_parsers[::language].status == "active",
+        last_used: 0,
+        parse_count: 0,
+        error_count: 0,
+        average_parse_time: 0
+      }
+    }
+    
+    emit "parser_registry.initialized" with {
+      status: ::status,
+      version: ::registry_version,
+      registered_parsers: ::registered_parsers.length,
+      active_parsers: ::count_active_parsers()
+    }
+    
+    set ::status = "ready"
+    say "📚 Parser Registry initialized"
+    say "📊 Registered parsers: ::registered_parsers.length"
+    say "✅ Active parsers: ::count_active_parsers()"
+  }
+
+  behavior {
+    # Register a new parser
+    listen for "parser_registry.register" then {
+      set ::language = ::register_data.language
+      set ::parser_info = ::register_data.parser_info
+      
+      say "📚 Registering parser for language: ::language"
+      
+      set ::registered_parsers[::language] = ::parser_info
+      set ::parser_status[::language] = {
+        active: true,
+        last_used: 0,
+        parse_count: 0,
+        error_count: 0,
+        average_parse_time: 0
+      }
+      
+      emit "parser_registry.registered" with {
+        language: ::language,
+        parser_info: ::parser_info
+      }
+      
+      say "✅ Parser registered successfully"
+    }
+    
+    # Parse source code using appropriate parser
+    listen for "parser_registry.parse" then {
+      set ::source_code = ::parse_data.source
+      set ::language = ::parse_data.language
+      set ::file_path = ::parse_data.file_path || "unknown." + ::language
+      set ::options = ::parse_data.options || {}
+      
+      set ::status = "parsing"
+      
+      say "📚 Parsing source code with registry..."
+      say "📝 Language: ::language"
+      say "📁 File: ::file_path"
+      
+      # Check if parser is available
+      if ::registered_parsers[::language] and ::parser_status[::language].active {
+        set ::parser_info = ::registered_parsers[::language]
+        set ::parser_component = ::parser_info.component
+        
+        # Record parse start time
+        set ::parse_start_time = ::time.engine.now().epoch
+        
+        # Route to appropriate parser
+        emit ::parser_component + ".parse_source" with {
+          source: ::source_code,
+          file_path: ::file_path,
+          options: ::options
+        }
+        
+        # Update parser status
+        set ::parser_status[::language].last_used = ::time.engine.now().epoch
+        set ::parser_status[::language].parse_count = ::parser_status[::language].parse_count + 1
+        
+      } else {
+        emit "parser_registry.parse_error" with {
+          error: "No active parser available for language: " + ::language,
+          available_languages: ::get_available_languages(),
+          requested_language: ::language
+        }
+        
+        say "❌ Parser not available for language: ::language"
+      }
+    }
+    
+    # Handle parse completion from any parser
+    listen for "python.parse_complete" then {
+      set ::parse_result = ::parse_result
+      set ::language = "python"
+      
+      say "✅ Parse complete for ::language"
+      
+      # Calculate parse time
+      set ::parse_time = ::time.engine.now().epoch - ::parse_start_time
+      set ::parser_status[::language].average_parse_time = ::update_average_parse_time(::language, ::parse_time)
+      
+      # Cache AST result
+      set ::ast_cache[::parse_result.file_path] = {
+        language: ::language,
+        ast: ::parse_result.universal_ast,
+        parse_time: ::parse_time,
+        timestamp: ::time.engine.now().epoch
+      }
+      
+      # Emit AST ready event
+      emit "ast.event_bus.ast.generated" with {
+        language: ::language,
+        file_path: ::parse_result.file_path,
+        ast: ::parse_result.universal_ast,
+        parse_time: ::parse_time,
+        source: ::parse_result.source
+      }
+      
+      emit "parser_registry.parse_complete" with {
+        language: ::language,
+        file_path: ::parse_result.file_path,
+        ast: ::parse_result.universal_ast,
+        parse_time: ::parse_time
+      }
+    }
+    
+    # Handle parse errors
+    listen for "parser_registry.parse_error" then {
+      set ::error_data = ::parse_error_data
+      set ::language = ::error_data.language || "unknown"
+      
+      say "❌ Parse error for language: ::language"
+      say "📝 Error: ::error_data.error"
+      
+      # Update parser status
+      set ::parser_status[::language].error_count = ::parser_status[::language].error_count + 1
+      
+      emit "ast.event_bus.ast.error" with {
+        language: ::language,
+        error: ::error_data.error,
+        file_path: ::error_data.file_path
+      }
+    }
+    
+    # Get parser information
+    listen for "parser_registry.get_parser_info" then {
+      set ::language = ::info_data.language
+      
+      if ::registered_parsers[::language] {
+        emit "parser_registry.parser_info" with {
+          language: ::language,
+          parser_info: ::registered_parsers[::language],
+          status: ::parser_status[::language]
+        }
+      } else {
+        emit "parser_registry.parser_not_found" with {
+          language: ::language,
+          available_languages: ::get_available_languages()
+        }
+      }
+    }
+    
+    # Activate/deactivate parser
+    listen for "parser_registry.set_parser_status" then {
+      set ::language = ::status_data.language
+      set ::active = ::status_data.active
+      
+      if ::registered_parsers[::language] {
+        set ::parser_status[::language].active = ::active
+        
+        say "📚 Parser status updated for ::language: " + (::active ? "active" : "inactive")
+        
+        emit "parser_registry.status_updated" with {
+          language: ::language,
+          active: ::active
+        }
+      } else {
+        emit "parser_registry.parser_not_found" with {
+          language: ::language,
+          available_languages: ::get_available_languages()
+        }
+      }
+    }
+    
+    # Get cached AST
+    listen for "parser_registry.get_cached_ast" then {
+      set ::file_path = ::cache_data.file_path
+      
+      if ::ast_cache[::file_path] {
+        emit "parser_registry.cached_ast" with {
+          file_path: ::file_path,
+          cached_ast: ::ast_cache[::file_path]
+        }
+      } else {
+        emit "parser_registry.cache_miss" with {
+          file_path: ::file_path
+        }
+      }
+    }
+    
+    # Clear AST cache
+    listen for "parser_registry.clear_cache" then {
+      set ::ast_cache = {}
+      
+      say "🗑️ AST cache cleared"
+      
+      emit "parser_registry.cache_cleared" with {
+        cache_size: 0
+      }
+    }
+    
+    # Handle orchestrator binding
+    listen for "parser_registry.bind_orchestrator" then {
+      set ::orchestrator = ::bind_data.orchestrator
+      
+      say "📚 Binding orchestrator: ::orchestrator"
+      
+      emit "parser_registry.orchestrator_bound" with {
+        orchestrator: ::orchestrator,
+        available_parsers: ::get_available_languages(),
+        registered_parsers: ::registered_parsers.length
+      }
+      
+      say "✅ Orchestrator bound to parser registry"
+    }
+  }
+
+  # Helper functions
+  function ::count_active_parsers() {
+    set ::active_count = 0
+    
+    loop for ::language in ::parser_status {
+      if ::parser_status[::language].active {
+        set ::active_count = ::active_count + 1
+      }
+    }
+    
+    return ::active_count
+  }
+  
+  function ::get_available_languages() {
+    set ::available = []
+    
+    loop for ::language in ::registered_parsers {
+      if ::parser_status[::language].active {
+        set ::available.push(::language)
+      }
+    }
+    
+    return ::available
+  }
+  
+  function ::update_average_parse_time(language, new_time) {
+    set ::current_avg = ::parser_status[::language].average_parse_time
+    set ::parse_count = ::parser_status[::language].parse_count
+    
+    if ::parse_count == 1 {
+      return ::new_time
+    } else {
+      return (::current_avg * (::parse_count - 1) + ::new_time) / ::parse_count
+    }
+  }
+  
+  function ::get_parser_statistics() {
+    set ::stats = {}
+    
+    loop for ::language in ::registered_parsers {
+      set ::stats[::language] = {
+        active: ::parser_status[::language].active,
+        parse_count: ::parser_status[::language].parse_count,
+        error_count: ::parser_status[::language].error_count,
+        average_parse_time: ::parser_status[::language].average_parse_time,
+        last_used: ::parser_status[::language].last_used
+      }
+    }
+    
+    return ::stats
+  }
+
+  memory {
+    ::status = ""
+    ::registry_version = ""
+    ::registered_parsers = {}
+    ::parser_status = {}
+    ::ast_cache = {}
+    ::parse_queue = []
+  }
+} 

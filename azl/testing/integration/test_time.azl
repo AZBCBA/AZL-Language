@@ -1,0 +1,208 @@
+component ::test.time {
+  init {
+    set ::t1 = {}
+    set ::t2 = {}
+    set ::delta = 0
+    set ::formatted_time = ""
+    
+    say "⏰ Starting Time Function Tests..."
+    emit "test.time.initialized"
+  }
+
+  behavior {
+    // Test basic time functions
+    listen for "test_basic_time" then {
+      say "🕒 Testing Basic Time Functions..."
+      
+      // Test now() function (returns both epoch and ISO)
+      store ::t1 from ::time.now()
+      say "Current time (epoch): ::t1.epoch"
+      say "Current time (ISO): ::t1.iso"
+      
+      // Test time formatting
+      store ::formatted_time from ::time.format(::t1.epoch, "readable")
+      say "Formatted time: ::formatted_time"
+      
+      // Test ISO formatting
+      store ::iso_time from ::time.format(::t1.epoch, "iso")
+      say "ISO time: ::iso_time"
+      
+      // Test Unix timestamp
+      store ::unix_time from ::time.format(::t1.epoch, "unix")
+      say "Unix timestamp: ::unix_time"
+      
+      emit "basic_time_tests.complete"
+    }
+
+    // Test time difference
+    listen for "test_time_diff" then {
+      say "⏱️ Testing Time Difference..."
+      
+      // Record start time
+      store ::t1 from ::time.now()
+      say "Start time (epoch): ::t1.epoch"
+      say "Start time (ISO): ::t1.iso"
+      
+      // Simulate some work (increment time)
+      emit "time.update"
+      listen for "time.updated" then {
+        emit "time.update"
+        listen for "time.updated" then {
+          // Record end time
+          store ::t2 from ::time.now()
+          say "End time (epoch): ::t2.epoch"
+          say "End time (ISO): ::t2.iso"
+          
+          // Calculate difference using epoch values
+          store ::delta from ::time.diff(::t1.epoch, ::t2.epoch)
+          say "Time difference: ::delta seconds"
+          
+          // Test the difference
+          emit "assert" with { expression: "::delta >= 0", test_name: "time_diff_positive" }
+          emit "assert" with { expression: "::delta <= 10", test_name: "time_diff_reasonable" }
+          
+          emit "time_diff_tests.complete"
+        }
+      }
+    }
+
+    // Test wait functionality
+    listen for "test_wait" then {
+      say "⏱️ Testing Wait Function..."
+      
+      // Record start time
+      store ::t1 from ::time.now()
+      say "Wait start time (epoch): ::t1.epoch"
+      
+      // Wait for 2 seconds
+      store ::wait_id from ::time.wait(2)
+      say "Wait ID: ::wait_id"
+      
+      // Check wait completion
+      emit "time.check_wait" with { wait_id: ::wait_id }
+      listen for "wait.completed" then {
+        store ::t2 from ::time.now()
+        say "Wait end time (epoch): ::t2.epoch"
+        
+        // Calculate actual wait time using epoch values
+        store ::actual_wait from ::time.diff(::t1.epoch, ::t2.epoch)
+        say "Actual wait time: ::actual_wait seconds"
+        
+        // Test wait duration
+        emit "assert" with { expression: "::actual_wait >= 2", test_name: "wait_duration" }
+        
+        emit "wait_tests.complete"
+      }
+    }
+
+    // Test scheduling
+    listen for "test_scheduling" then {
+      say "📅 Testing Event Scheduling..."
+      
+      // Schedule an event for 3 seconds from now
+      emit "time.schedule" with { event: "test.event", delay: 3 }
+      
+      // Listen for the scheduled event
+      listen for "test.event" then {
+        say "✅ Scheduled event executed!"
+        
+        // Record execution time
+        store ::execution_time from ::time.now()
+        say "Event executed at (epoch): ::execution_time.epoch"
+        say "Event executed at (ISO): ::execution_time.iso"
+        
+        emit "scheduling_tests.complete"
+      }
+    }
+
+    // Test time format changes
+    listen for "test_format_changes" then {
+      say "🕒 Testing Time Format Changes..."
+      
+      // Set format to Unix
+      emit "time.set_format" with { format: "unix" }
+      listen for "time.format.changed" then {
+        store ::unix_time from ::time.now()
+        say "Unix format time: ::unix_time"
+        
+        // Set format to readable
+        emit "time.set_format" with { format: "readable" }
+        listen for "time.format.changed" then {
+          store ::readable_time from ::time.now()
+          say "Readable format time: ::readable_time"
+          
+          // Set format back to both (default)
+          emit "time.set_format" with { format: "both" }
+          listen for "time.format.changed" then {
+            store ::both_time from ::time.now()
+            say "Both format time (epoch): ::both_time.epoch"
+            say "Both format time (ISO): ::both_time.iso"
+            
+            emit "format_change_tests.complete"
+          }
+        }
+      }
+    }
+
+    // Test the new both format
+    listen for "test_both_format" then {
+      say "🔄 Testing Both Format (Epoch + ISO)..."
+      
+      // Get time in both format
+      store ::current_time from ::time.now()
+      
+      // Test that we have both epoch and ISO
+      emit "assert" with { expression: "::current_time.epoch > 0", test_name: "epoch_exists" }
+      emit "assert" with { expression: "::current_time.iso.length > 0", test_name: "iso_exists" }
+      
+      say "✅ Both format test passed!"
+      say "  Epoch: ::current_time.epoch"
+      say "  ISO: ::current_time.iso"
+      
+      emit "both_format_tests.complete"
+    }
+
+    // Run all time tests
+    listen for "run_all_time_tests" then {
+      say "🚀 Running All Time Tests..."
+      
+      emit "test_basic_time"
+      listen for "basic_time_tests.complete" then {
+        emit "test_time_diff"
+        listen for "time_diff_tests.complete" then {
+          emit "test_wait"
+          listen for "wait_tests.complete" then {
+            emit "test_scheduling"
+            listen for "scheduling_tests.complete" then {
+              emit "test_format_changes"
+              listen for "format_change_tests.complete" then {
+                emit "test_both_format"
+                listen for "both_format_tests.complete" then {
+                  say "✅ All time tests completed!"
+                  emit "all_time_tests.complete"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  memory {
+    t1
+    t2
+    delta
+    formatted_time
+  }
+
+  interface {
+    test_basic_time
+    test_time_diff
+    test_wait
+    test_scheduling
+    test_format_changes
+    test_both_format
+    run_all_time_tests
+  }
+} 

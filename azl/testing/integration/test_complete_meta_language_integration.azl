@@ -1,0 +1,272 @@
+# Test Complete Meta-Language System Integration
+# Verifies parser registry, AST event bus, and orchestrator binding
+
+component ::test.complete_meta_language {
+  init {
+    set ::status = "initializing"
+    set ::test_results = []
+    set ::integration_status = {}
+    
+    # Link to all meta-language components
+    link ::meta_language.orchestrator
+    link ::meta_language.universal_ast
+    link ::meta_language.python_parser
+    link ::meta_language.transformation_engine
+    link ::meta_language.parser_registry
+    link ::meta_language.ast_event_bus
+    
+    # Link to autonomous brain
+    link ::agent.autonomous_brain
+    
+    emit "test.complete_meta_language.initialized" with {
+      status: ::status,
+      components: ["orchestrator", "universal_ast", "python_parser", "transformation_engine", "parser_registry", "ast_event_bus"]
+    }
+    
+    set ::status = "ready"
+    say "🧪 Complete Meta-Language Integration Test initialized"
+  }
+
+  behavior {
+    # Test parser registry integration
+    listen for "test.parser_registry" then {
+      say "🧪 Testing Parser Registry Integration..."
+      
+      # Test parser registration
+      set ::test_parser_info = {
+        component: "::meta_language.test_parser",
+        status: "active",
+        capabilities: ["functions", "classes", "imports"],
+        supported_extensions: [".test"],
+        parser_type: "custom"
+      }
+      
+      emit "parser_registry.register" with {
+        language: "test_language",
+        parser_info: ::test_parser_info
+      }
+      
+      # Test parser status
+      emit "parser_registry.set_parser_status" with {
+        language: "python",
+        active: true
+      }
+      
+      # Test parser information retrieval
+      emit "parser_registry.get_parser_info" with {
+        language: "python"
+      }
+    }
+    
+    # Test AST event bus integration
+    listen for "test.ast_event_bus" then {
+      say "🧪 Testing AST Event Bus Integration..."
+      
+      # Test AST generation event
+      set ::test_ast = {
+        type: "Program",
+        body: [
+          {
+            type: "FunctionDeclaration",
+            name: "test_function",
+            params: [],
+            body: []
+          }
+        ]
+      }
+      
+      emit "ast.event_bus.ast.generated" with {
+        language: "python",
+        file_path: "test_file.py",
+        ast: ::test_ast,
+        parse_time: 100,
+        source: "def test_function():\n    pass"
+      }
+      
+      # Test intent extraction event
+      emit "ast.event_bus.intent.extracted" with {
+        ast: ::test_ast,
+        intent: {
+          type: "extract_function",
+          value: "Extract test_function into separate module"
+        }
+      }
+    }
+    
+    # Test complete transformation pipeline
+    listen for "test.complete_pipeline" then {
+      say "🧪 Testing Complete Transformation Pipeline..."
+      
+      set ::test_source = "def calculate_area(width, height):\n    area = width * height\n    return area\n\nresult = calculate_area(10, 5)\nprint(result)"
+      
+      # Start transformation pipeline
+      emit "meta_language.transform_code" with {
+        source: ::test_source,
+        language: "python",
+        target_language: "python",
+        transformations: ["add_logging", "optimize_performance"],
+        options: { preserve_formatting: true }
+      }
+    }
+    
+    # Test orchestrator binding
+    listen for "test.orchestrator_binding" then {
+      say "🧪 Testing Orchestrator Binding..."
+      
+      # Test parser registry binding
+      emit "parser_registry.bind_orchestrator" with {
+        orchestrator: "::meta_language.orchestrator"
+      }
+      
+      # Test AST event bus binding
+      emit "ast.event_bus.bind_orchestrator" with {
+        orchestrator: "::meta_language.orchestrator"
+      }
+    }
+    
+    # Handle parser registry test results
+    listen for "parser_registry.registered" then {
+      say "✅ Parser registered successfully"
+      set ::test_results.push({ test: "parser_registration", success: true, language: $1.language })
+    }
+    
+    listen for "parser_registry.status_updated" then {
+      say "✅ Parser status updated: $1.language -> " + ($1.active ? "active" : "inactive")
+      set ::test_results.push({ test: "parser_status_update", success: true, language: $1.language, active: $1.active })
+    }
+    
+    listen for "parser_registry.parser_info" then {
+      say "✅ Parser info retrieved for: $1.language"
+      set ::test_results.push({ test: "parser_info_retrieval", success: true, language: $1.language })
+    }
+    
+    listen for "parser_registry.orchestrator_bound" then {
+      say "✅ Parser registry bound to orchestrator"
+      say "📊 Available parsers: $1.available_parsers.length"
+      set ::test_results.push({ test: "parser_registry_binding", success: true, available_parsers: $1.available_parsers.length })
+    }
+    
+    # Handle AST event bus test results
+    listen for "ast.event_bus.ast.generated" then {
+      say "✅ AST generation event processed"
+      set ::test_results.push({ test: "ast_generation_event", success: true, language: $1.language })
+    }
+    
+    listen for "ast.event_bus.intent.extracted" then {
+      say "✅ Intent extraction event processed"
+      set ::test_results.push({ test: "intent_extraction_event", success: true, intent_type: $1.intent.type })
+    }
+    
+    listen for "ast.event_bus.orchestrator_bound" then {
+      say "✅ AST event bus bound to orchestrator"
+      say "📊 Event handlers: $1.event_handlers.length"
+      set ::test_results.push({ test: "ast_event_bus_binding", success: true, event_handlers: $1.event_handlers.length })
+    }
+    
+    # Handle transformation pipeline results
+    listen for "meta_language.transform_complete" then {
+      say "✅ Complete transformation pipeline successful"
+      set ::test_results.push({ test: "complete_pipeline", success: true })
+      
+      # Generate integration report
+      emit "test.generate_integration_report"
+    }
+    
+    # Handle orchestrator binding results
+    listen for "parser_registry.orchestrator_bound" then {
+      set ::integration_status.parser_registry_bound = true
+      say "📚 Parser registry binding confirmed"
+    }
+    
+    listen for "ast.event_bus.orchestrator_bound" then {
+      set ::integration_status.ast_event_bus_bound = true
+      say "🚌 AST event bus binding confirmed"
+    }
+    
+    # Generate integration report
+    listen for "test.generate_integration_report" then {
+      say "📊 Generating Complete Integration Report..."
+      
+      set ::report = {
+        total_tests: ::test_results.length,
+        passed_tests: 0,
+        failed_tests: 0,
+        integration_status: ::integration_status,
+        test_details: ::test_results
+      }
+      
+      loop for ::result in ::test_results {
+        if ::result.success {
+          set ::report.passed_tests = ::report.passed_tests + 1
+        } else {
+          set ::report.failed_tests = ::report.failed_tests + 1
+        }
+      }
+      
+      say "📊 Integration Report:"
+      say "✅ Passed: ::report.passed_tests"
+      say "❌ Failed: ::report.failed_tests"
+      say "📋 Total: ::report.total_tests"
+      say "🔗 Parser Registry Bound: " + (::integration_status.parser_registry_bound ? "✅" : "❌")
+      say "🚌 AST Event Bus Bound: " + (::integration_status.ast_event_bus_bound ? "✅" : "❌")
+      
+      emit "test.integration_report_complete" with { report: ::report }
+    }
+    
+    # Run comprehensive integration test suite
+    listen for "test.run_integration_suite" then {
+      say "🧪 Running Complete Meta-Language Integration Test Suite..."
+      
+      # Test 1: Parser Registry Integration
+      emit "test.parser_registry"
+      
+      # Test 2: AST Event Bus Integration
+      emit "test.ast_event_bus"
+      
+      # Test 3: Orchestrator Binding
+      emit "test.orchestrator_binding"
+      
+      # Test 4: Complete Pipeline
+      emit "test.complete_pipeline"
+    }
+  }
+
+  memory {
+    ::status = ""
+    ::test_results = []
+    ::integration_status = {}
+  }
+}
+
+# Integration test executor
+component ::test.integration_executor {
+  init {
+    say "🚀 Starting Complete Meta-Language Integration Test Suite..."
+    emit "test.run_integration_suite"
+  }
+  
+  behavior {
+    listen for "test.integration_report_complete" then {
+      say "🎉 Complete Meta-Language Integration Test Suite Complete!"
+      say "📊 Final Results:"
+      say "✅ Passed: $1.report.passed_tests"
+      say "❌ Failed: $1.report.failed_tests"
+      say "📋 Total: $1.report.total_tests"
+      
+      if $1.report.failed_tests == 0 and $1.report.integration_status.parser_registry_bound and $1.report.integration_status.ast_event_bus_bound {
+        say "🎉 All integration tests passed! Meta-language system is fully operational."
+        say "🔗 Parser Registry: ✅ Bound"
+        say "🚌 AST Event Bus: ✅ Bound"
+        say "🎭 Orchestrator: ✅ Integrated"
+      } else {
+        say "⚠️ Some integration tests failed. Review the results for issues."
+        if not $1.report.integration_status.parser_registry_bound {
+          say "❌ Parser Registry binding failed"
+        }
+        if not $1.report.integration_status.ast_event_bus_bound {
+          say "❌ AST Event Bus binding failed"
+        }
+      }
+    }
+  }
+} 

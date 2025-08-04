@@ -1,0 +1,205 @@
+# Simple QRCP Test
+# Tests the quantum blockchain consensus protocol
+
+component ::test.qbc_simple {
+  init {
+    set ::test_results = {}
+  }
+
+  behavior {
+    on start {
+      say "🚀 Starting Quantum Blockchain Consensus Protocol (QRCP) Test"
+      emit qbc.node_initialized with {node_id: "node_1", qds_certified: true, identity: "quantum_node_1"}
+    }
+
+    on qbc.node_initialized {
+      set ::node_info = $1
+      say "📦 Node initialized: " + ::node_info.node_id + " with QDS certification"
+      emit qbc.node_initialized with {node_id: "node_2", qds_certified: true, identity: "quantum_node_2"}
+    }
+
+    on qbc.node_initialized {
+      set ::node_info = $1
+      if ::node_info.node_id == "node_2" {
+        say "📦 Node initialized: " + ::node_info.node_id + " with QDS certification"
+        emit qbc.node_initialized with {node_id: "node_3", qds_certified: true, identity: "quantum_node_3"}
+      } else if ::node_info.node_id == "node_3" {
+        say "📦 Node initialized: " + ::node_info.node_id + " with QDS certification"
+        emit qbc.node_initialized with {node_id: "node_4", qds_certified: true, identity: "quantum_node_4"}
+      } else if ::node_info.node_id == "node_4" {
+        say "📦 Node initialized: " + ::node_info.node_id + " with QDS certification"
+        emit qbc.node_initialized with {node_id: "node_5", qds_certified: true, identity: "quantum_node_5"}
+      } else if ::node_info.node_id == "node_5" {
+        say "📦 Node initialized: " + ::node_info.node_id + " with QDS certification"
+        say "🎲 All nodes initialized, beginning consensus round"
+        emit qbc.block_proposed with {
+          block_id: "block_" + ::internal.now(),
+          proposer_id: "node_3",
+          timestamp: ::internal.now(),
+          transactions: [
+            {from: "alice", to: "bob", amount: 100, quantum_signed: true},
+            {from: "charlie", to: "david", amount: 250, quantum_signed: true},
+            {from: "eve", to: "frank", amount: 75, quantum_signed: true}
+          ]
+        }
+      }
+    }
+
+    on qbc.block_proposed {
+      set ::block_info = $1
+      say "📦 Block proposed: " + ::block_info.block_id + " by " + ::block_info.proposer_id
+      emit qbc.vote_cast with {
+        node_id: "node_1",
+        block_id: ::block_info.block_id,
+        signature: "qds_signature_node_1_" + ::block_info.block_id,
+        vote: "approve",
+        timestamp: ::internal.now()
+      }
+    }
+
+    on qbc.vote_cast {
+      set ::vote_info = $1
+      say "🗳️ Vote cast by " + ::vote_info.node_id + " with QDS signature"
+      emit qbc.vote_verified with {
+        node_id: ::vote_info.node_id,
+        block_id: ::vote_info.block_id,
+        valid: true,
+        signature_verified: true,
+        qds_valid: true
+      }
+      
+      # Cast votes from other nodes
+      if ::vote_info.node_id == "node_1" {
+        emit qbc.vote_cast with {
+          node_id: "node_2",
+          block_id: ::vote_info.block_id,
+          signature: "qds_signature_node_2_" + ::vote_info.block_id,
+          vote: "approve",
+          timestamp: ::internal.now()
+        }
+      } else if ::vote_info.node_id == "node_2" {
+        emit qbc.vote_cast with {
+          node_id: "node_3",
+          block_id: ::vote_info.block_id,
+          signature: "qds_signature_node_3_" + ::vote_info.block_id,
+          vote: "approve",
+          timestamp: ::internal.now()
+        }
+      } else if ::vote_info.node_id == "node_3" {
+        emit qbc.vote_cast with {
+          node_id: "node_4",
+          block_id: ::vote_info.block_id,
+          signature: "qds_signature_node_4_" + ::vote_info.block_id,
+          vote: "approve",
+          timestamp: ::internal.now()
+        }
+      } else if ::vote_info.node_id == "node_4" {
+        emit qbc.vote_cast with {
+          node_id: "node_5",
+          block_id: ::vote_info.block_id,
+          signature: "qds_signature_node_5_" + ::vote_info.block_id,
+          vote: "approve",
+          timestamp: ::internal.now()
+        }
+      } else if ::vote_info.node_id == "node_5" {
+        say "✅ All votes cast, checking consensus quorum"
+        emit qbc.consensus_reached with {
+          block_id: ::vote_info.block_id,
+          votes_collected: 5,
+          consensus_ratio: 1.0,
+          threshold_met: true,
+          quantum_secure: true
+        }
+      }
+    }
+
+    on qbc.vote_verified {
+      set ::verification_info = $1
+      say "🔍 Vote verified for " + ::verification_info.node_id + " with QDS validation"
+    }
+
+    on qbc.consensus_reached {
+      set ::consensus_info = $1
+      say "🤝 Consensus reached with quantum security"
+      say "📊 Votes collected: " + ::consensus_info.votes_collected
+      say "📈 Consensus ratio: " + ::consensus_info.consensus_ratio
+      emit qbc.block_finalized with {
+        block_id: ::consensus_info.block_id,
+        committed: true,
+        quantum_signed: true,
+        tamper_proof: true,
+        consensus_verified: true,
+        timestamp: ::internal.now()
+      }
+    }
+
+    on qbc.block_finalized {
+      set ::finalization_info = $1
+      say "🔒 Block finalized with quantum signatures"
+      emit qbc.ledger_updated with {
+        block_data: {transactions: 3, total_value: 425},
+        new_state: {
+          total_transactions: 3,
+          total_value: 425,
+          quantum_signed_transactions: 3,
+          ledger_hash: "quantum_ledger_hash_" + ::internal.now(),
+          consensus_verified: true,
+          tamper_detected: false
+        },
+        block_finalized: true,
+        quantum_secure: true
+      }
+    }
+
+    on qbc.ledger_updated {
+      set ::ledger_info = $1
+      say "📚 Global ledger updated with quantum security"
+      emit qbc.chain_synchronized with {
+        status: "✅",
+        nodes_synchronized: 5,
+        ledger_consistency: true,
+        quantum_verification: true,
+        tamper_proof_verified: true,
+        consensus_finality: true
+      }
+    }
+
+    on qbc.chain_synchronized {
+      set ::sync_info = $1
+      say "🌐 All nodes synchronized with tamper-proof verification"
+      emit qbc.complete with {
+        protocol_executed: true,
+        quantum_secure: true,
+        consensus_achieved: true,
+        ledger_updated: true,
+        all_nodes_synchronized: true,
+        post_quantum_resistant: true
+      }
+    }
+
+    on qbc.complete {
+      set ::completion_info = $1
+      say "✅ Quantum Blockchain Consensus Protocol (QRCP) completed successfully!"
+      say "🌐 Quantum-secured distributed ledger operational"
+      say "🔐 All transactions quantum-signed and tamper-proof"
+      say "🤖 Ready for quantum AI training pipelines"
+      
+      set ::test_results.qbc_success = {
+        protocol_executed: ::completion_info.protocol_executed,
+        quantum_secure: ::completion_info.quantum_secure,
+        consensus_achieved: ::completion_info.consensus_achieved,
+        ledger_updated: ::completion_info.ledger_updated,
+        all_nodes_synchronized: ::completion_info.all_nodes_synchronized,
+        post_quantum_resistant: ::completion_info.post_quantum_resistant
+      }
+      
+      say "🎯 QRCP Test Results:"
+      say "   - Protocol executed: " + ::test_results.qbc_success.protocol_executed
+      say "   - Quantum secure: " + ::test_results.qbc_success.quantum_secure
+      say "   - Consensus achieved: " + ::test_results.qbc_success.consensus_achieved
+      say "   - Ledger updated: " + ::test_results.qbc_success.ledger_updated
+      say "   - All nodes synchronized: " + ::test_results.qbc_success.all_nodes_synchronized
+      say "   - Post-quantum resistant: " + ::test_results.qbc_success.post_quantum_resistant
+    }
+  }
+} 

@@ -1,0 +1,25 @@
+# Test Goal Execution
+# Tests goal execution with the current storage format
+
+say "🧠 Starting Goal Execution Test..."
+
+# Add multiple goals with different priorities
+addgoal "Increase consciousness level" 10
+addgoal "Clear memory" 8
+addgoal "Learn new behavior" 6
+
+# Execute goals multiple times
+say "🔍 Test 1: First execution..."
+run
+
+say "🔍 Test 2: Second execution..."
+run
+
+say "🔍 Test 3: Third execution..."
+run
+
+# Check final state
+say "🔍 Final state..."
+reflect
+
+say "✅ Goal Execution Test Complete!" 

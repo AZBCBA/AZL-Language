@@ -1,0 +1,156 @@
+component ::test.aba_integration_test {
+  init {
+    set ::test_results = []
+    set ::reinforcement_schedule = ::aba.reinforcement_schedule
+    set ::language_shaper = ::aba.language_shaper
+    set ::dtt = ::aba.discrete_trial_training
+    set ::test_phase = "setup"
+  }
+
+  behavior {
+    listen for "test_started" then {
+      run_reinforcement_schedule_test()
+    }
+
+    listen for "reinforcement_test_completed" then {
+      run_language_shaping_test()
+    }
+
+    listen for "shaping_test_completed" then {
+      run_dtt_test()
+    }
+
+    listen for "dtt_test_completed" then {
+      generate_test_report()
+    }
+  }
+
+  memory {
+    test_results
+    reinforcement_schedule
+    language_shaper
+    dtt
+    test_phase
+  }
+
+  interface {
+    run_all_tests
+    run_reinforcement_schedule_test
+    run_language_shaping_test
+    run_dtt_test
+    generate_test_report
+  }
+}
+
+// Test Reinforcement Schedule
+function run_reinforcement_schedule_test() {
+  let test_data = []
+  
+  // Test Continuous Reinforcement
+  set ::reinforcement_schedule.schedule_type = "continuous"
+  emit "response_occurred" with { behavior: "greeting", context: "test" }
+  
+  // Test Fixed Ratio
+  set ::reinforcement_schedule.schedule_type = "fixed_ratio"
+  set ::reinforcement_schedule.parameter = 3
+  
+  loop from 1 to 6 {
+    emit "response_occurred" with { behavior: "greeting", context: "test" }
+  }
+  
+  // Test Variable Ratio
+  set ::reinforcement_schedule.schedule_type = "variable_ratio"
+  set ::reinforcement_schedule.parameter = 3
+  
+  loop from 1 to 10 {
+    emit "response_occurred" with { behavior: "greeting", context: "test" }
+  }
+  
+  store ::test_results from add_test_result("reinforcement_schedule", {
+    status: "completed",
+    schedule_types_tested: ["continuous", "fixed_ratio", "variable_ratio"],
+    reinforcement_count: ::reinforcement_schedule.reinforcement_history.length
+  })
+  
+  emit "reinforcement_test_completed"
+}
+
+// Test Language Shaping
+function run_language_shaping_test() {
+  // Test behavior recording
+  emit "agent_responded" with { behavior: "greeting", context: "social" }
+  emit "agent_responded" with { behavior: "greeting", context: "social" }
+  emit "agent_responded" with { behavior: "greeting", context: "social" }
+  
+  // Test shaping progress
+  let progress = ::language_shaper.get_shaping_progress()
+  
+  store ::test_results from add_test_result("language_shaping", {
+    status: "completed",
+    behaviors_recorded: ::language_shaper.behavior_data.length,
+    current_target: ::language_shaper.current_target_behavior,
+    success_rate: ::language_shaper.shaping_progress.success_rate
+  })
+  
+  emit "shaping_test_completed"
+}
+
+// Test Discrete Trial Training
+function run_dtt_test() {
+  // Start DTT session
+  emit "start_session"
+  
+  // Simulate correct responses
+  emit "agent_responded" with { response: "touch_nose" }
+  emit "agent_responded" with { response: "clap_hands" }
+  emit "agent_responded" with { response: "wave_hand" }
+  emit "agent_responded" with { response: "4" }
+  
+  // Simulate incorrect responses
+  emit "agent_responded" with { response: "wrong_answer" }
+  emit "agent_responded" with { response: "touch_nose" }  // Correct after prompt
+  
+  let session_data = ::dtt.session_data
+  
+  store ::test_results from add_test_result("discrete_trial_training", {
+    status: "completed",
+    total_trials: session_data.total_trials,
+    correct_responses: session_data.correct_responses,
+    incorrect_responses: session_data.incorrect_responses,
+    accuracy: session_data.accuracy,
+    final_prompt_level: session_data.prompt_level
+  })
+  
+  emit "dtt_test_completed"
+}
+
+// Helper Functions
+function add_test_result(test_name, result_data) {
+  let results = ::test_results
+  results.push({
+    test_name: test_name,
+    timestamp: now(),
+    data: result_data
+  })
+  return results
+}
+
+function generate_test_report() {
+  let report = {
+    total_tests: ::test_results.length,
+    tests_passed: 0,
+    tests_failed: 0,
+    details: ::test_results
+  }
+  
+  loop for result in ::test_results {
+    branch when result.data.status == "completed" {
+      increment report.tests_passed
+    } else {
+      increment report.tests_failed
+    }
+  }
+  
+  emit "test_report_generated" with report
+  log("ABA Integration Test Report:", report)
+} 

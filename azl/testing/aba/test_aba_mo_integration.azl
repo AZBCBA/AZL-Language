@@ -1,0 +1,93 @@
+// ABA + MO Integration Test
+// Tests the complete behavioral system
+
+component ::aba.reinforcement_schedule {
+  init {
+    set ::schedule_type = variable_ratio
+    set ::ratio = 3
+    set ::current_responses = 0
+    set ::reinforcements_given = 0
+    say ABA Reinforcement Schedule initialized with ::schedule_type
+    emit aba.reinforcement.ready
+  }
+
+  behavior {
+    listen for aba.reinforcement.ready {
+      say Reinforcement schedule is ready to provide rewards
+      emit aba.behavior.request
+    }
+    
+    listen for behavior.response {
+      set ::current_responses = ::current_responses + 1
+      say Behavior response received, total: ::current_responses
+      
+      branch when ::current_responses >= ::ratio {
+        emit reinforcement.given
+        set ::reinforcements_given = ::reinforcements_given + 1
+        set ::current_responses = 0
+        say Reinforcement provided! Total given: ::reinforcements_given
+      }
+    }
+  }
+}
+
+component ::mo.tracker {
+  init {
+    set ::value_map.interaction = 1.0
+    set ::value_map.praise = 1.0
+    set ::value_map.attention = 1.0
+    set ::hunger_level = 0.5
+    say MO Tracker initialized with motivation values
+    emit mo.tracker.initialized
+  }
+
+  behavior {
+    listen for mo.tracker.initialized {
+      say MO Tracker ready to track motivation
+      emit mo.updated
+    }
+    
+    listen for reinforcement.given {
+      set ::value_map.praise = 1.0
+      say Praise motivation boosted by reinforcement
+      emit mo.praise.boosted
+    }
+    
+    listen for behavior.response {
+      set ::value_map.interaction = 1.0
+      say Interaction motivation boosted by behavior
+      emit mo.interaction.boosted
+    }
+  }
+}
+
+component ::system.orchestrator {
+  init {
+    set ::status = initializing
+    say System orchestrator starting ABA + MO integration
+    emit system.ready
+  }
+
+  behavior {
+    listen for system.ready {
+      say Starting integrated behavioral system
+      emit aba.reinforcement.ready
+      emit mo.tracker.initialized
+    }
+    
+    listen for aba.behavior.request {
+      say Simulating behavior response
+      emit behavior.response
+    }
+    
+    listen for mo.praise.boosted {
+      say MO system detected praise boost
+      emit mo.state.updated
+    }
+    
+    listen for mo.interaction.boosted {
+      say MO system detected interaction boost
+      emit mo.state.updated
+    }
+  }
+} 

@@ -1,0 +1,27 @@
+# Simple Dashboard Display Test
+# Tests the dashboard visualization output
+
+say "📊 Starting Dashboard Display Test..."
+
+# Initialize dashboard
+emit "ui.dashboard.initialized" with "ready"
+
+# Generate some sample data
+emit "aba.trial.completed" with "test_behavior_1"
+emit "aba.trial.completed" with "test_behavior_2"
+emit "aba.trial.completed" with "test_behavior_3"
+
+emit "reinforcement.delivered" with "high_strength"
+emit "reinforcement.delivered" with "medium_strength"
+
+emit "behavior.chain.completed" with "test_chain_1"
+emit "behavior.chain.completed" with "test_chain_2"
+
+emit "insight.generated" with "meta_learning"
+emit "insight.generated" with "behavior_patterns"
+
+# Request dashboard display
+say "📊 Requesting Dashboard Display..."
+emit "dashboard.request" with "all_sections"
+
+say "✅ Dashboard Display Test Complete!" 

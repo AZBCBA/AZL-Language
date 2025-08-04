@@ -1,0 +1,355 @@
+component ::ui.dashboard_connector {
+  init {
+    set ::status = "initializing"
+    set ::dashboard_version = "1.0"
+    set ::display_mode = "comprehensive"
+    set ::refresh_interval = 5000 // 5 seconds
+    set ::last_update = now()
+    set ::dashboard_sections = {
+      trial_summary: true,
+      behavior_analysis: true,
+      reinforcement_flow: true,
+      insight_heatmap: true,
+      system_health: true
+    }
+    set ::visualization_settings = {
+      show_graphs: true,
+      show_trends: true,
+      show_metrics: true,
+      auto_refresh: true
+    }
+    
+    # Link to analytics components
+    link ::aba.aba_analytics
+    link ::aba.reinforcement_schedule
+    link ::agent.self_reflection
+    
+    # Link to AZME components
+    link ::agi.azme_behavior_manager
+    link ::agi.azme_feedback_processor
+    
+    emit "ui.dashboard.initialized" with {
+      status: ::status,
+      version: ::dashboard_version,
+      display_mode: ::display_mode
+    }
+    
+    set ::status = "ready"
+    say "📊 Dashboard Connector initialized with comprehensive UI"
+  }
+
+  # Dashboard display and interaction
+  behavior {
+    listen for "dashboard.trial_summary" then {
+      display_trial_summary($1)
+    }
+    
+    listen for "dashboard.behavior_analysis" then {
+      display_behavior_analysis($1)
+    }
+    
+    listen for "dashboard.reinforcement_flow" then {
+      display_reinforcement_flow($1)
+    }
+    
+    listen for "dashboard.insight_heatmap" then {
+      display_insight_heatmap($1)
+    }
+    
+    listen for "dashboard.system_health" then {
+      display_system_health($1)
+    }
+    
+    listen for "insight:graph" then {
+      display_behavior_graph($1)
+    }
+    
+    listen for "insight:trend" then {
+      display_learning_trends($1)
+    }
+    
+    listen for "ui.dashboard.request" then {
+      request_dashboard_update($1)
+    }
+    
+    listen for "ui.dashboard.export" then {
+      export_dashboard_data($1)
+    }
+  }
+
+  # Display trial summary section
+  function display_trial_summary(summary_data) {
+    say "📊 TRIAL SUMMARY DASHBOARD"
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    say "📈 Total Trials: " + summary_data.total_trials
+    say "✅ Successful Trials: " + summary_data.successful_trials
+    say "❌ Failed Trials: " + summary_data.failed_trials
+    say "📊 Average Success Rate: " + (summary_data.average_success_rate * 100).toFixed(1) + "%"
+    
+    if summary_data.recent_trials.length > 0 {
+      say ""
+      say "🕒 Recent Trials:"
+      for (let trial of summary_data.recent_trials.slice(-5)) {
+        let status = trial.success ? "✅" : "❌"
+        say "  " + status + " " + trial.behavior + " (" + (trial.performance * 100).toFixed(1) + "%)"
+      }
+    }
+    
+    if summary_data.trial_trend.length > 0 {
+      say ""
+      say "📈 Trial Trend (Last 6 batches):"
+      for (let trend of summary_data.trial_trend.slice(-6)) {
+        let bar = "█".repeat(Math.floor(trend.success_rate * 10))
+        say "  Batch " + trend.batch + ": " + bar + " " + (trend.success_rate * 100).toFixed(1) + "%"
+      }
+    }
+    
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  }
+
+  # Display behavior analysis section
+  function display_behavior_analysis(analysis_data) {
+    say "🎯 BEHAVIOR ANALYSIS DASHBOARD"
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    if analysis_data.top_behaviors.length > 0 {
+      say "🏆 Top Performing Behaviors:"
+      for (let i = 0; i < Math.min(5, analysis_data.top_behaviors.length); i++) {
+        let behavior = analysis_data.top_behaviors[i]
+        let medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "  "
+        say "  " + medal + " " + behavior.behavior + " (" + (behavior.success_rate * 100).toFixed(1) + "%)"
+      }
+    }
+    
+    if analysis_data.complexity_distribution) {
+      say ""
+      say "🔗 Behavior Chain Complexity:"
+      say "  📊 Low Complexity: " + analysis_data.complexity_distribution.low
+      say "  📊 Medium Complexity: " + analysis_data.complexity_distribution.medium
+      say "  📊 High Complexity: " + analysis_data.complexity_distribution.high
+    }
+    
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  }
+
+  # Display reinforcement flow section
+  function display_reinforcement_flow(flow_data) {
+    say "🎁 REINFORCEMENT FLOW DASHBOARD"
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    if flow_data.reinforcement_effectiveness) {
+      let effectiveness = flow_data.reinforcement_effectiveness
+      say "💪 Reinforcement Effectiveness:"
+      say "  🔥 High Strength: " + effectiveness.high_strength
+      say "  ⚡ Medium Strength: " + effectiveness.medium_strength
+      say "  💡 Low Strength: " + effectiveness.low_strength
+      say "  📊 Average Effectiveness: " + effectiveness.average_effectiveness.toFixed(2)
+    }
+    
+    if flow_data.reinforcement_types) {
+      say ""
+      say "🎯 Reinforcement Types:"
+      for (let type in flow_data.reinforcement_types) {
+        say "  📊 " + type + ": " + flow_data.reinforcement_types[type]
+      }
+    }
+    
+    if flow_data.reinforcement_trends.length > 0 {
+      say ""
+      say "📈 Recent Reinforcements:"
+      for (let reinforcement of flow_data.reinforcement_trends.slice(-5)) {
+        let strength_bar = "█".repeat(Math.floor(reinforcement.strength * 2))
+        say "  💪 " + reinforcement.type + ": " + strength_bar + " " + reinforcement.strength.toFixed(1)
+      }
+    }
+    
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  }
+
+  # Display insight heatmap section
+  function display_insight_heatmap(heatmap_data) {
+    say "💡 INSIGHT HEATMAP DASHBOARD"
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    if heatmap_data.insight_trends) {
+      let trends = heatmap_data.insight_trends
+      say "🧠 Insight Generation Trends:"
+      say "  🧠 Meta-Learning: " + trends.meta_learning
+      say "  🎯 Behavior Patterns: " + trends.behavior_patterns
+      say "  ⚙️ System Optimization: " + trends.system_optimization
+      say "  🔄 Adaptive Strategies: " + trends.adaptive_strategies
+    }
+    
+    if heatmap_data.meta_learning_progress) {
+      let progress = heatmap_data.meta_learning_progress
+      say ""
+      say "📚 Meta-Learning Progress:"
+      say "  📊 Insight Generation Rate: " + (progress.insight_generation_rate * 100).toFixed(1) + "%"
+      say "  🎯 Pattern Recognition Accuracy: " + (progress.pattern_recognition_accuracy * 100).toFixed(1) + "%"
+      say "  🔄 Adaptive Learning Capacity: " + (progress.adaptive_learning_capacity * 100).toFixed(1) + "%"
+    }
+    
+    if heatmap_data.insight_patterns.length > 0 {
+      say ""
+      say "💡 Recent Insights:"
+      for (let insight of heatmap_data.insight_patterns.slice(-3)) {
+        let confidence_bar = "█".repeat(Math.floor(insight.confidence * 10))
+        say "  💡 " + insight.type + ": " + confidence_bar + " " + (insight.confidence * 100).toFixed(1) + "%"
+      }
+    }
+    
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  }
+
+  # Display system health section
+  function display_system_health(health_data) {
+    say "🏥 SYSTEM HEALTH DASHBOARD"
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    say "📊 Learning Metrics:"
+    say "  🚀 Learning Velocity: " + (health_data.learning_velocity * 100).toFixed(1) + "%"
+    say "  🔗 Behavior Complexity: " + health_data.behavior_complexity.toFixed(2)
+    
+    if health_data.system_adaptation) {
+      let adaptation = health_data.system_adaptation
+      say ""
+      say "🔄 System Adaptation:"
+      say "  📈 Adaptation Score: " + (adaptation.adaptation_score * 100).toFixed(1) + "%"
+      say "  🎯 Success Rate Improvement: " + (adaptation.success_rate_improvement * 100).toFixed(1) + "%"
+      say "  🔗 Complexity Increase: " + (adaptation.behavior_complexity_increase * 100).toFixed(1) + "%"
+    }
+    
+    if health_data.performance_indicators) {
+      let indicators = health_data.performance_indicators
+      say ""
+      say "📈 Performance Indicators:"
+      say "  ⚡ Trial Efficiency: " + (indicators.trial_efficiency * 100).toFixed(1) + "%"
+      say "  💪 Reinforcement Efficiency: " + (indicators.reinforcement_efficiency * 100).toFixed(1) + "%"
+      say "  💡 Insight Generation Efficiency: " + (indicators.insight_generation_efficiency * 100).toFixed(1) + "%"
+      say "  🏥 System Health Score: " + (indicators.system_health_score * 100).toFixed(1) + "%"
+    }
+    
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  }
+
+  # Display behavior graph visualization
+  function display_behavior_graph(graph_data) {
+    say "🔗 BEHAVIOR GRAPH VISUALIZATION"
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    say "📊 Graph Statistics:"
+    say "  🎯 Total Behaviors: " + graph_data.metadata.total_behaviors
+    say "  🔗 Total Chains: " + graph_data.metadata.total_chains
+    say "  📈 Average Success Rate: " + (graph_data.metadata.average_success_rate * 100).toFixed(1) + "%"
+    
+    if graph_data.nodes.length > 0 {
+      say ""
+      say "🎯 Behavior Nodes:"
+      for (let node of graph_data.nodes.slice(0, 5)) {
+        let success_bar = "█".repeat(Math.floor(node.success_rate * 10))
+        say "  📊 " + node.id + ": " + success_bar + " " + (node.success_rate * 100).toFixed(1) + "% (" + node.total_trials + " trials)"
+      }
+    }
+    
+    if graph_data.edges.length > 0 {
+      say ""
+      say "🔗 Chain Connections:"
+      for (let edge of graph_data.edges.slice(0, 5)) {
+        let weight_bar = "█".repeat(Math.floor(edge.weight * 10))
+        say "  🔗 " + edge.source + " → " + edge.target + ": " + weight_bar + " " + (edge.weight * 100).toFixed(1) + "%"
+      }
+    }
+    
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  }
+
+  # Display learning trends visualization
+  function display_learning_trends(trends_data) {
+    say "📈 LEARNING TRENDS VISUALIZATION"
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    if trends_data.success_rate_trend.length > 0 {
+      say "📊 Success Rate Trend:"
+      for (let trend of trends_data.success_rate_trend.slice(-6)) {
+        let bar = "█".repeat(Math.floor(trend.success_rate * 10))
+        say "  📈 Batch " + trend.batch + ": " + bar + " " + (trend.success_rate * 100).toFixed(1) + "%"
+      }
+    }
+    
+    if trends_data.reinforcement_trend.length > 0 {
+      say ""
+      say "💪 Reinforcement Trend:"
+      for (let trend of trends_data.reinforcement_trend.slice(-6)) {
+        let bar = "█".repeat(Math.floor(trend.average_strength * 2))
+        say "  💪 Batch " + trend.batch + ": " + bar + " " + trend.average_strength.toFixed(1)
+      }
+    }
+    
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  }
+
+  # Request dashboard update
+  function request_dashboard_update(request_data) {
+    say "📊 Requesting dashboard update..."
+    
+    # Request data from analytics component
+    emit "dashboard.request" with request_data
+    
+    # Update last refresh time
+    set ::last_update = now()
+    
+    say "📊 Dashboard update requested"
+  }
+
+  # Export dashboard data
+  function export_dashboard_data(export_request) {
+    say "📊 Exporting dashboard data..."
+    
+    let export_data = {
+      dashboard_version: ::dashboard_version,
+      display_mode: ::display_mode,
+      last_update: ::last_update,
+      dashboard_sections: ::dashboard_sections,
+      visualization_settings: ::visualization_settings,
+      export_timestamp: now()
+    }
+    
+    emit "ui.dashboard.export.complete" with export_data
+    
+    say "📊 Dashboard data exported"
+  }
+
+  # Generate comprehensive dashboard display
+  function generate_comprehensive_dashboard() {
+    say "📊 GENERATING COMPREHENSIVE DASHBOARD"
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    say "🕒 Last Updated: " + ::last_update
+    say "📊 Display Mode: " + ::display_mode
+    say "🔄 Auto Refresh: " + (::visualization_settings.auto_refresh ? "Enabled" : "Disabled")
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    # Request all dashboard sections
+    emit "dashboard.request" with { sections: "all" }
+  }
+
+  # Get dashboard statistics
+  function get_dashboard_stats() {
+    return {
+      dashboard_version: ::dashboard_version,
+      display_mode: ::display_mode,
+      last_update: ::last_update,
+      active_sections: Object.keys(::dashboard_sections).filter(section => ::dashboard_sections[section]).length,
+      visualization_enabled: ::visualization_settings.show_graphs
+    }
+  }
+
+  memory {
+    status
+    dashboard_version
+    display_mode
+    refresh_interval
+    last_update
+    dashboard_sections
+    visualization_settings
+  }
+} 

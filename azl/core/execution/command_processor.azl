@@ -1,0 +1,85 @@
+# AZL Command Processor - Command Processing
+# This component processes and routes AZL commands
+
+component ::core.command_processor {
+  init {
+    set ::status = "initializing"
+    set ::command_handlers = {}
+    set ::processing_queue = []
+    
+    say "⚡ AZL Command Processor initializing..."
+    emit command_processor.initializing
+  }
+
+  on process_command {
+    set ::command = $1
+    set ::params = $2
+    
+    say "⚡ Processing command: ::command"
+    
+    # Route command to appropriate handler
+    if ::command_handlers[::command] {
+      set ::handler = ::command_handlers[::command]
+      emit execute_handler with ::handler ::params
+    } else {
+      say "⚠️ No handler found for command: ::command"
+      emit command.unhandled with ::command
+    }
+  }
+
+  on register_handler {
+    set ::command = $1
+    set ::handler = $2
+    
+    set ::command_handlers[::command] = ::handler
+    say "⚡ Registered handler for: ::command"
+    emit handler.registered with ::command
+  }
+
+  on execute_handler {
+    set ::handler = $1
+    set ::params = $2
+    
+    say "⚡ Executing handler: ::handler"
+    emit ::handler with ::params
+  }
+
+  on queue_command {
+    set ::command = $1
+    set ::params = $2
+    set ::priority = $3
+    
+    set ::queued_command = {
+      command: ::command,
+      params: ::params,
+      priority: ::priority,
+      timestamp: "now"
+    }
+    
+    set ::processing_queue[::processing_queue.length] = ::queued_command
+    say "⚡ Queued command: ::command (priority: ::priority)"
+    emit command.queued with ::command
+  }
+
+  on process_queue {
+    say "⚡ Processing command queue..."
+    
+    # Sort by priority
+    emit sort_queue_by_priority
+    
+    # Process each command
+    loop for ::queued_command in ::processing_queue {
+      emit process_command with ::queued_command.command ::queued_command.params
+    }
+    
+    # Clear queue
+    set ::processing_queue = []
+    emit queue.processed
+  }
+
+  memory {
+    ::status = "ready"
+    ::command_handlers = {}
+    ::processing_queue = []
+  }
+} 

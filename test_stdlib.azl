@@ -1,0 +1,36 @@
+# Test AZL v2 Standard Library Functions
+
+# File I/O
+let content = "Hello from AZL v2!"
+let result = write_file("test.txt", content)
+say "File write result: " + result
+
+let file_content = read_file("test.txt")
+say "File content: " + file_content
+
+# String operations
+let text = "apple,banana,cherry"
+let fruits = split(text, ",")
+say "Split result: " + stringify(fruits)
+
+let joined = join(fruits, " | ")
+say "Joined result: " + joined
+
+let replaced = replace(text, "banana", "orange")
+say "Replace result: " + replaced
+
+# Math functions
+let num = 3.7
+let floor_result = floor(num)
+let ceil_result = ceil(num)
+say "Floor of " + stringify(num) + " is " + stringify(floor_result)
+say "Ceil of " + stringify(num) + " is " + stringify(ceil_result)
+
+# Random number
+let random_num = random()
+say "Random number: " + stringify(random_num)
+
+# Type checking
+say "Type of text: " + typeof(text)
+say "Type of fruits: " + typeof(fruits)
+say "Type of num: " + typeof(num) 

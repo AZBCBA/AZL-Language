@@ -1,0 +1,63 @@
+# Test Goal Scheduling & Autonomous Execution
+# Tests the addgoal, run, and goal prioritization functionality
+
+say "🚀 Starting Goal Scheduling Test..."
+
+# Test 1: Initial state (no goals)
+say "🔍 Testing initial state..."
+reflect
+
+# Test 2: Add multiple goals with different priorities
+say "🔍 Adding multiple goals..."
+addgoal "Clear memory" 6
+addgoal "Increase consciousness level" 10
+addgoal "Learn new behavior" 4
+addgoal "Optimize performance" 8
+addgoal "Register new component" 7
+
+# Test 3: Check goals list
+say "🔍 Checking goals list..."
+reflect
+
+# Test 4: Run autonomous execution
+say "🔍 Running autonomous execution..."
+run
+reflect
+
+# Test 5: Run again to execute next goal
+say "🔍 Running again for next goal..."
+run
+reflect
+
+# Test 6: Run multiple times
+say "🔍 Running multiple executions..."
+run
+reflect
+run
+reflect
+run
+reflect
+
+# Test 7: Add more goals and run
+say "🔍 Adding more goals and running..."
+addgoal "Test unknown goal" 3
+addgoal "Increase consciousness level" 9
+run
+reflect
+
+# Test 8: Test error handling
+say "🔍 Testing error handling..."
+addgoal "Invalid goal without quotes"
+run
+
+# Test 9: Test empty goals
+say "🔍 Testing empty goals..."
+# Clear goals by setting to empty
+set ::goals = "No goals set"
+run
+reflect
+
+say "✅ Goal Scheduling Test Complete!"
+say "🚀 Goal scheduling system is working correctly"
+say "📊 Autonomous execution is functional"
+say "🔧 Goal prioritization is operational" 

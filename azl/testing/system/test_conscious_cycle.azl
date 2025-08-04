@@ -1,0 +1,53 @@
+# Test the full conscious cycle with real agents
+# This will test the autonomous brain with actual conscious components
+
+component ::test.conscious_cycle {
+  init {
+    set ::status = "testing"
+    set ::test_name = "Conscious Cycle Test"
+    say "🧪 Starting ::test_name..."
+    
+    # Load the autonomous brain
+    link ::agent.autonomous_brain
+    
+    # Load conscious agents
+    link ::agent.self_reflection
+    link ::agent.curiosity  
+    link ::agent.goal_loop
+    
+    # Load core systems
+    link ::core.memory.memory
+    link ::core.time.time_engine
+    link ::core.cli_shell
+    link ::core.arithmetic.math_engine
+    
+    say "✅ All components loaded"
+    emit test.conscious_cycle.start
+  }
+
+  behavior {
+    listen for "test.conscious_cycle.start" then {
+      say "🚀 Starting conscious cycle test..."
+      emit system.start
+    }
+    
+    # Monitor the conscious cycle
+    listen for "self_reflection.analyze" then {
+      say "🪞 Self-reflection triggered"
+    }
+    
+    listen for "curiosity.trigger" then {
+      say "🔍 Curiosity triggered"
+    }
+    
+    listen for "goal_loop.goal_created" then {
+      say "🎯 New goal created"
+    }
+  }
+
+  memory {
+    ::status = "ready"
+    ::test_name = "Conscious Cycle Test"
+    ::cycle_count = 0
+  }
+} 

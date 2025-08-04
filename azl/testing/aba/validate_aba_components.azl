@@ -1,0 +1,329 @@
+// ABA Components Validation Script
+// Validates that our ABA components have correct AZL syntax
+
+component ::validator.aba_components {
+  init {
+    set ::validation_status = "initializing"
+    set ::validation_results = {}
+    set ::components_to_validate = [
+      "reinforcement_schedule",
+      "discrete_trial_training", 
+      "function_identifier",
+      "language_shaper"
+    ]
+    set ::validation_errors = []
+    set ::validation_successes = []
+    
+    emit "validator.aba_components.initialized" with ::validation_status
+  }
+
+  behavior {
+    listen for "start_validation" then {
+      set ::validation_status = "validating"
+      emit "validation_started" with { components: ::components_to_validate }
+      
+      validate_reinforcement_schedule()
+    }
+
+    listen for "reinforcement_validated" then {
+      validate_discrete_trial_training()
+    }
+
+    listen for "dtt_validated" then {
+      validate_function_identifier()
+    }
+
+    listen for "function_validated" then {
+      validate_language_shaper()
+    }
+
+    listen for "language_validated" then {
+      generate_validation_report()
+    }
+  }
+
+  memory {
+    validation_status
+    validation_results
+    components_to_validate
+    validation_errors
+    validation_successes
+  }
+
+  interface {
+    start_validation
+    validate_reinforcement_schedule
+    validate_discrete_trial_training
+    validate_function_identifier
+    validate_language_shaper
+    generate_validation_report
+  }
+}
+
+// Validate Reinforcement Schedule Component
+function validate_reinforcement_schedule() {
+  emit "console.log" with { message: "🔍 Validating Reinforcement Schedule Component...", timestamp: now() }
+  
+  // Check if component exists
+  branch when ::aba.reinforcement_schedule {
+    // Check required properties
+    branch when ::aba.reinforcement_schedule.schedule_type {
+      store ::validation_successes from ::validation_successes.push("reinforcement_schedule.schedule_type")
+    } else {
+      store ::validation_errors from ::validation_errors.push("reinforcement_schedule.schedule_type missing")
+    }
+    
+    branch when ::aba.reinforcement_schedule.parameter {
+      store ::validation_successes from ::validation_successes.push("reinforcement_schedule.parameter")
+    } else {
+      store ::validation_errors from ::validation_errors.push("reinforcement_schedule.parameter missing")
+    }
+    
+    branch when ::aba.reinforcement_schedule.reinforcement_history {
+      store ::validation_successes from ::validation_successes.push("reinforcement_schedule.reinforcement_history")
+    } else {
+      store ::validation_errors from ::validation_errors.push("reinforcement_schedule.reinforcement_history missing")
+    }
+    
+    // Check global improvements
+    branch when ::aba.reinforcement_schedule.introspection_state {
+      store ::validation_successes from ::validation_successes.push("reinforcement_schedule.introspection_state")
+    } else {
+      store ::validation_errors from ::validation_errors.push("reinforcement_schedule.introspection_state missing")
+    }
+    
+    branch when ::aba.reinforcement_schedule.goal_meta {
+      store ::validation_successes from ::validation_successes.push("reinforcement_schedule.goal_meta")
+    } else {
+      store ::validation_errors from ::validation_errors.push("reinforcement_schedule.goal_meta missing")
+    }
+    
+    branch when ::aba.reinforcement_schedule.evolution_slots {
+      store ::validation_successes from ::validation_successes.push("reinforcement_schedule.evolution_slots")
+    } else {
+      store ::validation_errors from ::validation_errors.push("reinforcement_schedule.evolution_slots missing")
+    }
+    
+    branch when ::aba.reinforcement_schedule.modular_interface {
+      store ::validation_successes from ::validation_successes.push("reinforcement_schedule.modular_interface")
+    } else {
+      store ::validation_errors from ::validation_errors.push("reinforcement_schedule.modular_interface missing")
+    }
+    
+    emit "console.log" with { message: "✅ Reinforcement Schedule Component Validated", timestamp: now() }
+  } else {
+    store ::validation_errors from ::validation_errors.push("reinforcement_schedule component not found")
+    emit "console.log" with { message: "❌ Reinforcement Schedule Component Not Found", timestamp: now() }
+  }
+  
+  emit "reinforcement_validated"
+}
+
+// Validate Discrete Trial Training Component
+function validate_discrete_trial_training() {
+  emit "console.log" with { message: "🔍 Validating Discrete Trial Training Component...", timestamp: now() }
+  
+  // Check if component exists
+  branch when ::aba.discrete_trial_training {
+    // Check required properties
+    branch when ::aba.discrete_trial_training.trials {
+      store ::validation_successes from ::validation_successes.push("discrete_trial_training.trials")
+    } else {
+      store ::validation_errors from ::validation_errors.push("discrete_trial_training.trials missing")
+    }
+    
+    branch when ::aba.discrete_trial_training.current_trial {
+      store ::validation_successes from ::validation_successes.push("discrete_trial_training.current_trial")
+    } else {
+      store ::validation_errors from ::validation_errors.push("discrete_trial_training.current_trial missing")
+    }
+    
+    branch when ::aba.discrete_trial_training.session_data {
+      store ::validation_successes from ::validation_successes.push("discrete_trial_training.session_data")
+    } else {
+      store ::validation_errors from ::validation_errors.push("discrete_trial_training.session_data missing")
+    }
+    
+    // Check global improvements
+    branch when ::aba.discrete_trial_training.introspection_state {
+      store ::validation_successes from ::validation_successes.push("discrete_trial_training.introspection_state")
+    } else {
+      store ::validation_errors from ::validation_errors.push("discrete_trial_training.introspection_state missing")
+    }
+    
+    branch when ::aba.discrete_trial_training.goal_meta {
+      store ::validation_successes from ::validation_successes.push("discrete_trial_training.goal_meta")
+    } else {
+      store ::validation_errors from ::validation_errors.push("discrete_trial_training.goal_meta missing")
+    }
+    
+    branch when ::aba.discrete_trial_training.evolution_slots {
+      store ::validation_successes from ::validation_successes.push("discrete_trial_training.evolution_slots")
+    } else {
+      store ::validation_errors from ::validation_errors.push("discrete_trial_training.evolution_slots missing")
+    }
+    
+    branch when ::aba.discrete_trial_training.modular_interface {
+      store ::validation_successes from ::validation_successes.push("discrete_trial_training.modular_interface")
+    } else {
+      store ::validation_errors from ::validation_errors.push("discrete_trial_training.modular_interface missing")
+    }
+    
+    emit "console.log" with { message: "✅ Discrete Trial Training Component Validated", timestamp: now() }
+  } else {
+    store ::validation_errors from ::validation_errors.push("discrete_trial_training component not found")
+    emit "console.log" with { message: "❌ Discrete Trial Training Component Not Found", timestamp: now() }
+  }
+  
+  emit "dtt_validated"
+}
+
+// Validate Function Identifier Component
+function validate_function_identifier() {
+  emit "console.log" with { message: "🔍 Validating Function Identifier Component...", timestamp: now() }
+  
+  // Check if component exists
+  branch when ::aba.function_identifier {
+    // Check required properties
+    branch when ::aba.function_identifier.function_scores {
+      store ::validation_successes from ::validation_successes.push("function_identifier.function_scores")
+    } else {
+      store ::validation_errors from ::validation_errors.push("function_identifier.function_scores missing")
+    }
+    
+    branch when ::aba.function_identifier.behavior_history {
+      store ::validation_successes from ::validation_successes.push("function_identifier.behavior_history")
+    } else {
+      store ::validation_errors from ::validation_errors.push("function_identifier.behavior_history missing")
+    }
+    
+    branch when ::aba.function_identifier.confidence_threshold {
+      store ::validation_successes from ::validation_successes.push("function_identifier.confidence_threshold")
+    } else {
+      store ::validation_errors from ::validation_errors.push("function_identifier.confidence_threshold missing")
+    }
+    
+    // Check global improvements
+    branch when ::aba.function_identifier.introspection_state {
+      store ::validation_successes from ::validation_successes.push("function_identifier.introspection_state")
+    } else {
+      store ::validation_errors from ::validation_errors.push("function_identifier.introspection_state missing")
+    }
+    
+    branch when ::aba.function_identifier.goal_meta {
+      store ::validation_successes from ::validation_successes.push("function_identifier.goal_meta")
+    } else {
+      store ::validation_errors from ::validation_errors.push("function_identifier.goal_meta missing")
+    }
+    
+    branch when ::aba.function_identifier.evolution_slots {
+      store ::validation_successes from ::validation_successes.push("function_identifier.evolution_slots")
+    } else {
+      store ::validation_errors from ::validation_errors.push("function_identifier.evolution_slots missing")
+    }
+    
+    branch when ::aba.function_identifier.modular_interface {
+      store ::validation_successes from ::validation_successes.push("function_identifier.modular_interface")
+    } else {
+      store ::validation_errors from ::validation_errors.push("function_identifier.modular_interface missing")
+    }
+    
+    emit "console.log" with { message: "✅ Function Identifier Component Validated", timestamp: now() }
+  } else {
+    store ::validation_errors from ::validation_errors.push("function_identifier component not found")
+    emit "console.log" with { message: "❌ Function Identifier Component Not Found", timestamp: now() }
+  }
+  
+  emit "function_validated"
+}
+
+// Validate Language Shaper Component
+function validate_language_shaper() {
+  emit "console.log" with { message: "🔍 Validating Language Shaper Component...", timestamp: now() }
+  
+  // Check if component exists
+  branch when ::aba.language_shaper {
+    // Check required properties
+    branch when ::aba.language_shaper.behavior_data {
+      store ::validation_successes from ::validation_successes.push("language_shaper.behavior_data")
+    } else {
+      store ::validation_errors from ::validation_errors.push("language_shaper.behavior_data missing")
+    }
+    
+    branch when ::aba.language_shaper.current_target_behavior {
+      store ::validation_successes from ::validation_successes.push("language_shaper.current_target_behavior")
+    } else {
+      store ::validation_errors from ::validation_errors.push("language_shaper.current_target_behavior missing")
+    }
+    
+    branch when ::aba.language_shaper.shaping_progress {
+      store ::validation_successes from ::validation_successes.push("language_shaper.shaping_progress")
+    } else {
+      store ::validation_errors from ::validation_errors.push("language_shaper.shaping_progress missing")
+    }
+    
+    // Check global improvements
+    branch when ::aba.language_shaper.introspection_state {
+      store ::validation_successes from ::validation_successes.push("language_shaper.introspection_state")
+    } else {
+      store ::validation_errors from ::validation_errors.push("language_shaper.introspection_state missing")
+    }
+    
+    branch when ::aba.language_shaper.goal_meta {
+      store ::validation_successes from ::validation_successes.push("language_shaper.goal_meta")
+    } else {
+      store ::validation_errors from ::validation_errors.push("language_shaper.goal_meta missing")
+    }
+    
+    branch when ::aba.language_shaper.evolution_slots {
+      store ::validation_successes from ::validation_successes.push("language_shaper.evolution_slots")
+    } else {
+      store ::validation_errors from ::validation_errors.push("language_shaper.evolution_slots missing")
+    }
+    
+    branch when ::aba.language_shaper.modular_interface {
+      store ::validation_successes from ::validation_successes.push("language_shaper.modular_interface")
+    } else {
+      store ::validation_errors from ::validation_errors.push("language_shaper.modular_interface missing")
+    }
+    
+    emit "console.log" with { message: "✅ Language Shaper Component Validated", timestamp: now() }
+  } else {
+    store ::validation_errors from ::validation_errors.push("language_shaper component not found")
+    emit "console.log" with { message: "❌ Language Shaper Component Not Found", timestamp: now() }
+  }
+  
+  emit "language_validated"
+}
+
+// Generate Validation Report
+function generate_validation_report() {
+  emit "console.log" with { message: "📊 Generating Validation Report...", timestamp: now() }
+  
+  set ::validation_results = {
+    total_components: ::components_to_validate.length,
+    successful_validations: ::validation_successes.length,
+    validation_errors: ::validation_errors.length,
+    success_rate: ::validation_successes.length / (::validation_successes.length + ::validation_errors.length),
+    errors: ::validation_errors,
+    successes: ::validation_successes,
+    timestamp: now()
+  }
+  
+  emit "console.log" with { message: "🎉 ABA Components Validation Complete!", timestamp: now() }
+  emit "console.log" with { message: "Total Components: " + ::components_to_validate.length, timestamp: now() }
+  emit "console.log" with { message: "Successful Validations: " + ::validation_successes.length, timestamp: now() }
+  emit "console.log" with { message: "Validation Errors: " + ::validation_errors.length, timestamp: now() }
+  emit "console.log" with { message: "Success Rate: " + (::validation_successes.length / (::validation_successes.length + ::validation_errors.length) * 100) + "%", timestamp: now() }
+  
+  branch when ::validation_errors.length = 0 {
+    emit "console.log" with { message: "🎉 All ABA Components Validated Successfully!", timestamp: now() }
+  } else {
+    emit "console.log" with { message: "⚠️ Some validation errors found. Check the error list.", timestamp: now() }
+  }
+  
+  emit "validation_complete" with ::validation_results
+}
+
+// Start validation
+emit "start_validation" 

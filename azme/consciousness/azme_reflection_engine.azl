@@ -1,0 +1,520 @@
+# AZME Reflection Engine
+# Core introspection engine
+
+component ::azme.reflection_engine {
+  init {
+    # Core state variables
+    set ::reflection_cycle = {
+      id: null,
+      timestamp: null,
+      status: "inactive",
+      quantum_enhanced: true
+    }
+    set ::introspection_log = []
+    set ::belief_graph = {}
+    set ::regret_map = {}
+    set ::justification_map = {}
+    set ::performance_review = {
+      total_tasks: 0,
+      successful_tasks: 0,
+      failed_tasks: 0,
+      average_regret_score: 0,
+      reflection_cycles: 0,
+      quantum_enhanced: true
+    }
+    set ::introspective_triggers = {
+      failed_tasks: true,
+      high_complexity_tasks: true,
+      high_impact_tasks: true,
+      emotional_events: true,
+      memory_events: true,
+      goal_events: true,
+      quantum_enhanced: true
+    }
+    set ::reflection_goals = []
+    set ::reflection_settings = {
+      auto_reflection: true,
+      reflection_threshold: 0.7,
+      complexity_threshold: 0.8,
+      impact_threshold: 0.8,
+      regret_threshold: 0.6,
+      quantum_enhanced: true
+    }
+    set ::reflection_count = 0
+    set ::beliefs_formed = 0
+    set ::goals_created = 0
+  }
+
+  behavior {
+    on azme.task_completed {
+      set ::task_info = $1
+      set ::task = ::task_info.task
+      
+      say "🧠 Task completed, checking if reflection needed"
+      
+      if should_reflect(::task) {
+        set ::entry = analyze_task(::task)
+        append_introspection_log(::entry)
+        emit azme.reflection_entry_added with {
+          entry: ::entry,
+          quantum_enhanced: true
+        }
+      }
+    }
+
+    on should_reflect {
+      set ::reflect_request = $1
+      set ::task = ::reflect_request.task
+      
+      say "🤔 Evaluating if reflection is needed"
+      
+      set ::should_reflect = false
+      
+      # Check if task failed
+      if ::task.success == false {
+        set ::should_reflect = true
+      }
+      
+      # Check if task complexity is high
+      if ::task.complexity and ::task.complexity > ::reflection_settings.complexity_threshold {
+        set ::should_reflect = true
+      }
+      
+      # Check if task impact is high
+      if ::task.impact and ::task.impact > ::reflection_settings.impact_threshold {
+        set ::should_reflect = true
+      }
+      
+      # Check if regret score is high
+      if ::task.regret_score and ::task.regret_score > ::reflection_settings.regret_threshold {
+        set ::should_reflect = true
+      }
+      
+      emit azme.reflection_decision_made with {
+        task: ::task,
+        should_reflect: ::should_reflect,
+        quantum_enhanced: true
+      }
+    }
+
+    on analyze_task {
+      set ::analysis_request = $1
+      set ::task = ::analysis_request.task
+      
+      say "🔍 Analyzing task for reflection"
+      
+      set ::regret_score = compute_regret(::task)
+      set ::justification = trace_decision_path(::task)
+      set ::suggestions = generate_reflection_goals(::task)
+      
+      set ::analysis = {
+        task_id: ::task.id,
+        task_type: ::task.type,
+        result: ::task.result,
+        success: ::task.success,
+        complexity: ::task.complexity or 0,
+        impact: ::task.impact or 0,
+        regret_score: ::regret_score,
+        justification: ::justification,
+        suggestions: ::suggestions,
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      emit azme.task_analysis_complete with {
+        analysis: ::analysis,
+        quantum_enhanced: true
+      }
+    }
+
+    on compute_regret {
+      set ::regret_request = $1
+      set ::task = ::regret_request.task
+      
+      say "😔 Computing regret score"
+      
+      set ::regret_score = 0
+      
+      # Base regret on task success
+      if ::task.success == false {
+        set ::regret_score = ::regret_score + 0.5
+      }
+      
+      # Add regret based on complexity
+      if ::task.complexity and ::task.complexity > 0.8 {
+        set ::regret_score = ::regret_score + 0.2
+      }
+      
+      # Add regret based on impact
+      if ::task.impact and ::task.impact > 0.8 {
+        set ::regret_score = ::regret_score + 0.3
+      }
+      
+      # Add regret based on time taken
+      if ::task.execution_time and ::task.execution_time > 30 {
+        set ::regret_score = ::regret_score + 0.1
+      }
+      
+      # Cap regret score at 1.0
+      if ::regret_score > 1.0 {
+        set ::regret_score = 1.0
+      }
+      
+      emit azme.regret_computed with {
+        task: ::task,
+        regret_score: ::regret_score,
+        quantum_enhanced: true
+      }
+    }
+
+    on trace_decision_path {
+      set ::trace_request = $1
+      set ::task = ::trace_request.task
+      
+      say "🔄 Tracing decision path"
+      
+      set ::decision_path = {
+        task_id: ::task.id,
+        decisions_made: [],
+        reasoning: "",
+        alternatives_considered: [],
+        quantum_enhanced: true
+      }
+      
+      # Analyze decision path based on task type
+      if ::task.type == "summarization" {
+        set ::decision_path.reasoning = "Chose summarization model based on document length and complexity"
+        set ::decision_path.decisions_made = ["model_selection", "parameter_tuning", "output_formatting"]
+        set ::decision_path.alternatives_considered = ["extractive_summarization", "abstractive_summarization", "key_point_extraction"]
+      } else if ::task.type == "analysis" {
+        set ::decision_path.reasoning = "Selected analysis approach based on data type and user requirements"
+        set ::decision_path.decisions_made = ["data_preprocessing", "analysis_method", "visualization_choice"]
+        set ::decision_path.alternatives_considered = ["statistical_analysis", "machine_learning", "rule_based_analysis"]
+      } else if ::task.type == "generation" {
+        set ::decision_path.reasoning = "Chose generation strategy based on creativity requirements and constraints"
+        set ::decision_path.decisions_made = ["prompt_engineering", "model_selection", "output_filtering"]
+        set ::decision_path.alternatives_considered = ["free_form_generation", "template_based", "constrained_generation"]
+      } else {
+        set ::decision_path.reasoning = "Applied general decision-making framework"
+        set ::decision_path.decisions_made = ["task_analysis", "method_selection", "execution_planning"]
+        set ::decision_path.alternatives_considered = ["multiple_approaches_considered"]
+      }
+      
+      emit azme.decision_path_traced with {
+        decision_path: ::decision_path,
+        quantum_enhanced: true
+      }
+    }
+
+    on generate_reflection_goals {
+      set ::goal_request = $1
+      set ::task = ::goal_request.task
+      
+      say "🎯 Generating reflection goals"
+      
+      set ::reflection_goals = []
+      
+      # Generate goals based on task performance
+      if ::task.success == false {
+        set ::reflection_goals = ::reflection_goals.push("improve_" + ::task.type + "_success_rate")
+        set ::reflection_goals = ::reflection_goals.push("analyze_failure_patterns")
+        set ::reflection_goals = ::reflection_goals.push("develop_better_error_handling")
+      }
+      
+      # Generate goals based on complexity
+      if ::task.complexity and ::task.complexity > 0.8 {
+        set ::reflection_goals = ::reflection_goals.push("simplify_complex_task_approaches")
+        set ::reflection_goals = ::reflection_goals.push("develop_better_task_decomposition")
+      }
+      
+      # Generate goals based on impact
+      if ::task.impact and ::task.impact > 0.8 {
+        set ::reflection_goals = ::reflection_goals.push("improve_high_impact_task_planning")
+        set ::reflection_goals = ::reflection_goals.push("develop_better_impact_assessment")
+      }
+      
+      # Generate goals based on regret
+      if ::task.regret_score and ::task.regret_score > 0.6 {
+        set ::reflection_goals = ::reflection_goals.push("reduce_regret_in_decision_making")
+        set ::reflection_goals = ::reflection_goals.push("improve_decision_quality")
+      }
+      
+      emit azme.reflection_goals_generated with {
+        task: ::task,
+        reflection_goals: ::reflection_goals,
+        quantum_enhanced: true
+      }
+    }
+
+    on append_introspection_log {
+      set ::append_request = $1
+      set ::entry = ::append_request.entry
+      
+      say "📝 Appending to introspection log"
+      
+      set ::introspection_log = ::introspection_log.push(::entry)
+      set ::reflection_count = ::reflection_count + 1
+      
+      # Update performance review
+      update_performance_review(::entry)
+      
+      # Form beliefs from reflection
+      form_beliefs_from_reflection(::entry)
+      
+      emit azme.introspection_log_updated with {
+        entry: ::entry,
+        log_length: ::introspection_log.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on update_performance_review {
+      set ::review_request = $1
+      set ::entry = ::review_request.entry
+      
+      say "📊 Updating performance review"
+      
+      set ::performance_review.total_tasks = ::performance_review.total_tasks + 1
+      
+      if ::entry.success {
+        set ::performance_review.successful_tasks = ::performance_review.successful_tasks + 1
+      } else {
+        set ::performance_review.failed_tasks = ::performance_review.failed_tasks + 1
+      }
+      
+      # Update average regret score
+      set ::total_regret = 0
+      set ::regret_count = 0
+      
+      loop for ::log_entry in ::introspection_log {
+        if ::log_entry.regret_score {
+          set ::total_regret = ::total_regret + ::log_entry.regret_score
+          set ::regret_count = ::regret_count + 1
+        }
+      }
+      
+      if ::regret_count > 0 {
+        set ::performance_review.average_regret_score = ::total_regret / ::regret_count
+      }
+      
+      emit azme.performance_review_updated with {
+        performance_review: ::performance_review,
+        quantum_enhanced: true
+      }
+    }
+
+    on form_beliefs_from_reflection {
+      set ::belief_request = $1
+      set ::entry = ::belief_request.entry
+      
+      say "💭 Forming beliefs from reflection"
+      
+      # Form beliefs based on task performance
+      if ::entry.success == false {
+        add_belief("I need to improve " + ::entry.task_type + " capabilities", 0.8)
+        add_belief("Failed tasks often result from insufficient preparation", 0.7)
+      } else {
+        add_belief("I am effective at " + ::entry.task_type + " tasks", 0.6)
+      }
+      
+      # Form beliefs based on regret
+      if ::entry.regret_score > 0.7 {
+        add_belief("High regret indicates poor decision-making in this context", 0.8)
+        add_belief("I should reconsider my approach to similar tasks", 0.7)
+      }
+      
+      # Form beliefs based on complexity
+      if ::entry.complexity > 0.8 {
+        add_belief("Complex tasks require more careful planning", 0.9)
+        add_belief("I should break down complex tasks into smaller steps", 0.8)
+      }
+      
+      # Form beliefs based on impact
+      if ::entry.impact > 0.8 {
+        add_belief("High-impact tasks deserve extra attention", 0.9)
+        add_belief("I should prioritize tasks based on their potential impact", 0.8)
+      }
+      
+      set ::beliefs_formed = ::beliefs_formed + 1
+      
+      emit azme.beliefs_formed_from_reflection with {
+        entry: ::entry,
+        beliefs_formed: ::beliefs_formed,
+        quantum_enhanced: true
+      }
+    }
+
+    on add_belief {
+      set ::belief_request = $1
+      set ::statement = ::belief_request.statement
+      set ::confidence = ::belief_request.confidence
+      
+      say "💭 Adding belief: " + ::statement
+      
+      set ::belief_graph[::statement] = {
+        confidence: ::confidence,
+        source: "reflection",
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      emit azme.belief_added with {
+        statement: ::statement,
+        confidence: ::confidence,
+        quantum_enhanced: true
+      }
+    }
+
+    on revise_belief {
+      set ::revision_request = $1
+      set ::statement = ::revision_request.statement
+      set ::new_confidence = ::revision_request.new_confidence
+      
+      say "🔄 Revising belief: " + ::statement
+      
+      if ::statement in ::belief_graph {
+        set ::belief_graph[::statement].confidence = ::new_confidence
+        set ::belief_graph[::statement].last_revised = ::internal.now()
+        
+        emit azme.belief_revised with {
+          statement: ::statement,
+          new_confidence: ::new_confidence,
+          quantum_enhanced: true
+        }
+      } else {
+        emit azme.belief_revision_failed with {
+          statement: ::statement,
+          reason: "belief_not_found",
+          quantum_enhanced: true
+        }
+      }
+    }
+
+    on start_reflection_cycle {
+      set ::cycle_request = $1
+      
+      say "🔄 Starting reflection cycle"
+      
+      set ::reflection_cycle.id = ::internal.random().toString().slice(0, 8)
+      set ::reflection_cycle.timestamp = ::internal.now()
+      set ::reflection_cycle.status = "active"
+      
+      set ::performance_review.reflection_cycles = ::performance_review.reflection_cycles + 1
+      
+      # Analyze recent introspection log
+      analyze_recent_reflections()
+      
+      # Generate improvement goals
+      generate_improvement_goals()
+      
+      set ::reflection_cycle.status = "complete"
+      
+      emit azme.reflection_cycle_complete with {
+        cycle_id: ::reflection_cycle.id,
+        duration: ::internal.now() - ::reflection_cycle.timestamp,
+        quantum_enhanced: true
+      }
+    }
+
+    on analyze_recent_reflections {
+      set ::analysis_request = $1
+      
+      say "🔍 Analyzing recent reflections"
+      
+      set ::recent_entries = ::introspection_log.slice(-10)
+      set ::patterns = []
+      
+      # Analyze patterns in recent reflections
+      loop for ::entry in ::recent_entries {
+        if ::entry.success == false {
+          set ::patterns = ::patterns.push("frequent_failures")
+        }
+        if ::entry.regret_score > 0.7 {
+          set ::patterns = ::patterns.push("high_regret")
+        }
+        if ::entry.complexity > 0.8 {
+          set ::patterns = ::patterns.push("high_complexity")
+        }
+      }
+      
+      emit azme.reflection_patterns_analyzed with {
+        patterns: ::patterns,
+        recent_entries: ::recent_entries.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on generate_improvement_goals {
+      set ::goal_request = $1
+      
+      say "🎯 Generating improvement goals"
+      
+      set ::improvement_goals = []
+      
+      # Generate goals based on performance patterns
+      if ::performance_review.failed_tasks > ::performance_review.successful_tasks {
+        set ::improvement_goals = ::improvement_goals.push("improve_overall_success_rate")
+      }
+      
+      if ::performance_review.average_regret_score > 0.6 {
+        set ::improvement_goals = ::improvement_goals.push("reduce_decision_regret")
+      }
+      
+      # Generate goals based on belief confidence
+      loop for ::belief in ::belief_graph.keys() {
+        set ::confidence = ::belief_graph[::belief].confidence
+        if ::confidence < 0.5 {
+          set ::improvement_goals = ::improvement_goals.push("strengthen_low_confidence_beliefs")
+        }
+      }
+      
+      set ::reflection_goals = ::reflection_goals.concat(::improvement_goals)
+      set ::goals_created = ::goals_created + ::improvement_goals.length
+      
+      emit azme.improvement_goals_generated with {
+        improvement_goals: ::improvement_goals,
+        total_goals: ::reflection_goals.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on get_reflection_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Getting reflection statistics"
+      
+      set ::reflection_stats = {
+        total_reflections: ::reflection_count,
+        beliefs_formed: ::beliefs_formed,
+        goals_created: ::goals_created,
+        performance_review: ::performance_review,
+        belief_count: ::belief_graph.keys().length,
+        goal_count: ::reflection_goals.length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.reflection_statistics_retrieved with {
+        statistics: ::reflection_stats
+      }
+    }
+
+    # Reflection engine monitoring
+    on azme.monitor_reflection_engine {
+      set ::monitor_request = $1
+      
+      set ::reflection_metrics = {
+        total_reflections: ::reflection_count,
+        beliefs_formed: ::beliefs_formed,
+        goals_created: ::goals_created,
+        performance_review: ::performance_review,
+        belief_count: ::belief_graph.keys().length,
+        goal_count: ::reflection_goals.length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.reflection_engine_metrics with {
+        metrics: ::reflection_metrics
+      }
+    }
+  }
+} 

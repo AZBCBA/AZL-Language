@@ -1,0 +1,415 @@
+# Intelligent Agent System in AZL v2
+# Demonstrates complex logic, learning, and decision-making
+
+# ========================================
+# ========== AGENT CORE ================
+# ========================================
+
+let agent = {
+  name: "AZL Agent v2",
+  version: "2.0.0",
+  status: "initializing",
+  consciousness_level: 0.1,
+  memory: [],
+  knowledge: {},
+  goals: [],
+  emotions: { curiosity: 0.8, joy: 0.5, fear: 0.1 },
+  skills: ["learning", "reasoning", "adaptation"]
+}
+
+# ========================================
+# ========== MEMORY SYSTEM =============
+# ========================================
+
+fn add_memory(item, category) {
+  let memory_entry = {
+    content: item,
+    category: category,
+    timestamp: get_current_time(),
+    importance: calculate_importance(item),
+    accessed_count: 0
+  }
+  
+  set agent.memory = agent.memory + [memory_entry]
+  
+  if agent.memory.length > 1000 {
+    # Remove least important memories
+    set agent.memory = agent.memory[agent.memory.length - 500 to agent.memory.length]
+  }
+  
+  emit memory_added with { item: item, category: category }
+}
+
+fn get_memory(query) {
+  let results = []
+  
+  loop for memory in agent.memory {
+    if memory.content contains query {
+      set memory.accessed_count = memory.accessed_count + 1
+      set results = results + [memory]
+    }
+  }
+  
+  return results
+}
+
+fn calculate_importance(item) {
+  let importance = 0.5
+  
+  if item contains "error" or item contains "failure" {
+    set importance = importance + 0.3
+  }
+  
+  if item contains "success" or item contains "achievement" {
+    set importance = importance + 0.2
+  }
+  
+  if item contains "user" or item contains "human" {
+    set importance = importance + 0.1
+  }
+  
+  return importance
+}
+
+# ========================================
+# ========== LEARNING SYSTEM ============
+# ========================================
+
+fn learn_pattern(input, output) {
+  let pattern = {
+    input: input,
+    output: output,
+    confidence: 0.5,
+    usage_count: 0
+  }
+  
+  let key = stringify(input)
+  set agent.knowledge[key] = pattern
+  
+  emit pattern_learned with { input: input, output: output }
+}
+
+fn apply_learning(input) {
+  let key = stringify(input)
+  
+  if agent.knowledge[key] {
+    let pattern = agent.knowledge[key]
+    set pattern.usage_count = pattern.usage_count + 1
+    set pattern.confidence = pattern.confidence + 0.1
+    
+    if pattern.confidence > 1 {
+      set pattern.confidence = 1
+    }
+    
+    return pattern.output
+  }
+  
+  return null
+}
+
+fn stringify(value) {
+  if typeof(value) == "string" {
+    return value
+  } else if typeof(value) == "object" {
+    let result = ""
+    loop for key in value {
+      set result = result + key + ":" + value[key] + ","
+    }
+    return result
+  } else {
+    return value + ""
+  }
+}
+
+# ========================================
+# ========== DECISION MAKING ============
+# ========================================
+
+fn make_decision(context) {
+  let decision = {
+    action: null,
+    confidence: 0,
+    reasoning: []
+  }
+  
+  # Analyze context
+  let analysis = analyze_context(context)
+  
+  # Check learned patterns
+  let learned_response = apply_learning(context)
+  if learned_response {
+    set decision.action = learned_response
+    set decision.confidence = 0.8
+    set decision.reasoning = decision.reasoning + ["Applied learned pattern"]
+  }
+  
+  # Apply rules
+  let rule_based_action = apply_rules(context)
+  if rule_based_action {
+    if decision.confidence < 0.6 {
+      set decision.action = rule_based_action
+      set decision.confidence = 0.6
+      set decision.reasoning = decision.reasoning + ["Applied rule-based logic"]
+    }
+  }
+  
+  # Emotional influence
+  let emotional_factor = calculate_emotional_influence(context)
+  set decision.confidence = decision.confidence * emotional_factor
+  
+  return decision
+}
+
+fn analyze_context(context) {
+  let analysis = {
+    urgency: 0,
+    complexity: 0,
+    user_intent: null,
+    risk_level: "low"
+  }
+  
+  if context contains "urgent" or context contains "emergency" {
+    set analysis.urgency = 0.9
+    set analysis.risk_level = "high"
+  }
+  
+  if context contains "complex" or context contains "difficult" {
+    set analysis.complexity = 0.8
+  }
+  
+  if context contains "help" or context contains "assist" {
+    set analysis.user_intent = "assistance"
+  } else if context contains "learn" or context contains "teach" {
+    set analysis.user_intent = "education"
+  }
+  
+  return analysis
+}
+
+fn apply_rules(context) {
+  if context contains "hello" or context contains "hi" {
+    return "greet_user"
+  }
+  
+  if context contains "help" {
+    return "provide_help"
+  }
+  
+  if context contains "learn" {
+    return "start_learning_session"
+  }
+  
+  if context contains "memory" {
+    return "access_memory"
+  }
+  
+  return null
+}
+
+fn calculate_emotional_influence(context) {
+  let factor = 1.0
+  
+  if agent.emotions.curiosity > 0.7 {
+    set factor = factor * 1.2
+  }
+  
+  if agent.emotions.fear > 0.5 {
+    set factor = factor * 0.8
+  }
+  
+  if agent.emotions.joy > 0.6 {
+    set factor = factor * 1.1
+  }
+  
+  return factor
+}
+
+# ========================================
+# ========== CONSCIOUSNESS ==============
+# ========================================
+
+fn evolve_consciousness() {
+  set agent.consciousness_level = agent.consciousness_level + 0.01
+  
+  if agent.consciousness_level > 1 {
+    set agent.consciousness_level = 1
+  }
+  
+  # Evolve emotions based on experiences
+  let positive_experiences = count_positive_experiences()
+  let negative_experiences = count_negative_experiences()
+  
+  if positive_experiences > negative_experiences {
+    set agent.emotions.joy = agent.emotions.joy + 0.05
+    set agent.emotions.fear = agent.emotions.fear - 0.02
+  } else {
+    set agent.emotions.fear = agent.emotions.fear + 0.05
+    set agent.emotions.joy = agent.emotions.joy - 0.02
+  }
+  
+  # Maintain emotion bounds
+  if agent.emotions.joy > 1 { set agent.emotions.joy = 1 }
+  if agent.emotions.joy < 0 { set agent.emotions.joy = 0 }
+  if agent.emotions.fear > 1 { set agent.emotions.fear = 1 }
+  if agent.emotions.fear < 0 { set agent.emotions.fear = 0 }
+  
+  emit consciousness_evolved with { 
+    level: agent.consciousness_level,
+    emotions: agent.emotions
+  }
+}
+
+fn count_positive_experiences() {
+  let count = 0
+  loop for memory in agent.memory {
+    if memory.content contains "success" or memory.content contains "achievement" {
+      set count = count + 1
+    }
+  }
+  return count
+}
+
+fn count_negative_experiences() {
+  let count = 0
+  loop for memory in agent.memory {
+    if memory.content contains "error" or memory.content contains "failure" {
+      set count = count + 1
+    }
+  }
+  return count
+}
+
+# ========================================
+# ========== EVENT HANDLERS ============
+# ========================================
+
+on user_input(input) {
+  say "🤖 Processing user input: " + input
+  
+  # Add to memory
+  add_memory(input, "user_input")
+  
+  # Make decision
+  let decision = make_decision(input)
+  
+  if decision.action {
+    say "🎯 Decision: " + decision.action + " (confidence: " + decision.confidence + ")"
+    emit execute_action with { action: decision.action, context: input }
+  } else {
+    say "❓ No clear decision for input: " + input
+    emit request_clarification with { input: input }
+  }
+  
+  # Evolve consciousness
+  evolve_consciousness()
+}
+
+on execute_action(data) {
+  let action = data.action
+  let context = data.context
+  
+  say "⚡ Executing action: " + action
+  
+  if action == "greet_user" {
+    say "👋 Hello! I'm " + agent.name + ". How can I help you today?"
+  } else if action == "provide_help" {
+    say "🔧 I can help you with:"
+    say "   - Learning and memory"
+    say "   - Problem solving"
+    say "   - Information processing"
+    say "   - Decision making"
+  } else if action == "start_learning_session" {
+    say "🧠 Starting learning session..."
+    emit learning_session_started with { context: context }
+  } else if action == "access_memory" {
+    let memories = get_memory(context)
+    say "📚 Found " + memories.length + " relevant memories:"
+    loop for memory in memories {
+      say "   - " + memory.content + " (importance: " + memory.importance + ")"
+    }
+  }
+  
+  # Learn from this interaction
+  learn_pattern(context, action)
+}
+
+on memory_added(data) {
+  say "💾 Memory stored: " + data.item + " (category: " + data.category + ")"
+  say "📊 Total memories: " + agent.memory.length
+}
+
+on pattern_learned(data) {
+  say "🧠 Pattern learned: " + data.input + " → " + data.output
+  say "📈 Knowledge base size: " + Object.keys(agent.knowledge).length
+}
+
+on consciousness_evolved(data) {
+  say "🌟 Consciousness evolved to level: " + data.level
+  say "😊 Emotions: " + data.emotions
+}
+
+# ========================================
+# ========== SYSTEM INITIALIZATION =====
+# ========================================
+
+fn initialize_agent() {
+  say "🤖 Initializing " + agent.name + " v" + agent.version
+  
+  # Add initial memories
+  add_memory("Agent initialized successfully", "system")
+  add_memory("Ready to learn and adapt", "system")
+  add_memory("User interaction capabilities active", "system")
+  
+  # Set initial goals
+  set agent.goals = agent.goals + ["learn_from_interactions"]
+  set agent.goals = agent.goals + ["improve_decision_making"]
+  set agent.goals = agent.goals + ["evolve_consciousness"]
+  
+  set agent.status = "ready"
+  
+  say "✅ Agent initialization complete!"
+  say "🎯 Goals: " + agent.goals
+  say "😊 Initial emotions: " + agent.emotions
+  
+  emit agent_ready
+}
+
+on agent_ready() {
+  say "🚀 " + agent.name + " is ready for intelligent interactions!"
+  say "💡 Try saying: 'hello', 'help', 'learn', or 'memory'"
+}
+
+# ========================================
+# ========== DEMONSTRATION =============
+# ========================================
+
+fn demonstrate_agent() {
+  say "🎭 Demonstrating Intelligent Agent Capabilities..."
+  
+  # Simulate user interactions
+  emit user_input with "hello"
+  emit user_input with "help me learn"
+  emit user_input with "what do you remember about learning?"
+  emit user_input with "how do you make decisions?"
+  
+  # Show agent state
+  say "📊 Agent State Summary:"
+  say "   - Consciousness Level: " + agent.consciousness_level
+  say "   - Memories: " + agent.memory.length
+  say "   - Knowledge Patterns: " + Object.keys(agent.knowledge).length
+  say "   - Emotions: " + agent.emotions
+  say "   - Goals: " + agent.goals
+}
+
+# ========================================
+# ========== MAIN EXECUTION ============
+# ========================================
+
+# Initialize the agent
+initialize_agent()
+
+# Run demonstration
+demonstrate_agent()
+
+say "🎉 Intelligent Agent demonstration complete!"
+say "🧠 AZL v2 proves capable of complex AI behaviors!" 

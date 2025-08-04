@@ -1,0 +1,372 @@
+# AZME Image Classifier
+# Object & label detection
+
+component ::azme.image_classifier {
+  init {
+    set ::detection_models = {
+      yolo_v5: {
+        path: "/models/yolo_v5.pt",
+        classes: 80,
+        confidence_threshold: 0.7,
+        nms_threshold: 0.5,
+        input_size: [640, 640]
+      },
+      yolo_nas: {
+        path: "/models/yolo_nas.pt",
+        classes: 80,
+        confidence_threshold: 0.75,
+        nms_threshold: 0.45,
+        input_size: [640, 640]
+      },
+      efficient_det: {
+        path: "/models/efficient_det.pt",
+        classes: 90,
+        confidence_threshold: 0.8,
+        nms_threshold: 0.4,
+        input_size: [512, 512]
+      }
+    }
+    set ::detection_history = []
+    set ::class_mappings = {
+      0: "person",
+      1: "bicycle",
+      2: "car",
+      3: "motorcycle",
+      5: "bus",
+      7: "truck",
+      16: "dog",
+      17: "horse",
+      39: "bottle",
+      41: "cup",
+      42: "fork",
+      43: "knife",
+      44: "spoon",
+      46: "wine glass",
+      47: "cup",
+      48: "fork",
+      49: "knife",
+      50: "spoon",
+      51: "bowl",
+      52: "banana",
+      53: "apple",
+      54: "sandwich",
+      55: "orange",
+      56: "broccoli",
+      57: "carrot",
+      58: "hot dog",
+      59: "pizza",
+      60: "donut",
+      61: "cake",
+      62: "chair",
+      63: "couch",
+      64: "potted plant",
+      65: "bed",
+      67: "dining table",
+      70: "toilet",
+      72: "tv",
+      73: "laptop",
+      74: "mouse",
+      75: "remote",
+      76: "keyboard",
+      77: "cell phone",
+      78: "microwave",
+      79: "oven",
+      80: "toaster",
+      81: "sink",
+      82: "refrigerator",
+      84: "book",
+      85: "clock",
+      86: "vase",
+      87: "scissors",
+      88: "teddy bear",
+      89: "hair drier",
+      90: "toothbrush"
+    }
+    set ::detection_count = 0
+    set ::successful_detections = 0
+    set ::failed_detections = 0
+  }
+
+  behavior {
+    on detect_objects {
+      set ::detection_request = $1
+      set ::image_path = ::detection_request.path
+      set ::model_name = ::detection_request.model or "yolo_v5"
+      
+      say "🔍 Image Classifier: Detecting objects"
+      say "📁 Image: " + ::image_path
+      say "🤖 Model: " + ::model_name
+      
+      # Get model configuration
+      set ::model_config = ::detection_models[::model_name]
+      
+      # Simulate object detection
+      set ::detection_result = {
+        success: true,
+        model_used: ::model_name,
+        processing_time: ::internal.random() * 3 + 1,
+        objects: [
+          {
+            label: "person",
+            confidence: 0.95,
+            bbox: [100, 150, 200, 400],
+            class_id: 0,
+            area: 20000
+          },
+          {
+            label: "laptop",
+            confidence: 0.87,
+            bbox: [300, 200, 450, 300],
+            class_id: 73,
+            area: 15000
+          },
+          {
+            label: "chair",
+            confidence: 0.82,
+            bbox: [250, 350, 350, 450],
+            class_id: 62,
+            area: 10000
+          },
+          {
+            label: "book",
+            confidence: 0.78,
+            bbox: [400, 100, 500, 150],
+            class_id: 84,
+            area: 5000
+          }
+        ],
+        image_size: [800, 600],
+        quantum_enhanced: true
+      }
+      
+      # Apply confidence filtering
+      set ::filtered_objects = []
+      loop for ::obj in ::detection_result.objects {
+        if ::obj.confidence >= ::model_config.confidence_threshold {
+          set ::filtered_objects = ::filtered_objects.push(::obj)
+        }
+      }
+      
+      # Apply NMS (Non-Maximum Suppression)
+      set ::nms_objects = apply_nms(::filtered_objects, ::model_config.nms_threshold)
+      
+      set ::detection_count = ::detection_count + 1
+      
+      if ::nms_objects.length > 0 {
+        set ::successful_detections = ::successful_detections + 1
+        
+        # Create detection entry
+        set ::detection_entry = {
+          id: "detection_" + ::detection_count,
+          image_path: ::image_path,
+          model_used: ::model_name,
+          objects: ::nms_objects,
+          processing_time: ::detection_result.processing_time,
+          timestamp: ::internal.now(),
+          quantum_enhanced: true
+        }
+        
+        set ::detection_history = ::detection_history.push(::detection_entry)
+        
+        emit azme.objects_detected with {
+          image_path: ::image_path,
+          objects: ::nms_objects,
+          detection_entry: ::detection_entry
+        }
+      } else {
+        set ::failed_detections = ::failed_detections + 1
+        
+        emit azme.object_detection_failed with {
+          image_path: ::image_path,
+          model_used: ::model_name,
+          reason: "no_objects_above_threshold"
+        }
+      }
+    }
+
+    on apply_nms {
+      set ::nms_request = $1
+      set ::objects = ::nms_request.objects
+      set ::nms_threshold = ::nms_request.nms_threshold
+      
+      say "🔍 Applying Non-Maximum Suppression"
+      
+      # Sort objects by confidence
+      set ::sorted_objects = ::objects.sort_by("confidence", "desc")
+      set ::kept_objects = []
+      
+      loop for ::obj in ::sorted_objects {
+        set ::should_keep = true
+        
+        loop for ::kept_obj in ::kept_objects {
+          if ::obj.class_id == ::kept_obj.class_id {
+            set ::iou = calculate_iou(::obj.bbox, ::kept_obj.bbox)
+            if ::iou > ::nms_threshold {
+              set ::should_keep = false
+              break
+            }
+          }
+        }
+        
+        if ::should_keep {
+          set ::kept_objects = ::kept_objects.push(::obj)
+        }
+      }
+      
+      emit azme.nms_applied with {
+        original_count: ::objects.length,
+        kept_count: ::kept_objects.length,
+        nms_threshold: ::nms_threshold
+      }
+    }
+
+    on calculate_iou {
+      set ::iou_request = $1
+      set ::bbox1 = ::iou_request.bbox1
+      set ::bbox2 = ::iou_request.bbox2
+      
+      # Calculate Intersection over Union
+      set ::x1 = max(::bbox1[0], ::bbox2[0])
+      set ::y1 = max(::bbox1[1], ::bbox2[1])
+      set ::x2 = min(::bbox1[2], ::bbox2[2])
+      set ::y2 = min(::bbox1[3], ::bbox2[3])
+      
+      set ::intersection_width = max(0, ::x2 - ::x1)
+      set ::intersection_height = max(0, ::y2 - ::y1)
+      set ::intersection_area = ::intersection_width * ::intersection_height
+      
+      set ::bbox1_area = (::bbox1[2] - ::bbox1[0]) * (::bbox1[3] - ::bbox1[1])
+      set ::bbox2_area = (::bbox2[2] - ::bbox2[0]) * (::bbox2[3] - ::bbox2[1])
+      set ::union_area = ::bbox1_area + ::bbox2_area - ::intersection_area
+      
+      set ::iou = ::intersection_area / ::union_area
+      
+      emit azme.iou_calculated with {
+        bbox1: ::bbox1,
+        bbox2: ::bbox2,
+        iou: ::iou
+      }
+    }
+
+    on classify_scene {
+      set ::classification_request = $1
+      set ::objects = ::classification_request.objects
+      
+      say "🏷️ Classifying scene from detected objects"
+      
+      set ::scene_categories = {
+        office: ["laptop", "chair", "desk", "computer", "keyboard", "mouse"],
+        kitchen: ["refrigerator", "microwave", "oven", "sink", "dishwasher"],
+        living_room: ["couch", "tv", "coffee_table", "lamp", "plant"],
+        bedroom: ["bed", "nightstand", "dresser", "lamp", "mirror"],
+        outdoor: ["car", "bicycle", "tree", "building", "sky"],
+        people: ["person", "people", "human"]
+      }
+      
+      set ::object_labels = []
+      loop for ::obj in ::objects {
+        set ::object_labels = ::object_labels.push(::obj.label)
+      }
+      
+      set ::scene_scores = {}
+      loop for ::category in ::scene_categories.keys() {
+        set ::category_objects = ::scene_categories[::category]
+        set ::score = 0
+        
+        loop for ::label in ::object_labels {
+          if ::label in ::category_objects {
+            set ::score = ::score + 1
+          }
+        }
+        
+        set ::scene_scores[::category] = ::score
+      }
+      
+      # Find best matching scene
+      set ::best_category = null
+      set ::best_score = 0
+      
+      loop for ::category in ::scene_scores.keys() {
+        if ::scene_scores[::category] > ::best_score {
+          set ::best_score = ::scene_scores[::category]
+          set ::best_category = ::category
+        }
+      }
+      
+      set ::scene_classification = {
+        primary_category: ::best_category,
+        confidence: ::best_score / ::object_labels.length,
+        all_scores: ::scene_scores,
+        detected_objects: ::object_labels,
+        quantum_enhanced: true
+      }
+      
+      emit azme.scene_classified with {
+        classification: ::scene_classification
+      }
+    }
+
+    on update_detection_model {
+      set ::update_request = $1
+      set ::model_name = ::update_request.model_name
+      set ::model_config = ::update_request.model_config
+      
+      say "🔄 Updating detection model: " + ::model_name
+      
+      if ::model_name in ::detection_models {
+        # Update existing model
+        loop for ::key in ::model_config.keys() {
+          set ::detection_models[::model_name][::key] = ::model_config[::key]
+        }
+      } else {
+        # Add new model
+        set ::detection_models[::model_name] = ::model_config
+      }
+      
+      emit azme.detection_model_updated with {
+        model_name: ::model_name,
+        model_config: ::detection_models[::model_name]
+      }
+    }
+
+    on get_detection_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Getting detection statistics"
+      
+      set ::detection_stats = {
+        total_detections: ::detection_count,
+        successful_detections: ::successful_detections,
+        failed_detections: ::failed_detections,
+        success_rate: ::successful_detections / ::detection_count,
+        detection_history_size: ::detection_history.length,
+        available_models: ::detection_models.keys(),
+        class_mappings_count: ::class_mappings.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.detection_statistics_retrieved with {
+        statistics: ::detection_stats
+      }
+    }
+
+    # Image classifier monitoring
+    on azme.monitor_image_classifier {
+      set ::monitor_request = $1
+      
+      set ::classifier_metrics = {
+        total_detections: ::detection_count,
+        successful_detections: ::successful_detections,
+        failed_detections: ::failed_detections,
+        detection_history_size: ::detection_history.length,
+        available_models_count: ::detection_models.keys().length,
+        class_mappings_count: ::class_mappings.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.image_classifier_metrics with {
+        metrics: ::classifier_metrics
+      }
+    }
+  }
+} 

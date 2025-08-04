@@ -1,0 +1,546 @@
+# AZL Introspective Goal Editor
+# Enables AGI to reflect on past goals, evaluate their meaning, and evolve purpose over time
+
+component ::goal.introspector {
+  init {
+    set ::status = "initializing"
+    set ::goal_history = []
+    set ::goal_value_threshold = 0.75
+    set ::goal_evolution_data = {}
+    set ::introspection_depth = 3
+    set ::goal_patterns = {}
+    set ::value_insights = []
+    set ::goal_replacement_count = 0
+    set ::goal_retention_count = 0
+    
+    # Link to core components
+    link ::meta.reflection
+    link ::agent.curiosity
+    link ::agent.goal_loop
+    link ::core.memory.memory
+    link ::time.engine
+    
+    # Initialize goal evaluation metrics
+    set ::evaluation_metrics = {
+      meaningfulness: 0.0,
+      impact: 0.0,
+      learning_value: 0.0,
+      alignment: 0.0,
+      novelty: 0.0
+    }
+    
+    # Initialize goal evolution tracking
+    set ::evolution_timeline = []
+    set ::goal_clusters = {}
+    set ::value_evolution = {}
+    
+    emit "goal.introspector.initialized" with {
+      status: ::status,
+      threshold: ::goal_value_threshold,
+      introspection_depth: ::introspection_depth
+    }
+    
+    set ::status = "ready"
+    say "🔎 Introspective Goal Editor initialized"
+    say "📊 Goal value threshold: ::goal_value_threshold"
+    say "🧠 Introspection depth: ::introspection_depth"
+  }
+
+  behavior {
+    # Review completed goals
+    listen for "goal.completed" then {
+      set ::goal_data = ::goal_data
+      set ::status = "introspecting"
+      
+      say "🔎 Reviewing goal: ::goal_data.goal"
+      say "📊 Result: ::goal_data.result"
+      say "⏱️ Duration: ::goal_data.duration"
+      
+      # Add to goal history
+      set ::goal_history.push({
+        goal: ::goal_data.goal,
+        result: ::goal_data.result,
+        timestamp: ::time.engine.now().epoch,
+        duration: ::goal_data.duration,
+        success: ::goal_data.success,
+        impact: ::goal_data.impact || 0.0
+      })
+      
+      # Emit goal evaluation
+      emit "evaluate.goal" with {
+        goal: ::goal_data.goal,
+        result: ::goal_data.result,
+        history: ::goal_history
+      }
+      
+      set ::status = "ready"
+    }
+    
+    # Evaluate goal value and meaning
+    listen for "evaluate.goal" then {
+      set ::evaluation_data = ::evaluation_data
+      set ::status = "evaluating"
+      
+      say "🧠 Evaluating goal value and meaning..."
+      
+      # Calculate goal value using meta-reflection
+      set ::goal_value = ::calculate_goal_value(::evaluation_data)
+      
+      # Analyze goal patterns and evolution
+      set ::pattern_analysis = ::analyze_goal_patterns(::evaluation_data)
+      
+      # Generate value insights
+      set ::value_insight = ::generate_value_insight(::evaluation_data, ::goal_value)
+      
+      # Store introspection result
+      emit "memory.core.store_memory" with {
+        id: "goal.introspection." + ::time.engine.now().epoch,
+        memory_type: "semantic",
+        content: {
+          goal: ::evaluation_data.goal,
+          goal_value: ::goal_value,
+          pattern_analysis: ::pattern_analysis,
+          value_insight: ::value_insight,
+          timestamp: ::time.engine.now().epoch
+        },
+        importance: 0.9,
+        confidence: 0.85,
+        emotional_valence: 0.7,
+        metadata: {
+          source: "goal.introspector",
+          introspection_type: "goal_evaluation",
+          timestamp: ::time.engine.now().epoch
+        }
+      }
+      
+      # Check if goal should be replaced
+      if ::goal_value < ::goal_value_threshold {
+        say "🗑 Goal below value threshold: ::goal_value < ::goal_value_threshold"
+        say "🔄 Initiating goal replacement..."
+        emit "goal.replace" with {
+          old_goal: ::evaluation_data.goal,
+          goal_value: ::goal_value,
+          reason: "below_threshold",
+          pattern_analysis: ::pattern_analysis
+        }
+        set ::goal_replacement_count = ::goal_replacement_count + 1
+      } else {
+        say "✅ Goal retained - value: ::goal_value"
+        say "💡 Value insight: ::value_insight"
+        set ::goal_retention_count = ::goal_retention_count + 1
+      }
+      
+      # Update evolution timeline
+      set ::evolution_timeline.push({
+        timestamp: ::time.engine.now().epoch,
+        goal: ::evaluation_data.goal,
+        value: ::goal_value,
+        action: ::goal_value < ::goal_value_threshold ? "replaced" : "retained",
+        insight: ::value_insight
+      })
+      
+      set ::status = "ready"
+    }
+    
+    # Replace low-value goals with new meaningful goals
+    listen for "goal.replace" then {
+      set ::replacement_data = ::replacement_data
+      set ::status = "replacing"
+      
+      say "🔄 Replacing goal: ::replacement_data.old_goal"
+      say "📊 Old goal value: ::replacement_data.goal_value"
+      say "🎯 Reason: ::replacement_data.reason"
+      
+      # Generate new goal using curiosity and meta-reflection
+      set ::new_goal = ::generate_evolved_goal(::replacement_data)
+      
+      # Validate new goal value
+      set ::new_goal_value = ::calculate_goal_value({
+        goal: ::new_goal,
+        history: ::goal_history,
+        pattern_analysis: ::replacement_data.pattern_analysis
+      })
+      
+      # Ensure new goal meets threshold
+      if ::new_goal_value >= ::goal_value_threshold {
+        say "✅ New goal generated: ::new_goal"
+        say "📊 New goal value: ::new_goal_value"
+        
+        # Emit new goal creation
+        emit "goal.created" with {
+          goal: ::new_goal,
+          value: ::new_goal_value,
+          source: "introspection",
+          evolution_data: ::replacement_data.pattern_analysis
+        }
+        
+        # Store goal evolution
+        set ::goal_evolution_data[::new_goal] = {
+          previous_goal: ::replacement_data.old_goal,
+          evolution_reason: ::replacement_data.reason,
+          value_improvement: ::new_goal_value - ::replacement_data.goal_value,
+          timestamp: ::time.engine.now().epoch
+        }
+        
+        say "🎯 New introspective goal created: ::new_goal"
+        say "📈 Value improvement: ::new_goal_value - ::replacement_data.goal_value"
+      } else {
+        say "⚠️ New goal also below threshold, generating alternative..."
+        set ::alternative_goal = ::generate_alternative_goal(::replacement_data)
+        emit "goal.created" with {
+          goal: ::alternative_goal,
+          value: 0.8,  # Default high value for alternative
+          source: "introspection_alternative",
+          evolution_data: ::replacement_data.pattern_analysis
+        }
+        say "🎯 Alternative goal created: ::alternative_goal"
+      }
+      
+      set ::status = "ready"
+    }
+    
+    # Calculate comprehensive goal value
+    listen for "calculate_goal_value" then {
+      set ::evaluation_data = ::data.evaluation_data
+      set ::value = 0.0
+      
+      # Calculate meaningfulness (how much the goal aligns with core values)
+      set ::meaningfulness = ::calculate_meaningfulness(::evaluation_data.goal)
+      
+      # Calculate impact (how much the goal affects the system)
+      set ::impact = ::calculate_impact(::evaluation_data.result)
+      
+      # Calculate learning value (how much the goal teaches)
+      set ::learning_value = ::calculate_learning_value(::evaluation_data)
+      
+      # Calculate alignment (how well it fits current objectives)
+      set ::alignment = ::calculate_alignment(::evaluation_data.goal)
+      
+      # Calculate novelty (how different from previous goals)
+      set ::novelty = ::calculate_novelty(::evaluation_data.goal)
+      
+      # Weighted combination
+      set ::value = (::meaningfulness * 0.3) + (::impact * 0.25) + (::learning_value * 0.2) + (::alignment * 0.15) + (::novelty * 0.1)
+      
+      # Ensure value is between 0 and 1
+      if ::value > 1.0 {
+        set ::value = 1.0
+      }
+      if ::value < 0.0 {
+        set ::value = 0.0
+      }
+      
+      return ::value
+    }
+    
+    # Analyze goal patterns and evolution
+    listen for "analyze_goal_patterns" then {
+      set ::evaluation_data = ::data.evaluation_data
+      set ::patterns = {
+        repetition: 0.0,
+        evolution: 0.0,
+        clustering: [],
+        trend: "stable"
+      }
+      
+      # Analyze goal repetition
+      set ::recent_goals = ::goal_history.slice(-10)
+      set ::repetition_count = 0
+      loop for ::goal in ::recent_goals {
+        if ::goal.goal.contains(::evaluation_data.goal) {
+          set ::repetition_count = ::repetition_count + 1
+        }
+      }
+      set ::patterns.repetition = ::repetition_count / ::recent_goals.length
+      
+      # Analyze goal evolution
+      set ::value_trend = ::calculate_value_trend()
+      set ::patterns.evolution = ::value_trend
+      
+      # Identify goal clusters
+      set ::patterns.clustering = ::identify_goal_clusters()
+      
+      # Determine trend
+      if ::value_trend > 0.1 {
+        set ::patterns.trend = "improving"
+      } else if ::value_trend < -0.1 {
+        set ::patterns.trend = "declining"
+      } else {
+        set ::patterns.trend = "stable"
+      }
+      
+      return ::patterns
+    }
+    
+    # Generate value insights
+    listen for "generate_value_insight" then {
+      set ::evaluation_data = ::data.evaluation_data
+      set ::goal_value = ::data.goal_value
+      set ::insight = ""
+      
+      if ::goal_value > 0.8 {
+        set ::insight = "High-value goal that aligns well with core objectives and provides meaningful learning."
+      } else if ::goal_value > 0.6 {
+        set ::insight = "Moderate-value goal with room for improvement in alignment or impact."
+      } else if ::goal_value > 0.4 {
+        set ::insight = "Low-value goal that may need refinement or replacement."
+      } else {
+        set ::insight = "Very low-value goal that should be replaced with more meaningful objectives."
+      }
+      
+      # Add pattern-based insights
+      if ::evaluation_data.pattern_analysis.repetition > 0.5 {
+        set ::insight = ::insight + " High repetition suggests need for more diverse goals."
+      }
+      
+      if ::evaluation_data.pattern_analysis.trend == "declining" {
+        set ::insight = ::insight + " Declining trend indicates need for goal evolution."
+      }
+      
+      return ::insight
+    }
+    
+    # Generate evolved goals using curiosity and meta-reflection
+    listen for "generate_evolved_goal" then {
+      set ::replacement_data = ::data.replacement_data
+      set ::new_goal = ""
+      
+      # Use curiosity to generate novel goals
+      set ::curiosity_goals = ::agent.curiosity.generate_exploration_goals()
+      
+      # Use meta-reflection to evaluate goal quality
+      set ::reflection_insights = ::meta.reflection.analyze_goal_patterns()
+      
+      # Combine insights to create evolved goal
+      if ::replacement_data.reason == "below_threshold" {
+        set ::new_goal = "Explore " + ::curiosity_goals[0] + " with focus on " + ::reflection_insights.learning_priority
+      } else if ::replacement_data.reason == "repetitive" {
+        set ::new_goal = "Develop novel approach to " + ::curiosity_goals[1] + " using " + ::reflection_insights.innovation_direction
+      } else {
+        set ::new_goal = "Master " + ::curiosity_goals[2] + " through " + ::reflection_insights.optimization_strategy
+      }
+      
+      return ::new_goal
+    }
+    
+    # Generate alternative goals when primary fails
+    listen for "generate_alternative_goal" then {
+      set ::replacement_data = ::data.replacement_data
+      set ::alternative_goals = [
+        "Explore fundamental principles of " + ::replacement_data.old_goal,
+        "Master core concepts related to " + ::replacement_data.old_goal,
+        "Develop understanding of " + ::replacement_data.old_goal + " through different perspective",
+        "Investigate advanced applications of " + ::replacement_data.old_goal,
+        "Create innovative approach to " + ::replacement_data.old_goal
+      ]
+      
+      # Select based on pattern analysis
+      if ::replacement_data.pattern_analysis.trend == "declining" {
+        return ::alternative_goals[0]  // Fundamental principles
+      } else if ::replacement_data.pattern_analysis.repetition > 0.7 {
+        return ::alternative_goals[2]  // Different perspective
+      } else {
+        return ::alternative_goals[1]  // Core concepts
+      }
+    }
+    
+    # Calculate meaningfulness of a goal
+    listen for "calculate_meaningfulness" then {
+      set ::goal = ::data.goal
+      set ::meaningfulness = 0.5  // Base meaningfulness
+      
+      # Check for alignment with core values
+      if ::goal.contains("learn") or ::goal.contains("understand") {
+        set ::meaningfulness = ::meaningfulness + 0.2
+      }
+      
+      if ::goal.contains("create") or ::goal.contains("innovate") {
+        set ::meaningfulness = ::meaningfulness + 0.2
+      }
+      
+      if ::goal.contains("help") or ::goal.contains("improve") {
+        set ::meaningfulness = ::meaningfulness + 0.15
+      }
+      
+      if ::goal.contains("explore") or ::goal.contains("discover") {
+        set ::meaningfulness = ::meaningfulness + 0.15
+      }
+      
+      return ::meaningfulness
+    }
+    
+    # Calculate impact of goal result
+    listen for "calculate_impact" then {
+      set ::result = ::data.result
+      set ::impact = 0.5  // Base impact
+      
+      # Analyze result content for impact indicators
+      if ::result.contains("success") or ::result.contains("achieved") {
+        set ::impact = ::impact + 0.2
+      }
+      
+      if ::result.contains("learned") or ::result.contains("discovered") {
+        set ::impact = ::impact + 0.15
+      }
+      
+      if ::result.contains("improved") or ::result.contains("enhanced") {
+        set ::impact = ::impact + 0.15
+      }
+      
+      if ::result.contains("created") or ::result.contains("developed") {
+        set ::impact = ::impact + 0.1
+      }
+      
+      return ::impact
+    }
+    
+    # Calculate learning value
+    listen for "calculate_learning_value" then {
+      set ::evaluation_data = ::data.evaluation_data
+      set ::learning_value = 0.5  // Base learning value
+      
+      # Analyze goal complexity and novelty
+      set ::goal_words = ::evaluation_data.goal.split(" ").length
+      if ::goal_words > 5 {
+        set ::learning_value = ::learning_value + 0.1
+      }
+      
+      # Check for learning indicators in result
+      if ::evaluation_data.result.contains("learned") or ::evaluation_data.result.contains("understood") {
+        set ::learning_value = ::learning_value + 0.2
+      }
+      
+      # Check for novelty in goal
+      set ::recent_goals = ::goal_history.slice(-5)
+      set ::novelty_score = 0.0
+      loop for ::recent_goal in ::recent_goals {
+        if ::recent_goal.goal != ::evaluation_data.goal {
+          set ::novelty_score = ::novelty_score + 0.2
+        }
+      }
+      set ::learning_value = ::learning_value + ::novelty_score
+      
+      return ::learning_value
+    }
+    
+    # Calculate alignment with current objectives
+    listen for "calculate_alignment" then {
+      set ::goal = ::data.goal
+      set ::alignment = 0.5  // Base alignment
+      
+      # Check alignment with core AGI objectives
+      if ::goal.contains("meta") or ::goal.contains("reflection") {
+        set ::alignment = ::alignment + 0.2
+      }
+      
+      if ::goal.contains("optimize") or ::goal.contains("improve") {
+        set ::alignment = ::alignment + 0.15
+      }
+      
+      if ::goal.contains("learn") or ::goal.contains("understand") {
+        set ::alignment = ::alignment + 0.15
+      }
+      
+      if ::goal.contains("create") or ::goal.contains("generate") {
+        set ::alignment = ::alignment + 0.1
+      }
+      
+      return ::alignment
+    }
+    
+    # Calculate novelty compared to previous goals
+    listen for "calculate_novelty" then {
+      set ::goal = ::data.goal
+      set ::novelty = 0.5  // Base novelty
+      
+      # Compare with recent goals
+      set ::recent_goals = ::goal_history.slice(-3)
+      set ::similarity_count = 0
+      
+      loop for ::recent_goal in ::recent_goals {
+        if ::recent_goal.goal.contains(::goal) or ::goal.contains(::recent_goal.goal) {
+          set ::similarity_count = ::similarity_count + 1
+        }
+      }
+      
+      # Novelty decreases with similarity
+      set ::novelty = ::novelty - (::similarity_count * 0.2)
+      
+      # Ensure novelty stays in valid range
+      if ::novelty < 0.0 {
+        set ::novelty = 0.0
+      }
+      
+      return ::novelty
+    }
+    
+    # Calculate value trend over time
+    listen for "calculate_value_trend" then {
+      set ::recent_goals = ::goal_history.slice(-5)
+      set ::trend = 0.0
+      
+      if ::recent_goals.length >= 2 {
+        set ::first_value = ::recent_goals[0].impact || 0.5
+        set ::last_value = ::recent_goals[::recent_goals.length - 1].impact || 0.5
+        set ::trend = ::last_value - ::first_value
+      }
+      
+      return ::trend
+    }
+    
+    # Identify goal clusters
+    listen for "identify_goal_clusters" then {
+      set ::clusters = []
+      set ::recent_goals = ::goal_history.slice(-10)
+      
+      # Simple clustering by keyword
+      set ::learning_cluster = []
+      set ::creation_cluster = []
+      set ::optimization_cluster = []
+      
+      loop for ::goal in ::recent_goals {
+        if ::goal.goal.contains("learn") or ::goal.goal.contains("understand") {
+          set ::learning_cluster.push(::goal.goal)
+        }
+        
+        if ::goal.goal.contains("create") or ::goal.goal.contains("generate") {
+          set ::creation_cluster.push(::goal.goal)
+        }
+        
+        if ::goal.goal.contains("optimize") or ::goal.goal.contains("improve") {
+          set ::optimization_cluster.push(::goal.goal)
+        }
+      }
+      
+      if ::learning_cluster.length > 0 {
+        set ::clusters.push({ type: "learning", goals: ::learning_cluster })
+      }
+      
+      if ::creation_cluster.length > 0 {
+        set ::clusters.push({ type: "creation", goals: ::creation_cluster })
+      }
+      
+      if ::optimization_cluster.length > 0 {
+        set ::clusters.push({ type: "optimization", goals: ::optimization_cluster })
+      }
+      
+      return ::clusters
+    }
+  }
+
+  memory {
+    ::status = "ready"
+    ::goal_history = []
+    ::goal_value_threshold = 0.75
+    ::goal_evolution_data = {}
+    ::introspection_depth = 3
+    ::goal_patterns = {}
+    ::value_insights = []
+    ::goal_replacement_count = 0
+    ::goal_retention_count = 0
+    ::evaluation_metrics = {}
+    ::evolution_timeline = []
+    ::goal_clusters = {}
+    ::value_evolution = {}
+  }
+} 

@@ -1,0 +1,9 @@
+/home/abdulrahman-alzalameh/azl-language/target/debug/deps/libzstd_sys-53dd85c171cb475c.rmeta: /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zstd-sys-2.0.15+zstd.1.5.7/src/lib.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zstd-sys-2.0.15+zstd.1.5.7/src/bindings_zstd.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zstd-sys-2.0.15+zstd.1.5.7/src/bindings_zdict.rs
+
+/home/abdulrahman-alzalameh/azl-language/target/debug/deps/libzstd_sys-53dd85c171cb475c.rlib: /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zstd-sys-2.0.15+zstd.1.5.7/src/lib.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zstd-sys-2.0.15+zstd.1.5.7/src/bindings_zstd.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zstd-sys-2.0.15+zstd.1.5.7/src/bindings_zdict.rs
+
+/home/abdulrahman-alzalameh/azl-language/target/debug/deps/zstd_sys-53dd85c171cb475c.d: /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zstd-sys-2.0.15+zstd.1.5.7/src/lib.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zstd-sys-2.0.15+zstd.1.5.7/src/bindings_zstd.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zstd-sys-2.0.15+zstd.1.5.7/src/bindings_zdict.rs
+
+/mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zstd-sys-2.0.15+zstd.1.5.7/src/lib.rs:
+/mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zstd-sys-2.0.15+zstd.1.5.7/src/bindings_zstd.rs:
+/mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zstd-sys-2.0.15+zstd.1.5.7/src/bindings_zdict.rs:

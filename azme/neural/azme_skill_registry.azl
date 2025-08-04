@@ -1,0 +1,448 @@
+# AZME Skill Registry
+# Skill metadata and lookup
+
+component ::azme.skill_registry {
+  init {
+    set ::skill_registry = {
+      "code_generation.optimized_path_3": {
+        path: ["intent → model:deepseek → plugin:summarizer → memory:save"],
+        reward_score: 12,
+        penalty_score: 1,
+        version: 3,
+        task_type: "code_generation",
+        success_rate: 0.92,
+        last_used: ::internal.now(),
+        metadata: {
+          description: "Optimized code generation using DeepSeek model with summarizer plugin",
+          author: "AZME",
+          created: ::internal.now(),
+          tags: ["code", "generation", "optimized"],
+          complexity: "medium",
+          dependencies: ["deepseek", "summarizer"],
+          quantum_enhanced: true
+        }
+      },
+      "text_processing.efficient_summary": {
+        path: ["intent → model:mistral → plugin:summarizer → output:formatted"],
+        reward_score: 8,
+        penalty_score: 2,
+        version: 1,
+        task_type: "text_processing",
+        success_rate: 0.85,
+        last_used: ::internal.now(),
+        metadata: {
+          description: "Efficient text summarization using Mistral model",
+          author: "AZME",
+          created: ::internal.now(),
+          tags: ["text", "summarization", "efficient"],
+          complexity: "low",
+          dependencies: ["mistral", "summarizer"],
+          quantum_enhanced: true
+        }
+      },
+      "data_analysis.insight_extraction": {
+        path: ["intent → model:azme_lang → plugin:data_analyzer → memory:store"],
+        reward_score: 15,
+        penalty_score: 0,
+        version: 2,
+        task_type: "data_analysis",
+        success_rate: 0.95,
+        last_used: ::internal.now(),
+        metadata: {
+          description: "Advanced data analysis with insight extraction",
+          author: "AZME",
+          created: ::internal.now(),
+          tags: ["data", "analysis", "insights"],
+          complexity: "high",
+          dependencies: ["azme_lang", "data_analyzer"],
+          quantum_enhanced: true
+        }
+      }
+    }
+    set ::skill_categories = {
+      code_generation: {
+        description: "Skills for generating and processing code",
+        skills: ["code_generation.optimized_path_3"],
+        priority: "high"
+      },
+      text_processing: {
+        description: "Skills for text analysis and manipulation",
+        skills: ["text_processing.efficient_summary"],
+        priority: "medium"
+      },
+      data_analysis: {
+        description: "Skills for data analysis and insights",
+        skills: ["data_analysis.insight_extraction"],
+        priority: "high"
+      }
+    }
+    set ::skill_search_index = {}
+    set ::registry_count = 0
+    set ::successful_registrations = 0
+    set ::failed_registrations = 0
+  }
+
+  behavior {
+    on register_skill {
+      set ::registration_request = $1
+      set ::skill_id = ::registration_request.skill_id
+      set ::skill_data = ::registration_request.skill_data
+      
+      say "📝 Registering skill: " + ::skill_id
+      
+      if ::skill_id in ::skill_registry {
+        set ::registration_result = {
+          skill_id: ::skill_id,
+          success: false,
+          reason: "skill_already_exists",
+          quantum_enhanced: true
+        }
+        set ::failed_registrations = ::failed_registrations + 1
+      } else {
+        # Validate skill data
+        set ::validation = validate_skill_data(::skill_data)
+        
+        if ::validation.valid {
+          # Add skill to registry
+          set ::skill_registry[::skill_id] = ::skill_data
+          
+          # Update search index
+          update_search_index(::skill_id, ::skill_data)
+          
+          # Update categories
+          update_skill_categories(::skill_id, ::skill_data)
+          
+          set ::registration_result = {
+            skill_id: ::skill_id,
+            success: true,
+            reason: "skill_registered",
+            validation: ::validation,
+            quantum_enhanced: true
+          }
+          set ::successful_registrations = ::successful_registrations + 1
+        } else {
+          set ::registration_result = {
+            skill_id: ::skill_id,
+            success: false,
+            reason: "invalid_skill_data",
+            validation_errors: ::validation.errors,
+            quantum_enhanced: true
+          }
+          set ::failed_registrations = ::failed_registrations + 1
+        }
+      }
+      
+      set ::registry_count = ::registry_count + 1
+      
+      emit azme.skill_registered with {
+        skill_id: ::skill_id,
+        result: ::registration_result
+      }
+    }
+
+    on validate_skill_data {
+      set ::validation_request = $1
+      set ::skill_data = ::validation_request.skill_data
+      
+      say "🔍 Validating skill data"
+      
+      set ::validation = {
+        valid: true,
+        errors: [],
+        warnings: [],
+        quantum_enhanced: true
+      }
+      
+      # Check required fields
+      set ::required_fields = ["path", "reward_score", "task_type", "success_rate"]
+      loop for ::field in ::required_fields {
+        if not ::field in ::skill_data {
+          set ::validation.valid = false
+          set ::validation.errors = ::validation.errors.push("Missing required field: " + ::field)
+        }
+      }
+      
+      # Check path format
+      if ::skill_data.path and not ::skill_data.path.length > 0 {
+        set ::validation.valid = false
+        set ::validation.errors = ::validation.errors.push("Path must contain at least one step")
+      }
+      
+      # Check success rate bounds
+      if ::skill_data.success_rate and (::skill_data.success_rate < 0 or ::skill_data.success_rate > 1) {
+        set ::validation.valid = false
+        set ::validation.errors = ::validation.errors.push("Success rate must be between 0 and 1")
+      }
+      
+      # Check reward/penalty scores
+      if ::skill_data.reward_score and ::skill_data.reward_score < 0 {
+        set ::validation.warnings = ::validation.warnings.push("Reward score should be positive")
+      }
+      if ::skill_data.penalty_score and ::skill_data.penalty_score < 0 {
+        set ::validation.warnings = ::validation.warnings.push("Penalty score should be positive")
+      }
+      
+      emit azme.skill_data_validated with {
+        skill_data: ::skill_data,
+        validation: ::validation
+      }
+    }
+
+    on update_search_index {
+      set ::index_request = $1
+      set ::skill_id = ::index_request.skill_id
+      set ::skill_data = ::index_request.skill_data
+      
+      say "🔍 Updating search index for skill: " + ::skill_id
+      
+      set ::index_terms = []
+      
+      # Extract searchable terms
+      set ::index_terms = ::index_terms.push(::skill_id)
+      set ::index_terms = ::index_terms.push(::skill_data.task_type)
+      
+      if ::skill_data.metadata {
+        if ::skill_data.metadata.description {
+          set ::index_terms = ::index_terms.push(::skill_data.metadata.description)
+        }
+        if ::skill_data.metadata.tags {
+          loop for ::tag in ::skill_data.metadata.tags {
+            set ::index_terms = ::index_terms.push(::tag)
+          }
+        }
+      }
+      
+      # Add to search index
+      set ::skill_search_index[::skill_id] = ::index_terms
+      
+      emit azme.search_index_updated with {
+        skill_id: ::skill_id,
+        index_terms: ::index_terms
+      }
+    }
+
+    on update_skill_categories {
+      set ::category_request = $1
+      set ::skill_id = ::category_request.skill_id
+      set ::skill_data = ::category_request.skill_data
+      
+      say "📂 Updating skill categories for: " + ::skill_id
+      
+      set ::task_type = ::skill_data.task_type
+      
+      if not ::task_type in ::skill_categories {
+        set ::skill_categories[::task_type] = {
+          description: "Skills for " + ::task_type,
+          skills: [],
+          priority: "medium"
+        }
+      }
+      
+      if not ::skill_id in ::skill_categories[::task_type].skills {
+        set ::skill_categories[::task_type].skills = ::skill_categories[::task_type].skills.push(::skill_id)
+      }
+      
+      emit azme.skill_categories_updated with {
+        skill_id: ::skill_id,
+        task_type: ::task_type,
+        category: ::skill_categories[::task_type]
+      }
+    }
+
+    on search_skills {
+      set ::search_request = $1
+      set ::query = ::search_request.query
+      set ::task_type = ::search_request.task_type or null
+      set ::min_success_rate = ::search_request.min_success_rate or 0
+      
+      say "🔍 Searching skills with query: " + ::query
+      
+      set ::search_results = []
+      
+      loop for ::skill_id in ::skill_registry.keys() {
+        set ::skill_data = ::skill_registry[::skill_id]
+        set ::match_score = 0
+        
+        # Check task type filter
+        if ::task_type and ::skill_data.task_type != ::task_type {
+          continue
+        }
+        
+        # Check success rate filter
+        if ::skill_data.success_rate < ::min_success_rate {
+          continue
+        }
+        
+        # Check query match
+        if ::query {
+          set ::index_terms = ::skill_search_index[::skill_id] or []
+          loop for ::term in ::index_terms {
+            if ::term.contains(::query) {
+              set ::match_score = ::match_score + 1
+            }
+          }
+        } else {
+          set ::match_score = 1
+        }
+        
+        if ::match_score > 0 {
+          set ::search_result = {
+            skill_id: ::skill_id,
+            skill_data: ::skill_data,
+            match_score: ::match_score,
+            quantum_enhanced: true
+          }
+          set ::search_results = ::search_results.push(::search_result)
+        }
+      }
+      
+      # Sort by match score
+      set ::search_results = ::search_results.sort_by("match_score", "desc")
+      
+      emit azme.skill_search_complete with {
+        query: ::query,
+        task_type: ::task_type,
+        min_success_rate: ::min_success_rate,
+        results: ::search_results,
+        total_matches: ::search_results.length
+      }
+    }
+
+    on get_skill_info {
+      set ::info_request = $1
+      set ::skill_id = ::info_request.skill_id
+      
+      say "📋 Getting skill info for: " + ::skill_id
+      
+      if ::skill_id in ::skill_registry {
+        set ::skill_data = ::skill_registry[::skill_id]
+        
+        # Add additional info
+        set ::skill_info = {
+          skill_id: ::skill_id,
+          data: ::skill_data,
+          category: get_skill_category(::skill_id),
+          search_terms: ::skill_search_index[::skill_id] or [],
+          quantum_enhanced: true
+        }
+        
+        emit azme.skill_info_retrieved with {
+          skill_id: ::skill_id,
+          info: ::skill_info
+        }
+      } else {
+        emit azme.skill_info_not_found with {
+          skill_id: ::skill_id
+        }
+      }
+    }
+
+    on get_skill_category {
+      set ::category_request = $1
+      set ::skill_id = ::category_request.skill_id
+      
+      say "📂 Getting skill category for: " + ::skill_id
+      
+      set ::category = null
+      
+      loop for ::task_type in ::skill_categories.keys() {
+        if ::skill_id in ::skill_categories[::task_type].skills {
+          set ::category = ::skill_categories[::task_type]
+          break
+        }
+      }
+      
+      emit azme.skill_category_retrieved with {
+        skill_id: ::skill_id,
+        category: ::category
+      }
+    }
+
+    on list_skill_categories {
+      set ::list_request = $1
+      
+      say "📂 Listing skill categories"
+      
+      set ::category_list = []
+      loop for ::task_type in ::skill_categories.keys() {
+        set ::category = ::skill_categories[::task_type]
+        set ::category_info = {
+          task_type: ::task_type,
+          description: ::category.description,
+          skill_count: ::category.skills.length,
+          priority: ::category.priority,
+          quantum_enhanced: true
+        }
+        set ::category_list = ::category_list.push(::category_info)
+      }
+      
+      emit azme.skill_categories_listed with {
+        categories: ::category_list,
+        total_categories: ::category_list.length
+      }
+    }
+
+    on update_skill_metadata {
+      set ::update_request = $1
+      set ::skill_id = ::update_request.skill_id
+      set ::metadata_updates = ::update_request.metadata_updates
+      
+      say "📝 Updating skill metadata: " + ::skill_id
+      
+      if ::skill_id in ::skill_registry {
+        set ::skill_data = ::skill_registry[::skill_id]
+        
+        # Apply metadata updates
+        if not ::skill_data.metadata {
+          set ::skill_data.metadata = {}
+        }
+        
+        loop for ::key in ::metadata_updates.keys() {
+          set ::skill_data.metadata[::key] = ::metadata_updates[::key]
+        }
+        
+        set ::skill_registry[::skill_id] = ::skill_data
+        
+        # Update search index
+        update_search_index(::skill_id, ::skill_data)
+        
+        set ::update_result = {
+          skill_id: ::skill_id,
+          success: true,
+          reason: "skill_metadata_updated",
+          quantum_enhanced: true
+        }
+      } else {
+        set ::update_result = {
+          skill_id: ::skill_id,
+          success: false,
+          reason: "skill_not_found",
+          quantum_enhanced: true
+        }
+      }
+      
+      emit azme.skill_metadata_updated with {
+        skill_id: ::skill_id,
+        result: ::update_result
+      }
+    }
+
+    # Skill registry monitoring
+    on azme.monitor_skill_registry {
+      set ::monitor_request = $1
+      
+      set ::registry_metrics = {
+        total_skills: ::skill_registry.keys().length,
+        successful_registrations: ::successful_registrations,
+        failed_registrations: ::failed_registrations,
+        skill_categories_count: ::skill_categories.keys().length,
+        search_index_size: ::skill_search_index.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.skill_registry_metrics with {
+        metrics: ::registry_metrics
+      }
+    }
+  }
+} 

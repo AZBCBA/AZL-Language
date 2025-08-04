@@ -1,0 +1,988 @@
+component ::aba.function_identifier {
+  init {
+    set ::function_scores = {
+      escape: 0.0,
+      attention: 0.0,
+      access: 0.0,
+      automatic: 0.0
+    }
+    set ::behavior_history = []
+    set ::function_patterns = {
+      escape: {
+        antecedents: ["task_demand", "difficult_activity", "long_session"],
+        consequences: ["task_removed", "break_given", "activity_stopped"],
+        indicators: ["avoidance", "refusal", "tantrum"]
+      },
+      attention: {
+        antecedents: ["alone", "ignored", "quiet_environment"],
+        consequences: ["adult_attention", "scolding", "eye_contact"],
+        indicators: ["calling_out", "making_noise", "repetitive_behavior"]
+      },
+      access: {
+        antecedents: ["desired_item_visible", "request_denied", "waiting"],
+        consequences: ["item_given", "request_granted", "access_provided"],
+        indicators: ["grabbing", "pointing", "requesting"]
+      },
+      automatic: {
+        antecedents: ["boredom", "sensory_stimulation", "internal_state"],
+        consequences: ["sensory_satisfaction", "self_stimulation", "no_external_consequence"],
+        indicators: ["repetitive_movements", "self_stimulation", "no_social_attention"]
+      }
+    }
+    set ::confidence_threshold = 0.6
+    set ::weighted_average_window = 10
+    
+    // Global Improvements
+    set ::introspection_state = {
+      last_review: now(),
+      decision_history: [],
+      goal_alignment: {},
+      evolution_ready: false
+    }
+    set ::goal_meta = {
+      primary_goal: "accurate_function_analysis",
+      subgoals: ["pattern_recognition", "multi_function_detection", "intervention_effectiveness"],
+      goal_progress: {},
+      goal_weights: {
+        accurate_function_analysis: 0.4,
+        pattern_recognition: 0.3,
+        multi_function_detection: 0.2,
+        intervention_effectiveness: 0.1
+      }
+    }
+    set ::evolution_slots = {
+      pattern_intelligence: "future_enhancement",
+      multi_function_analysis: "future_enhancement",
+      predictive_intervention: "future_enhancement",
+      behavioral_clustering: "future_enhancement"
+    }
+    set ::modular_interface = {
+      submodules: ["pattern_analyzer", "function_processor", "intervention_engine"],
+      external_hooks: ["cli_interface", "dashboard_integration", "api_endpoint"],
+      split_capable: true
+    }
+  }
+
+  behavior {
+    listen for "behavior_observed" then {
+      // Introspective state review before major decisions
+      reflect_introspective_state()
+      
+      store ::function_analysis from analyze_behavior_function(::behavior_data)
+      
+      // Goal meta integration
+      update_goal_progress(::function_analysis)
+      
+      // Real-time monitoring with confidence scoring
+      branch when ::function_analysis.confidence > ::confidence_threshold {
+        emit "function_identified" with ::function_analysis
+        update_function_scores(::function_analysis)
+        
+        // Emit for modular response by other components
+        emit "function_analysis_complete" with {
+          primary_function: ::function_analysis.primary_function,
+          secondary_function: ::function_analysis.secondary_function,
+          confidence: ::function_analysis.confidence,
+          evidence: ::function_analysis.evidence,
+          timestamp: now(),
+          goal_meta: ::goal_meta.primary_goal
+        }
+      }
+      
+      store ::behavior_history from add_behavior_to_history(::behavior_data)
+      
+      // Real-time streaming analysis
+      emit "streaming_analysis" with {
+        current_scores: ::function_scores,
+        recent_confidence: ::function_analysis.confidence,
+        trend: calculate_function_trend()
+      }
+      
+      // Evolution slot check
+      check_evolution_readiness()
+    }
+
+    listen for "behavior_sequence_completed" then {
+      store ::sequence_analysis from analyze_behavior_sequence(::behavior_sequence)
+      emit "sequence_pattern_identified" with ::sequence_analysis
+    }
+
+    listen for "multi_function_detected" then {
+      store ::multi_function_analysis from analyze_multi_function_behavior(::behavior_data)
+      emit "multi_function_result" with ::multi_function_analysis
+    }
+    
+    // External hooking for CLI and dashboard integration
+    listen for "cli.command" then {
+      handle_cli_command(::cli_command)
+    }
+    
+    listen for "dashboard.request" then {
+      emit "dashboard.data" with get_dashboard_data()
+    }
+    
+    listen for "api.request" then {
+      emit "api.response" with handle_api_request(::api_request)
+    }
+    
+    // Modular interface support
+    listen for "module.split" then {
+      emit "module.split.ready" with prepare_module_split()
+    }
+    
+    listen for "evolution.trigger" then {
+      trigger_evolution(::evolution_type)
+    }
+  }
+
+  memory {
+    function_scores
+    behavior_history
+    function_patterns
+    confidence_threshold
+    weighted_average_window
+  }
+
+  interface {
+    analyze_behavior_function using ::behavior_data
+    analyze_behavior_sequence using ::behavior_sequence
+    get_function_scores
+    get_top_functions using ::count
+    update_function_scores using ::analysis_data
+  }
+}
+
+// Function Analysis Functions
+function analyze_behavior_function(behavior_data) {
+  let analysis = {
+    primary_function: null,
+    secondary_function: null,
+    confidence: 0.0,
+    function_scores: {},
+    evidence: {},
+    multi_function_detected: false,
+    blended_functions: []
+  }
+  
+  // Calculate scores for each function
+  let escape_score = calculate_escape_score(behavior_data)
+  let attention_score = calculate_attention_score(behavior_data)
+  let access_score = calculate_access_score(behavior_data)
+  let automatic_score = calculate_automatic_score(behavior_data)
+  
+  set analysis.function_scores = {
+    escape: escape_score,
+    attention: attention_score,
+    access: access_score,
+    automatic: automatic_score
+  }
+  
+  // Check for multi-function behavior
+  let high_scoring_functions = get_high_scoring_functions(analysis.function_scores)
+  branch when high_scoring_functions.length > 1 {
+    set analysis.multi_function_detected = true
+    set analysis.blended_functions = high_scoring_functions
+    set analysis.confidence = calculate_multi_function_confidence(high_scoring_functions)
+  } else {
+    // Single function analysis
+    let sorted_functions = sort_functions_by_score(analysis.function_scores)
+    set analysis.primary_function = sorted_functions[0]
+    set analysis.secondary_function = sorted_functions[1]
+    
+    // Calculate confidence based on score difference
+    let primary_score = analysis.function_scores[analysis.primary_function]
+    let secondary_score = analysis.function_scores[analysis.secondary_function]
+    set analysis.confidence = primary_score - secondary_score
+  }
+  
+  // Collect evidence
+  set analysis.evidence = collect_function_evidence(behavior_data, analysis.primary_function || analysis.blended_functions[0])
+  
+  return analysis
+}
+
+function calculate_escape_score(behavior_data) {
+  let score = 0.0
+  let patterns = ::function_patterns.escape
+  
+  // Check antecedents
+  loop for antecedent in behavior_data.antecedents {
+    branch when patterns.antecedents.includes(antecedent) {
+      increment score by 0.3
+    }
+  }
+  
+  // Check consequences
+  loop for consequence in behavior_data.consequences {
+    branch when patterns.consequences.includes(consequence) {
+      increment score by 0.4
+    }
+  }
+  
+  // Check indicators
+  loop for indicator in behavior_data.indicators {
+    branch when patterns.indicators.includes(indicator) {
+      increment score by 0.3
+    }
+  }
+  
+  return score
+}
+
+function calculate_attention_score(behavior_data) {
+  let score = 0.0
+  let patterns = ::function_patterns.attention
+  
+  // Check antecedents
+  loop for antecedent in behavior_data.antecedents {
+    branch when patterns.antecedents.includes(antecedent) {
+      increment score by 0.3
+    }
+  }
+  
+  // Check consequences
+  loop for consequence in behavior_data.consequences {
+    branch when patterns.consequences.includes(consequence) {
+      increment score by 0.4
+    }
+  }
+  
+  // Check indicators
+  loop for indicator in behavior_data.indicators {
+    branch when patterns.indicators.includes(indicator) {
+      increment score by 0.3
+    }
+  }
+  
+  return score
+}
+
+function calculate_access_score(behavior_data) {
+  let score = 0.0
+  let patterns = ::function_patterns.access
+  
+  // Check antecedents
+  loop for antecedent in behavior_data.antecedents {
+    branch when patterns.antecedents.includes(antecedent) {
+      increment score by 0.3
+    }
+  }
+  
+  // Check consequences
+  loop for consequence in behavior_data.consequences {
+    branch when patterns.consequences.includes(consequence) {
+      increment score by 0.4
+    }
+  }
+  
+  // Check indicators
+  loop for indicator in behavior_data.indicators {
+    branch when patterns.indicators.includes(indicator) {
+      increment score by 0.3
+    }
+  }
+  
+  return score
+}
+
+function calculate_automatic_score(behavior_data) {
+  let score = 0.0
+  let patterns = ::function_patterns.automatic
+  
+  // Check antecedents
+  loop for antecedent in behavior_data.antecedents {
+    branch when patterns.antecedents.includes(antecedent) {
+      increment score by 0.3
+    }
+  }
+  
+  // Check consequences
+  loop for consequence in behavior_data.consequences {
+    branch when patterns.consequences.includes(consequence) {
+      increment score by 0.4
+    }
+  }
+  
+  // Check indicators
+  loop for indicator in behavior_data.indicators {
+    branch when patterns.indicators.includes(indicator) {
+      increment score by 0.3
+    }
+  }
+  
+  return score
+}
+
+function sort_functions_by_score(function_scores) {
+  let functions = ["escape", "attention", "access", "automatic"]
+  let sorted = []
+  
+  loop for function in functions {
+    sorted.push({
+      function: function,
+      score: function_scores[function]
+    })
+  }
+  
+  // Sort by score (descending)
+  sorted.sort((a, b) => b.score - a.score)
+  
+  return [sorted[0].function, sorted[1].function]
+}
+
+function collect_function_evidence(behavior_data, function_name) {
+  let evidence = {
+    antecedent_matches: [],
+    consequence_matches: [],
+    indicator_matches: []
+  }
+  
+  let patterns = ::function_patterns[function_name]
+  
+  // Check antecedents
+  loop for antecedent in behavior_data.antecedents {
+    branch when patterns.antecedents.includes(antecedent) {
+      evidence.antecedent_matches.push(antecedent)
+    }
+  }
+  
+  // Check consequences
+  loop for consequence in behavior_data.consequences {
+    branch when patterns.consequences.includes(consequence) {
+      evidence.consequence_matches.push(consequence)
+    }
+  }
+  
+  // Check indicators
+  loop for indicator in behavior_data.indicators {
+    branch when patterns.indicators.includes(indicator) {
+      evidence.indicator_matches.push(indicator)
+    }
+  }
+  
+  return evidence
+}
+
+function update_function_scores(analysis_data) {
+  // Update weighted average of function scores
+  let recent_analyses = get_recent_analyses(::weighted_average_window)
+  
+  loop for function in ["escape", "attention", "access", "automatic"] {
+    let weighted_sum = 0.0
+    let total_weight = 0.0
+    
+    loop for analysis in recent_analyses {
+      let weight = analysis.confidence
+      weighted_sum = weighted_sum + (analysis.function_scores[function] * weight)
+      total_weight = total_weight + weight
+    }
+    
+    branch when total_weight > 0 {
+      set ::function_scores[function] = weighted_sum / total_weight
+    }
+  }
+}
+
+function analyze_behavior_sequence(behavior_sequence) {
+  let sequence_analysis = {
+    pattern_type: null,
+    confidence: 0.0,
+    functions_identified: [],
+    temporal_pattern: []
+  }
+  
+  // Analyze temporal patterns
+  let temporal_pattern = analyze_temporal_pattern(behavior_sequence)
+  set sequence_analysis.temporal_pattern = temporal_pattern
+  
+  // Identify function patterns
+  let function_pattern = identify_function_pattern(behavior_sequence)
+  set sequence_analysis.functions_identified = function_pattern
+  
+  // Determine pattern type
+  set sequence_analysis.pattern_type = determine_pattern_type(function_pattern, temporal_pattern)
+  set sequence_analysis.confidence = calculate_sequence_confidence(function_pattern, temporal_pattern)
+  
+  return sequence_analysis
+}
+
+// Helper functions
+function add_behavior_to_history(behavior_data) {
+  let history = ::behavior_history
+  history.push({
+    behavior: behavior_data,
+    timestamp: now(),
+    function_analysis: null
+  })
+  return history
+}
+
+function get_recent_analyses(count) {
+  let history = ::behavior_history
+  let recent = history.slice(-count)
+  let analyses = []
+  
+  loop for entry in recent {
+    branch when entry.function_analysis != null {
+      analyses.push(entry.function_analysis)
+    }
+  }
+  
+  return analyses
+}
+
+function analyze_temporal_pattern(sequence) {
+  let pattern = []
+  
+  loop for behavior in sequence {
+    pattern.push({
+      behavior: behavior.type,
+      timestamp: behavior.timestamp,
+      interval: calculate_interval(behavior, sequence)
+    })
+  }
+  
+  return pattern
+}
+
+function identify_function_pattern(sequence) {
+  let functions = []
+  
+  loop for behavior in sequence {
+    let analysis = analyze_behavior_function(behavior)
+    functions.push({
+      behavior: behavior.type,
+      primary_function: analysis.primary_function,
+      confidence: analysis.confidence
+    })
+  }
+  
+  return functions
+}
+
+function determine_pattern_type(function_pattern, temporal_pattern) {
+  // Analyze patterns to determine type (e.g., "escalating", "cyclical", "random")
+  let function_counts = count_functions(function_pattern)
+  let temporal_consistency = analyze_temporal_consistency(temporal_pattern)
+  
+  branch when function_counts.escape > 0.5 {
+    return "escape_pattern"
+  } else branch when temporal_consistency > 0.8 {
+    return "cyclical_pattern"
+  } else {
+    return "mixed_pattern"
+  }
+}
+
+function calculate_sequence_confidence(function_pattern, temporal_pattern) {
+  let function_confidence = calculate_function_confidence(function_pattern)
+  let temporal_confidence = calculate_temporal_confidence(temporal_pattern)
+  
+  return (function_confidence + temporal_confidence) / 2
+}
+
+// Additional helper functions would be implemented here
+function calculate_interval(behavior, sequence) {
+  // Calculate time interval between behaviors
+  return 0  // Placeholder
+}
+
+function count_functions(function_pattern) {
+  let counts = { escape: 0, attention: 0, access: 0, automatic: 0 }
+  
+  loop for func in function_pattern {
+    increment counts[func.primary_function]
+  }
+  
+  return counts
+}
+
+function analyze_temporal_consistency(temporal_pattern) {
+  // Analyze consistency of temporal intervals
+  return 0.5  // Placeholder
+}
+
+function calculate_function_confidence(function_pattern) {
+  let total_confidence = 0.0
+  
+  loop for func in function_pattern {
+    total_confidence = total_confidence + func.confidence
+  }
+  
+  return total_confidence / function_pattern.length
+}
+
+function calculate_temporal_confidence(temporal_pattern) {
+  // Calculate confidence based on temporal consistency
+  return 0.7  // Placeholder
+}
+
+// Enhanced Function Identifier Functions
+function get_high_scoring_functions(function_scores) {
+  let high_scoring = []
+  let threshold = 0.3  // Minimum score to be considered high
+  
+  loop for function in ["escape", "attention", "access", "automatic"] {
+    branch when function_scores[function] >= threshold {
+      high_scoring.push({
+        function: function,
+        score: function_scores[function]
+      })
+    }
+  }
+  
+  // Sort by score (descending)
+  high_scoring.sort((a, b) => b.score - a.score)
+  
+  return high_scoring
+}
+
+function calculate_multi_function_confidence(high_scoring_functions) {
+  let total_score = 0.0
+  let function_count = high_scoring_functions.length
+  
+  loop for func in high_scoring_functions {
+    total_score = total_score + func.score
+  }
+  
+  // Higher confidence when multiple functions have similar high scores
+  let average_score = total_score / function_count
+  let variance = calculate_score_variance(high_scoring_functions, average_score)
+  
+  return average_score * (1 - variance)  // Lower variance = higher confidence
+}
+
+function calculate_score_variance(functions, average) {
+  let variance = 0.0
+  
+  loop for func in functions {
+    let diff = func.score - average
+    variance = variance + (diff * diff)
+  }
+  
+  return variance / functions.length
+}
+
+function analyze_multi_function_behavior(behavior_data) {
+  let analysis = {
+    primary_functions: [],
+    function_weights: {},
+    combined_confidence: 0.0,
+    intervention_recommendations: []
+  }
+  
+  // Analyze each function separately
+  let escape_analysis = analyze_escape_function(behavior_data)
+  let attention_analysis = analyze_attention_function(behavior_data)
+  let access_analysis = analyze_access_function(behavior_data)
+  let automatic_analysis = analyze_automatic_function(behavior_data)
+  
+  // Combine analyses
+  let analyses = [escape_analysis, attention_analysis, access_analysis, automatic_analysis]
+  
+  loop for analysis in analyses {
+    branch when analysis.confidence > 0.2 {
+      analysis.primary_functions.push(analysis.function)
+      analysis.function_weights[analysis.function] = analysis.confidence
+    }
+  }
+  
+  // Calculate combined confidence
+  let total_weight = 0.0
+  loop for weight in analysis.function_weights {
+    total_weight = total_weight + weight
+  }
+  set analysis.combined_confidence = total_weight / analysis.primary_functions.length
+  
+  // Generate intervention recommendations
+  set analysis.intervention_recommendations = generate_multi_function_interventions(analysis.primary_functions)
+  
+  return analysis
+}
+
+function analyze_escape_function(behavior_data) {
+  return {
+    function: "escape",
+    confidence: calculate_escape_score(behavior_data),
+    evidence: collect_function_evidence(behavior_data, "escape")
+  }
+}
+
+function analyze_attention_function(behavior_data) {
+  return {
+    function: "attention",
+    confidence: calculate_attention_score(behavior_data),
+    evidence: collect_function_evidence(behavior_data, "attention")
+  }
+}
+
+function analyze_access_function(behavior_data) {
+  return {
+    function: "access",
+    confidence: calculate_access_score(behavior_data),
+    evidence: collect_function_evidence(behavior_data, "access")
+  }
+}
+
+function analyze_automatic_function(behavior_data) {
+  return {
+    function: "automatic",
+    confidence: calculate_automatic_score(behavior_data),
+    evidence: collect_function_evidence(behavior_data, "automatic")
+  }
+}
+
+function generate_multi_function_interventions(primary_functions) {
+  let recommendations = []
+  
+  branch when primary_functions.includes("escape") and primary_functions.includes("attention") {
+    recommendations.push("task_modification_with_attention_schedule")
+  } else branch when primary_functions.includes("access") and primary_functions.includes("escape") {
+    recommendations.push("functional_communication_training_with_break_schedule")
+  } else branch when primary_functions.includes("automatic") {
+    recommendations.push("sensory_intervention_with_alternative_behavior")
+  }
+  
+  return recommendations
+}
+
+function calculate_function_trend() {
+  let history = ::behavior_history
+  let recent_analyses = get_recent_analyses(5)
+  
+  let trend = {
+    escape_trend: 0.0,
+    attention_trend: 0.0,
+    access_trend: 0.0,
+    automatic_trend: 0.0
+  }
+  
+  branch when recent_analyses.length >= 2 {
+    let current_scores = recent_analyses[recent_analyses.length - 1].function_scores
+    let previous_scores = recent_analyses[recent_analyses.length - 2].function_scores
+    
+    loop for function in ["escape", "attention", "access", "automatic"] {
+      let change = current_scores[function] - previous_scores[function]
+      set trend[function + "_trend"] = change
+    }
+  }
+  
+  return trend
+}
+
+// Global Improvement Functions
+function reflect_introspective_state() {
+  let introspection = ::introspection_state
+  
+  // Record decision context
+  introspection.decision_history.push({
+    timestamp: now(),
+    function_scores: ::function_scores,
+    confidence_threshold: ::confidence_threshold,
+    behavior_history_length: ::behavior_history.length
+  })
+  
+  // Update goal alignment
+  set introspection.goal_alignment = {
+    primary_goal_progress: calculate_goal_progress(::goal_meta.primary_goal),
+    subgoal_alignment: calculate_subgoal_alignment(),
+    overall_alignment: calculate_overall_goal_alignment()
+  }
+  
+  // Check evolution readiness
+  branch when introspection.decision_history.length >= 25 {
+    set introspection.evolution_ready = true
+    emit "evolution.ready" with { readiness_score: calculate_evolution_readiness() }
+  }
+  
+  set introspection.last_review = now()
+}
+
+function calculate_goal_progress(goal) {
+  let progress = 0.0
+  
+  branch when goal == "accurate_function_analysis" {
+    let recent_analyses = get_recent_analyses(10)
+    let accurate_analyses = 0
+    loop for analysis in recent_analyses {
+      branch when analysis.confidence > ::confidence_threshold {
+        increment accurate_analyses
+      }
+    }
+    set progress = accurate_analyses / recent_analyses.length
+  } else branch when goal == "pattern_recognition" {
+    let patterns_identified = count_identified_patterns()
+    set progress = patterns_identified / 10.0  // Normalize to 0-1
+  } else branch when goal == "multi_function_detection" {
+    let multi_function_count = count_multi_function_detections()
+    set progress = multi_function_count / 5.0  // Normalize to 0-1
+  } else branch when goal == "intervention_effectiveness" {
+    set progress = calculate_intervention_effectiveness()
+  }
+  
+  return progress
+}
+
+function calculate_subgoal_alignment() {
+  let alignment = {}
+  let subgoals = ::goal_meta.subgoals
+  
+  loop for subgoal in subgoals {
+    set alignment[subgoal] = calculate_goal_progress(subgoal)
+  }
+  
+  return alignment
+}
+
+function calculate_overall_goal_alignment() {
+  let alignment = calculate_subgoal_alignment()
+  let total_alignment = 0.0
+  let weights = ::goal_meta.goal_weights
+  
+  loop for goal in ["accurate_function_analysis", "pattern_recognition", "multi_function_detection", "intervention_effectiveness"] {
+    let weight = weights[goal] || 0.25
+    let progress = alignment[goal] || 0.0
+    total_alignment = total_alignment + (progress * weight)
+  }
+  
+  return total_alignment
+}
+
+function update_goal_progress(function_analysis) {
+  let goal_progress = ::goal_meta.goal_progress
+  
+  // Update primary goal progress
+  let primary_goal = ::goal_meta.primary_goal
+  branch when goal_progress[primary_goal] == null {
+    set goal_progress[primary_goal] = 0.0
+  }
+  
+  // Update based on analysis confidence
+  branch when function_analysis.confidence > ::confidence_threshold {
+    increment goal_progress[primary_goal] by 0.01
+  } else {
+    decrement goal_progress[primary_goal] by 0.005
+  }
+  
+  // Ensure progress stays in valid range
+  branch when goal_progress[primary_goal] < 0.0 {
+    set goal_progress[primary_goal] = 0.0
+  } else branch when goal_progress[primary_goal] > 1.0 {
+    set goal_progress[primary_goal] = 1.0
+  }
+  
+  emit "goal_progress_updated" with {
+    goal: primary_goal,
+    progress: goal_progress[primary_goal],
+    overall_alignment: calculate_overall_goal_alignment()
+  }
+}
+
+function check_evolution_readiness() {
+  let evolution_slots = ::evolution_slots
+  let readiness_score = calculate_evolution_readiness()
+  
+  branch when readiness_score > 0.8 {
+    set evolution_slots.pattern_intelligence = "ready"
+    set evolution_slots.multi_function_analysis = "ready"
+    emit "evolution.slots.ready" with evolution_slots
+  }
+}
+
+function calculate_evolution_readiness() {
+  let readiness = 0.0
+  
+  // Check decision history length
+  let decision_count = ::introspection_state.decision_history.length
+  branch when decision_count >= 25 {
+    increment readiness by 0.3
+  }
+  
+  // Check goal alignment
+  let goal_alignment = calculate_overall_goal_alignment()
+  increment readiness by (goal_alignment * 0.4)
+  
+  // Check analysis accuracy
+  let recent_analyses = get_recent_analyses(10)
+  let accurate_analyses = 0
+  loop for analysis in recent_analyses {
+    branch when analysis.confidence > ::confidence_threshold {
+      increment accurate_analyses
+    }
+  }
+  let accuracy_rate = accurate_analyses / recent_analyses.length
+  increment readiness by (accuracy_rate * 0.3)
+  
+  return readiness
+}
+
+function count_identified_patterns() {
+  let patterns = 0
+  let history = ::behavior_history
+  
+  loop for behavior in history {
+    branch when behavior.pattern_identified {
+      increment patterns
+    }
+  }
+  
+  return patterns
+}
+
+function count_multi_function_detections() {
+  let detections = 0
+  let history = ::behavior_history
+  
+  loop for behavior in history {
+    branch when behavior.multi_function_detected {
+      increment detections
+    }
+  }
+  
+  return detections
+}
+
+function calculate_intervention_effectiveness() {
+  let effectiveness = 0.0
+  let history = ::behavior_history
+  
+  let successful_interventions = 0
+  let total_interventions = 0
+  
+  loop for behavior in history {
+    branch when behavior.intervention_applied {
+      increment total_interventions
+      branch when behavior.intervention_successful {
+        increment successful_interventions
+      }
+    }
+  }
+  
+  branch when total_interventions > 0 {
+    set effectiveness = successful_interventions / total_interventions
+  }
+  
+  return effectiveness
+}
+
+function handle_cli_command(cli_command) {
+  let response = {
+    command: cli_command,
+    timestamp: now(),
+    status: "processed"
+  }
+  
+  branch when cli_command == "status" {
+    set response.data = {
+      function_scores: ::function_scores,
+      confidence_threshold: ::confidence_threshold,
+      behavior_history_length: ::behavior_history.length
+    }
+  } else branch when cli_command == "reset" {
+    set ::function_scores = { escape: 0.0, attention: 0.0, access: 0.0, automatic: 0.0 }
+    set response.data = { message: "Function scores reset" }
+  } else branch when cli_command == "evolution_status" {
+    set response.data = {
+      evolution_slots: ::evolution_slots,
+      readiness_score: calculate_evolution_readiness()
+    }
+  } else {
+    set response.status = "unknown_command"
+    set response.data = { error: "Unknown command" }
+  }
+  
+  emit "cli.response" with response
+}
+
+function get_dashboard_data() {
+  return {
+    function_scores: ::function_scores,
+    confidence_threshold: ::confidence_threshold,
+    behavior_history_length: ::behavior_history.length,
+    goal_progress: ::goal_meta.goal_progress,
+    evolution_readiness: calculate_evolution_readiness(),
+    recent_analyses: get_recent_analyses(5),
+    pattern_recognition: count_identified_patterns()
+  }
+}
+
+function handle_api_request(api_request) {
+  let response = {
+    request: api_request,
+    timestamp: now(),
+    status: "success"
+  }
+  
+  branch when api_request.endpoint == "function_analysis" {
+    set response.data = get_dashboard_data()
+  } else branch when api_request.endpoint == "update_threshold" {
+    set ::confidence_threshold = api_request.threshold
+    set response.data = { message: "Confidence threshold updated" }
+  } else branch when api_request.endpoint == "evolution_trigger" {
+    trigger_evolution(api_request.evolution_type)
+    set response.data = { message: "Evolution triggered" }
+  } else {
+    set response.status = "error"
+    set response.data = { error: "Unknown endpoint" }
+  }
+  
+  return response
+}
+
+function prepare_module_split() {
+  let modules = {
+    pattern_analyzer: {
+      function_patterns: ::function_patterns,
+      behavior_history: ::behavior_history
+    },
+    function_processor: {
+      function_scores: ::function_scores,
+      confidence_threshold: ::confidence_threshold
+    },
+    intervention_engine: {
+      intervention_recommendations: [],
+      effectiveness_tracking: {}
+    }
+  }
+  
+  return {
+    modules: modules,
+    split_capable: ::modular_interface.split_capable,
+    external_hooks: ::modular_interface.external_hooks
+  }
+}
+
+function trigger_evolution(evolution_type) {
+  let evolution_slots = ::evolution_slots
+  
+  branch when evolution_type == "pattern_intelligence" {
+    set evolution_slots.pattern_intelligence = "evolving"
+    emit "evolution.pattern_intelligence" with {
+      current_patterns: Object.keys(::function_patterns).length,
+      intelligence_target: "advanced"
+    }
+  } else branch when evolution_type == "multi_function_analysis" {
+    set evolution_slots.multi_function_analysis = "evolving"
+    emit "evolution.multi_function_analysis" with {
+      current_analysis: "single_function",
+      analysis_target: "multi_function"
+    }
+  } else branch when evolution_type == "predictive_intervention" {
+    set evolution_slots.predictive_intervention = "evolving"
+    emit "evolution.predictive_intervention" with {
+      current_intervention: "reactive",
+      intervention_target: "predictive"
+    }
+  } else branch when evolution_type == "behavioral_clustering" {
+    set evolution_slots.behavioral_clustering = "evolving"
+    emit "evolution.behavioral_clustering" with {
+      current_clustering: "manual",
+      clustering_target: "automatic"
+    }
+  }
+  
+  emit "evolution.triggered" with {
+    evolution_type: evolution_type,
+    evolution_slots: evolution_slots
+  }
+} 

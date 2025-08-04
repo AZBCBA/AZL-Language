@@ -1,0 +1,152 @@
+component ::test.azl_self_execution {
+  init {
+    set ::test_name = "AZL Self-Execution Engine Test"
+    set ::test_version = 1
+    set ::status = "initializing"
+    say "🔧 Starting AZL Self-Execution Engine Test v1..."
+  }
+
+  # Link to self-execution engine and core systems
+  link ::azl.self_execution_engine
+  link ::agent.autonomous_brain
+  link ::core.memory.memory
+  link ::core.time.time_engine
+
+  on test.start {
+    say "🔧 Starting AZL Self-Execution Test..."
+    emit test.trigger_code_generation
+  }
+
+  on test.trigger_code_generation {
+    say "🧪 Triggering AZL code generation test..."
+    emit azl.self_execution_engine.generate_azl_code with "component_name:test_component,specification:type:simple_component,name:test_component,behavior:say \"Hello from generated component!\",memory:status:initialized"
+  }
+
+  on azl.code.generated {
+    say "✅ AZL code generated successfully"
+    say "🎯 Component: $1.component"
+    say "📝 Code length: $1.code.length characters"
+    say "📊 Context size: $1.context.keys.length"
+    emit test.trigger_code_execution
+  }
+
+  on test.trigger_code_execution {
+    say "🧪 Triggering generated code execution..."
+    set ::generated_code = "component ::test.generated_component {\n  init {\n    set ::status = \"initializing\"\n    say \"🔧 Generated component initializing...\"\n  }\n\n  behavior {\n    on system.start {\n      say \"🚀 Generated component started!\"\n      emit test.generated_component.ready\n    }\n  }\n\n  memory {\n    ::status = \"\"\n  }\n}"
+    
+    emit azl.self_execution_engine.execute_generated_azl with "code:generated_code,component_name:test.generated_component,context:test_context:true"
+  }
+
+  on azl.code.executed {
+    say "✅ Generated AZL code executed successfully"
+    say "🎯 Component: $1.component"
+    say "📊 Execution result: $1.result.status"
+    say "📊 Context: $1.context.keys.length"
+    emit test.trigger_component_modification
+  }
+
+  on test.trigger_component_modification {
+    say "🧪 Triggering component modification test..."
+    emit azl.self_execution_engine.modify_running_component with "component:test.generated_component,changes:pattern:say \"Hello from generated component!\",replacement:say \"Hello from modified generated component!\",type:behavior"
+  }
+
+  on component.modified {
+    say "✅ Component modification completed"
+    say "🎯 Component: $1.component"
+    say "📝 Modification type: $1.type"
+    say "🔧 Changes: $1.modifications.length modifications"
+    emit test.trigger_adaptive_code_generation
+  }
+
+  on test.trigger_adaptive_code_generation {
+    say "🧪 Triggering adaptive code generation test..."
+    set ::learning_insights = [
+      { type: "performance_optimization", implementation: "set ::optimized_mode = true" },
+      { type: "memory_efficiency", implementation: "set ::memory_optimized = true" },
+      { type: "error_handling", implementation: "set ::error_recovery = true" }
+    ]
+    
+    emit azl.self_execution_engine.generate_adaptive_code with "insights:learning_insights,behavior:optimized_behavior,context:learning_context:true"
+  }
+
+  on azl.code.generated {
+    if $1.source == "learning_adaptation" {
+      say "✅ Adaptive code generated successfully"
+      say "🎯 Component: $1.component"
+      say "📊 Learning insights: $1.context.learning_insights.length"
+      emit test.trigger_code_introspection
+    }
+  }
+
+  on test.trigger_code_introspection {
+    say "🧪 Triggering code introspection test..."
+    emit azl.self_execution_engine.introspect_azl_code with "component:test.generated_component,depth:full"
+  }
+
+  on azl.introspection.complete {
+    say "✅ Code introspection completed"
+    say "🎯 Component: $1.component"
+    say "📊 Analysis depth: $1.depth"
+    say "📊 Insights: $1.result.insights.length"
+    emit test.trigger_code_optimization
+  }
+
+  on test.trigger_code_optimization {
+    say "🧪 Triggering code optimization test..."
+    set ::performance_metrics = {
+      execution_time: 1500,
+      memory_usage: 150,
+      cpu_usage: 75
+    }
+    
+    emit azl.self_execution_engine.optimize_azl_code with "component:test.generated_component,metrics:performance_metrics,goals:performance,memory"
+  }
+
+  on azl.optimization.complete {
+    say "✅ Code optimization completed"
+    say "🎯 Component: $1.component"
+    say "📊 Optimization suggestions: $1.suggestions.length"
+    say "🎯 Goals: $1.goals"
+    emit test.trigger_self_modification_integration
+  }
+
+  on test.trigger_self_modification_integration {
+    say "🧪 Testing self-modification with autonomous brain..."
+    emit agent.autonomous_brain.learn_and_adapt with "insights:performance_optimization_learned,behavior:code_generation,context:learning_integration:true"
+  }
+
+  on agent.autonomous_brain.learn_and_adapt {
+    say "✅ Autonomous brain learning and adaptation triggered"
+    say "🎯 Target behavior: $1.behavior"
+    say "📊 Learning insights: $1.insights.length"
+    emit test.complete
+  }
+
+  on test.complete {
+    say "🎉 AZL Self-Execution Engine Test COMPLETE!"
+    say "✅ AZL can generate AZL code"
+    say "✅ AZL can execute generated code"
+    say "✅ AZL can modify running components"
+    say "✅ AZL can generate adaptive code from learning"
+    say "✅ AZL can introspect and analyze code"
+    say "✅ AZL can optimize code based on performance"
+    say "✅ Integration with autonomous brain successful"
+    say "🚀 AZL is now self-executing and self-modifying!"
+  }
+
+  behavior {
+    on system.start {
+      emit test.start
+    }
+  }
+
+  memory {
+    ::test_name = ""
+    ::test_version = 1
+    ::status = ""
+    ::generated_code_samples = []
+    ::execution_results = []
+    ::modification_history = []
+    ::optimization_results = []
+  }
+} 

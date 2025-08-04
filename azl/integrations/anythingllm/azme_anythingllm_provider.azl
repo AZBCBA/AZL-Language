@@ -1,0 +1,191 @@
+// AZME Provider for AnythingLLM
+// This creates an API that AnythingLLM can use to access AZME capabilities
+// as a custom LLM provider.
+
+// AZME Provider for AnythingLLM Integration
+class AZMEProvider {
+    constructor() {
+        this.ollama_endpoint = "http://localhost:11434"
+        this.azme_workspace = "/mnt/ssd4t/azme-workspace"
+        this.available_models = this._get_ollama_models()
+    }
+    
+    // Get available Ollama models
+    _get_ollama_models() {
+        try {
+            let response = http_get(this.ollama_endpoint + "/api/tags")
+            if (response.status == 200) {
+                let data = json_parse(response.body)
+                let models = []
+                for (let model in data.models) {
+                    models.push(model.name)
+                }
+                return models
+            }
+            return []
+        } catch (error) {
+            return []
+        }
+    }
+    
+    // Generate AZME-style response using local models
+    azme_generate(prompt, model = "llama3:latest", options = {}) {
+        // AZME-style prompt enhancement
+        let enhanced_prompt = this._enhance_prompt(prompt)
+        
+        // Use Ollama for inference
+        try {
+            let request_data = {
+                "model": model,
+                "prompt": enhanced_prompt,
+                "stream": false,
+                "options": {
+                    "temperature": options.temperature || 0.1,
+                    "top_p": options.top_p || 0.9,
+                    "max_tokens": options.max_tokens || 2048
+                }
+            }
+            
+            let response = http_post(this.ollama_endpoint + "/api/generate", json_stringify(request_data))
+            
+            if (response.status == 200) {
+                let result = json_parse(response.body)
+                return {
+                    "id": "azme-" + model,
+                    "object": "chat.completion",
+                    "created": get_current_time(),
+                    "model": "azme-" + model,
+                    "choices": [{
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": result.response || ""
+                        },
+                        "finish_reason": "stop"
+                    }],
+                    "usage": {
+                        "prompt_tokens": split_string(enhanced_prompt, " ").length,
+                        "completion_tokens": split_string(result.response || "", " ").length,
+                        "total_tokens": split_string(enhanced_prompt, " ").length + split_string(result.response || "", " ").length
+                    }
+                }
+            } else {
+                return {"error": "Ollama request failed"}
+            }
+        } catch (error) {
+            return {"error": error.toString()}
+        }
+    }
+    
+    // Enhance prompt with AZME-style analysis framework
+    _enhance_prompt(prompt) {
+        let enhanced = "AZME Analysis Framework\n\nTASK: " + prompt + "\n\nPlease provide a comprehensive analysis following AZME principles:\n\n1. **SYSTEM ANALYSIS**: Identify key components and their relationships\n2. **PERFORMANCE EVALUATION**: Assess efficiency and optimization opportunities  \n3. **SECURITY CONSIDERATIONS**: Identify potential vulnerabilities and improvements\n4. **SCALABILITY ASSESSMENT**: Evaluate growth potential and bottlenecks\n5. **BEST PRACTICES**: Recommend industry standards and improvements\n6. **ALTERNATIVE APPROACHES**: Suggest different methodologies or solutions\n7. **IMPLEMENTATION ROADMAP**: Provide step-by-step execution plan\n\nPlease structure your response with clear sections and actionable insights.\n"
+        return enhanced
+    }
+    
+    // Get available AZME models
+    get_models() {
+        let models = []
+        for (let model in this.available_models) {
+            models.push({
+                "id": "azme-" + model,
+                "object": "model",
+                "created": get_current_time(),
+                "owned_by": "azme"
+            })
+        }
+        
+        return {
+            "object": "list",
+            "data": models
+        }
+    }
+}
+
+// Global provider instance
+let provider = new AZMEProvider()
+
+// HTTP handler for AZME Provider API
+class AZMEHandler {
+    constructor() {
+        this.server = null
+    }
+    
+    // Set response headers
+    _set_headers(response, status_code = 200) {
+        response.status = status_code
+        response.headers = {
+            "Content-type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization"
+        }
+    }
+    
+    // Handle GET requests
+    handle_get(path) {
+        if (path == "/health") {
+            return {
+                "status": "healthy",
+                "service": "AZME Provider",
+                "ollama_connected": provider.available_models.length > 0,
+                "available_models": provider.available_models
+            }
+        } else if (path == "/v1/models") {
+            return provider.get_models()
+        } else {
+            return {"error": "Not found"}
+        }
+    }
+    
+    // Handle POST requests
+    handle_post(path, data) {
+        if (path == "/v1/chat/completions") {
+            let messages = data.messages || []
+            let model = data.model || "azme-llama3:latest"
+            
+            // Extract the actual model name
+            if (starts_with(model, "azme-")) {
+                model = substring(model, 5) // Remove 'azme-' prefix
+            }
+            
+            // Get the last user message
+            let user_message = ""
+            for (let i = messages.length - 1; i >= 0; i--) {
+                let msg = messages[i]
+                if (msg.role == "user") {
+                    user_message = msg.content || ""
+                    break
+                }
+            }
+            
+            if (!user_message) {
+                return {"error": "No user message found"}
+            } else {
+                return provider.azme_generate(user_message, model, data.options || {})
+            }
+        } else {
+            return {"error": "Not found"}
+        }
+    }
+}
+
+// Run the AZME Provider server
+function run_server(port = 8080) {
+    let handler = new AZMEHandler()
+    print("🚀 AZME Provider server running on port " + port)
+    print("🔗 Health check: http://localhost:" + port + "/health")
+    print("📊 Available models: " + provider.available_models)
+    print("🎯 AnythingLLM can use this as a custom provider at: http://localhost:" + port)
+    
+    // Start HTTP server (simplified for AZL)
+    start_http_server(port, handler)
+}
+
+// Main execution
+print("🚀 Starting AZME Provider for AnythingLLM...")
+print("📊 Available models: " + provider.available_models)
+print("🌐 API will be available at: http://localhost:8080")
+print("🎯 Configure in AnythingLLM as custom provider: http://localhost:8080")
+
+run_server(8080) 

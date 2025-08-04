@@ -1,0 +1,248 @@
+component ::agi.azme_feedback_processor {
+  init {
+    set ::status = "initializing"
+    set ::feedback_history = []
+    set ::evaluation_patterns = []
+    set ::positive_feedback_count = 0
+    set ::negative_feedback_count = 0
+    set ::neutral_feedback_count = 0
+    set ::learning_insights = []
+    
+    # Link to AZL ABA functions
+    link ::aba_trial_engine
+    link ::aba_result_logger
+    
+    # Link to AZME components
+    link ::agi.azme_cognitive_loop
+    link ::agi.azme_behavior_manager
+    
+    emit "azme.feedback_processor.initialized" with {
+      status: ::status,
+      feedback_history: ::feedback_history.length
+    }
+    
+    set ::status = "ready"
+    say "📊 AZME FeedbackProcessor initialized with ABA integration"
+  }
+
+  # Feedback processing with ABA integration
+  behavior {
+    listen for "feedback.evaluate" then {
+      evaluate_feedback($1)
+    }
+    
+    listen for "action.completed" then {
+      process_action_feedback($1)
+    }
+    
+    listen for "goal.completed" then {
+      process_goal_feedback($1)
+    }
+    
+    listen for "learning.completed" then {
+      process_learning_feedback($1)
+    }
+  }
+
+  # Evaluate feedback with ABA consequence analysis
+  function evaluate_feedback(feedback_data) {
+    say "📊 Evaluating feedback..."
+    say "🎯 Action: " + feedback_data.action
+    say "📈 Performance: " + feedback_data.performance
+    say "🎭 Behavior: " + feedback_data.behavior
+    
+    # Use AZL's advanced ABA analysis
+    emit "azl.execute_command" with { command: "analyze_consequence" }
+    
+    # Perform task analysis for complex feedback
+    if feedback_data.performance < 0.5 {
+      say "🔍 Low performance detected - performing task analysis..."
+      let task_analysis_command = "task_analysis \"" + feedback_data.action + ": subtasks=5, dependencies=3, complexity=high\""
+      emit "azl.execute_command" with { command: task_analysis_command }
+    }
+    
+    # Determine feedback type
+    let feedback_type = determine_feedback_type(feedback_data.performance)
+    
+    # Apply appropriate reinforcement
+    if feedback_type == "positive" {
+      increment ::positive_feedback_count
+      emit "azl.execute_command" with { command: "reinforce_behavior positive_feedback" }
+      say "🎁 Reinforcing positive feedback behavior"
+    } else if feedback_type == "negative" {
+      increment ::negative_feedback_count
+      emit "azl.execute_command" with { command: "reinforce_behavior negative_feedback" }
+      say "🎁 Reinforcing negative feedback behavior (for learning)"
+    } else {
+      increment ::neutral_feedback_count
+      emit "azl.execute_command" with { command: "reinforce_behavior neutral_feedback" }
+      say "🎁 Reinforcing neutral feedback behavior"
+    }
+    
+    # Log ABA trial for feedback evaluation
+    let trial_data = "antecedent: feedback_evaluation; behavior: " + feedback_data.behavior + "; consequence: " + feedback_type
+    emit "azl.execute_command" with { command: "apply_trial \"" + trial_data + "\"" }
+    
+    # Store feedback in history
+    store ::feedback_history from ::feedback_history.push({
+      action: feedback_data.action,
+      behavior: feedback_data.behavior,
+      performance: feedback_data.performance,
+      feedback_type: feedback_type,
+      timestamp: now()
+    })
+    
+    # Generate learning insight
+    let insight = generate_learning_insight(feedback_data, feedback_type)
+    if insight {
+      store ::learning_insights from ::learning_insights.push(insight)
+      say "💡 Learning insight generated: " + insight.insight
+    }
+    
+    say "📊 Feedback evaluation completed with ABA integration"
+  }
+
+  # Process action feedback
+  function process_action_feedback(action_data) {
+    say "📊 Processing action feedback..."
+    say "🎯 Action: " + action_data.action
+    say "✅ Success: " + action_data.success
+    say "📈 Score: " + action_data.score
+    
+    # Create feedback data
+    let feedback_data = {
+      action: action_data.action,
+      behavior: "action_execution",
+      performance: action_data.score,
+      success: action_data.success
+    }
+    
+    # Evaluate the feedback
+    evaluate_feedback(feedback_data)
+    
+    # Update evaluation patterns
+    update_evaluation_patterns(action_data)
+    
+    say "📊 Action feedback processed"
+  }
+
+  # Process goal feedback
+  function process_goal_feedback(goal_data) {
+    say "📊 Processing goal feedback..."
+    say "🎯 Goal: " + goal_data.goal
+    say "✅ Success: " + goal_data.success
+    say "📈 Completion: " + goal_data.completion_rate
+    
+    # Create feedback data
+    let feedback_data = {
+      action: goal_data.goal,
+      behavior: "goal_pursuit",
+      performance: goal_data.completion_rate,
+      success: goal_data.success
+    }
+    
+    # Evaluate the feedback
+    evaluate_feedback(feedback_data)
+    
+    # Log ABA trial for goal completion
+    let trial_data = "antecedent: goal_attempt; behavior: goal_completion; consequence: " + (goal_data.success ? "success" : "failure")
+    emit "azl.execute_command" with { command: "apply_trial \"" + trial_data + "\"" }
+    
+    say "📊 Goal feedback processed"
+  }
+
+  # Process learning feedback
+  function process_learning_feedback(learning_data) {
+    say "📊 Processing learning feedback..."
+    say "📚 Topic: " + learning_data.topic
+    say "📈 Success rate: " + learning_data.success_rate
+    say "🎯 Mastery: " + learning_data.mastery_level
+    
+    # Create feedback data
+    let feedback_data = {
+      action: learning_data.topic,
+      behavior: "learning_activity",
+      performance: learning_data.success_rate,
+      success: learning_data.success_rate > 0.7
+    }
+    
+    # Evaluate the feedback
+    evaluate_feedback(feedback_data)
+    
+    # Log ABA trial for learning
+    let trial_data = "antecedent: learning_session; behavior: " + learning_data.topic + "; consequence: " + learning_data.success_rate
+    emit "azl.execute_command" with { command: "apply_trial \"" + trial_data + "\"" }
+    
+    say "📊 Learning feedback processed"
+  }
+
+  # Determine feedback type based on performance
+  function determine_feedback_type(performance) {
+    if performance > 0.8 {
+      return "positive"
+    } else if performance < 0.4 {
+      return "negative"
+    } else {
+      return "neutral"
+    }
+  }
+
+  # Generate learning insight from feedback
+  function generate_learning_insight(feedback_data, feedback_type) {
+    let insight = null
+    
+    if feedback_type == "positive" && feedback_data.performance > 0.9 {
+      insight = {
+        type: "success_pattern",
+        insight: "High performance behavior identified: " + feedback_data.behavior,
+        confidence: feedback_data.performance,
+        timestamp: now()
+      }
+    } else if feedback_type == "negative" && feedback_data.performance < 0.3 {
+      insight = {
+        type: "failure_pattern",
+        insight: "Low performance behavior identified: " + feedback_data.behavior,
+        confidence: 1 - feedback_data.performance,
+        timestamp: now()
+      }
+    }
+    
+    return insight
+  }
+
+  # Update evaluation patterns
+  function update_evaluation_patterns(action_data) {
+    let pattern = {
+      action_type: action_data.action,
+      success_rate: action_data.success ? 1.0 : 0.0,
+      performance_score: action_data.score,
+      timestamp: now()
+    }
+    
+    store ::evaluation_patterns from ::evaluation_patterns.push(pattern)
+    
+    say "📈 Evaluation pattern updated"
+  }
+
+  # Get feedback processor statistics
+  function get_feedback_stats() {
+    return {
+      positive_feedback: ::positive_feedback_count,
+      negative_feedback: ::negative_feedback_count,
+      neutral_feedback: ::neutral_feedback_count,
+      feedback_history_length: ::feedback_history.length,
+      evaluation_patterns: ::evaluation_patterns.length,
+      learning_insights: ::learning_insights.length
+    }
+  }
+
+  memory {
+    status
+    feedback_history
+    evaluation_patterns
+    positive_feedback_count
+    negative_feedback_count
+    neutral_feedback_count
+    learning_insights
+  }
+} 

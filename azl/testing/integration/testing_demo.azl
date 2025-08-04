@@ -1,0 +1,49 @@
+component ::testing.demo {
+  init {
+    set ::a = 10
+    set ::b = 5
+    set ::c = 2
+    
+    say "🧪 AZL Testing Framework Demo"
+    say "================================"
+    
+    emit "demo.start"
+  }
+
+  behavior {
+    listen for "demo.start" then {
+      say "🔢 Running Basic Tests..."
+      
+      // Test basic arithmetic
+      emit "assert" with { expression: "3 + 4 == 7", test_name: "simple_addition" }
+      emit "assert" with { expression: "2 * 5 == 10", test_name: "simple_multiplication" }
+      emit "assert" with { expression: "6 / 2 == 3", test_name: "simple_division" }
+      emit "assert" with { expression: "10 - 3 == 7", test_name: "simple_subtraction" }
+      
+      // Test with variables
+      emit "assert" with { expression: "::a + ::b == 15", test_name: "variable_addition" }
+      emit "assert" with { expression: "::a * ::c == 20", test_name: "variable_multiplication" }
+      
+      // Test complex expression
+      emit "assert" with { expression: "::a + ::b * ::c == 20", test_name: "complex_expression" }
+      
+      // Test comparison operators
+      emit "assert" with { expression: "::a > ::b", test_name: "greater_than" }
+      emit "assert" with { expression: "::b < ::a", test_name: "less_than" }
+      emit "assert" with { expression: "::a >= ::b", test_name: "greater_equals" }
+      emit "assert" with { expression: "::a != ::b", test_name: "not_equals" }
+      
+      // Test that should fail
+      emit "assert" with { expression: "1 + 1 == 3", test_name: "intentional_fail" }
+      
+      // Generate report
+      emit "report"
+    }
+  }
+
+  memory {
+    a
+    b
+    c
+  }
+} 

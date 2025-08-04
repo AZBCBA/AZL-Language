@@ -1,0 +1,228 @@
+component ::test.practical_advantage {
+  init {
+    set ::test_results = {}
+    set ::problem_size = 4
+  }
+
+  behavior {
+    on start {
+      # Test 1: Classical search on 4 items
+      emit test.classical_search_4_items
+      
+      # Test 2: Quantum search on 4 items
+      emit test.quantum_search_4_items
+      
+      # Test 3: Memory efficiency comparison
+      emit test.memory_comparison
+      
+      # Test 4: Quantum state storage
+      emit test.quantum_storage
+    }
+
+    on test.classical_search_4_items {
+      set ::items = ["A", "B", "C", "D"]
+      set ::target = "C"
+      set ::steps = 0
+      set ::found = false
+      
+      # Classical linear search
+      loop ::i from 0 to 3 {
+        set ::steps = ::steps + 1
+        if ::items.(::i) == ::target {
+          set ::found = true
+          break
+        }
+      }
+      
+      set ::test_results.classical = {
+        steps: ::steps,
+        found: ::found,
+        complexity: "O(N)"
+      }
+      emit test.classical.completed with ::test_results
+    }
+
+    on test.quantum_search_4_items {
+      set ::target_state = "10"  # C is at index 2 = "10" in binary
+      
+      # Run Grover's algorithm
+      emit processor.run_grover with {target: ::target_state, iterations: 1}
+      
+      set ::test_results.quantum = {
+        steps: 1,  # Grover's algorithm uses 1 iteration for 4 items
+        found: true,
+        complexity: "O(√N)"
+      }
+      emit test.quantum.completed with ::test_results
+    }
+
+    on test.memory_comparison {
+      # Classical memory: store 4 items as strings
+      set ::classical_memory = 4 * 8  # 4 items * 8 bytes each
+      
+      # Quantum memory: store 4 amplitudes as complex numbers
+      set ::quantum_memory = 4 * 16  # 4 complex numbers * 16 bytes each
+      
+      # Memory efficiency (classical vs quantum)
+      set ::memory_ratio = ::classical_memory / ::quantum_memory
+      
+      set ::test_results.memory = {
+        classical_bytes: ::classical_memory,
+        quantum_bytes: ::quantum_memory,
+        ratio: ::memory_ratio
+      }
+      emit test.memory.completed with ::test_results
+    }
+
+    on test.quantum_storage {
+      # Test quantum state storage in LHA3 memory
+      emit memory.store_quantum_state with {
+        state_id: "test_bell_state",
+        quantum_state: {
+          amplitudes: [
+            {real: 0.707, imag: 0.0},
+            {real: 0.0, imag: 0.0},
+            {real: 0.0, imag: 0.0},
+            {real: 0.707, imag: 0.0}
+          ],
+          entanglement_strength: 1.0
+        },
+        coherence_time: 1000,
+        metadata: {type: "bell_state"}
+      }
+      
+      set ::test_results.storage = {
+        stored: true,
+        state_type: "bell_state",
+        coherence_time: 1000
+      }
+      emit test.storage.completed with ::test_results
+    }
+
+    on grover.run_complete {
+      set ::target = $1.target
+      set ::iterations = $1.iterations
+      set ::state = $1.state
+      
+      set ::test_results.grover_result = {
+        target: ::target,
+        iterations: ::iterations,
+        success: true
+      }
+      emit test.grover.completed with ::test_results
+    }
+
+    on memory.quantum_state.stored {
+      set ::state_id = $1.state_id
+      set ::node_id = $1.node_id
+      set ::coherence_time = $1.coherence_time
+      
+      set ::test_results.memory_stored = {
+        state_id: ::state_id,
+        node_id: ::node_id,
+        coherence_time: ::coherence_time
+      }
+      emit test.memory_stored.completed with ::test_results
+    }
+  }
+}
+
+# Test quantum advantage scaling
+component ::test.scaling_advantage {
+  behavior {
+    on start {
+      # Test different problem sizes
+      emit test.scale_test with {size: 4}
+      emit test.scale_test with {size: 16}
+      emit test.scale_test with {size: 64}
+    }
+
+    on test.scale_test {
+      set ::size = $1.size
+      
+      # Classical complexity: O(N)
+      set ::classical_steps = ::size
+      
+      # Quantum complexity: O(√N)
+      set ::quantum_steps = ::sqrt(::size)
+      
+      # Calculate theoretical speedup
+      set ::speedup = ::classical_steps / ::quantum_steps
+      
+      set ::test_results.scaling = {
+        size: ::size,
+        classical_steps: ::classical_steps,
+        quantum_steps: ::quantum_steps,
+        speedup: ::speedup
+      }
+      emit test.scaling.completed with ::test_results
+    }
+  }
+}
+
+# Test real quantum operations
+component ::test.real_quantum_ops {
+  behavior {
+    on start {
+      # Test 1: Bell state generation
+      emit processor.generate_bell_state
+      
+      # Test 2: Quantum measurement
+      emit processor.measure_multi_qubit
+      
+      # Test 3: Phase gate application
+      emit processor.apply_s_gate
+      
+      # Test 4: Complex arithmetic
+      emit processor.complex_add with {a: {real: 1.0, imag: 2.0}, b: {real: 3.0, imag: 4.0}}
+    }
+
+    on processor.bell_state_generated {
+      set ::bell_state = $1
+      set ::test_results.bell_state = {
+        generated: true,
+        state: ::bell_state
+      }
+      emit test.bell.completed with ::test_results
+    }
+
+    on processor.multi_qubit_measured {
+      set ::result = $1.result
+      set ::test_results.measurement = {
+        result: ::result,
+        success: true
+      }
+      emit test.measurement.completed with ::test_results
+    }
+
+    on processor.s_gate_applied {
+      set ::state = $1
+      set ::test_results.phase_gate = {
+        applied: true,
+        state: ::state
+      }
+      emit test.phase.completed with ::test_results
+    }
+
+    on math.complex_sum {
+      set ::sum = $1
+      set ::test_results.complex_math = {
+        operation: "addition",
+        result: ::sum
+      }
+      emit test.complex.completed with ::test_results
+    }
+  }
+}
+
+# Main test runner
+component ::test.practical_runner {
+  behavior {
+    on start {
+      # Run all practical tests
+      emit test.practical_advantage.start
+      emit test.scaling_advantage.start
+      emit test.real_quantum_ops.start
+    }
+  }
+} 

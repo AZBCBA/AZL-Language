@@ -1,0 +1,32 @@
+// Simple Break/Continue Test
+// This test avoids complex expressions but includes required parentheses
+
+say "Testing Basic Break/Continue:";
+
+// Test 1: Basic break in while loop
+say "Test 1: Basic break";
+let i = 0;
+while (i < 3) {
+    if (i < 1) {
+        say "i = " + i;
+        set i = i + 1;
+    } else {
+        break;
+    }
+}
+say "After break";
+
+// Test 2: Basic continue in while loop  
+say "Test 2: Basic continue";
+let j = 0;
+while (j < 3) {
+    set j = j + 1;
+    if (j < 2) {
+        say "j = " + j;
+    } else {
+        continue;
+    }
+}
+say "After continue";
+
+say "Simple break/continue tests completed!"; 

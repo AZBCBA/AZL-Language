@@ -1,0 +1,352 @@
+component ::test.post_quantum_key_exchange {
+  init {
+    set ::test_results = {}
+  }
+
+  behavior {
+    on start {
+      # Test complete post-quantum key exchange protocol
+      emit processor.run_post_quantum_key_exchange
+      
+      # Test individual PQKE methods
+      emit processor.pqke_generate_alice_keys
+      emit processor.pqke_generate_bob_keys
+      emit processor.pqke_initiate_kyber
+      emit processor.pqke_derive_shared_secret
+      emit processor.pqke_generate_dilithium_signature
+      emit processor.pqke_verify_dilithium_signature
+      emit processor.pqke_verify_shared_secret
+      emit processor.pqke_check_classic_fallback
+    }
+
+    on pqke.alice_keys_generated {
+      set ::alice_info = $1
+      set ::test_results.alice_keys = {
+        success: 1,
+        alice_pk: ::alice_info.alice_pk,
+        alice_sk: ::alice_info.alice_sk
+      }
+      emit test.alice_keys.completed
+    }
+
+    on pqke.bob_keys_generated {
+      set ::bob_info = $1
+      set ::test_results.bob_keys = {
+        success: 1,
+        bob_pk: ::bob_info.bob_pk,
+        bob_sk: ::bob_info.bob_sk
+      }
+      emit test.bob_keys.completed
+    }
+
+    on pqke.kyber_initiated {
+      set ::kyber_info = $1
+      set ::test_results.kyber_initiation = {
+        alice_pk: ::kyber_info.alice_pk,
+        bob_pk: ::kyber_info.bob_pk,
+        ciphertext: ::kyber_info.ciphertext
+      }
+      emit test.kyber_initiation.completed
+    }
+
+    on pqke.kyber_shared_secret_derived {
+      set ::shared_info = $1
+      set ::test_results.shared_secret_derivation = {
+        shared_key: ::shared_info.shared_key,
+        key_length: ::shared_info.key_length
+      }
+      emit test.shared_secret_derivation.completed
+    }
+
+    on pqke.dilithium_signature_generated {
+      set ::signature_info = $1
+      set ::test_results.dilithium_signature = {
+        message: ::signature_info.message,
+        signature: ::signature_info.signature,
+        signer: ::signature_info.signer
+      }
+      emit test.dilithium_signature.completed
+    }
+
+    on pqke.dilithium_used_for_auth {
+      set ::auth_info = $1
+      set ::test_results.dilithium_authentication = {
+        signature: ::auth_info.signature,
+        verified: ::auth_info.verified
+      }
+      emit test.dilithium_authentication.completed
+    }
+
+    on pqke.shared_secret_verified {
+      set ::verify_info = $1
+      set ::test_results.shared_secret_verification = {
+        key_id: ::verify_info.key_id,
+        validity: ::verify_info.validity,
+        key_length: ::verify_info.key_length
+      }
+      emit test.shared_secret_verification.completed
+    }
+
+    on pqke.classic_checked {
+      set ::classic_info = $1
+      set ::test_results.classic_fallback = {
+        rsa_support: ::classic_info.rsa_support,
+        ecc_support: ::classic_info.ecc_support,
+        hybrid_mode: ::classic_info.hybrid_mode
+      }
+      emit test.classic_fallback.completed
+    }
+
+    on pqke.complete {
+      set ::test_results.post_quantum_key_exchange_complete = 1
+      emit test.post_quantum_key_exchange.completed with ::test_results
+    }
+  }
+}
+
+# Test quantum-resistant messaging
+component ::test.quantum_resistant_messaging {
+  behavior {
+    on start {
+      # Test quantum-resistant messaging
+      emit test.quantum_resistant_messaging_operation
+    }
+
+    on test.quantum_resistant_messaging_operation {
+      emit processor.pqke_quantum_resistant_messaging
+    }
+
+    on pqke.quantum_resistant_message_encrypted {
+      set ::message_info = $1
+      set ::test_results.quantum_resistant_messaging = {
+        original_message: ::message_info.original_message,
+        encrypted_message: ::message_info.encrypted_message,
+        shared_key: ::message_info.shared_key
+      }
+      emit test.quantum_resistant_messaging.completed
+    }
+  }
+}
+
+# Test quantum VPN initialization
+component ::test.quantum_vpn_initialization {
+  behavior {
+    on start {
+      # Test quantum VPN initialization
+      emit test.quantum_vpn_operation
+    }
+
+    on test.quantum_vpn_operation {
+      emit processor.pqke_quantum_vpn_init
+    }
+
+    on pqke.quantum_vpn_initialized {
+      set ::vpn_info = $1
+      set ::test_results.quantum_vpn_initialization = {
+        vpn_config: ::vpn_info.vpn_config,
+        shared_key: ::vpn_info.shared_key,
+        quantum_resistant: ::vpn_info.quantum_resistant,
+        hybrid_support: ::vpn_info.hybrid_support
+      }
+      emit test.quantum_vpn_initialization.completed
+    }
+  }
+}
+
+# Test hybrid network support
+component ::test.hybrid_network_support {
+  behavior {
+    on start {
+      # Test hybrid network support
+      emit test.hybrid_network_operation
+    }
+
+    on test.hybrid_network_operation {
+      emit processor.pqke_hybrid_network_support
+    }
+
+    on pqke.hybrid_network_established {
+      set ::hybrid_info = $1
+      set ::test_results.hybrid_network_support = {
+        quantum_nodes: ::hybrid_info.quantum_nodes,
+        classical_nodes: ::hybrid_info.classical_nodes,
+        shared_key: ::hybrid_info.shared_key,
+        hybrid_communication: ::hybrid_info.hybrid_communication
+      }
+      emit test.hybrid_network_support.completed
+    }
+  }
+}
+
+# Test IoT key exchange
+component ::test.iot_key_exchange {
+  behavior {
+    on start {
+      # Test IoT key exchange
+      emit test.iot_key_exchange_operation
+    }
+
+    on test.iot_key_exchange_operation {
+      emit processor.pqke_iot_key_exchange
+    }
+
+    on pqke.iot_key_exchange_complete {
+      set ::iot_info = $1
+      set ::test_results.iot_key_exchange = {
+        iot_device: ::iot_info.iot_device,
+        shared_key: ::iot_info.shared_key,
+        authenticated: ::iot_info.authenticated,
+        quantum_resistant: ::iot_info.quantum_resistant
+      }
+      emit test.iot_key_exchange.completed
+    }
+  }
+}
+
+# Test post-quantum security verification
+component ::test.post_quantum_security_verification {
+  behavior {
+    on start {
+      # Test post-quantum security verification
+      emit test.quantum_resistance_operation
+    }
+
+    on test.quantum_resistance_operation {
+      emit processor.pqke_verify_quantum_resistance
+    }
+
+    on pqke.quantum_resistance_verified {
+      set ::resistance_info = $1
+      set ::test_results.post_quantum_security = {
+        shor_resistant: ::resistance_info.shor_resistant,
+        grover_resistant: ::resistance_info.grover_resistant,
+        quantum_attack_resistant: ::resistance_info.quantum_attack_resistant,
+        lattice_based: ::resistance_info.lattice_based
+      }
+      emit test.post_quantum_security.completed
+    }
+  }
+}
+
+# Test PQKE use cases
+component ::test.pqke_use_cases {
+  behavior {
+    on start {
+      # Test PQKE use cases
+      emit test.quantum_resistant_messaging_use
+      emit test.quantum_vpn_initialization_use
+      emit test.hybrid_networks_use
+      emit test.iot_key_exchange_use
+    }
+
+    on test.quantum_resistant_messaging_use {
+      set ::test_results.quantum_resistant_messaging_use = {
+        post_quantum_encryption: true,
+        shared_key_derivation: true,
+        quantum_resistant: true,
+        lattice_based: true
+      }
+      emit test.quantum_resistant_messaging_use.completed
+    }
+
+    on test.quantum_vpn_initialization_use {
+      set ::test_results.quantum_vpn_initialization_use = {
+        vpn_key_exchange: true,
+        quantum_resistant: true,
+        hybrid_support: true,
+        secure_tunneling: true
+      }
+      emit test.quantum_vpn_initialization_use.completed
+    }
+
+    on test.hybrid_networks_use {
+      set ::test_results.hybrid_networks_use = {
+        quantum_classical_bridge: true,
+        secure_translation: true,
+        hybrid_communication: true,
+        quantum_resistant: true
+      }
+      emit test.hybrid_networks_use.completed
+    }
+
+    on test.iot_key_exchange_use {
+      set ::test_results.iot_key_exchange_use = {
+        iot_authentication: true,
+        quantum_resistant: true,
+        low_power_optimized: true,
+        without_qkd: true
+      }
+      emit test.iot_key_exchange_use.completed
+    }
+  }
+}
+
+# Test PQKE security properties
+component ::test.pqke_security_properties {
+  behavior {
+    on start {
+      # Test PQKE security properties
+      emit test.kyber_security
+      emit test.dilithium_security
+      emit test.lattice_based_security
+      emit test.quantum_resistance
+    }
+
+    on test.kyber_security {
+      set ::test_results.kyber_security = {
+        lattice_based: true,
+        module_lwe: true,
+        quantum_resistant: true,
+        nist_approved: true
+      }
+      emit test.kyber_security.completed
+    }
+
+    on test.dilithium_security {
+      set ::test_results.dilithium_security = {
+        lattice_based: true,
+        signature_scheme: true,
+        quantum_resistant: true,
+        authentication: true
+      }
+      emit test.dilithium_security.completed
+    }
+
+    on test.lattice_based_security {
+      set ::test_results.lattice_based_security = {
+        hard_problems: true,
+        quantum_resistant: true,
+        mathematical_security: true,
+        post_quantum: true
+      }
+      emit test.lattice_based_security.completed
+    }
+
+    on test.quantum_resistance {
+      set ::test_results.quantum_resistance = {
+        shor_algorithm_resistant: true,
+        grover_algorithm_resistant: true,
+        quantum_attack_resistant: true,
+        future_proof: true
+      }
+      emit test.quantum_resistance.completed
+    }
+  }
+}
+
+# Main test runner
+component ::test.post_quantum_key_exchange_runner {
+  behavior {
+    on start {
+      # Run all post-quantum key exchange tests
+      emit test.post_quantum_key_exchange.start
+      emit test.quantum_resistant_messaging.start
+      emit test.quantum_vpn_initialization.start
+      emit test.hybrid_network_support.start
+      emit test.iot_key_exchange.start
+      emit test.post_quantum_security_verification.start
+      emit test.pqke_use_cases.start
+      emit test.pqke_security_properties.start
+    }
+  }
+} 

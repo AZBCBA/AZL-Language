@@ -1,0 +1,23 @@
+component ::test.emitter {
+  init {
+    set ::count = 7
+    say "🧪 Test emitter initialized"
+  }
+
+  on start {
+    say "🧪 Starting emit test..."
+    emit test.event with "hello" 3 ::count
+  }
+}
+
+component ::test.receiver {
+  init {
+    say "📥 Test receiver initialized"
+  }
+
+  on test.event {
+    say "📥 Received: $1 $2 $3"
+    say "📊 Expected: hello 3 7"
+    say "📊 Actual: $1 $2 $3"
+  }
+} 

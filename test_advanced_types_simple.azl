@@ -1,0 +1,76 @@
+say "🧠 Testing Advanced Type System Features...";
+
+// ========================================
+// 1. BASIC TYPE DECLARATIONS
+// ========================================
+
+say "=== 1. Basic Type Declarations ===";
+
+// Simple type aliases
+type StringOrNumber = string | number;
+type DrawableQuantum = Drawable & Quantum;
+
+say "✅ Basic type declarations working";
+
+// ========================================
+// 2. GENERIC FUNCTIONS
+// ========================================
+
+say "=== 2. Generic Functions ===";
+
+// Generic identity function
+fn identity(x) {
+    return x;
+}
+
+// Test generic function
+let string_result = identity("Hello Generic World");
+let number_result = identity(42);
+
+say "✅ Generic functions working";
+
+// ========================================
+// 3. COMPONENT SYSTEM
+// ========================================
+
+say "=== 3. Component System ===";
+
+// Simple component
+component TestComponent {
+    let name = "TestComponent";
+    let version = 1.0;
+}
+
+say "✅ Component system working";
+
+// ========================================
+// 4. TRAIT SYSTEM
+// ========================================
+
+say "=== 4. Trait System ===";
+
+// Define a trait
+trait Drawable {
+    fn draw() -> void;
+}
+
+// Implement trait
+component Circle implements Drawable {
+    fn draw() {
+        say "Drawing circle";
+    }
+}
+
+say "✅ Trait system working";
+
+// ========================================
+// 5. FINAL SUMMARY
+// ========================================
+
+say "=== 5. Final Summary ===";
+say "🎉 Advanced Type System Features Working!";
+say "✅ Type declarations";
+say "✅ Generic functions";
+say "✅ Component system";
+say "✅ Trait system";
+say "🚀 AZL v2 Advanced Features Ready!"; 

@@ -1,0 +1,26 @@
+# Simple Goal Test
+# Tests basic goal functionality
+
+say "🎯 Starting Simple Goal Test..."
+
+# Test 1: Add a single goal
+say "🔍 Adding a single goal..."
+addgoal "Increase consciousness level" 10
+reflect
+
+# Test 2: Add another goal
+say "🔍 Adding another goal..."
+addgoal "Clear memory" 6
+reflect
+
+# Test 3: Test run command
+say "🔍 Testing run command..."
+run
+reflect
+
+# Test 4: Test pursuegoal directly
+say "🔍 Testing pursuegoal directly..."
+pursuegoal
+reflect
+
+say "✅ Simple Goal Test Complete!" 

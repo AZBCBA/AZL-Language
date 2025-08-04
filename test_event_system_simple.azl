@@ -1,0 +1,12 @@
+say "Testing AZL v2 Event-Driven Core...";
+
+// Test event emission and listening
+emit "quantum_measurement" with {state: "superposition", probability: 0.5};
+
+on "quantum_measurement" do {
+    say "Quantum measurement event received!";
+    let result = quantum.superposition(0.3, 0.7);
+    say "Processing quantum measurement...";
+};
+
+say "Event-driven core test completed!"; 

@@ -1,0 +1,255 @@
+# AZME Neural Agent Loader
+# Main loader & model controller
+
+# Initialize neural agent loader state
+set ::current_model = "azme_lang"
+set ::available_models = { deepseek: { path: "/models/deepseek-7b", runtime_options: { quant: "int8", device: "gpu" }, requires: { gpu_memory: 12, ram: 4 }, status: "unloaded", loaded_at: null }, mistral: { path: "/models/mistral-7b", runtime_options: { threads: 8, device: "cpu" }, requires: { ram: 6 }, status: "unloaded", loaded_at: null }, azme_lang: { path: "/azme/core/lang_runtime.azl", runtime_options: { safe_mode: true }, requires: { ram: 2 }, status: "loaded", loaded_at: get_current_time() } }
+set ::model_performance_cache = {}
+set ::model_resource_requirements = { gpu_memory: 16, ram: 8, cpu_cores: 4 }
+set ::model_task_preference_map = { code_generation: "deepseek", logic_reasoning: "mistral", system_check: "azme_lang", file_operations: "azme_lang", voice_processing: "azme_lang", web_scraping: "azme_lang", quantum_operations: "azme_lang" }
+set ::model_swap_history = []
+set ::swap_count = 0
+set ::successful_swaps = 0
+set ::failed_swaps = 0
+
+# Event handlers for neural agent loader
+on azme.intent_resolved with ::intent:
+  set intent_type = intent.type
+  
+  emit azme.choose_model_for with intent_type
+
+# Choose model for task
+on azme.choose_model_for with ::intent_type:
+  set chosen_model = ::current_model
+  
+  # Check task preference map
+  if intent_type in ::model_task_preference_map:
+    set preferred_model = ::model_task_preference_map[intent_type]
+    set chosen_model = preferred_model
+  
+  # Check if model needs to be switched
+  if chosen_model != ::current_model:
+    emit azme.switch_model with ::current_model chosen_model intent_type
+  else:
+    emit azme.model_selected with chosen_model intent_type
+
+# Switch model
+on azme.switch_model with ::from_model ::to_model ::intent_type:
+  # Unload current model
+  emit azme.unload_model with from_model
+  
+  # Load new model
+  emit azme.load_model with to_model
+  
+  # Update current model
+  set ::current_model = to_model
+  
+  # Record swap
+  set swap_entry = { id: "swap_" + ::swap_count, from_model: from_model, to_model: to_model, intent_type: intent_type, timestamp: get_current_time(), success: true, quantum_enhanced: true }
+  set ::model_swap_history = ::model_swap_history + [swap_entry]
+  set ::swap_count = ::swap_count + 1
+  
+  emit azme.model_switched with from_model to_model intent_type
+
+# Model switched
+on azme.model_switched with ::from_model ::to_model ::intent_type:
+  emit azme.switch_complete with from_model to_model intent_type
+
+# Switch complete
+on azme.switch_complete with ::from_model ::to_model ::intent_type:
+  emit azme.model_selected with to_model intent_type
+
+# Model selected
+on azme.model_selected with ::model ::intent_type:
+  emit azme.neural_agent_ready with model intent_type
+
+# Unload model
+on azme.unload_model with ::model_id:
+  if model_id in ::available_models:
+    set model_info = ::available_models[model_id]
+    set model_info.status = "unloaded"
+    set model_info.loaded_at = null
+    
+    emit azme.model_unloaded with model_id
+  else:
+    emit azme.model_unload_failed with model_id "unknown_model"
+
+# Model unloaded
+on azme.model_unloaded with ::model_id:
+  emit azme.unload_complete with model_id
+
+# Load model
+on azme.load_model with ::model_id:
+  if model_id in ::available_models:
+    set model_info = ::available_models[model_id]
+    set model_info.status = "loaded"
+    set model_info.loaded_at = get_current_time()
+    
+    emit azme.model_loaded with model_id
+  else:
+    emit azme.model_load_failed with model_id "unknown_model"
+
+# Model loaded
+on azme.model_loaded with ::model_id:
+  emit azme.load_complete with model_id
+
+# Load complete
+on azme.load_complete with ::model_id:
+  emit azme.model_ready with model_id
+
+# Neural agent ready
+on azme.neural_agent_ready with ::model ::intent_type:
+  emit azme.agent_ready with model intent_type
+
+# Get model info
+on azme.get_model_info with ::model_id:
+  set model_info = {}
+  
+  if model_id in ::available_models:
+    set model_info = ::available_models[model_id]
+  
+  emit azme.model_info_retrieved with model_id model_info
+
+# Model info retrieved
+on azme.model_info_retrieved with ::model_id ::model_info:
+  emit azme.info_ready with model_id model_info
+
+# Get current model
+on azme.get_current_model:
+  set current_model = ::current_model
+  set model_info = ::available_models[current_model]
+  
+  emit azme.current_model_retrieved with current_model model_info
+
+# Current model retrieved
+on azme.current_model_retrieved with ::model_id ::model_info:
+  emit azme.current_model_ready with model_id model_info
+
+# Get model performance
+on azme.get_model_performance with ::model_id:
+  set performance = {}
+  
+  if model_id in ::model_performance_cache:
+    set performance = ::model_performance_cache[model_id]
+  
+  emit azme.model_performance_retrieved with model_id performance
+
+# Model performance retrieved
+on azme.model_performance_retrieved with ::model_id ::performance:
+  emit azme.performance_ready with model_id performance
+
+# Update model performance
+on azme.update_model_performance with ::performance_update:
+  set model_id = performance_update.model_id
+  set metrics = performance_update.metrics
+  
+  set ::model_performance_cache[model_id] = metrics
+  
+  emit azme.performance_updated with model_id metrics
+
+# Performance updated
+on azme.performance_updated with ::model_id ::metrics:
+  emit azme.update_complete with model_id metrics
+
+# Get swap history
+on azme.get_swap_history:
+  set history = ::model_swap_history
+  set total_swaps = ::swap_count
+  set successful_swaps = ::successful_swaps
+  set failed_swaps = ::failed_swaps
+  
+  set swap_stats = { history: history, total_swaps: total_swaps, successful_swaps: successful_swaps, failed_swaps: failed_swaps, quantum_enhanced: true }
+  
+  emit azme.swap_history_retrieved with swap_stats
+
+# Swap history retrieved
+on azme.swap_history_retrieved with ::swap_stats:
+  emit azme.history_ready with swap_stats
+
+# Get resource requirements
+on azme.get_resource_requirements with ::model_id:
+  set requirements = {}
+  
+  if model_id in ::available_models:
+    set model_info = ::available_models[model_id]
+    set requirements = model_info.requires
+  
+  emit azme.resource_requirements_retrieved with model_id requirements
+
+# Resource requirements retrieved
+on azme.resource_requirements_retrieved with ::model_id ::requirements:
+  emit azme.requirements_ready with model_id requirements
+
+# Check resource availability
+on azme.check_resource_availability with ::model_id:
+  set available = true
+  set missing_resources = []
+  
+  if model_id in ::available_models:
+    set model_info = ::available_models[model_id]
+    set requirements = model_info.requires
+    
+    emit azme.check_individual_requirements with model_id requirements 0 available missing_resources
+  
+  emit azme.resource_check_complete with model_id available missing_resources
+
+# Check individual requirements
+on azme.check_individual_requirements with ::model_id ::requirements ::index ::available ::missing_resources:
+  set requirement_names = requirements.keys()
+  
+  if index >= requirement_names.length:
+    emit azme.resource_check_complete with model_id available missing_resources
+    return
+  
+  if index < requirement_names.length:
+    set resource_name = requirement_names[index]
+    set required_amount = requirements[resource_name]
+    
+    # Check if resource is available
+    emit azme.check_single_resource with resource_name required_amount available missing_resources
+
+# Check single resource
+on azme.check_single_resource with ::resource_name ::required_amount ::available ::missing_resources:
+  set current_amount = 0
+  
+  if resource_name == "gpu_memory":
+    set current_amount = get_gpu_memory()
+  if resource_name == "ram":
+    set current_amount = get_ram()
+  if resource_name == "cpu_cores":
+    set current_amount = get_cpu_cores()
+  
+  if current_amount < required_amount:
+    set available = false
+    set missing_resources = missing_resources + [resource_name + ": " + required_amount + " (available: " + current_amount + ")"]
+  
+  emit azme.single_resource_checked with resource_name required_amount current_amount available missing_resources
+
+# Single resource checked
+on azme.single_resource_checked with ::resource_name ::required_amount ::current_amount ::available ::missing_resources:
+  emit azme.resource_check_complete with model_id available missing_resources
+
+# Resource check complete
+on azme.resource_check_complete with ::model_id ::available ::missing_resources:
+  emit azme.availability_ready with model_id available missing_resources
+
+# Utility functions
+on azme.get_current_time:
+  set current_time = system_time()
+  emit azme.current_time_retrieved with current_time
+
+on azme.system_time:
+  set time = now()
+  emit azme.system_time_retrieved with time
+
+on azme.get_gpu_memory:
+  set gpu_memory = 16
+  emit azme.gpu_memory_retrieved with gpu_memory
+
+on azme.get_ram:
+  set ram = 8
+  emit azme.ram_retrieved with ram
+
+on azme.get_cpu_cores:
+  set cpu_cores = 4
+  emit azme.cpu_cores_retrieved with cpu_cores 

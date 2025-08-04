@@ -1,0 +1,187 @@
+// Auto-upload documents to AnythingLLM for AZME testing
+// This script will automatically upload the test documents to AnythingLLM
+
+// Configuration
+let ANYTHINGLLM_URL = "http://localhost:3001"
+let DOCUMENTS_PATH = "/home/abdulrahman-alzalameh/AnythingLLMDesktop/test_documents/"
+
+// Function to check if AnythingLLM is running
+function check_anythingllm_status() {
+    try {
+        let response = http_get(ANYTHINGLLM_URL + "/api/workspaces")
+        if response.status == 200 {
+            print("✅ AnythingLLM is running and accessible")
+            return true
+        } else {
+            print("❌ AnythingLLM returned status code: " + response.status)
+            return false
+        }
+    } catch (error) {
+        print("❌ Cannot connect to AnythingLLM: " + error)
+        print("   Make sure AnythingLLM is running on " + ANYTHINGLLM_URL)
+        return false
+    }
+}
+
+// Function to get list of existing workspaces
+function get_workspaces() {
+    try {
+        let response = http_get(ANYTHINGLLM_URL + "/api/workspaces")
+        if response.status == 200 {
+            let workspaces = json_parse(response.body)
+            print("📋 Found " + workspaces.length + " existing workspaces")
+            for (let ws in workspaces) {
+                print("   - " + ws.name + " (ID: " + ws.id + ")")
+            }
+            return workspaces
+        } else {
+            print("❌ Failed to get workspaces: " + response.status)
+            return []
+        }
+    } catch (error) {
+        print("❌ Error getting workspaces: " + error)
+        return []
+    }
+}
+
+// Function to create a new workspace for AZME testing
+function create_workspace() {
+    let workspace_data = {
+        "name": "AZME Quantum Testing",
+        "description": "Workspace for testing AZME quantum AI capabilities",
+        "llmProvider": "azme-quantum-ai",
+        "embeddingProvider": "local",
+        "chunkSize": 1500,
+        "chunkOverlap": 200
+    }
+    
+    try {
+        let response = http_post(ANYTHINGLLM_URL + "/api/workspaces", json_stringify(workspace_data))
+        if response.status == 200 {
+            let workspace = json_parse(response.body)
+            print("✅ Created workspace: " + workspace.name + " (ID: " + workspace.id + ")")
+            return workspace
+        } else {
+            print("❌ Failed to create workspace: " + response.status)
+            print("   Response: " + response.body)
+            return null
+        }
+    } catch (error) {
+        print("❌ Error creating workspace: " + error)
+        return null
+    }
+}
+
+// Function to upload a single document to the workspace
+function upload_document(workspace_id, file_path) {
+    try {
+        let file_content = read_file(file_path)
+        let files = {"file": file_content}
+        let data = {"workspaceId": workspace_id}
+        
+        let response = http_post(
+            ANYTHINGLLM_URL + "/api/workspaces/" + workspace_id + "/documents",
+            files,
+            data
+        )
+        
+        if response.status == 200 {
+            let result = json_parse(response.body)
+            print("✅ Uploaded: " + get_filename(file_path))
+            return true
+        } else {
+            print("❌ Failed to upload " + get_filename(file_path) + ": " + response.status)
+            print("   Response: " + response.body)
+            return false
+        }
+    } catch (error) {
+        print("❌ Error uploading " + get_filename(file_path) + ": " + error)
+        return false
+    }
+}
+
+// Function to upload all test documents
+function upload_all_documents(workspace_id) {
+    let documents = [
+        "azme_quantum_systems_overview.md",
+        "sample_python_code.py", 
+        "research_paper_quantum_computing.txt"
+    ]
+    
+    print("\n📤 Uploading documents to workspace " + workspace_id + "...")
+    
+    let success_count = 0
+    for (let doc in documents) {
+        let file_path = DOCUMENTS_PATH + doc
+        if file_exists(file_path) {
+            if upload_document(workspace_id, file_path) {
+                success_count = success_count + 1
+            }
+        } else {
+            print("❌ Document not found: " + file_path)
+        }
+    }
+    
+    print("\n📊 Upload Summary: " + success_count + "/" + documents.length + " documents uploaded successfully")
+    return success_count == documents.length
+}
+
+// Main function to upload documents
+function main() {
+    print("🚀 AZME Document Upload Script")
+    print("=" * 40)
+    
+    // Check if AnythingLLM is running
+    if (!check_anythingllm_status()) {
+        print("\n🔧 Troubleshooting:")
+        print("1. Make sure AnythingLLM is running")
+        print("2. Check if it's accessible at http://localhost:3001")
+        print("3. Restart AnythingLLM if needed")
+        return
+    }
+    
+    // Get existing workspaces
+    let workspaces = get_workspaces()
+    
+    // Look for existing AZME workspace
+    let azme_workspace = null
+    for (let ws in workspaces) {
+        if (contains(ws.name.toLowerCase(), "azme")) {
+            azme_workspace = ws
+            print("✅ Found existing AZME workspace: " + ws.name)
+            break
+        }
+    }
+    
+    // Create new workspace if needed
+    if (!azme_workspace) {
+        print("\n📝 Creating new AZME workspace...")
+        azme_workspace = create_workspace()
+        if (!azme_workspace) {
+            print("❌ Failed to create workspace")
+            return
+        }
+    }
+    
+    // Upload documents
+    let workspace_id = azme_workspace.id
+    if (workspace_id) {
+        let success = upload_all_documents(workspace_id)
+        if (success) {
+            print("\n🎉 All documents uploaded successfully!")
+            print("🌐 Open AnythingLLM at: " + ANYTHINGLLM_URL)
+            print("📚 Workspace: " + azme_workspace.name)
+            print("\n🧠 Test AZME with these questions:")
+            print("   - 'What are the 13 quantum systems in AZME?'")
+            print("   - 'Explain the QuantumProcessor class in the Python code'")
+            print("   - 'What are the main challenges in quantum computing?'")
+        } else {
+            print("\n⚠️ Some documents failed to upload. Check the errors above.")
+        }
+    } else {
+        print("❌ No workspace ID found")
+    }
+}
+
+// Execute main function
+main() 

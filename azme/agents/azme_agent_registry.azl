@@ -1,0 +1,455 @@
+# AZME Agent Registry
+# Known peers, trust levels, capabilities
+
+component ::azme.agent_registry {
+  init {
+    set ::known_agents = [
+      {
+        id: "azme-node-2",
+        address: "ws://192.168.1.10:3001",
+        trust: 0.95,
+        capabilities: ["text_processing", "image_analysis", "data_summarization"],
+        last_seen: ::internal.now(),
+        status: "online",
+        quantum_enhanced: true
+      },
+      {
+        id: "azme-node-3",
+        address: "ipc://local.sock",
+        trust: 0.88,
+        capabilities: ["voice_processing", "real_time_analysis", "system_monitoring"],
+        last_seen: ::internal.now(),
+        status: "online",
+        quantum_enhanced: true
+      },
+      {
+        id: "azme-mobile-1",
+        address: "ws://192.168.1.15:3002",
+        trust: 0.92,
+        capabilities: ["mobile_sensing", "location_awareness", "battery_optimization"],
+        last_seen: ::internal.now(),
+        status: "online",
+        quantum_enhanced: true
+      },
+      {
+        id: "azme-server-main",
+        address: "ws://192.168.1.100:3000",
+        trust: 0.98,
+        capabilities: ["high_performance_computing", "large_scale_processing", "distributed_training"],
+        last_seen: ::internal.now(),
+        status: "online",
+        quantum_enhanced: true
+      }
+    ]
+    set ::agent_trust_map = {
+      "azme-node-2": 0.95,
+      "azme-node-3": 0.88,
+      "azme-mobile-1": 0.92,
+      "azme-server-main": 0.98,
+      quantum_enhanced: true
+    }
+    set ::agent_capability_map = {
+      "azme-node-2": ["text_processing", "image_analysis", "data_summarization"],
+      "azme-node-3": ["voice_processing", "real_time_analysis", "system_monitoring"],
+      "azme-mobile-1": ["mobile_sensing", "location_awareness", "battery_optimization"],
+      "azme-server-main": ["high_performance_computing", "large_scale_processing", "distributed_training"],
+      quantum_enhanced: true
+    }
+    set ::registry_settings = {
+      auto_discovery: true,
+      trust_decay_rate: 0.95,
+      capability_sync_interval: 300,
+      max_agents: 50,
+      quantum_enhanced: true
+    }
+    set ::registry_count = 0
+    set ::agents_added = 0
+    set ::agents_removed = 0
+  }
+
+  behavior {
+    on register_agent {
+      set ::registration_request = $1
+      set ::agent_id = ::registration_request.agent_id
+      set ::address = ::registration_request.address
+      set ::trust_level = ::registration_request.trust_level or 0.8
+      set ::capabilities = ::registration_request.capabilities or []
+      
+      say "📝 Registering agent: " + ::agent_id
+      
+      set ::agent_info = {
+        id: ::agent_id,
+        address: ::address,
+        trust: ::trust_level,
+        capabilities: ::capabilities,
+        last_seen: ::internal.now(),
+        status: "online",
+        quantum_enhanced: true
+      }
+      
+      set ::known_agents = ::known_agents.push(::agent_info)
+      set ::agent_trust_map[::agent_id] = ::trust_level
+      set ::agent_capability_map[::agent_id] = ::capabilities
+      
+      set ::agents_added = ::agents_added + 1
+      set ::registry_count = ::registry_count + 1
+      
+      emit azme.agent_registered with {
+        agent_info: ::agent_info,
+        quantum_enhanced: true
+      }
+    }
+
+    on unregister_agent {
+      set ::unregistration_request = $1
+      set ::agent_id = ::unregistration_request.agent_id
+      
+      say "📝 Unregistering agent: " + ::agent_id
+      
+      # Remove from known agents
+      set ::filtered_agents = []
+      loop for ::agent in ::known_agents {
+        if ::agent.id != ::agent_id {
+          set ::filtered_agents = ::filtered_agents.push(::agent)
+        }
+      }
+      set ::known_agents = ::filtered_agents
+      
+      # Remove from trust map
+      if ::agent_id in ::agent_trust_map {
+        set ::agent_trust_map = ::agent_trust_map.remove(::agent_id)
+      }
+      
+      # Remove from capability map
+      if ::agent_id in ::agent_capability_map {
+        set ::agent_capability_map = ::agent_capability_map.remove(::agent_id)
+      }
+      
+      set ::agents_removed = ::agents_removed + 1
+      set ::registry_count = ::registry_count - 1
+      
+      emit azme.agent_unregistered with {
+        agent_id: ::agent_id,
+        quantum_enhanced: true
+      }
+    }
+
+    on update_agent_trust {
+      set ::trust_request = $1
+      set ::agent_id = ::trust_request.agent_id
+      set ::new_trust_level = ::trust_request.trust_level
+      
+      say "🔐 Updating agent trust: " + ::agent_id + " -> " + ::new_trust_level
+      
+      set ::agent_trust_map[::agent_id] = ::new_trust_level
+      
+      # Update known agents
+      loop for ::agent in ::known_agents {
+        if ::agent.id == ::agent_id {
+          set ::agent.trust = ::new_trust_level
+        }
+      }
+      
+      emit azme.agent_trust_updated with {
+        agent_id: ::agent_id,
+        new_trust_level: ::new_trust_level,
+        quantum_enhanced: true
+      }
+    }
+
+    on update_agent_capabilities {
+      set ::capability_request = $1
+      set ::agent_id = ::capability_request.agent_id
+      set ::new_capabilities = ::capability_request.capabilities
+      
+      say "🛠️ Updating agent capabilities: " + ::agent_id
+      
+      set ::agent_capability_map[::agent_id] = ::new_capabilities
+      
+      # Update known agents
+      loop for ::agent in ::known_agents {
+        if ::agent.id == ::agent_id {
+          set ::agent.capabilities = ::new_capabilities
+        }
+      }
+      
+      emit azme.agent_capabilities_updated with {
+        agent_id: ::agent_id,
+        new_capabilities: ::new_capabilities,
+        quantum_enhanced: true
+      }
+    }
+
+    on get_agent_info {
+      set ::info_request = $1
+      set ::agent_id = ::info_request.agent_id
+      
+      say "📋 Getting agent info: " + ::agent_id
+      
+      set ::agent_info = null
+      
+      loop for ::agent in ::known_agents {
+        if ::agent.id == ::agent_id {
+          set ::agent_info = ::agent
+        }
+      }
+      
+      emit azme.agent_info_retrieved with {
+        agent_id: ::agent_id,
+        agent_info: ::agent_info,
+        quantum_enhanced: true
+      }
+    }
+
+    on get_all_agents {
+      set ::all_request = $1
+      
+      say "📋 Getting all agents"
+      
+      set ::all_agents = {
+        agents: ::known_agents,
+        total_count: ::known_agents.length,
+        online_count: count_online_agents(),
+        offline_count: count_offline_agents(),
+        quantum_enhanced: true
+      }
+      
+      emit azme.all_agents_retrieved with {
+        all_agents: ::all_agents,
+        quantum_enhanced: true
+      }
+    }
+
+    on count_online_agents {
+      set ::count_request = $1
+      
+      say "🔢 Counting online agents"
+      
+      set ::online_count = 0
+      
+      loop for ::agent in ::known_agents {
+        if ::agent.status == "online" {
+          set ::online_count = ::online_count + 1
+        }
+      }
+      
+      emit azme.online_agents_counted with {
+        online_count: ::online_count,
+        quantum_enhanced: true
+      }
+    }
+
+    on count_offline_agents {
+      set ::count_request = $1
+      
+      say "🔢 Counting offline agents"
+      
+      set ::offline_count = 0
+      
+      loop for ::agent in ::known_agents {
+        if ::agent.status == "offline" {
+          set ::offline_count = ::offline_count + 1
+        }
+      }
+      
+      emit azme.offline_agents_counted with {
+        offline_count: ::offline_count,
+        quantum_enhanced: true
+      }
+    }
+
+    on find_agents_by_capability {
+      set ::search_request = $1
+      set ::capability = ::search_request.capability
+      
+      say "🔍 Finding agents by capability: " + ::capability
+      
+      set ::matching_agents = []
+      
+      loop for ::agent in ::known_agents {
+        if ::agent.capabilities and ::capability in ::agent.capabilities {
+          set ::matching_agents = ::matching_agents.push(::agent)
+        }
+      }
+      
+      emit azme.agents_found_by_capability with {
+        capability: ::capability,
+        matching_agents: ::matching_agents,
+        count: ::matching_agents.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on find_agents_by_trust_level {
+      set ::search_request = $1
+      set ::min_trust_level = ::search_request.min_trust_level
+      
+      say "🔍 Finding agents by trust level: " + ::min_trust_level
+      
+      set ::matching_agents = []
+      
+      loop for ::agent in ::known_agents {
+        if ::agent.trust >= ::min_trust_level {
+          set ::matching_agents = ::matching_agents.push(::agent)
+        }
+      }
+      
+      emit azme.agents_found_by_trust with {
+        min_trust_level: ::min_trust_level,
+        matching_agents: ::matching_agents,
+        count: ::matching_agents.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on update_agent_status {
+      set ::status_request = $1
+      set ::agent_id = ::status_request.agent_id
+      set ::new_status = ::status_request.status
+      
+      say "🔄 Updating agent status: " + ::agent_id + " -> " + ::new_status
+      
+      loop for ::agent in ::known_agents {
+        if ::agent.id == ::agent_id {
+          set ::agent.status = ::new_status
+          set ::agent.last_seen = ::internal.now()
+        }
+      }
+      
+      emit azme.agent_status_updated with {
+        agent_id: ::agent_id,
+        new_status: ::new_status,
+        quantum_enhanced: true
+      }
+    }
+
+    on cleanup_inactive_agents {
+      set ::cleanup_request = $1
+      
+      say "🧹 Cleaning up inactive agents"
+      
+      set ::current_time = ::internal.now()
+      set ::cleanup_threshold = ::current_time - (24 * 60 * 60 * 1000) # 24 hours
+      set ::removed_count = 0
+      
+      set ::active_agents = []
+      
+      loop for ::agent in ::known_agents {
+        if ::agent.last_seen > ::cleanup_threshold {
+          set ::active_agents = ::active_agents.push(::agent)
+        } else {
+          set ::removed_count = ::removed_count + 1
+          
+          # Remove from trust map
+          if ::agent.id in ::agent_trust_map {
+            set ::agent_trust_map = ::agent_trust_map.remove(::agent.id)
+          }
+          
+          # Remove from capability map
+          if ::agent.id in ::agent_capability_map {
+            set ::agent_capability_map = ::agent_capability_map.remove(::agent.id)
+          }
+        }
+      }
+      
+      set ::known_agents = ::active_agents
+      set ::registry_count = ::known_agents.length
+      
+      emit azme.inactive_agents_cleaned with {
+        removed_count: ::removed_count,
+        remaining_count: ::known_agents.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on get_registry_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Getting registry statistics"
+      
+      set ::registry_stats = {
+        total_agents: ::known_agents.length,
+        agents_added: ::agents_added,
+        agents_removed: ::agents_removed,
+        online_agents: count_online_agents(),
+        offline_agents: count_offline_agents(),
+        average_trust_level: calculate_average_trust(),
+        total_capabilities: count_total_capabilities(),
+        quantum_enhanced: true
+      }
+      
+      emit azme.registry_statistics_retrieved with {
+        statistics: ::registry_stats
+      }
+    }
+
+    on calculate_average_trust {
+      set ::calc_request = $1
+      
+      say "📊 Calculating average trust level"
+      
+      set ::total_trust = 0
+      set ::trust_count = 0
+      
+      loop for ::agent in ::known_agents {
+        set ::total_trust = ::total_trust + ::agent.trust
+        set ::trust_count = ::trust_count + 1
+      }
+      
+      set ::average_trust = 0
+      if ::trust_count > 0 {
+        set ::average_trust = ::total_trust / ::trust_count
+      }
+      
+      emit azme.average_trust_calculated with {
+        average_trust: ::average_trust,
+        total_agents: ::trust_count,
+        quantum_enhanced: true
+      }
+    }
+
+    on count_total_capabilities {
+      set ::count_request = $1
+      
+      say "🔢 Counting total capabilities"
+      
+      set ::all_capabilities = []
+      
+      loop for ::agent in ::known_agents {
+        if ::agent.capabilities {
+          loop for ::capability in ::agent.capabilities {
+            if not ::capability in ::all_capabilities {
+              set ::all_capabilities = ::all_capabilities.push(::capability)
+            }
+          }
+        }
+      }
+      
+      emit azme.total_capabilities_counted with {
+        total_capabilities: ::all_capabilities.length,
+        capabilities: ::all_capabilities,
+        quantum_enhanced: true
+      }
+    }
+
+    # Agent registry monitoring
+    on azme.monitor_agent_registry {
+      set ::monitor_request = $1
+      
+      set ::registry_metrics = {
+        total_agents: ::known_agents.length,
+        agents_added: ::agents_added,
+        agents_removed: ::agents_removed,
+        online_agents: count_online_agents(),
+        offline_agents: count_offline_agents(),
+        average_trust_level: calculate_average_trust(),
+        total_capabilities: count_total_capabilities(),
+        quantum_enhanced: true
+      }
+      
+      emit azme.agent_registry_metrics with {
+        metrics: ::registry_metrics
+      }
+    }
+  }
+} 

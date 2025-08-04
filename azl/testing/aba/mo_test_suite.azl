@@ -1,0 +1,459 @@
+// MO Test Suite - Validation Component
+// Validates all core motivating operation behavior with simulated inputs
+
+component ::mo.test_suite {
+  init {
+    set ::test_status = "initializing"
+    set ::test_results = {}
+    set ::current_test = "none"
+    set ::test_phase = 0
+    set ::test_history = []
+    set ::simulation_data = {}
+    
+    emit "mo.test_suite.initializing" with { status: ::test_status }
+  }
+
+  behavior {
+    // Test suite initialization
+    listen for "mo.boot.ok" then {
+      set ::test_status = "ready"
+      emit "system.log" with "🧪 Starting MO Test Suite"
+      emit "mo.test.init"
+    }
+
+    // Initialize test sequence
+    listen for "mo.test.init" then {
+      set ::test_status = "running"
+      set ::current_test = "motivation_tracking"
+      set ::test_phase = 1
+      
+      emit "console.log" with { message: "🧪 Starting MO Test Sequence", timestamp: now() }
+      
+      // Start with motivation tracking test
+      run_motivation_tracking_test()
+    }
+
+    // Handle test validation
+    listen for "mo.test.validate" then {
+      validate_test_results()
+    }
+
+    // Handle test completion
+    listen for "test.results" then {
+      set ::test_results = ::test.results_data
+      emit "mo.test.complete" with ::test_results
+    }
+
+    // Handle test errors
+    listen for "test.error" then {
+      set ::error_data = ::test.error_data
+      emit "mo.test.error" with ::error_data
+    }
+
+    // Handle test timeout
+    listen for "test.timeout" then {
+      set ::timeout_data = ::test.timeout_data
+      emit "mo.test.timeout" with ::timeout_data
+    }
+
+    // Handle test reset
+    listen for "test.reset" then {
+      reset_test_suite()
+    }
+
+    // Handle specific test requests
+    listen for "test.motivation_tracking" then {
+      run_motivation_tracking_test()
+    }
+
+    listen for "test.eo_ao_detection" then {
+      run_eo_ao_detection_test()
+    }
+
+    listen for "test.prompt_generation" then {
+      run_prompt_generation_test()
+    }
+
+    listen for "test.goal_creation" then {
+      run_goal_creation_test()
+    }
+
+    listen for "test.drive_regulation" then {
+      run_drive_regulation_test()
+    }
+
+    listen for "test.integration" then {
+      run_integration_test()
+    }
+
+    // Handle test results collection
+    listen for "mo.test.results" then {
+      set ::results_data = ::mo.test.results_data
+      collect_test_results(::results_data)
+    }
+
+    // Handle test phase completion
+    listen for "test.phase.complete" then {
+      set ::phase_data = ::test.phase.complete_data
+      advance_test_phase(::phase_data)
+    }
+
+    // Handle test simulation events
+    listen for "simulation.user_response" then {
+      set ::simulation_data.user_response = ::simulation.user_response_data
+      emit "user.response" with ::simulation_data.user_response
+    }
+
+    listen for "simulation.reinforcement" then {
+      set ::simulation_data.reinforcement = ::simulation.reinforcement_data
+      emit "reinforcement.given" with ::simulation_data.reinforcement
+    }
+
+    listen for "simulation.food_provision" then {
+      set ::simulation_data.food = ::simulation.food_provision_data
+      emit "food.provided" with ::simulation_data.food
+    }
+
+    listen for "simulation.attention" then {
+      set ::simulation_data.attention = ::simulation.attention_data
+      emit "attention.received" with ::simulation_data.attention
+    }
+
+    listen for "simulation.interaction" then {
+      set ::simulation_data.interaction = ::simulation.interaction_data
+      emit "interaction.received" with ::simulation_data.interaction
+    }
+
+    listen for "simulation.praise" then {
+      set ::simulation_data.praise = ::simulation.praise_data
+      emit "praise.received" with ::simulation_data.praise
+    }
+
+    // Handle test completion
+    listen for "mo.test.complete" then {
+      set ::completion_data = ::mo.test.complete_data
+      finalize_test_suite(::completion_data)
+    }
+  }
+
+  memory {
+    test_status
+    test_results
+    current_test
+    test_phase
+    test_history
+    simulation_data
+  }
+
+  interface {
+    run_motivation_tracking_test
+    run_eo_ao_detection_test
+    run_prompt_generation_test
+    run_goal_creation_test
+    run_drive_regulation_test
+    run_integration_test
+    get_test_results
+    get_test_status
+    reset_test_suite
+  }
+}
+
+// Run motivation tracking test
+function run_motivation_tracking_test() {
+  set ::current_test = "motivation_tracking"
+  set ::test_phase = 1
+  
+  emit "console.log" with { message: "🧪 Testing Motivation Tracking", timestamp: now() }
+  
+  // Simulate EO (e.g., hunger)
+  emit "simulation.user_response" with {
+    "context": "food",
+    "response": "I'm hungry",
+    "timestamp": now()
+  }
+  
+  // Wait for processing
+  emit "system.delay" with { duration: 2 }
+  
+  // Simulate reinforcement
+  emit "simulation.reinforcement" with {
+    "type": "food",
+    "magnitude": "high",
+    "timestamp": now()
+  }
+  
+  // Wait for processing
+  emit "system.delay" with { duration: 3 }
+  
+  // Simulate user response
+  emit "simulation.user_response" with {
+    "context": "praise",
+    "response": "Thanks!",
+    "timestamp": now()
+  }
+  
+  // Validate results
+  emit "mo.test.validate"
+}
+
+// Run EO/AO detection test
+function run_eo_ao_detection_test() {
+  set ::current_test = "eo_ao_detection"
+  set ::test_phase = 2
+  
+  emit "console.log" with { message: "🧪 Testing EO/AO Detection", timestamp: now() }
+  
+  // Simulate high motivation (EO state)
+  emit "simulation.user_response" with {
+    "context": "interaction",
+    "response": "Let's play!",
+    "timestamp": now()
+  }
+  
+  // Wait for processing
+  emit "system.delay" with { duration: 2 }
+  
+  // Simulate low motivation (AO state)
+  emit "simulation.user_response" with {
+    "context": "idle",
+    "response": "I'm tired",
+    "timestamp": now()
+  }
+  
+  // Validate results
+  emit "mo.test.validate"
+}
+
+// Run prompt generation test
+function run_prompt_generation_test() {
+  set ::current_test = "prompt_generation"
+  set ::test_phase = 3
+  
+  emit "console.log" with { message: "🧪 Testing Prompt Generation", timestamp: now() }
+  
+  // Simulate EO state to trigger prompts
+  emit "simulation.user_response" with {
+    "context": "attention",
+    "response": "Look at me!",
+    "timestamp": now()
+  }
+  
+  // Wait for processing
+  emit "system.delay" with { duration: 2 }
+  
+  // Simulate another EO state
+  emit "simulation.user_response" with {
+    "context": "praise",
+    "response": "Good job!",
+    "timestamp": now()
+  }
+  
+  // Validate results
+  emit "mo.test.validate"
+}
+
+// Run goal creation test
+function run_goal_creation_test() {
+  set ::current_test = "goal_creation"
+  set ::test_phase = 4
+  
+  emit "console.log" with { message: "🧪 Testing Goal Creation", timestamp: now() }
+  
+  // Simulate EO states to trigger goal creation
+  emit "simulation.user_response" with {
+    "context": "interaction",
+    "response": "Engage me!",
+    "timestamp": now()
+  }
+  
+  // Wait for processing
+  emit "system.delay" with { duration: 2 }
+  
+  // Simulate attention EO
+  emit "simulation.user_response" with {
+    "context": "attention",
+    "response": "Pay attention!",
+    "timestamp": now()
+  }
+  
+  // Validate results
+  emit "mo.test.validate"
+}
+
+// Run drive regulation test
+function run_drive_regulation_test() {
+  set ::current_test = "drive_regulation"
+  set ::test_phase = 5
+  
+  emit "console.log" with { message: "🧪 Testing Drive Regulation", timestamp: now() }
+  
+  // Simulate user response to reset drives
+  emit "simulation.user_response" with {
+    "context": "general",
+    "response": "Hello!",
+    "timestamp": now()
+  }
+  
+  // Wait for processing
+  emit "system.delay" with { duration: 2 }
+  
+  // Simulate reinforcement to boost drives
+  emit "simulation.reinforcement" with {
+    "type": "praise",
+    "magnitude": "high",
+    "timestamp": now()
+  }
+  
+  // Wait for processing
+  emit "system.delay" with { duration: 2 }
+  
+  // Simulate food provision
+  emit "simulation.food_provision" with {
+    "type": "snack",
+    "quantity": "medium",
+    "timestamp": now()
+  }
+  
+  // Validate results
+  emit "mo.test.validate"
+}
+
+// Run integration test
+function run_integration_test() {
+  set ::current_test = "integration"
+  set ::test_phase = 6
+  
+  emit "console.log" with { message: "🧪 Testing MO Integration", timestamp: now() }
+  
+  // Simulate comprehensive interaction sequence
+  emit "simulation.user_response" with {
+    "context": "comprehensive",
+    "response": "Let's do everything!",
+    "timestamp": now()
+  }
+  
+  // Wait for processing
+  emit "system.delay" with { duration: 3 }
+  
+  // Simulate reinforcement
+  emit "simulation.reinforcement" with {
+    "type": "comprehensive",
+    "magnitude": "high",
+    "timestamp": now()
+  }
+  
+  // Wait for processing
+  emit "system.delay" with { duration: 3 }
+  
+  // Simulate food provision
+  emit "simulation.food_provision" with {
+    "type": "meal",
+    "quantity": "large",
+    "timestamp": now()
+  }
+  
+  // Wait for processing
+  emit "system.delay" with { duration: 3 }
+  
+  // Simulate attention
+  emit "simulation.attention" with {
+    "type": "eye_contact",
+    "duration": "sustained",
+    "timestamp": now()
+  }
+  
+  // Validate results
+  emit "mo.test.validate"
+}
+
+// Validate test results
+function validate_test_results() {
+  set ::validation_data = {
+    "mo_state": ::mo.tracker.current_state,
+    "goal_selected": ::goal.manager.active_goal,
+    "prompt_issued": ::prompting.agent.last_prompt,
+    "emotional_valence": ::mo.modulator.emotional_state,
+    "drive_levels": {
+      "hunger": ::mo.tracker.hunger_level,
+      "interaction": ::mo.tracker.value_map.interaction,
+      "attention": ::mo.tracker.value_map.attention,
+      "praise": ::mo.tracker.value_map.praise
+    },
+    "regulation_history": ::drive.regulator.regulation_history,
+    "test_phase": ::test_phase,
+    "current_test": ::current_test,
+    "timestamp": now()
+  }
+  
+  emit "test.results" with ::validation_data
+}
+
+// Collect test results
+function collect_test_results(results_data) {
+  store ::test_results from ::test_results.push({
+    test: ::current_test,
+    phase: ::test_phase,
+    results: results_data,
+    timestamp: now()
+  })
+  
+  emit "test.phase.complete" with {
+    test: ::current_test,
+    phase: ::test_phase,
+    results: results_data
+  }
+}
+
+// Advance test phase
+function advance_test_phase(phase_data) {
+  set ::test_phase = ::test_phase + 1
+  
+  branch when ::test_phase = 2 {
+    run_eo_ao_detection_test()
+  } else branch when ::test_phase = 3 {
+    run_prompt_generation_test()
+  } else branch when ::test_phase = 4 {
+    run_goal_creation_test()
+  } else branch when ::test_phase = 5 {
+    run_drive_regulation_test()
+  } else branch when ::test_phase = 6 {
+    run_integration_test()
+  } else {
+    // All tests complete
+    emit "mo.test.complete" with {
+      test_results: ::test_results,
+      total_tests: 6,
+      completed_tests: ::test_results.length,
+      timestamp: now()
+    }
+  }
+}
+
+// Reset test suite
+function reset_test_suite() {
+  set ::test_status = "ready"
+  set ::test_results = {}
+  set ::current_test = "none"
+  set ::test_phase = 0
+  set ::test_history = []
+  set ::simulation_data = {}
+  
+  emit "mo.test_suite.reset" with { timestamp: now() }
+}
+
+// Finalize test suite
+function finalize_test_suite(completion_data) {
+  set ::test_status = "complete"
+  
+  emit "console.log" with { 
+    message: "✅ MO Test Suite Complete", 
+    results: completion_data,
+    timestamp: now() 
+  }
+  
+  emit "mo.test_suite.complete" with completion_data
+}
+
+// Initialize the MO Test Suite
+set ::mo_test_suite = ::mo.test_suite
+emit "mo.test_suite.ready" with ::mo_test_suite.test_status 

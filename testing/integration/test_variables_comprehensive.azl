@@ -1,0 +1,27 @@
+let x = 42;
+say "x = ";
+say x;
+
+let y = "hello world";
+say "y = ";
+say y;
+
+let z = x;
+say "z = x = ";
+say z;
+
+let sum = x + 10;
+say "sum = x + 10 = ";
+say sum;
+
+let message = y + " from AZL!";
+say "message = ";
+say message;
+
+let flag = true;
+say "flag = ";
+say flag;
+
+let empty = null;
+say "empty = ";
+say empty; 

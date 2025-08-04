@@ -1,0 +1,81 @@
+# Simple AZL v2 Standard Library Demo
+
+# File operations
+let message = "Hello from AZL v2 Standard Library!"
+write_file("demo_output.txt", message)
+let read_message = read_file("demo_output.txt")
+say "📄 File content: " + read_message
+
+# String operations
+let text = "apple,banana,cherry,date"
+let fruits = split(text, ",")
+say "🍎 Split fruits: " + stringify(fruits)
+
+let joined = join(fruits, " | ")
+say "🔗 Joined: " + joined
+
+let replaced = replace(text, "banana", "orange")
+say "🔄 Replaced: " + replaced
+
+# Array operations
+let numbers = [1, 2, 3, 4, 5]
+say "📊 Original array: " + stringify(numbers)
+
+let pushed = push(numbers, 6)
+say "➕ After push: " + stringify(pushed)
+
+let popped = pop(pushed)
+say "➖ Popped value: " + stringify(popped)
+
+let sliced = slice(numbers, 1, 3)
+say "✂️ Slice [1:3]: " + stringify(sliced)
+
+# Math operations
+let x = -5.7
+let y = 16.0
+let z = 2.5
+
+say "🔢 Math operations:"
+say "  abs(" + stringify(x) + ") = " + stringify(abs(x))
+say "  sqrt(" + stringify(y) + ") = " + stringify(sqrt(y))
+say "  pow(" + stringify(z) + ", 3) = " + stringify(pow(z, 3))
+
+# Trigonometry
+let angle = 0.5
+say "📐 Trigonometry:"
+say "  sin(" + stringify(angle) + ") = " + stringify(sin(angle))
+say "  cos(" + stringify(angle) + ") = " + stringify(cos(angle))
+say "  tan(" + stringify(angle) + ") = " + stringify(tan(angle))
+
+# Logarithms and exponentials
+let num = 2.718
+say "📈 Logarithms:"
+say "  ln(" + stringify(num) + ") = " + stringify(log(num))
+say "  e^" + stringify(z) + " = " + stringify(exp(z))
+
+# Rounding
+let pi = 3.14159
+say "🔢 Rounding:"
+say "  floor(" + stringify(pi) + ") = " + stringify(floor(pi))
+say "  ceil(" + stringify(pi) + ") = " + stringify(ceil(pi))
+say "  round(" + stringify(pi) + ") = " + stringify(round(pi))
+
+# Min/Max
+say "⚖️ Min/Max:"
+say "  min(5, 3) = " + stringify(min(5, 3))
+say "  max(5, 3) = " + stringify(max(5, 3))
+
+# Random and time
+let random_num = random()
+let current_time = now()
+
+say "🎲 Random number: " + stringify(round(random_num * 100) / 100)
+say "⏰ Current timestamp: " + stringify(current_time)
+
+# Type checking
+say "🔍 Type checking:"
+say "  typeof('hello') = " + typeof("hello")
+say "  typeof(42) = " + typeof(42)
+say "  typeof([1,2,3]) = " + typeof([1, 2, 3])
+
+say "\n✅ AZL v2 Standard Library Demo Complete!" 

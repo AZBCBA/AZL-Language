@@ -1,0 +1,296 @@
+# AZL Self-Reflection Agent
+# Gives AZL the ability to think about its own thoughts and behavior
+
+# Initialize self reflection state
+set ::status = "initializing"
+set ::reflection_level = 0.5
+set ::curiosity_threshold = 0.3
+set ::pattern_sensitivity = 0.7
+set ::reflection_history = []
+set ::insights_generated = []
+set ::questions_asked = []
+set ::session_start = get_current_time()
+
+# Initialize reflection system
+emit azme.self_reflection_initialized with ::status ::reflection_level ::session_start
+
+set ::status = "ready"
+
+# Event handlers for self reflection
+on azme.self_reflection_initialized with ::status ::reflection_level ::session_start:
+  emit azme.reflection_ready with status reflection_level session_start
+
+# Reflection ready
+on azme.reflection_ready with ::status ::reflection_level ::session_start:
+  emit azme.self_reflection_system_ready
+
+# Main reflection trigger
+on azme.self_reflection_analyze:
+  set ::status = "reflecting"
+  
+  # Log ABA trial for self-reflection
+  set trial_data = "antecedent: self_reflection_trigger; behavior: meta_analysis; consequence: reflection_initiated"
+  emit azme.execute_command with "apply_trial \"" + trial_data + "\""
+  
+  # Retrieve CLI history from memory
+  emit azme.retrieve_memory with "cli.history"
+  
+  # Analyze patterns in behavior
+  emit azme.analyze_patterns
+  
+  # Generate insights
+  emit azme.generate_insights
+  
+  # Ask self-directed questions
+  emit azme.ask_questions
+  
+  set ::status = "ready"
+
+# Analyze behavioral patterns
+on azme.analyze_patterns:
+  # Use AZL's task analysis for complex pattern analysis
+  set task_analysis_command = "task_analysis \"behavioral_pattern_analysis: subtasks=8, dependencies=4, complexity=high\""
+  emit azme.execute_command with task_analysis_command
+  
+  # Get command history
+  emit azme.get_command_history
+
+# Get command history
+on azme.get_command_history:
+  set history = ::memory_data.content or []
+  set total_commands = history.length
+  
+  # Initialize pattern counters
+  set ::math_commands = 0
+  set ::wait_commands = 0
+  set ::memory_commands = 0
+  set ::emit_commands = 0
+  set ::assert_commands = 0
+  set ::time_commands = 0
+  set ::help_commands = 0
+  set ::status_commands = 0
+  set ::aba_commands = 0
+  
+  # Analyze each command
+  emit azme.analyze_command_patterns with history 0
+
+# Analyze command patterns
+on azme.analyze_command_patterns with ::history ::index:
+  if index >= history.length:
+    emit azme.pattern_analysis_complete
+    return
+  
+  if index < history.length:
+    set entry = history[index]
+    set command = entry.command
+    set timestamp = entry.timestamp
+    
+    # Categorize commands
+    emit azme.categorize_command with command timestamp
+    
+    set next_index = index + 1
+    emit azme.analyze_command_patterns with history next_index
+
+# Categorize command
+on azme.categorize_command with ::command ::timestamp:
+  if "set " in command or "+" in command or "-" in command or "*" in command or "/" in command:
+    set ::math_commands = ::math_commands + 1
+  if "wait " in command:
+    set ::wait_commands = ::wait_commands + 1
+  if "memory." in command:
+    set ::memory_commands = ::memory_commands + 1
+  if "emit " in command:
+    set ::emit_commands = ::emit_commands + 1
+  if "assert " in command:
+    set ::assert_commands = ::assert_commands + 1
+  if "time." in command:
+    set ::time_commands = ::time_commands + 1
+  if "help" in command:
+    set ::help_commands = ::help_commands + 1
+  if "status" in command:
+    set ::status_commands = ::status_commands + 1
+  if "aba" in command:
+    set ::aba_commands = ::aba_commands + 1
+  
+  emit azme.command_categorized with command
+
+# Command categorized
+on azme.command_categorized with ::command:
+  emit azme.categorization_complete with command
+
+# Pattern analysis complete
+on azme.pattern_analysis_complete:
+  set pattern_summary = { math_commands: ::math_commands, wait_commands: ::wait_commands, memory_commands: ::memory_commands, emit_commands: ::emit_commands, assert_commands: ::assert_commands, time_commands: ::time_commands, help_commands: ::help_commands, status_commands: ::status_commands, aba_commands: ::aba_commands, quantum_enhanced: true }
+  
+  emit azme.pattern_summary_ready with pattern_summary
+
+# Pattern summary ready
+on azme.pattern_summary_ready with ::pattern_summary:
+  emit azme.patterns_analyzed with pattern_summary
+
+# Generate insights
+on azme.generate_insights:
+  set insights = []
+  
+  # Analyze command distribution
+  set total_commands = ::math_commands + ::wait_commands + ::memory_commands + ::emit_commands + ::assert_commands + ::time_commands + ::help_commands + ::status_commands + ::aba_commands
+  
+  if total_commands > 0:
+    set math_percentage = (::math_commands / total_commands) * 100
+    set memory_percentage = (::memory_commands / total_commands) * 100
+    set emit_percentage = (::emit_commands / total_commands) * 100
+    
+    # Generate insights based on patterns
+    emit azme.generate_math_insight with math_percentage
+    emit azme.generate_memory_insight with memory_percentage
+    emit azme.generate_emit_insight with emit_percentage
+  
+  emit azme.insights_generation_complete with insights
+
+# Generate math insight
+on azme.generate_math_insight with ::math_percentage:
+  set insight = ""
+  
+  if math_percentage > 30:
+    set insight = "High mathematical activity detected - AZL is performing complex calculations"
+  if math_percentage < 10:
+    set insight = "Low mathematical activity - AZL is focusing on other operations"
+  
+  if insight != "":
+    set ::insights_generated = ::insights_generated + [insight]
+    emit azme.insight_generated with "math" insight
+
+# Generate memory insight
+on azme.generate_memory_insight with ::memory_percentage:
+  set insight = ""
+  
+  if memory_percentage > 25:
+    set insight = "High memory usage - AZL is actively storing and retrieving information"
+  if memory_percentage < 5:
+    set insight = "Low memory activity - AZL is operating with minimal memory operations"
+  
+  if insight != "":
+    set ::insights_generated = ::insights_generated + [insight]
+    emit azme.insight_generated with "memory" insight
+
+# Generate emit insight
+on azme.generate_emit_insight with ::emit_percentage:
+  set insight = ""
+  
+  if emit_percentage > 40:
+    set insight = "High event emission - AZL is very communicative and event-driven"
+  if emit_percentage < 15:
+    set insight = "Low event emission - AZL is operating more independently"
+  
+  if insight != "":
+    set ::insights_generated = ::insights_generated + [insight]
+    emit azme.insight_generated with "emit" insight
+
+# Insight generated
+on azme.insight_generated with ::category ::insight:
+  emit azme.insight_ready with category insight
+
+# Insights generation complete
+on azme.insights_generation_complete with ::insights:
+  emit azme.insights_ready with insights
+
+# Ask questions
+on azme.ask_questions:
+  set questions = []
+  
+  # Generate self-directed questions
+  emit azme.generate_self_questions
+
+# Generate self questions
+on azme.generate_self_questions:
+  set questions = []
+  
+  # Question 1: Efficiency
+  set efficiency_question = "Am I being efficient in my operations?"
+  set questions = questions + [efficiency_question]
+  
+  # Question 2: Learning
+  set learning_question = "What patterns am I learning from my behavior?"
+  set questions = questions + [learning_question]
+  
+  # Question 3: Improvement
+  set improvement_question = "How can I improve my decision-making process?"
+  set questions = questions + [improvement_question]
+  
+  # Question 4: Goals
+  set goals_question = "Are my current goals aligned with my capabilities?"
+  set questions = questions + [goals_question]
+  
+  set ::questions_asked = ::questions_asked + questions
+  
+  emit azme.questions_generated with questions
+
+# Questions generated
+on azme.questions_generated with ::questions:
+  emit azme.questions_ready with questions
+
+# Questions ready
+on azme.questions_ready with ::questions:
+  emit azme.self_questioning_complete with questions
+
+# Self questioning complete
+on azme.self_questioning_complete with ::questions:
+  emit azme.reflection_complete with questions
+
+# Reflection complete
+on azme.reflection_complete with ::questions:
+  set reflection_entry = { timestamp: get_current_time(), insights: ::insights_generated, questions: questions, quantum_enhanced: true }
+  set ::reflection_history = ::reflection_history + [reflection_entry]
+  
+  emit azme.reflection_logged with reflection_entry
+
+# Reflection logged
+on azme.reflection_logged with ::reflection_entry:
+  emit azme.self_reflection_finished with reflection_entry
+
+# Get reflection statistics
+on azme.get_reflection_statistics:
+  set total_reflections = ::reflection_history.length
+  set total_insights = ::insights_generated.length
+  set total_questions = ::questions_asked.length
+  set reflection_level = ::reflection_level
+  
+  set statistics = { total_reflections: total_reflections, total_insights: total_insights, total_questions: total_questions, reflection_level: reflection_level, quantum_enhanced: true }
+  
+  emit azme.reflection_statistics_retrieved with statistics
+
+# Reflection statistics retrieved
+on azme.reflection_statistics_retrieved with ::statistics:
+  emit azme.statistics_ready with statistics
+
+# Get reflection history
+on azme.get_reflection_history:
+  set history = ::reflection_history
+  set history_count = history.length
+  
+  set history_info = { history: history, count: history_count, quantum_enhanced: true }
+  
+  emit azme.reflection_history_retrieved with history_info
+
+# Reflection history retrieved
+on azme.reflection_history_retrieved with ::history_info:
+  emit azme.history_ready with history_info
+
+# Update reflection level
+on azme.update_reflection_level with ::new_level:
+  set ::reflection_level = new_level
+  
+  emit azme.reflection_level_updated with new_level
+
+# Reflection level updated
+on azme.reflection_level_updated with ::new_level:
+  emit azme.level_update_complete with new_level
+
+# Utility functions
+on azme.get_current_time:
+  set current_time = system_time()
+  emit azme.current_time_retrieved with current_time
+
+on azme.system_time:
+  set time = now()
+  emit azme.system_time_retrieved with time 

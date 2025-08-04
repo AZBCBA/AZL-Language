@@ -1,0 +1,69 @@
+# Data Processor Demo - AZL v2 Standard Library Showcase
+
+# Create sample data
+let data = [
+  { name: "Alice", age: 25, score: 85.5 },
+  { name: "Bob", age: 30, score: 92.3 },
+  { name: "Charlie", age: 28, score: 78.9 },
+  { name: "Diana", age: 35, score: 95.1 },
+  { name: "Eve", age: 22, score: 88.7 }
+]
+
+# Process and analyze the data
+let total_score = 0
+let ages = []
+let names = []
+
+loop for person in data {
+  set total_score = total_score + person.score
+  set ages = push(ages, person.age)
+  set names = push(names, person.name)
+}
+
+let average_score = total_score / length(data)
+
+# Find min and max ages
+let age1 = ages[0]
+let age2 = ages[1]
+let age3 = ages[2]
+let age4 = ages[3]
+let age5 = ages[4]
+
+let max_age = max(age1, max(age2, max(age3, max(age4, age5))))
+let min_age = min(age1, min(age2, min(age3, min(age4, age5))))
+
+# Generate report
+let report = "Data Analysis Report\n"
+let report = report + "==================\n"
+let report = report + "Total records: " + stringify(length(data)) + "\n"
+let report = report + "Average score: " + stringify(round(average_score * 100) / 100) + "\n"
+let report = report + "Age range: " + stringify(min_age) + " - " + stringify(max_age) + "\n"
+let report = report + "Names: " + join(names, ", ")
+
+# Save report to file
+write_file("analysis_report.txt", report)
+
+# Display results
+say "📊 Data Analysis Complete!"
+say "📄 Report saved to: analysis_report.txt"
+say "📈 Average Score: " + stringify(round(average_score * 100) / 100)
+say "👥 Participants: " + join(names, ", ")
+
+# Mathematical demonstration
+say "\n🧮 Mathematical Operations:"
+let pi = 3.14159
+say "Pi: " + stringify(pi)
+say "Pi rounded: " + stringify(round(pi))
+say "Sin(pi/2): " + stringify(sin(pi / 2))
+say "Cos(pi): " + stringify(cos(pi))
+
+# Random number generation
+say "\n🎲 Random Numbers:"
+let random1 = random()
+let random2 = random()
+say "Random 1: " + stringify(round(random1 * 100) / 100)
+say "Random 2: " + stringify(round(random2 * 100) / 100)
+
+# Current timestamp
+let timestamp = now()
+say "\n⏰ Current timestamp: " + stringify(timestamp) 

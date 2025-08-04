@@ -1,0 +1,273 @@
+# AZME Optimizer Feedback Loop
+# Manages feedback comparison, component mutation, and path restructuring strategies
+
+# State variables for feedback processing
+set ::feedback_comparison_history = {}
+set ::component_mutation_history = {}
+set ::restructuring_strategies = {}
+set ::feedback_accuracy_scores = {}
+set ::simulation_vs_reality_gaps = {}
+set ::optimization_effectiveness = {}
+
+# Event handlers for feedback processing
+on azme.compare_path_performance with ::comparison_data:
+  set path_a = comparison_data.path_a
+  set path_b = comparison_data.path_b
+  set metric = comparison_data.metric or "score"
+  
+  # Get metrics for both paths
+  set score_a = get_path_metric(path_a, metric)
+  set score_b = get_path_metric(path_b, metric)
+  
+  # Determine winner
+  set winner = if score_a > score_b then path_a else path_b
+  set improvement = score_b - score_a
+  
+  set comparison_result = { path_a: path_a, path_b: path_b, score_a: score_a, score_b: score_b, winner: winner, improvement: improvement }
+  
+  # Store comparison history
+  if not path_a in ::feedback_comparison_history:
+    set ::feedback_comparison_history[path_a] = []
+  set ::feedback_comparison_history[path_a] = ::feedback_comparison_history[path_a] + [comparison_result]
+  
+  emit azme.path_comparison_completed with comparison_result
+
+on azme.get_path_metric with ::metric_data:
+  set path = metric_data.path
+  set metric = metric_data.metric
+  
+  set metric_value = 0
+  
+  if metric == "score":
+    set metric_value = ::execution_score_map[path] or 0
+  
+  if metric == "success_rate":
+    set metric_value = ::path_success_rates[path] or 0
+  
+  if metric == "complexity":
+    set metric_value = ::path_complexity_scores[path] or 0
+  
+  emit azme.path_metric_retrieved with { path: path, metric: metric, value: metric_value }
+
+on azme.mutate_component with ::mutation_data:
+  set component = mutation_data.component
+  set mutation_type = mutation_data.mutation_type or "optimize"
+  
+  set mutated_component = component
+  
+  # Apply mutations based on type
+  if mutation_type == "optimize":
+    set mutated_component = optimize_component(component)
+  
+  if mutation_type == "simplify":
+    set mutated_component = simplify_component(component)
+  
+  if mutation_type == "enhance":
+    set mutated_component = enhance_component(component)
+  
+  # Store mutation history
+  if not component in ::component_mutation_history:
+    set ::component_mutation_history[component] = []
+  set ::component_mutation_history[component] = ::component_mutation_history[component] + [mutated_component]
+  
+  emit azme.component_mutated with { original: component, mutated: mutated_component, type: mutation_type }
+
+on azme.optimize_component with ::optimize_data:
+  set component = optimize_data.component
+  
+  set optimized = component
+  
+  # Component optimization rules
+  if component == "mistral":
+    set optimized = "deepseek"
+  
+  if component == "formatter":
+    set optimized = "memory_writer"
+  
+  if component == "math_engine":
+    set optimized = "quantum_math_engine"
+  
+  if component == "simple_processor":
+    set optimized = "neural_processor"
+  
+  emit azme.component_optimized with { original: component, optimized: optimized }
+
+on azme.simplify_component with ::simplify_data:
+  set component = simplify_data.component
+  
+  set simplified = component
+  
+  # Component simplification rules
+  if component == "quantum_math_engine":
+    set simplified = "math_engine"
+  
+  if component == "neural_processor":
+    set simplified = "simple_processor"
+  
+  if component == "memory_writer":
+    set simplified = "formatter"
+  
+  emit azme.component_simplified with { original: component, simplified: simplified }
+
+on azme.enhance_component with ::enhance_data:
+  set component = enhance_data.component
+  
+  set enhanced = component
+  
+  # Component enhancement rules
+  if component == "math_engine":
+    set enhanced = "quantum_math_engine"
+  
+  if component == "simple_processor":
+    set enhanced = "neural_processor"
+  
+  if component == "formatter":
+    set enhanced = "memory_writer"
+  
+  emit azme.component_enhanced with { original: component, enhanced: enhanced }
+
+on azme.apply_restructuring_strategy with ::strategy_data:
+  set path = strategy_data.path
+  set strategy = strategy_data.strategy
+  set reason = strategy_data.reason
+  
+  set restructured_path = path
+  
+  # Apply different restructuring strategies
+  if strategy == "component_replacement":
+    set restructured_path = apply_component_replacement(path)
+  
+  if strategy == "path_simplification":
+    set restructured_path = apply_path_simplification(path)
+  
+  if strategy == "path_enhancement":
+    set restructured_path = apply_path_enhancement(path)
+  
+  # Store strategy history
+  if not path in ::restructuring_strategies:
+    set ::restructuring_strategies[path] = []
+  set ::restructuring_strategies[path] = ::restructuring_strategies[path] + [strategy]
+  
+  emit azme.restructuring_strategy_applied with { original_path: path, new_path: restructured_path, strategy: strategy, reason: reason }
+
+on azme.apply_component_replacement with ::replacement_data:
+  set path = replacement_data.path
+  
+  # Decompose path and replace components
+  set components = []
+  set current = ""
+  emit azme.decompose_for_replacement with { path: path, components: components, current: current, index: 0 }
+
+on azme.decompose_for_replacement with ::decompose_data:
+  set path = decompose_data.path
+  set components = decompose_data.components
+  set current = decompose_data.current
+  set index = decompose_data.index
+  
+  if index >= path.length:
+    set components = components + [current]
+    emit azme.replace_components with { components: components, index: 0, replaced_components: [] }
+  
+  if index < path.length:
+    set char = path[index]
+    if char == "+":
+      set new_components = components + [current]
+      set new_current = ""
+      set next_index = index + 1
+      emit azme.decompose_for_replacement with { path: path, components: new_components, current: new_current, index: next_index }
+    
+    if char != "+":
+      set new_current = current + char
+      set next_index = index + 1
+      emit azme.decompose_for_replacement with { path: path, components: components, current: new_current, index: next_index }
+
+on azme.replace_components with ::replace_data:
+  set components = replace_data.components
+  set index = replace_data.index
+  set replaced_components = replace_data.replaced_components or []
+  
+  if index >= components.length:
+    emit azme.reassemble_replaced_path with { replaced_components: replaced_components, index: 0, new_path: "" }
+  
+  if index < components.length:
+    set component = components[index]
+    emit azme.replace_single_component with { component: component, components: components, index: index, replaced_components: replaced_components }
+
+on azme.replace_single_component with ::single_data:
+  set component = single_data.component
+  set components = single_data.components
+  set index = single_data.index
+  set replaced_components = single_data.replaced_components
+  
+  set replaced = component
+  
+  # Apply replacement rules
+  if component == "mistral":
+    set replaced = "deepseek"
+  
+  if component == "formatter":
+    set replaced = "memory_writer"
+  
+  if component == "math_engine":
+    set replaced = "quantum_math_engine"
+  
+  set new_replaced = replaced_components + [replaced]
+  set next_index = index + 1
+  emit azme.replace_components with { components: components, index: next_index, replaced_components: new_replaced }
+
+on azme.reassemble_replaced_path with ::reassemble_data:
+  set replaced_components = reassemble_data.replaced_components
+  set index = reassemble_data.index
+  set new_path = reassemble_data.new_path
+  
+  if index >= replaced_components.length:
+    emit azme.path_replacement_completed with { new_path: new_path }
+  
+  if index < replaced_components.length:
+    set component = replaced_components[index]
+    set path_part = if index > 0 then "+" + component else component
+    set updated_path = new_path + path_part
+    set next_index = index + 1
+    emit azme.reassemble_replaced_path with { replaced_components: replaced_components, index: next_index, new_path: updated_path }
+
+on azme.apply_path_simplification with ::simplify_data:
+  set path = simplify_data.path
+  
+  # Simplify path by reducing complexity
+  set simplified_path = path
+  
+  # Replace complex components with simpler ones
+  if "quantum_math_engine" in path:
+    set simplified_path = replace_in_string(path, "quantum_math_engine", "math_engine")
+  
+  if "neural_processor" in path:
+    set simplified_path = replace_in_string(path, "neural_processor", "simple_processor")
+  
+  emit azme.path_simplification_completed with { original_path: path, simplified_path: simplified_path }
+
+on azme.apply_path_enhancement with ::enhance_data:
+  set path = enhance_data.path
+  
+  # Enhance path by adding more powerful components
+  set enhanced_path = path
+  
+  # Replace simple components with enhanced ones
+  if "math_engine" in path:
+    set enhanced_path = replace_in_string(path, "math_engine", "quantum_math_engine")
+  
+  if "simple_processor" in path:
+    set enhanced_path = replace_in_string(path, "simple_processor", "neural_processor")
+  
+  emit azme.path_enhancement_completed with { original_path: path, enhanced_path: enhanced_path }
+
+on azme.replace_in_string with ::replace_data:
+  set original = replace_data.original
+  set old_text = replace_data.old_text
+  set new_text = replace_data.new_text
+  
+  # Simple string replacement
+  set result = original
+  if old_text in result:
+    set result = new_text
+  
+  emit azme.string_replacement_completed with { original: original, result: result } 

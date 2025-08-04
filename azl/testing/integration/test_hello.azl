@@ -1,0 +1,28 @@
+component ::hello.bot {
+  init {
+    set ::name = AZME
+    say Hello from ::name!
+    emit greet.user
+  }
+
+  behavior {
+    listen for greet.user {
+      say Welcome, human. I am here.
+      emit mo.boot.start
+    }
+  }
+}
+
+component ::mo.tracker {
+  init {
+    set ::status = ready
+    say MO Tracker initialized with status: ::status
+  }
+
+  behavior {
+    listen for mo.boot.start {
+      say MO Tracker received boot start event
+      emit mo.tracker.initialized
+    }
+  }
+} 

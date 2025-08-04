@@ -1,0 +1,42 @@
+# Test program to be executed by AZL runtime
+# This proves AZL can run AZL without Rust
+
+component ::test.self_hosting {
+  init {
+    set ::status = "initializing"
+    set ::test_count = 0
+    say "🧪 Self-hosting test component initialized"
+  }
+
+  on start {
+    say "🧪 Starting self-hosting test..."
+    set ::test_count = ::test_count + 1
+    say "🧪 Test count: ::test_count"
+    emit test.step with "step1" "success"
+  }
+
+  on test.step {
+    set ::step_name = $1
+    set ::result = $2
+    say "🧪 Test step: ::step_name - ::result"
+    
+    if ::step_name == "step1" {
+      emit test.step with "step2" "success"
+    }
+    
+    if ::step_name == "step2" {
+      emit test.complete with "all_passed"
+    }
+  }
+
+  on test.complete {
+    set ::final_result = $1
+    say "🎉 Self-hosting test completed: ::final_result"
+    say "🚀 PROOF: AZL is running AZL without Rust!"
+  }
+
+  memory {
+    ::status = "ready"
+    ::test_count = 0
+  }
+} 

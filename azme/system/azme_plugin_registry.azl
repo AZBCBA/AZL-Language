@@ -1,0 +1,432 @@
+# AZME Plugin Registry
+# Tool metadata and execution rules
+
+component ::azme.plugin_registry {
+  init {
+    set ::plugin_registry = {
+      summarizer: {
+        type: "python",
+        path: "/tools/summarizer.py",
+        description: "Summarizes input text",
+        version: "1.0",
+        author: "AZME Tools",
+        license: "MIT",
+        permissions: ["read_files", "process_text"],
+        timeout: 30,
+        sandboxed: true,
+        dependencies: ["nltk", "textblob"],
+        input_format: "text",
+        output_format: "text",
+        max_input_size: 10000,
+        tags: ["text_processing", "summarization"]
+      },
+      translate_ar: {
+        type: "bash",
+        path: "/tools/translate_ar.sh",
+        description: "Translates text to Arabic",
+        version: "1.0",
+        author: "AZME Tools",
+        license: "MIT",
+        permissions: ["read_files", "process_text"],
+        timeout: 15,
+        sandboxed: true,
+        dependencies: ["curl", "jq"],
+        input_format: "text",
+        output_format: "text",
+        max_input_size: 5000,
+        tags: ["translation", "arabic"]
+      },
+      hash_file: {
+        type: "binary",
+        path: "/tools/hash_file",
+        description: "SHA256 hashing tool",
+        version: "1.0",
+        author: "AZME Tools",
+        license: "MIT",
+        permissions: ["read_files", "file_operations"],
+        timeout: 10,
+        sandboxed: true,
+        dependencies: [],
+        input_format: "file",
+        output_format: "hash",
+        max_file_size: 1000000,
+        tags: ["security", "hashing"]
+      },
+      data_analyzer: {
+        type: "python",
+        path: "/tools/data_analyzer.py",
+        description: "Analyzes data files and generates reports",
+        version: "1.0",
+        author: "AZME Tools",
+        license: "MIT",
+        permissions: ["read_files", "process_data"],
+        timeout: 60,
+        sandboxed: true,
+        dependencies: ["pandas", "numpy", "matplotlib"],
+        input_format: "csv",
+        output_format: "json",
+        max_file_size: 50000000,
+        tags: ["data_analysis", "reporting"]
+      },
+      image_processor: {
+        type: "python",
+        path: "/tools/image_processor.py",
+        description: "Processes and analyzes images",
+        version: "1.0",
+        author: "AZME Tools",
+        license: "MIT",
+        permissions: ["read_files", "process_images"],
+        timeout: 45,
+        sandboxed: true,
+        dependencies: ["opencv-python", "pillow"],
+        input_format: "image",
+        output_format: "json",
+        max_file_size: 10000000,
+        tags: ["image_processing", "computer_vision"]
+      }
+    }
+    set ::execution_rules = {
+      default_timeout: 30,
+      max_concurrent_plugins: 5,
+      sandbox_mode: true,
+      allow_network_access: false,
+      allow_file_write: false,
+      allow_system_commands: false,
+      memory_limit: 512,
+      cpu_limit: 50
+    }
+    set ::registry_count = 0
+    set ::successful_registrations = 0
+    set ::failed_registrations = 0
+  }
+
+  behavior {
+    on get_plugin_config {
+      set ::config_request = $1
+      set ::plugin_id = ::config_request.plugin_id
+      
+      say "📋 Getting plugin configuration for: " + ::plugin_id
+      
+      if ::plugin_id in ::plugin_registry {
+        set ::config = ::plugin_registry[::plugin_id]
+        
+        emit azme.plugin_config_retrieved with {
+          plugin_id: ::plugin_id,
+          config: ::config
+        }
+      } else {
+        emit azme.plugin_config_not_found with {
+          plugin_id: ::plugin_id
+        }
+      }
+    }
+
+    on register_plugin {
+      set ::registration_request = $1
+      set ::plugin_id = ::registration_request.plugin_id
+      set ::plugin_config = ::registration_request.plugin_config
+      
+      say "📝 Registering plugin in registry: " + ::plugin_id
+      
+      if ::plugin_id in ::plugin_registry {
+        set ::registration_result = {
+          plugin_id: ::plugin_id,
+          success: false,
+          reason: "plugin_already_exists",
+          quantum_enhanced: true
+        }
+        set ::failed_registrations = ::failed_registrations + 1
+      } else {
+        # Validate plugin configuration
+        set ::validation = validate_plugin_config(::plugin_config)
+        
+        if ::validation.valid {
+          # Add plugin to registry
+          set ::plugin_registry[::plugin_id] = ::plugin_config
+          
+          set ::registration_result = {
+            plugin_id: ::plugin_id,
+            success: true,
+            reason: "plugin_registered",
+            validation: ::validation,
+            quantum_enhanced: true
+          }
+          set ::successful_registrations = ::successful_registrations + 1
+        } else {
+          set ::registration_result = {
+            plugin_id: ::plugin_id,
+            success: false,
+            reason: "invalid_configuration",
+            validation_errors: ::validation.errors,
+            quantum_enhanced: true
+          }
+          set ::failed_registrations = ::failed_registrations + 1
+        }
+      }
+      
+      set ::registry_count = ::registry_count + 1
+      
+      emit azme.plugin_registered with {
+        plugin_id: ::plugin_id,
+        result: ::registration_result
+      }
+    }
+
+    on validate_plugin_config {
+      set ::validation_request = $1
+      set ::config = ::validation_request.config
+      
+      say "🔍 Validating plugin configuration"
+      
+      set ::validation = {
+        valid: true,
+        errors: [],
+        warnings: [],
+        quantum_enhanced: true
+      }
+      
+      # Check required fields
+      set ::required_fields = ["type", "path", "description", "permissions", "timeout"]
+      loop for ::field in ::required_fields {
+        if not ::field in ::config {
+          set ::validation.valid = false
+          set ::validation.errors = ::validation.errors.push("Missing required field: " + ::field)
+        }
+      }
+      
+      # Check plugin type
+      set ::valid_types = ["python", "bash", "binary", "rust"]
+      if ::config.type and not ::config.type in ::valid_types {
+        set ::validation.valid = false
+        set ::validation.errors = ::validation.errors.push("Invalid plugin type: " + ::config.type)
+      }
+      
+      # Check timeout limits
+      if ::config.timeout and ::config.timeout > ::execution_rules.default_timeout * 3 {
+        set ::validation.warnings = ::validation.warnings.push("Timeout exceeds recommended limit")
+      }
+      
+      # Check permissions
+      set ::valid_permissions = ["read_files", "process_text", "process_data", "process_images", "file_operations", "network_access"]
+      if ::config.permissions {
+        loop for ::permission in ::config.permissions {
+          if not ::permission in ::valid_permissions {
+            set ::validation.warnings = ::validation.warnings.push("Unknown permission: " + ::permission)
+          }
+        }
+      }
+      
+      emit azme.plugin_config_validated with {
+        config: ::config,
+        validation: ::validation
+      }
+    }
+
+    on update_plugin_config {
+      set ::update_request = $1
+      set ::plugin_id = ::update_request.plugin_id
+      set ::updates = ::update_request.updates
+      
+      say "📝 Updating plugin configuration: " + ::plugin_id
+      
+      if ::plugin_id in ::plugin_registry {
+        set ::current_config = ::plugin_registry[::plugin_id]
+        
+        # Apply updates
+        loop for ::key in ::updates.keys() {
+          set ::current_config[::key] = ::updates[::key]
+        }
+        
+        # Validate updated configuration
+        set ::validation = validate_plugin_config(::current_config)
+        
+        if ::validation.valid {
+          set ::plugin_registry[::plugin_id] = ::current_config
+          
+          set ::update_result = {
+            plugin_id: ::plugin_id,
+            success: true,
+            reason: "plugin_config_updated",
+            validation: ::validation,
+            quantum_enhanced: true
+          }
+        } else {
+          set ::update_result = {
+            plugin_id: ::plugin_id,
+            success: false,
+            reason: "invalid_configuration",
+            validation_errors: ::validation.errors,
+            quantum_enhanced: true
+          }
+        }
+      } else {
+        set ::update_result = {
+          plugin_id: ::plugin_id,
+          success: false,
+          reason: "plugin_not_found",
+          quantum_enhanced: true
+        }
+      }
+      
+      emit azme.plugin_config_updated with {
+        plugin_id: ::plugin_id,
+        result: ::update_result
+      }
+    }
+
+    on search_plugins {
+      set ::search_request = $1
+      set ::query = ::search_request.query
+      set ::tags = ::search_request.tags or []
+      set ::type_filter = ::search_request.type_filter or null
+      
+      say "🔍 Searching plugins with query: " + ::query
+      
+      set ::search_results = []
+      
+      loop for ::plugin_id in ::plugin_registry.keys() {
+        set ::plugin_config = ::plugin_registry[::plugin_id]
+        set ::match_score = 0
+        
+        # Check query match
+        if ::query and (::plugin_id.contains(::query) or ::plugin_config.description.contains(::query)) {
+          set ::match_score = ::match_score + 2
+        }
+        
+        # Check tag match
+        if ::tags.length > 0 {
+          loop for ::tag in ::tags {
+            if ::tag in ::plugin_config.tags {
+              set ::match_score = ::match_score + 1
+            }
+          }
+        }
+        
+        # Check type filter
+        if ::type_filter and ::plugin_config.type == ::type_filter {
+          set ::match_score = ::match_score + 1
+        }
+        
+        if ::match_score > 0 {
+          set ::search_result = {
+            plugin_id: ::plugin_id,
+            config: ::plugin_config,
+            match_score: ::match_score,
+            quantum_enhanced: true
+          }
+          set ::search_results = ::search_results.push(::search_result)
+        }
+      }
+      
+      # Sort by match score
+      set ::search_results = ::search_results.sort_by("match_score", "desc")
+      
+      emit azme.plugin_search_complete with {
+        query: ::query,
+        tags: ::tags,
+        type_filter: ::type_filter,
+        results: ::search_results,
+        total_matches: ::search_results.length
+      }
+    }
+
+    on get_execution_rules {
+      set ::rules_request = $1
+      
+      say "📋 Getting execution rules"
+      
+      emit azme.execution_rules_retrieved with {
+        rules: ::execution_rules,
+        quantum_enhanced: true
+      }
+    }
+
+    on update_execution_rules {
+      set ::update_request = $1
+      set ::updates = ::update_request.updates
+      
+      say "📝 Updating execution rules"
+      
+      # Apply updates
+      loop for ::key in ::updates.keys() {
+        set ::execution_rules[::key] = ::updates[::key]
+      }
+      
+      set ::update_result = {
+        success: true,
+        reason: "execution_rules_updated",
+        updated_rules: ::execution_rules,
+        quantum_enhanced: true
+      }
+      
+      emit azme.execution_rules_updated with {
+        result: ::update_result
+      }
+    }
+
+    on get_plugin_statistics {
+      set ::stats_request = $1
+      set ::plugin_id = ::stats_request.plugin_id
+      
+      say "📊 Getting plugin statistics for: " + ::plugin_id
+      
+      if ::plugin_id in ::plugin_registry {
+        set ::plugin_config = ::plugin_registry[::plugin_id]
+        
+        set ::statistics = {
+          plugin_id: ::plugin_id,
+          type: ::plugin_config.type,
+          version: ::plugin_config.version,
+          author: ::plugin_config.author,
+          license: ::plugin_config.license,
+          permissions: ::plugin_config.permissions,
+          timeout: ::plugin_config.timeout,
+          sandboxed: ::plugin_config.sandboxed,
+          dependencies: ::plugin_config.dependencies,
+          tags: ::plugin_config.tags,
+          quantum_enhanced: true
+        }
+        
+        emit azme.plugin_statistics_retrieved with {
+          plugin_id: ::plugin_id,
+          statistics: ::statistics
+        }
+      } else {
+        emit azme.plugin_statistics_not_found with {
+          plugin_id: ::plugin_id
+        }
+      }
+    }
+
+    # Plugin registry monitoring
+    on azme.monitor_plugin_registry {
+      set ::monitor_request = $1
+      
+      set ::registry_metrics = {
+        total_plugins: ::plugin_registry.keys().length,
+        successful_registrations: ::successful_registrations,
+        failed_registrations: ::failed_registrations,
+        python_plugins: 0,
+        bash_plugins: 0,
+        binary_plugins: 0,
+        quantum_enhanced: true
+      }
+      
+      # Count plugins by type
+      loop for ::plugin_id in ::plugin_registry.keys() {
+        set ::plugin_config = ::plugin_registry[::plugin_id]
+        if ::plugin_config.type == "python" {
+          set ::registry_metrics.python_plugins = ::registry_metrics.python_plugins + 1
+        } else if ::plugin_config.type == "bash" {
+          set ::registry_metrics.bash_plugins = ::registry_metrics.bash_plugins + 1
+        } else if ::plugin_config.type == "binary" {
+          set ::registry_metrics.binary_plugins = ::registry_metrics.binary_plugins + 1
+        }
+      }
+      
+      emit azme.plugin_registry_metrics with {
+        metrics: ::registry_metrics
+      }
+    }
+  }
+} 

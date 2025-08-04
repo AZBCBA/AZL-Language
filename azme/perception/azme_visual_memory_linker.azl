@@ -1,0 +1,396 @@
+# AZME Visual Memory Linker
+# Link visuals to memory & skills
+
+component ::azme.visual_memory_linker {
+  init {
+    set ::visual_memory_map = {}
+    set ::memory_links = []
+    set ::skill_activations = []
+    set ::goal_triggers = []
+    set ::visual_patterns = {
+      system_alerts: ["error", "warning", "critical", "alert", "failure"],
+      user_interface: ["button", "menu", "window", "dialog", "form"],
+      documents: ["text", "document", "file", "paper", "report"],
+      people: ["person", "face", "human", "people"],
+      objects: ["laptop", "phone", "book", "chair", "table"]
+    }
+    set ::link_count = 0
+    set ::successful_links = 0
+    set ::failed_links = 0
+  }
+
+  behavior {
+    on azme.vision_processed {
+      set ::vision_info = $1
+      set ::image_path = ::vision_info.image_path
+      set ::objects = ::vision_info.objects
+      set ::text = ::vision_info.text
+      set ::summary = ::vision_info.summary
+      set ::visual_entry = ::vision_info.visual_entry
+      
+      say "🔗 Visual Memory Linker: Processing vision data"
+      say "📁 Image: " + ::image_path
+      say "🏷️ Objects: " + ::objects.length
+      say "📝 Text blocks: " + ::text.length
+      
+      # Create memory link
+      set ::memory_link = create_memory_link(::visual_entry)
+      
+      # Check for skill activation
+      set ::skill_activation = check_skill_activation(::summary)
+      
+      # Check for goal triggers
+      set ::goal_trigger = check_goal_triggers(::summary)
+      
+      set ::link_count = ::link_count + 1
+      
+      if ::memory_link {
+        set ::successful_links = ::successful_links + 1
+        
+        # Store memory link
+        set ::visual_memory_map[::visual_entry.id] = ::memory_link
+        set ::memory_links = ::memory_links.push(::memory_link)
+        
+        emit azme.visual_memory_linked with {
+          visual_entry: ::visual_entry,
+          memory_link: ::memory_link,
+          skill_activation: ::skill_activation,
+          goal_trigger: ::goal_trigger
+        }
+      } else {
+        set ::failed_links = ::failed_links + 1
+        
+        emit azme.visual_memory_link_failed with {
+          visual_entry: ::visual_entry,
+          reason: "no_memory_pattern_matched"
+        }
+      }
+    }
+
+    on create_memory_link {
+      set ::link_request = $1
+      set ::visual_entry = ::link_request.visual_entry
+      
+      say "🔗 Creating memory link for visual entry"
+      
+      set ::memory_link = {
+        id: "memory_link_" + ::link_count,
+        visual_id: ::visual_entry.id,
+        memory_type: "visual_perception",
+        linked_at: ::internal.now(),
+        summary: ::visual_entry.summary,
+        objects: ::visual_entry.objects,
+        text: ::visual_entry.text,
+        urgency_level: ::visual_entry.summary.urgency_level,
+        quantum_enhanced: true
+      }
+      
+      # Add contextual information
+      set ::memory_link.context = analyze_visual_context(::visual_entry)
+      
+      # Add memory tags
+      set ::memory_link.tags = generate_memory_tags(::visual_entry)
+      
+      emit azme.memory_link_created with {
+        memory_link: ::memory_link
+      }
+    }
+
+    on analyze_visual_context {
+      set ::context_request = $1
+      set ::visual_entry = ::context_request.visual_entry
+      
+      say "🔍 Analyzing visual context"
+      
+      set ::context = {
+        scene_type: "unknown",
+        urgency_level: ::visual_entry.summary.urgency_level,
+        has_people: ::visual_entry.summary.has_people,
+        has_text: ::visual_entry.summary.has_text,
+        object_count: ::visual_entry.summary.object_count,
+        text_block_count: ::visual_entry.summary.text_block_count,
+        quantum_enhanced: true
+      }
+      
+      # Determine scene type based on objects and text
+      set ::object_labels = []
+      loop for ::obj in ::visual_entry.objects {
+        set ::object_labels = ::object_labels.push(::obj.label)
+      }
+      
+      if "person" in ::object_labels {
+        set ::context.scene_type = "people_present"
+      } else if "laptop" in ::object_labels or "computer" in ::object_labels {
+        set ::context.scene_type = "computer_interface"
+      } else if ::visual_entry.text.length > 0 {
+        set ::context.scene_type = "document_or_ui"
+      } else {
+        set ::context.scene_type = "general_scene"
+      }
+      
+      emit azme.visual_context_analyzed with {
+        context: ::context
+      }
+    }
+
+    on generate_memory_tags {
+      set ::tag_request = $1
+      set ::visual_entry = ::tag_request.visual_entry
+      
+      say "🏷️ Generating memory tags"
+      
+      set ::tags = []
+      
+      # Add urgency tags
+      if ::visual_entry.summary.urgency_level == "critical" {
+        set ::tags = ::tags.push("critical_alert")
+      } else if ::visual_entry.summary.urgency_level == "urgent" {
+        set ::tags = ::tags.push("urgent_alert")
+      }
+      
+      # Add object-based tags
+      loop for ::obj in ::visual_entry.objects {
+        set ::tags = ::tags.push("object_" + ::obj.label)
+      }
+      
+      # Add text-based tags
+      loop for ::block in ::visual_entry.text {
+        set ::text_lower = ::block.text.lower()
+        if ::text_lower.contains("system") {
+          set ::tags = ::tags.push("system_related")
+        }
+        if ::text_lower.contains("error") {
+          set ::tags = ::tags.push("error_message")
+        }
+        if ::text_lower.contains("status") {
+          set ::tags = ::tags.push("status_update")
+        }
+      }
+      
+      # Add scene type tag
+      set ::tags = ::tags.push("scene_" + ::visual_entry.summary.scene_type)
+      
+      emit azme.memory_tags_generated with {
+        tags: ::tags
+      }
+    }
+
+    on check_skill_activation {
+      set ::activation_request = $1
+      set ::summary = ::activation_request.summary
+      
+      say "🎯 Checking for skill activation"
+      
+      set ::skill_activation = {
+        activated: false,
+        skill_id: null,
+        confidence: 0,
+        reason: "",
+        quantum_enhanced: true
+      }
+      
+      # Check for system monitoring skills
+      if ::summary.urgency_level == "critical" {
+        set ::skill_activation.activated = true
+        set ::skill_activation.skill_id = "system_monitoring.critical_alert"
+        set ::skill_activation.confidence = 0.95
+        set ::skill_activation.reason = "Critical urgency detected in visual content"
+      } else if ::summary.urgency_level == "urgent" {
+        set ::skill_activation.activated = true
+        set ::skill_activation.skill_id = "system_monitoring.urgent_alert"
+        set ::skill_activation.confidence = 0.85
+        set ::skill_activation.reason = "Urgent content detected in visual input"
+      }
+      
+      # Check for text processing skills
+      if ::summary.has_text and ::summary.text_block_count > 2 {
+        set ::skill_activation.activated = true
+        set ::skill_activation.skill_id = "text_processing.document_analysis"
+        set ::skill_activation.confidence = 0.8
+        set ::skill_activation.reason = "Multiple text blocks detected"
+      }
+      
+      # Check for object recognition skills
+      if ::summary.object_count > 3 {
+        set ::skill_activation.activated = true
+        set ::skill_activation.skill_id = "object_recognition.scene_analysis"
+        set ::skill_activation.confidence = 0.75
+        set ::skill_activation.reason = "Multiple objects detected in scene"
+      }
+      
+      if ::skill_activation.activated {
+        set ::skill_activations = ::skill_activations.push(::skill_activation)
+        
+        emit azme.skill_activated with {
+          skill_activation: ::skill_activation
+        }
+      }
+      
+      emit azme.skill_activation_checked with {
+        skill_activation: ::skill_activation
+      }
+    }
+
+    on check_goal_triggers {
+      set ::trigger_request = $1
+      set ::summary = ::trigger_request.summary
+      
+      say "🎯 Checking for goal triggers"
+      
+      set ::goal_trigger = {
+        triggered: false,
+        goal_id: null,
+        priority: "normal",
+        description: "",
+        quantum_enhanced: true
+      }
+      
+      # Check for system maintenance goals
+      if ::summary.urgency_level == "critical" {
+        set ::goal_trigger.triggered = true
+        set ::goal_trigger.goal_id = "system_maintenance.critical_fix"
+        set ::goal_trigger.priority = "critical"
+        set ::goal_trigger.description = "Critical system issue detected in visual input"
+      } else if ::summary.urgency_level == "urgent" {
+        set ::goal_trigger.triggered = true
+        set ::goal_trigger.goal_id = "system_maintenance.urgent_fix"
+        set ::goal_trigger.priority = "high"
+        set ::goal_trigger.description = "Urgent system issue detected in visual input"
+      }
+      
+      # Check for monitoring goals
+      if ::summary.has_text and ::summary.text_block_count > 0 {
+        set ::text_content = ""
+        loop for ::block in ::summary.extracted_text {
+          set ::text_content = ::text_content + " " + ::block
+        }
+        
+        if ::text_content.contains("system") and ::text_content.contains("status") {
+          set ::goal_trigger.triggered = true
+          set ::goal_trigger.goal_id = "system_monitoring.status_check"
+          set ::goal_trigger.priority = "medium"
+          set ::goal_trigger.description = "System status information detected"
+        }
+      }
+      
+      if ::goal_trigger.triggered {
+        set ::goal_triggers = ::goal_triggers.push(::goal_trigger)
+        
+        emit azme.goal_triggered with {
+          goal_trigger: ::goal_trigger
+        }
+      }
+      
+      emit azme.goal_triggers_checked with {
+        goal_trigger: ::goal_trigger
+      }
+    }
+
+    on get_memory_link {
+      set ::link_request = $1
+      set ::visual_id = ::link_request.visual_id
+      
+      say "🔗 Getting memory link for visual ID: " + ::visual_id
+      
+      set ::memory_link = null
+      
+      if ::visual_id in ::visual_memory_map {
+        set ::memory_link = ::visual_memory_map[::visual_id]
+      }
+      
+      emit azme.memory_link_retrieved with {
+        visual_id: ::visual_id,
+        memory_link: ::memory_link
+      }
+    }
+
+    on search_visual_memories {
+      set ::search_request = $1
+      set ::query = ::search_request.query
+      set ::tags = ::search_request.tags or []
+      
+      say "🔍 Searching visual memories"
+      
+      set ::search_results = []
+      
+      loop for ::memory_link in ::memory_links {
+        set ::match_score = 0
+        
+        # Check query match in summary
+        if ::query and ::memory_link.summary.scene_description.contains(::query) {
+          set ::match_score = ::match_score + 2
+        }
+        
+        # Check tag matches
+        if ::tags.length > 0 {
+          loop for ::tag in ::tags {
+            if ::tag in ::memory_link.tags {
+              set ::match_score = ::match_score + 1
+            }
+          }
+        }
+        
+        if ::match_score > 0 {
+          set ::search_result = {
+            memory_link: ::memory_link,
+            match_score: ::match_score,
+            quantum_enhanced: true
+          }
+          set ::search_results = ::search_results.push(::search_result)
+        }
+      }
+      
+      # Sort by match score
+      set ::search_results = ::search_results.sort_by("match_score", "desc")
+      
+      emit azme.visual_memories_searched with {
+        query: ::query,
+        tags: ::tags,
+        results: ::search_results,
+        total_matches: ::search_results.length
+      }
+    }
+
+    on get_linker_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Getting linker statistics"
+      
+      set ::linker_stats = {
+        total_links: ::link_count,
+        successful_links: ::successful_links,
+        failed_links: ::failed_links,
+        success_rate: ::successful_links / ::link_count,
+        memory_links_count: ::memory_links.length,
+        skill_activations_count: ::skill_activations.length,
+        goal_triggers_count: ::goal_triggers.length,
+        visual_memory_map_size: ::visual_memory_map.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.linker_statistics_retrieved with {
+        statistics: ::linker_stats
+      }
+    }
+
+    # Visual memory linker monitoring
+    on azme.monitor_visual_memory_linker {
+      set ::monitor_request = $1
+      
+      set ::linker_metrics = {
+        total_links: ::link_count,
+        successful_links: ::successful_links,
+        failed_links: ::failed_links,
+        memory_links_count: ::memory_links.length,
+        skill_activations_count: ::skill_activations.length,
+        goal_triggers_count: ::goal_triggers.length,
+        visual_memory_map_size: ::visual_memory_map.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.visual_memory_linker_metrics with {
+        metrics: ::linker_metrics
+      }
+    }
+  }
+} 

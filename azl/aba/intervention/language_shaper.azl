@@ -1,0 +1,637 @@
+component ::aba.language_shaper {
+  init {
+    set ::behavior_data = []
+    set ::reinforcement_log = []
+    set ::current_target_behavior = "greeting"
+    set ::response_history = []
+    set ::shaping_progress = {
+      current_step: 0,
+      total_steps: 5,
+      success_rate: 0.0,
+      last_reinforcement: null,
+      latency_score: 0.0,
+      generalization_score: 0.0,
+      expressive_diversity: 0.0
+    }
+    set ::language_levels = {
+      greeting: { level: 1, criteria: { success_rate: 0.8, latency: 2000, generalization: 0.6 } },
+      simple_request: { level: 2, criteria: { success_rate: 0.8, latency: 3000, generalization: 0.7 } },
+      two_word_phrase: { level: 3, criteria: { success_rate: 0.8, latency: 4000, generalization: 0.8 } },
+      question_asking: { level: 4, criteria: { success_rate: 0.8, latency: 5000, generalization: 0.8 } },
+      conversation: { level: 5, criteria: { success_rate: 0.8, latency: 6000, generalization: 0.9 } }
+    }
+    set ::expressive_types = {
+      declarative: { utterances: [], success_rate: 0.0, shaping_priority: 1 },
+      imperative: { utterances: [], success_rate: 0.0, shaping_priority: 2 },
+      interrogative: { utterances: [], success_rate: 0.0, shaping_priority: 3 },
+      exclamatory: { utterances: [], success_rate: 0.0, shaping_priority: 4 }
+    }
+    set ::goal_mapping = {
+      goal_ask_question: "question_asking",
+      goal_make_request: "simple_request",
+      goal_greet_someone: "greeting",
+      goal_express_feeling: "two_word_phrase",
+      goal_tell_story: "conversation"
+    }
+    set ::self_monitoring = {
+      language_evolution: [],
+      current_language_level: 1,
+      evolution_timeline: [],
+      self_assessment: {}
+    }
+  }
+
+  behavior {
+    listen for "agent_responded" then {
+      store ::response_history from add_response(::agent_response)
+      emit "response_occurred" with ::agent_response
+      
+      // Language error detection
+      branch when detect_language_error(::agent_response) {
+        emit "language_error_detected" with {
+          utterance: ::agent_response.utterance,
+          expected_intent: ::agent_response.expected_intent,
+          error_type: classify_language_error(::agent_response),
+          timestamp: now()
+        }
+        trigger_language_correction(::agent_response)
+      }
+      
+      branch when ::agent_response.behavior == ::current_target_behavior {
+        store ::behavior_data from record_successful_behavior(::agent_response)
+        update_multidimensional_progress(::agent_response)
+        
+        // Reinforcement linkage
+        emit "reinforcement_request" with {
+          behavior: ::agent_response.behavior,
+          success_level: calculate_success_level(::agent_response),
+          shaping_step: ::shaping_progress.current_step,
+          goal_id: get_current_goal_id()
+        }
+      }
+      
+      // Self-monitoring
+      reflect_self_language_evolution(::agent_response)
+    }
+
+    listen for "reinforce" then {
+      store ::reinforcement_log from log_reinforcement(::reinforcement_data)
+      emit "reinforcement_delivered" with ::reinforcement_data
+      
+      // Multidimensional criteria check
+      branch when check_multidimensional_criteria() {
+        advance_to_next_step()
+      }
+    }
+
+    listen for "shaping_step_completed" then {
+      set ::current_target_behavior = get_next_target_behavior()
+      emit "new_target_behavior" with ::current_target_behavior
+      
+      // Update self-monitoring
+      update_self_monitoring()
+    }
+
+    listen for "goal_activated" then {
+      let target_behavior = ::goal_mapping[::goal_id]
+      branch when target_behavior {
+        set ::current_target_behavior = target_behavior
+        emit "goal_based_shaping" with {
+          goal_id: ::goal_id,
+          target_behavior: target_behavior,
+          shaping_priority: get_shaping_priority(target_behavior)
+        }
+      }
+    }
+
+    listen for "expressive_type_analysis" then {
+      analyze_expressive_type(::agent_response)
+      update_expressive_diversity()
+    }
+  }
+
+  memory {
+    behavior_data
+    reinforcement_log
+    current_target_behavior
+    response_history
+    shaping_progress
+  }
+
+  interface {
+    start_shaping using ::target_behavior
+    record_response using ::response_data
+    get_shaping_progress
+    get_behavior_data
+    advance_step
+  }
+}
+
+// Helper functions for language shaping
+function add_response(response_data) {
+  let history = ::response_history
+  history.push({
+    behavior: response_data.behavior,
+    timestamp: now(),
+    context: response_data.context,
+    reinforcement_given: false
+  })
+  return history
+}
+
+function record_successful_behavior(response_data) {
+  let behavior_data = ::behavior_data
+  behavior_data.push({
+    behavior: response_data.behavior,
+    timestamp: now(),
+    context: response_data.context,
+    reinforcement_schedule: ::aba.reinforcement_schedule.schedule_type,
+    success: true
+  })
+  return behavior_data
+}
+
+function log_reinforcement(reinforcement_data) {
+  let log = ::reinforcement_log
+  log.push({
+    timestamp: now(),
+    schedule_type: reinforcement_data.schedule_type,
+    behavior: reinforcement_data.response_data.behavior,
+    reinforcement_type: "positive"
+  })
+  return log
+}
+
+function update_shaping_progress() {
+  let recent_responses = get_recent_responses(10)
+  let success_count = count_successful_responses(recent_responses)
+  set ::shaping_progress.success_rate = success_count / recent_responses.length
+  set ::shaping_progress.last_reinforcement = now()
+}
+
+function advance_to_next_step() {
+  increment ::shaping_progress.current_step
+  emit "shaping_step_completed" with ::shaping_progress.current_step
+}
+
+function get_next_target_behavior() {
+  let behaviors = [
+    "greeting",
+    "simple_request",
+    "two_word_phrase",
+    "question_asking",
+    "conversation"
+  ]
+  
+  branch when ::shaping_progress.current_step < behaviors.length {
+    return behaviors[::shaping_progress.current_step]
+  } else {
+    return "conversation"
+  }
+}
+
+function get_recent_responses(count) {
+  let history = ::response_history
+  return history.slice(-count)
+}
+
+function count_successful_responses(responses) {
+  let count = 0
+  loop for response in responses {
+    branch when response.behavior == ::current_target_behavior {
+      increment count
+    }
+  }
+  return count
+}
+
+// Enhanced Language Shaper Functions
+function update_multidimensional_progress(agent_response) {
+  let progress = ::shaping_progress
+  
+  // Update success rate
+  let recent_responses = get_recent_responses(10)
+  let success_count = count_successful_responses(recent_responses)
+  set progress.success_rate = success_count / recent_responses.length
+  
+  // Update latency score
+  let latency = agent_response.response_time || 0
+  let target_latency = ::language_levels[::current_target_behavior].criteria.latency
+  set progress.latency_score = calculate_latency_score(latency, target_latency)
+  
+  // Update generalization score
+  let generalization = calculate_generalization_score(agent_response)
+  set progress.generalization_score = generalization
+  
+  // Update expressive diversity
+  let diversity = calculate_expressive_diversity()
+  set progress.expressive_diversity = diversity
+  
+  set progress.last_reinforcement = now()
+}
+
+function calculate_latency_score(actual_latency, target_latency) {
+  branch when actual_latency <= target_latency {
+    return 1.0  // Perfect score
+  } else {
+    let ratio = target_latency / actual_latency
+    return ratio  // Partial score based on how close to target
+  }
+}
+
+function calculate_generalization_score(agent_response) {
+  let score = 0.0
+  let context_variations = 0
+  
+  // Check if response generalizes across different contexts
+  branch when agent_response.context == "home" or agent_response.context == "school" {
+    increment context_variations
+  }
+  
+  branch when agent_response.context == "playground" or agent_response.context == "store" {
+    increment context_variations
+  }
+  
+  // Check if response generalizes across different people
+  branch when agent_response.interlocutor == "parent" or agent_response.interlocutor == "teacher" {
+    increment context_variations
+  }
+  
+  branch when agent_response.interlocutor == "peer" or agent_response.interlocutor == "stranger" {
+    increment context_variations
+  }
+  
+  // Calculate generalization score (0-1)
+  set score = context_variations / 4.0
+  
+  return score
+}
+
+function calculate_expressive_diversity() {
+  let types = ::expressive_types
+  let total_utterances = 0
+  let type_count = 0
+  
+  loop for type in ["declarative", "imperative", "interrogative", "exclamatory"] {
+    let utterances = types[type].utterances
+    total_utterances = total_utterances + utterances.length
+    
+    branch when utterances.length > 0 {
+      increment type_count
+    }
+  }
+  
+  // Calculate diversity as ratio of used types to total types
+  branch when total_utterances > 0 {
+    return type_count / 4.0
+  } else {
+    return 0.0
+  }
+}
+
+function check_multidimensional_criteria() {
+  let current_behavior = ::current_target_behavior
+  let criteria = ::language_levels[current_behavior].criteria
+  let progress = ::shaping_progress
+  
+  // Check all criteria
+  let success_criteria_met = progress.success_rate >= criteria.success_rate
+  let latency_criteria_met = progress.latency_score >= 0.8
+  let generalization_criteria_met = progress.generalization_score >= criteria.generalization
+  
+  // All criteria must be met to advance
+  return success_criteria_met and latency_criteria_met and generalization_criteria_met
+}
+
+function detect_language_error(agent_response) {
+  let utterance = agent_response.utterance
+  let expected_intent = agent_response.expected_intent
+  
+  // Check for intent mismatch
+  branch when utterance.match(expected_intent) == false {
+    return true
+  }
+  
+  // Check for grammatical errors
+  branch when detect_grammatical_error(utterance) {
+    return true
+  }
+  
+  // Check for inappropriate language level
+  branch when detect_inappropriate_level(utterance, ::current_target_behavior) {
+    return true
+  }
+  
+  return false
+}
+
+function classify_language_error(agent_response) {
+  let utterance = agent_response.utterance
+  let expected_intent = agent_response.expected_intent
+  
+  // Intent mismatch
+  branch when utterance.match(expected_intent) == false {
+    return "intent_mismatch"
+  }
+  
+  // Grammatical error
+  branch when detect_grammatical_error(utterance) {
+    return "grammatical_error"
+  }
+  
+  // Inappropriate level
+  branch when detect_inappropriate_level(utterance, ::current_target_behavior) {
+    return "inappropriate_level"
+  }
+  
+  return "unknown_error"
+}
+
+function detect_grammatical_error(utterance) {
+  // Simple grammatical error detection
+  let errors = [
+    "me want", "I is", "he go", "she have"
+  ]
+  
+  loop for error in errors {
+    branch when utterance.includes(error) {
+      return true
+    }
+  }
+  
+  return false
+}
+
+function detect_inappropriate_level(utterance, target_behavior) {
+  let current_level = ::language_levels[target_behavior].level
+  
+  // Check if utterance is too simple for current level
+  branch when current_level >= 3 and utterance.split(" ").length < 2 {
+    return true
+  }
+  
+  // Check if utterance is too complex for current level
+  branch when current_level <= 2 and utterance.split(" ").length > 4 {
+    return true
+  }
+  
+  return false
+}
+
+function trigger_language_correction(agent_response) {
+  let error_type = classify_language_error(agent_response)
+  
+  emit "language_correction" with {
+    utterance: agent_response.utterance,
+    error_type: error_type,
+    target_behavior: ::current_target_behavior,
+    correction_strategy: get_correction_strategy(error_type)
+  }
+}
+
+function get_correction_strategy(error_type) {
+  branch when error_type == "intent_mismatch" {
+    return "model_correct_intent"
+  } else branch when error_type == "grammatical_error" {
+    return "correct_grammar"
+  } else branch when error_type == "inappropriate_level" {
+    return "adjust_complexity"
+  } else {
+    return "general_correction"
+  }
+}
+
+function calculate_success_level(agent_response) {
+  let level = 1.0  // Base level
+  
+  // Increase level based on response quality
+  branch when agent_response.response_time < 2000 {
+    increment level by 0.2
+  }
+  
+  branch when agent_response.context_variations > 1 {
+    increment level by 0.3
+  }
+  
+  branch when agent_response.expressive_type != "declarative" {
+    increment level by 0.2
+  }
+  
+  return level
+}
+
+function get_current_goal_id() {
+  // Map current behavior to goal
+  loop for goal in ["goal_ask_question", "goal_make_request", "goal_greet_someone", "goal_express_feeling", "goal_tell_story"] {
+    let target_behavior = ::goal_mapping[goal]
+    branch when target_behavior == ::current_target_behavior {
+      return goal
+    }
+  }
+  
+  return "goal_general_communication"
+}
+
+function reflect_self_language_evolution(agent_response) {
+  let evolution = ::self_monitoring.language_evolution
+  
+  evolution.push({
+    timestamp: now(),
+    language_level: ::self_monitoring.current_language_level,
+    utterance: agent_response.utterance,
+    behavior: agent_response.behavior,
+    success: agent_response.success,
+    expressive_type: classify_expressive_type(agent_response.utterance)
+  })
+  
+  // Update current language level
+  let new_level = calculate_language_level()
+  branch when new_level > ::self_monitoring.current_language_level {
+    set ::self_monitoring.current_language_level = new_level
+    emit "language_level_evolved" with {
+      old_level: ::self_monitoring.current_language_level,
+      new_level: new_level,
+      evolution_data: evolution
+    }
+  }
+}
+
+function calculate_language_level() {
+  let progress = ::shaping_progress
+  let level = 1
+  
+  branch when progress.success_rate >= 0.8 and progress.latency_score >= 0.8 {
+    set level = 2
+  }
+  
+  branch when progress.generalization_score >= 0.7 {
+    set level = 3
+  }
+  
+  branch when progress.expressive_diversity >= 0.5 {
+    set level = 4
+  }
+  
+  branch when progress.success_rate >= 0.9 and progress.generalization_score >= 0.9 {
+    set level = 5
+  }
+  
+  return level
+}
+
+function classify_expressive_type(utterance) {
+  branch when utterance.includes("?") {
+    return "interrogative"
+  } else branch when utterance.includes("!") {
+    return "exclamatory"
+  } else branch when utterance.includes("please") or utterance.includes("can you") {
+    return "imperative"
+  } else {
+    return "declarative"
+  }
+}
+
+function analyze_expressive_type(agent_response) {
+  let utterance = agent_response.utterance
+  let expressive_type = classify_expressive_type(utterance)
+  let types = ::expressive_types
+  
+  // Add utterance to appropriate type
+  types[expressive_type].utterances.push({
+    utterance: utterance,
+    timestamp: now(),
+    success: agent_response.success
+  })
+  
+  // Update success rate for this type
+  let type_data = types[expressive_type]
+  let total_utterances = type_data.utterances.length
+  let successful_utterances = 0
+  
+  loop for utterance_data in type_data.utterances {
+    branch when utterance_data.success {
+      increment successful_utterances
+    }
+  }
+  
+  set type_data.success_rate = successful_utterances / total_utterances
+  
+  emit "expressive_type_updated" with {
+    type: expressive_type,
+    success_rate: type_data.success_rate,
+    total_utterances: total_utterances
+  }
+}
+
+function update_expressive_diversity() {
+  let diversity = calculate_expressive_diversity()
+  set ::shaping_progress.expressive_diversity = diversity
+  
+  emit "expressive_diversity_updated" with {
+    diversity_score: diversity,
+    shaping_progress: ::shaping_progress
+  }
+}
+
+function update_self_monitoring() {
+  let monitoring = ::self_monitoring
+  
+  // Add to evolution timeline
+  monitoring.evolution_timeline.push({
+    step: ::shaping_progress.current_step,
+    behavior: ::current_target_behavior,
+    language_level: monitoring.current_language_level,
+    timestamp: now()
+  })
+  
+  // Update self-assessment
+  set monitoring.self_assessment = {
+    current_level: monitoring.current_language_level,
+    progress_rate: calculate_progress_rate(),
+    strengths: identify_language_strengths(),
+    areas_for_improvement: identify_improvement_areas()
+  }
+  
+  emit "self_monitoring_updated" with monitoring.self_assessment
+}
+
+function calculate_progress_rate() {
+  let progress = ::shaping_progress
+  let total_criteria = 4  // success_rate, latency_score, generalization_score, expressive_diversity
+  let met_criteria = 0
+  
+  branch when progress.success_rate >= 0.8 {
+    increment met_criteria
+  }
+  
+  branch when progress.latency_score >= 0.8 {
+    increment met_criteria
+  }
+  
+  branch when progress.generalization_score >= 0.7 {
+    increment met_criteria
+  }
+  
+  branch when progress.expressive_diversity >= 0.5 {
+    increment met_criteria
+  }
+  
+  return met_criteria / total_criteria
+}
+
+function identify_language_strengths() {
+  let strengths = []
+  let progress = ::shaping_progress
+  
+  branch when progress.success_rate >= 0.8 {
+    strengths.push("high_success_rate")
+  }
+  
+  branch when progress.latency_score >= 0.8 {
+    strengths.push("fast_response_time")
+  }
+  
+  branch when progress.generalization_score >= 0.7 {
+    strengths.push("good_generalization")
+  }
+  
+  branch when progress.expressive_diversity >= 0.5 {
+    strengths.push("diverse_expression")
+  }
+  
+  return strengths
+}
+
+function identify_improvement_areas() {
+  let areas = []
+  let progress = ::shaping_progress
+  
+  branch when progress.success_rate < 0.8 {
+    areas.push("improve_success_rate")
+  }
+  
+  branch when progress.latency_score < 0.8 {
+    areas.push("reduce_response_time")
+  }
+  
+  branch when progress.generalization_score < 0.7 {
+    areas.push("improve_generalization")
+  }
+  
+  branch when progress.expressive_diversity < 0.5 {
+    areas.push("increase_expression_diversity")
+  }
+  
+  return areas
+}
+
+function get_shaping_priority(target_behavior) {
+  let levels = ::language_levels
+  let behavior_data = levels[target_behavior]
+  
+  branch when behavior_data {
+    return behavior_data.level
+  } else {
+    return 1  // Default priority
+  }
+} 

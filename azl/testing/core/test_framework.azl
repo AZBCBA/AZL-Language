@@ -1,0 +1,303 @@
+component ::test.framework {
+  init {
+    set ::pass_count = 0
+    set ::fail_count = 0
+    set ::total_tests = 0
+    set ::test_suite_name = "default"
+    set ::current_test = ""
+    set ::test_results = []
+    
+    emit "test.framework.initialized" with { pass_count: ::pass_count, fail_count: ::fail_count }
+  }
+
+  behavior {
+    // Main assert command
+    listen for "assert" then {
+      set ::expression = ::assert_data.expression
+      set ::test_name = ::assert_data.test_name || "unnamed_test"
+      set ::current_test = ::test_name
+      
+      // Evaluate the comparison
+      store ::result from ::evaluate_assertion(::expression)
+      
+      branch when ::result = true {
+        say "✅ ASSERT PASSED: ::expression"
+        set ::pass_count = ::pass_count + 1
+        set ::test_results.push({
+          test: ::test_name,
+          expression: ::expression,
+          result: "PASS",
+          timestamp: ::now()
+        })
+      } else {
+        say "❌ ASSERT FAILED: ::expression"
+        set ::fail_count = ::fail_count + 1
+        set ::test_results.push({
+          test: ::test_name,
+          expression: ::expression,
+          result: "FAIL",
+          timestamp: ::now()
+        })
+      }
+      
+      set ::total_tests = ::total_tests + 1
+      
+      emit "assert.completed" with {
+        test: ::test_name,
+        expression: ::expression,
+        result: ::result,
+        pass_count: ::pass_count,
+        fail_count: ::fail_count
+      }
+    }
+
+    // Check command (alias for assert)
+    listen for "check" then {
+      set ::expression = ::check_data.expression
+      set ::test_name = ::check_data.test_name || "unnamed_check"
+      
+      // Forward to assert
+      emit "assert" with {
+        expression: ::expression,
+        test_name: ::test_name
+      }
+    }
+
+    // Evaluate assertion with comparison operators
+    listen for "evaluate_assertion" then {
+      set ::expression = ::expression_data.expression
+      
+      // Parse comparison operators
+      branch when ::expression.contains("==") {
+        store ::result from ::evaluate_equals(::expression)
+      } else branch when ::expression.contains("!=") {
+        store ::result from ::evaluate_not_equals(::expression)
+      } else branch when ::expression.contains("<=") {
+        store ::result from ::evaluate_less_equals(::expression)
+      } else branch when ::expression.contains(">=") {
+        store ::result from ::evaluate_greater_equals(::expression)
+      } else branch when ::expression.contains("<") {
+        store ::result from ::evaluate_less_than(::expression)
+      } else branch when ::expression.contains(">") {
+        store ::result from ::evaluate_greater_than(::expression)
+      } else {
+        // Default to truthy evaluation
+        store ::result from ::evaluate_truthy(::expression)
+      }
+      
+      return ::result
+    }
+
+    // Evaluate equality (==)
+    listen for "evaluate_equals" then {
+      set ::expr = ::expression_data.expression
+      set ::parts = ::expr.split("==")
+      
+      branch when ::parts.length = 2 {
+        set ::lhs = ::parts[0].trim()
+        set ::rhs = ::parts[1].trim()
+        
+        // Evaluate both sides
+        store ::lhs_val from ::evaluate_expression(::lhs)
+        store ::rhs_val from ::evaluate_expression(::rhs)
+        
+        return ::lhs_val = ::rhs_val
+      } else {
+        say "⚠️ Invalid equality expression: ::expr"
+        return false
+      }
+    }
+
+    // Evaluate not equals (!=)
+    listen for "evaluate_not_equals" then {
+      set ::expr = ::expression_data.expression
+      set ::parts = ::expr.split("!=")
+      
+      branch when ::parts.length = 2 {
+        set ::lhs = ::parts[0].trim()
+        set ::rhs = ::parts[1].trim()
+        
+        // Evaluate both sides
+        store ::lhs_val from ::evaluate_expression(::lhs)
+        store ::rhs_val from ::evaluate_expression(::rhs)
+        
+        return ::lhs_val != ::rhs_val
+      } else {
+        say "⚠️ Invalid not-equals expression: ::expr"
+        return false
+      }
+    }
+
+    // Evaluate less than or equal (<=)
+    listen for "evaluate_less_equals" then {
+      set ::expr = ::expression_data.expression
+      set ::parts = ::expr.split("<=")
+      
+      branch when ::parts.length = 2 {
+        set ::lhs = ::parts[0].trim()
+        set ::rhs = ::parts[1].trim()
+        
+        // Evaluate both sides
+        store ::lhs_val from ::evaluate_expression(::lhs)
+        store ::rhs_val from ::evaluate_expression(::rhs)
+        
+        return ::lhs_val <= ::rhs_val
+      } else {
+        say "⚠️ Invalid less-equals expression: ::expr"
+        return false
+      }
+    }
+
+    // Evaluate greater than or equal (>=)
+    listen for "evaluate_greater_equals" then {
+      set ::expr = ::expression_data.expression
+      set ::parts = ::expr.split(">=")
+      
+      branch when ::parts.length = 2 {
+        set ::lhs = ::parts[0].trim()
+        set ::rhs = ::parts[1].trim()
+        
+        // Evaluate both sides
+        store ::lhs_val from ::evaluate_expression(::lhs)
+        store ::rhs_val from ::evaluate_expression(::rhs)
+        
+        return ::lhs_val >= ::rhs_val
+      } else {
+        say "⚠️ Invalid greater-equals expression: ::expr"
+        return false
+      }
+    }
+
+    // Evaluate less than (<)
+    listen for "evaluate_less_than" then {
+      set ::expr = ::expression_data.expression
+      set ::parts = ::expr.split("<")
+      
+      branch when ::parts.length = 2 {
+        set ::lhs = ::parts[0].trim()
+        set ::rhs = ::parts[1].trim()
+        
+        // Evaluate both sides
+        store ::lhs_val from ::evaluate_expression(::lhs)
+        store ::rhs_val from ::evaluate_expression(::rhs)
+        
+        return ::lhs_val < ::rhs_val
+      } else {
+        say "⚠️ Invalid less-than expression: ::expr"
+        return false
+      }
+    }
+
+    // Evaluate greater than (>)
+    listen for "evaluate_greater_than" then {
+      set ::expr = ::expression_data.expression
+      set ::parts = ::expr.split(">")
+      
+      branch when ::parts.length = 2 {
+        set ::lhs = ::parts[0].trim()
+        set ::rhs = ::parts[1].trim()
+        
+        // Evaluate both sides
+        store ::lhs_val from ::evaluate_expression(::lhs)
+        store ::rhs_val from ::evaluate_expression(::rhs)
+        
+        return ::lhs_val > ::rhs_val
+      } else {
+        say "⚠️ Invalid greater-than expression: ::expr"
+        return false
+      }
+    }
+
+    // Evaluate truthy expression (no comparison operator)
+    listen for "evaluate_truthy" then {
+      set ::expr = ::expression_data.expression
+      
+      // Evaluate the expression
+      store ::result from ::evaluate_expression(::expr)
+      
+      // Return truthy value
+      return ::result != 0 and ::result != "" and ::result != false
+    }
+
+    // Evaluate mathematical expression (delegate to math engine)
+    listen for "evaluate_expression" then {
+      set ::expr = ::expression_data.expression
+      
+      // Delegate to math engine for evaluation
+      emit "math.engine.evaluate_expression" with {
+        expression: ::expr,
+        component: ::current_component || "test.framework"
+      }
+      
+      // Wait for result
+      listen for "expression.evaluated" then {
+        return ::expression_data.result
+      }
+    }
+
+    // Generate test report
+    listen for "report" then {
+      say "📊 TEST REPORT"
+      say "================"
+      say "✅ Passed: ::pass_count"
+      say "❌ Failed: ::fail_count"
+      say "📈 Total: ::total_tests"
+      
+      branch when ::total_tests > 0 {
+        set ::success_rate = (::pass_count / ::total_tests) * 100
+        say "📊 Success Rate: ::success_rate%"
+      }
+      
+      // Show failed tests
+      branch when ::fail_count > 0 {
+        say "❌ FAILED TESTS:"
+        loop for ::result in ::test_results {
+          branch when ::result.result = "FAIL" {
+            say "  - ::result.test: ::result.expression"
+          }
+        }
+      }
+      
+      emit "test.report.complete" with {
+        pass_count: ::pass_count,
+        fail_count: ::fail_count,
+        total_tests: ::total_tests,
+        success_rate: ::success_rate || 0
+      }
+    }
+
+    // Reset test counters
+    listen for "reset" then {
+      set ::pass_count = 0
+      set ::fail_count = 0
+      set ::total_tests = 0
+      set ::test_results = []
+      
+      say "🔄 Test framework reset"
+      emit "test.framework.reset" with { status: "reset" }
+    }
+
+    // Set test suite name
+    listen for "set_suite" then {
+      set ::test_suite_name = ::suite_data.name
+      say "📋 Test Suite: ::test_suite_name"
+    }
+  }
+
+  memory {
+    pass_count
+    fail_count
+    total_tests
+    test_suite_name
+    current_test
+    test_results
+  }
+
+  interface {
+    assert
+    check
+    report
+    reset
+    set_suite
+  }
+} 

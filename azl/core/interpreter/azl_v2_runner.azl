@@ -1,0 +1,558 @@
+# AZL v2 Runner - Main Execution Engine
+# Loads and executes AZL v2 files with modern syntax
+
+component ::runner.v2 {
+  init {
+    set ::status = "initializing"
+    set ::interpreter = null
+    set ::parser = null
+    set ::loaded_files = {}
+    set ::execution_results = {}
+    
+    say "🚀 AZL v2 Runner initializing..."
+    
+    # Initialize interpreter and parser
+    emit initialize_interpreter
+    emit initialize_parser
+  }
+
+  # Initialize the interpreter
+  on initialize_interpreter {
+    say "🧠 Initializing AZL v2 interpreter..."
+    
+    # Create interpreter instance
+    set ::interpreter = {
+      variables: {},
+      functions: {},
+      components: {},
+      call_stack: [],
+      current_scope: "global",
+      execution_context: {
+        line_number: 0,
+        file_name: "",
+        error_count: 0,
+        warning_count: 0
+      }
+    }
+    
+    emit interpreter.ready
+  }
+
+  # Initialize the parser
+  on initialize_parser {
+    say "📝 Initializing AZL v2 parser..."
+    
+    # Create parser instance
+    set ::parser = {
+      current_token: 0,
+      tokens: [],
+      ast: {},
+      status: "ready"
+    }
+    
+    emit parser.ready
+  }
+
+  # Main entry point - run an AZL v2 file
+  on run_file {
+    set ::file_path = $1
+    
+    say "🚀 Running AZL v2 file: ::file_path"
+    
+    # Load the file
+    emit load_file with ::file_path
+    
+    # Parse the source code
+    emit parse_file with ::source_code
+    
+    # Execute the parsed AST
+    emit execute_ast with ::ast
+  }
+
+  # Load file from disk
+  on load_file {
+    set ::file_path = $1
+    
+    say "📂 Loading file: ::file_path"
+    
+    # Simulate file loading (in real implementation, this would read from disk)
+    set ::source_code = get_file_content(::file_path)
+    
+    if ::source_code {
+      set ::loaded_files[::file_path] = ::source_code
+      say "✅ File loaded successfully"
+      emit file.loaded with ::source_code
+    } else {
+      say "❌ Error: Could not load file ::file_path"
+      emit file.load_error with ::file_path
+    }
+  }
+
+  # Parse the source code into AST
+  on parse_file {
+    set ::source_code = $1
+    
+    say "📝 Parsing source code..."
+    
+    # Tokenize the source
+    emit tokenize_source with ::source_code
+    
+    # Build AST from tokens
+    emit build_ast with ::tokens
+    
+    say "✅ Parsing completed"
+    emit parsing.complete with ::ast
+  }
+
+  # Tokenize source code
+  on tokenize_source {
+    set ::source = $1
+    set ::tokens = []
+    set ::current_pos = 0
+    set ::line = 1
+    set ::column = 0
+    
+    say "🔍 Tokenizing source code..."
+    
+    loop while ::current_pos < ::source.length {
+      set ::char = ::source[::current_pos]
+      
+      # Skip whitespace
+      if ::char == " " or ::char == "\t" {
+        set ::current_pos = ::current_pos + 1
+        set ::column = ::column + 1
+        continue
+      }
+      
+      # Handle newlines
+      if ::char == "\n" {
+        set ::current_pos = ::current_pos + 1
+        set ::line = ::line + 1
+        set ::column = 0
+        continue
+      }
+      
+      # Handle comments
+      if ::char == "#" {
+        emit skip_comment with ::source ::current_pos
+        continue
+      }
+      
+      # Handle strings
+      if ::char == "\"" or ::char == "'" {
+        emit parse_string with ::source ::current_pos ::char
+        continue
+      }
+      
+      # Handle numbers
+      if ::char >= "0" and ::char <= "9" {
+        emit parse_number with ::source ::current_pos
+        continue
+      }
+      
+      # Handle identifiers and keywords
+      if ::char >= "a" and ::char <= "z" or ::char >= "A" and ::char <= "Z" or ::char == "_" {
+        emit parse_identifier with ::source ::current_pos
+        continue
+      }
+      
+      # Handle operators and punctuation
+      emit parse_operator with ::source ::current_pos
+    }
+    
+    say "✅ Tokenization completed: ::tokens.length tokens"
+    emit tokens.ready with ::tokens
+  }
+
+  # Skip comment until end of line
+  on skip_comment {
+    set ::source = $1
+    set ::pos = $2
+    
+    loop while ::pos < ::source.length and ::source[::pos] != "\n" {
+      set ::pos = ::pos + 1
+    }
+    
+    set ::current_pos = ::pos
+  }
+
+  # Parse string literal
+  on parse_string {
+    set ::source = $1
+    set ::pos = $2
+    set ::quote = $3
+    
+    set ::start = ::pos
+    set ::pos = ::pos + 1
+    
+    loop while ::pos < ::source.length and ::source[::pos] != ::quote {
+      if ::source[::pos] == "\\" {
+        set ::pos = ::pos + 2  # Skip escaped character
+      } else {
+        set ::pos = ::pos + 1
+      }
+    }
+    
+    if ::pos < ::source.length {
+      set ::value = ::source.substring(::start + 1, ::pos)
+      set ::token = { type: "string", value: ::value, line: ::line, column: ::column }
+      set ::tokens = ::tokens + [::token]
+      set ::current_pos = ::pos + 1
+      set ::column = ::column + (::pos - ::start + 1)
+    } else {
+      emit error.unterminated_string with ::line ::column
+    }
+  }
+
+  # Parse number literal
+  on parse_number {
+    set ::source = $1
+    set ::pos = $2
+    
+    set ::start = ::pos
+    set ::has_decimal = false
+    
+    loop while ::pos < ::source.length {
+      set ::char = ::source[::pos]
+      
+      if ::char >= "0" and ::char <= "9" {
+        set ::pos = ::pos + 1
+      } else if ::char == "." and not ::has_decimal {
+        set ::has_decimal = true
+        set ::pos = ::pos + 1
+      } else {
+        break
+      }
+    }
+    
+    set ::value = ::source.substring(::start, ::pos)
+    set ::token = { type: "number", value: parseFloat(::value), line: ::line, column: ::column }
+    set ::tokens = ::tokens + [::token]
+    set ::current_pos = ::pos
+    set ::column = ::column + (::pos - ::start)
+  }
+
+  # Parse identifier or keyword
+  on parse_identifier {
+    set ::source = $1
+    set ::pos = $2
+    
+    set ::start = ::pos
+    
+    loop while ::pos < ::source.length {
+      set ::char = ::source[::pos]
+      
+      if ::char >= "a" and ::char <= "z" or ::char >= "A" and ::char <= "Z" or ::char >= "0" and ::char <= "9" or ::char == "_" {
+        set ::pos = ::pos + 1
+      } else {
+        break
+      }
+    }
+    
+    set ::value = ::source.substring(::start, ::pos)
+    
+    # Check if it's a keyword
+    set ::keywords = ["let", "fn", "if", "else", "loop", "for", "in", "on", "emit", "say", "return", "set"]
+    
+    if ::value in ::keywords {
+      set ::token = { type: "keyword", value: ::value, line: ::line, column: ::column }
+    } else {
+      set ::token = { type: "identifier", value: ::value, line: ::line, column: ::column }
+    }
+    
+    set ::tokens = ::tokens + [::token]
+    set ::current_pos = ::pos
+    set ::column = ::column + (::pos - ::start)
+  }
+
+  # Parse operators and punctuation
+  on parse_operator {
+    set ::source = $1
+    set ::pos = $2
+    
+    set ::char = ::source[::pos]
+    set ::next_char = ::pos + 1 < ::source.length ? ::source[::pos + 1] : ""
+    
+    # Two-character operators
+    if ::char == "=" and ::next_char == "=" {
+      set ::token = { type: "operator", value: "==", line: ::line, column: ::column }
+      set ::current_pos = ::pos + 2
+      set ::column = ::column + 2
+    } else if ::char == "!" and ::next_char == "=" {
+      set ::token = { type: "operator", value: "!=", line: ::line, column: ::column }
+      set ::current_pos = ::pos + 2
+      set ::column = ::column + 2
+    } else if ::char == ">" and ::next_char == "=" {
+      set ::token = { type: "operator", value: ">=", line: ::line, column: ::column }
+      set ::current_pos = ::pos + 2
+      set ::column = ::column + 2
+    } else if ::char == "<" and ::next_char == "=" {
+      set ::token = { type: "operator", value: "<=", line: ::line, column: ::column }
+      set ::current_pos = ::pos + 2
+      set ::column = ::column + 2
+    } else {
+      # Single character operators and punctuation
+      set ::token = { type: "operator", value: ::char, line: ::line, column: ::column }
+      set ::current_pos = ::pos + 1
+      set ::column = ::column + 1
+    }
+    
+    set ::tokens = ::tokens + [::token]
+  }
+
+  # Build AST from tokens
+  on build_ast {
+    set ::tokens = $1
+    set ::ast = { type: "program", body: [] }
+    set ::current_token = 0
+    
+    say "🏗️ Building Abstract Syntax Tree..."
+    
+    loop while ::current_token < ::tokens.length {
+      set ::token = ::tokens[::current_token]
+      
+      if ::token.type == "keyword" {
+        if ::token.value == "let" {
+          emit parse_variable_declaration with ::tokens ::current_token
+        } else if ::token.value == "fn" {
+          emit parse_function_declaration with ::tokens ::current_token
+        } else if ::token.value == "if" {
+          emit parse_if_statement with ::tokens ::current_token
+        } else if ::token.value == "loop" {
+          emit parse_loop_statement with ::tokens ::current_token
+        } else if ::token.value == "set" {
+          emit parse_assignment with ::tokens ::current_token
+        } else if ::token.value == "emit" {
+          emit parse_emit_statement with ::tokens ::current_token
+        } else if ::token.value == "say" {
+          emit parse_say_statement with ::tokens ::current_token
+        } else if ::token.value == "on" {
+          emit parse_event_handler with ::tokens ::current_token
+        }
+      } else {
+        set ::current_token = ::current_token + 1
+      }
+    }
+    
+    say "✅ AST built successfully"
+    emit ast.ready with ::ast
+  }
+
+  # Execute the AST
+  on execute_ast {
+    set ::ast = $1
+    
+    say "⚡ Executing AST..."
+    
+    # Initialize execution environment
+    set ::interpreter.variables = {}
+    set ::interpreter.functions = {}
+    set ::interpreter.components = {}
+    set ::interpreter.call_stack = []
+    set ::interpreter.current_scope = "global"
+    set ::interpreter.execution_context.error_count = 0
+    set ::interpreter.execution_context.warning_count = 0
+    
+    # Execute each statement in the program
+    loop for ::statement in ::ast.body {
+      emit execute_statement with ::statement
+    }
+    
+    emit execution.complete with "success"
+  }
+
+  # Execute a single statement
+  on execute_statement {
+    set ::statement = $1
+    
+    if ::statement.type == "variable_declaration" {
+      emit execute_variable_declaration with ::statement
+    } else if ::statement.type == "function_declaration" {
+      emit execute_function_declaration with ::statement
+    } else if ::statement.type == "assignment" {
+      emit execute_assignment with ::statement
+    } else if ::statement.type == "if_statement" {
+      emit execute_if_statement with ::statement
+    } else if ::statement.type == "loop_statement" {
+      emit execute_loop_statement with ::statement
+    } else if ::statement.type == "emit_statement" {
+      emit execute_emit_statement with ::statement
+    } else if ::statement.type == "say_statement" {
+      emit execute_say_statement with ::statement
+    } else if ::statement.type == "event_handler" {
+      emit execute_event_handler with ::statement
+    }
+  }
+
+  # Execute variable declaration
+  on execute_variable_declaration {
+    set ::statement = $1
+    set ::name = ::statement.name
+    set ::value = ::statement.value
+    
+    # Evaluate the value if it's an expression
+    if ::value.type == "expression" {
+      emit evaluate_expression with ::value
+      set ::evaluated_value = ::result
+    } else {
+      set ::evaluated_value = ::value
+    }
+    
+    # Store in current scope
+    set ::interpreter.variables[::name] = ::evaluated_value
+    
+    say "📦 Variable declared: ::name = ::evaluated_value"
+  }
+
+  # Execute assignment
+  on execute_assignment {
+    set ::statement = $1
+    set ::name = ::statement.name
+    set ::value = ::statement.value
+    
+    # Evaluate the value if it's an expression
+    if ::value.type == "expression" {
+      emit evaluate_expression with ::value
+      set ::evaluated_value = ::result
+    } else {
+      set ::evaluated_value = ::value
+    }
+    
+    # Update variable in current scope
+    set ::interpreter.variables[::name] = ::evaluated_value
+    
+    say "📝 Assignment: ::name = ::evaluated_value"
+  }
+
+  # Execute say statement
+  on execute_say_statement {
+    set ::statement = $1
+    set ::message = ::statement.message
+    
+    # Evaluate message if it's an expression
+    if ::message.type == "expression" {
+      emit evaluate_expression with ::message
+      set ::evaluated_message = ::result
+    } else {
+      set ::evaluated_message = ::message
+    }
+    
+    say ::evaluated_message
+  }
+
+  # Execute emit statement
+  on execute_emit_statement {
+    set ::statement = $1
+    set ::event_name = ::statement.event_name
+    set ::payload = ::statement.payload
+    
+    # Evaluate payload if it's an expression
+    if ::payload.type == "expression" {
+      emit evaluate_expression with ::payload
+      set ::evaluated_payload = ::result
+    } else {
+      set ::evaluated_payload = ::payload
+    }
+    
+    say "📡 Emitting event: ::event_name with ::evaluated_payload"
+    
+    # Trigger event handlers
+    emit ::event_name with ::evaluated_payload
+  }
+
+  # Evaluate expression
+  on evaluate_expression {
+    set ::expression = $1
+    
+    if ::expression.type == "binary_expression" {
+      emit evaluate_binary_expression with ::expression
+    } else if ::expression.type == "identifier" {
+      set ::result = ::interpreter.variables[::expression.name] or "undefined"
+    } else if ::expression.type == "literal" {
+      set ::result = ::expression.value
+    } else if ::expression.type == "function_call" {
+      emit evaluate_function_call with ::expression
+    }
+  }
+
+  # Evaluate binary expression
+  on evaluate_binary_expression {
+    set ::expression = $1
+    set ::operator = ::expression.operator
+    set ::left = ::expression.left
+    set ::right = ::expression.right
+    
+    # Evaluate left and right operands
+    emit evaluate_expression with ::left
+    set ::left_value = ::result
+    
+    emit evaluate_expression with ::right
+    set ::right_value = ::result
+    
+    # Perform operation
+    if ::operator == "+" {
+      set ::result = ::left_value + ::right_value
+    } else if ::operator == "-" {
+      set ::result = ::left_value - ::right_value
+    } else if ::operator == "*" {
+      set ::result = ::left_value * ::right_value
+    } else if ::operator == "/" {
+      set ::result = ::left_value / ::right_value
+    } else if ::operator == "==" {
+      set ::result = ::left_value == ::right_value
+    } else if ::operator == "!=" {
+      set ::result = ::left_value != ::right_value
+    } else if ::operator == ">" {
+      set ::result = ::left_value > ::right_value
+    } else if ::operator == "<" {
+      set ::result = ::left_value < ::right_value
+    } else if ::operator == ">=" {
+      set ::result = ::left_value >= ::right_value
+    } else if ::operator == "<=" {
+      set ::result = ::left_value <= ::right_value
+    }
+  }
+
+  # Error handling
+  on error.unterminated_string {
+    set ::line = $1
+    set ::column = $2
+    
+    say "❌ Error: Unterminated string at line ::line, column ::column"
+    set ::interpreter.execution_context.error_count = ::interpreter.execution_context.error_count + 1
+  }
+
+  # Execution complete
+  on execution.complete {
+    set ::status = $1
+    
+    say "✅ AZL v2 execution completed with status: ::status"
+    say "📊 Execution summary:"
+    say "   - Variables: ::interpreter.variables.length"
+    say "   - Functions: ::interpreter.functions.length"
+    say "   - Components: ::interpreter.components.length"
+    say "   - Errors: ::interpreter.execution_context.error_count"
+    say "   - Warnings: ::interpreter.execution_context.warning_count"
+  }
+
+  # Utility function to get file content (placeholder)
+  on get_file_content {
+    set ::file_path = $1
+    
+    # In a real implementation, this would read from disk
+    # For now, return a placeholder
+    if ::file_path == "azl/testing/azl_v2_test.azl" {
+      return "# AZL v2 Test File\nlet name = \"AZME\"\nsay \"Hello, \" + name"
+    }
+    
+    return null
+  }
+
+  memory {
+    ::status = "ready"
+    ::interpreter = {}
+    ::parser = {}
+    ::loaded_files = {}
+    ::execution_results = {}
+  }
+} 

@@ -1,0 +1,206 @@
+component ::test.math {
+  init {
+    set ::a = 5
+    set ::b = 3
+    set ::c = 2
+    set ::x = 10
+    set ::y = 5
+    
+    say "🧪 Starting Math Tests..."
+    emit "test.math.initialized" with { a: ::a, b: ::b, c: ::c }
+  }
+
+  behavior {
+    // Test basic arithmetic assertions
+    listen for "test_basic_math" then {
+      say "🔢 Testing Basic Math Assertions..."
+      
+      // Test addition
+      emit "assert" with { expression: "3 + 4 == 7", test_name: "addition_test" }
+      
+      // Test multiplication
+      emit "assert" with { expression: "2 * 5 == 10", test_name: "multiplication_test" }
+      
+      // Test division
+      emit "assert" with { expression: "6 / 2 == 3", test_name: "division_test" }
+      
+      // Test subtraction
+      emit "assert" with { expression: "10 - 3 == 7", test_name: "subtraction_test" }
+      
+      // Test complex expression
+      emit "assert" with { expression: "::a + ::b * ::c == 11", test_name: "complex_expression_test" }
+      
+      // Test variable substitution
+      emit "assert" with { expression: "::x + ::y == 15", test_name: "variable_substitution_test" }
+      
+      // Test that should fail
+      emit "assert" with { expression: "1 + 1 == 3", test_name: "intentional_fail_test" }
+      
+      emit "basic_math_tests.complete"
+    }
+
+    // Test comparison operators
+    listen for "test_comparisons" then {
+      say "🔍 Testing Comparison Operators..."
+      
+      // Test equality
+      emit "assert" with { expression: "5 == 5", test_name: "equality_test" }
+      emit "assert" with { expression: "5 != 3", test_name: "not_equals_test" }
+      
+      // Test inequalities
+      emit "assert" with { expression: "3 < 5", test_name: "less_than_test" }
+      emit "assert" with { expression: "5 > 3", test_name: "greater_than_test" }
+      emit "assert" with { expression: "5 <= 5", test_name: "less_equals_test" }
+      emit "assert" with { expression: "5 >= 3", test_name: "greater_equals_test" }
+      
+      // Test with variables
+      emit "assert" with { expression: "::a > ::b", test_name: "variable_comparison_test" }
+      emit "assert" with { expression: "::x >= ::y", test_name: "variable_greater_equals_test" }
+      
+      // Test that should fail
+      emit "assert" with { expression: "3 > 5", test_name: "intentional_comparison_fail" }
+      
+      emit "comparison_tests.complete"
+    }
+
+    // Test mathematical functions
+    listen for "test_math_functions" then {
+      say "📊 Testing Math Functions..."
+      
+      // Test absolute value
+      emit "assert" with { expression: "::math.abs(-5) == 5", test_name: "abs_test" }
+      
+      // Test floor function
+      emit "assert" with { expression: "::math.floor(3.7) == 3", test_name: "floor_test" }
+      
+      // Test square root
+      emit "assert" with { expression: "::math.sqrt(16) == 4", test_name: "sqrt_test" }
+      
+      // Test random number (should be between 0 and 1)
+      emit "check" with { expression: "::math.random() >= 0", test_name: "random_lower_bound_test" }
+      emit "check" with { expression: "::math.random() <= 1", test_name: "random_upper_bound_test" }
+      
+      emit "math_functions_tests.complete"
+    }
+
+    // Test error conditions
+    listen for "test_error_conditions" then {
+      say "⚠️ Testing Error Conditions..."
+      
+      // Test division by zero (should be handled gracefully)
+      emit "check" with { expression: "5 / 0 == 0", test_name: "division_by_zero_test" }
+      
+      // Test invalid expressions
+      emit "check" with { expression: "invalid + expression", test_name: "invalid_expression_test" }
+      
+      emit "error_condition_tests.complete"
+    }
+
+    // Run all tests
+    listen for "run_all_tests" then {
+      say "🚀 Running All Math Tests..."
+      
+      emit "test_basic_math"
+      listen for "basic_math_tests.complete" then {
+        emit "test_comparisons"
+        listen for "comparison_tests.complete" then {
+          emit "test_math_functions"
+          listen for "math_functions_tests.complete" then {
+            emit "test_error_conditions"
+            listen for "error_condition_tests.complete" then {
+              emit "report"
+            }
+          }
+        }
+      }
+    }
+
+    // Test suite setup
+    listen for "setup_test_suite" then {
+      say "📋 Setting up Math Test Suite..."
+      
+      emit "set_suite" with { name: "Math Operations Test Suite" }
+      emit "reset"
+      
+      say "✅ Test suite ready"
+      emit "test_suite.ready"
+    }
+  }
+
+  memory {
+    a
+    b
+    c
+    x
+    y
+  }
+
+  interface {
+    test_basic_math
+    test_comparisons
+    test_math_functions
+    test_error_conditions
+    run_all_tests
+    setup_test_suite
+  }
+}
+
+// Test runner component
+component ::test.runner {
+  init {
+    set ::status = "ready"
+    emit "test.runner.initialized"
+  }
+
+  behavior {
+    // Run the math test suite
+    listen for "run_math_tests" then {
+      say "🧪 AZL Testing Framework Demo"
+      say "================================"
+      
+      // Setup test suite
+      emit "setup_test_suite"
+      listen for "test_suite.ready" then {
+        // Run all tests
+        emit "run_all_tests"
+      }
+    }
+
+    // Run specific test categories
+    listen for "run_basic_tests" then {
+      emit "test_basic_math"
+    }
+
+    listen for "run_comparison_tests" then {
+      emit "test_comparisons"
+    }
+
+    listen for "run_function_tests" then {
+      emit "test_math_functions"
+    }
+
+    // Generate final report
+    listen for "generate_report" then {
+      emit "report"
+      listen for "test.report.complete" then {
+        say "🎉 Testing complete!"
+        say "📊 Final Results:"
+        say "  - Passed: ::pass_count"
+        say "  - Failed: ::fail_count"
+        say "  - Success Rate: ::success_rate%"
+      }
+    }
+  }
+
+  memory {
+    status
+  }
+
+  interface {
+    run_math_tests
+    run_basic_tests
+    run_comparison_tests
+    run_function_tests
+    generate_report
+  }
+} 

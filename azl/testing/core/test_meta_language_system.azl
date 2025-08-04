@@ -1,0 +1,228 @@
+# Test Meta-Language System
+# Demonstrates AZL's universal code transformation capabilities
+
+component ::test.meta_language {
+  init {
+    set ::status = "initializing"
+    set ::test_results = []
+    
+    # Link to meta-language components
+    link ::meta_language.orchestrator
+    link ::meta_language.universal_ast
+    link ::meta_language.python_parser
+    link ::meta_language.transformation_engine
+    
+    # Link to autonomous brain
+    link ::agent.autonomous_brain
+    
+    emit "test.meta_language.initialized" with {
+      status: ::status,
+      components: ["orchestrator", "universal_ast", "python_parser", "transformation_engine"]
+    }
+    
+    set ::status = "ready"
+    say "🧪 Meta-Language System Test initialized"
+  }
+
+  behavior {
+    # Test universal AST schema
+    listen for "test.ast_schema" then {
+      say "🧪 Testing Universal AST Schema..."
+      
+      # Test AST node creation
+      set ::test_function = {
+        type: "FunctionDeclaration",
+        name: "test_function",
+        params: [
+          { type: "Identifier", name: "x" },
+          { type: "Identifier", name: "y" }
+        ],
+        body: [
+          {
+            type: "ReturnStatement",
+            argument: {
+              type: "BinaryExpression",
+              operator: "+",
+              left: { type: "Identifier", name: "x" },
+              right: { type: "Identifier", name: "y" }
+            }
+          }
+        ]
+      }
+      
+      emit "ast.create_node" with { node_data: ::test_function }
+      
+      # Test AST validation
+      emit "ast.validate" with { ast: ::test_function }
+      
+      # Test AST query
+      emit "ast.query" with {
+        pattern: { type: "FunctionDeclaration" },
+        ast: ::test_function
+      }
+    }
+    
+    # Test Python parser
+    listen for "test.python_parser" then {
+      say "🧪 Testing Python Parser..."
+      
+      set ::test_python_code = "def add_numbers(x, y):\n    return x + y\n\nresult = add_numbers(5, 3)\nprint(result)"
+      
+      emit "python.parse_source" with {
+        source: ::test_python_code,
+        file_path: "test_function.py"
+      }
+    }
+    
+    # Test transformation engine
+    listen for "test.transformation_engine" then {
+      say "🧪 Testing Transformation Engine..."
+      
+      set ::test_ast = {
+        type: "Program",
+        body: [
+          {
+            type: "FunctionDeclaration",
+            name: "long_function",
+            params: [],
+            body: [
+              { type: "ExpressionStatement", expression: { type: "Literal", value: "Hello" } },
+              { type: "ExpressionStatement", expression: { type: "Literal", value: "World" } },
+              { type: "ExpressionStatement", expression: { type: "Literal", value: "Test" } }
+            ]
+          }
+        ]
+      }
+      
+      emit "transform.analyze" with {
+        ast: ::test_ast,
+        options: { add_logging: true, optimize_performance: true }
+      }
+    }
+    
+    # Test complete transformation pipeline
+    listen for "test.complete_pipeline" then {
+      say "🧪 Testing Complete Transformation Pipeline..."
+      
+      set ::test_source = "def calculate_sum(a, b):\n    result = a + b\n    return result\n\nx = 10\ny = 20\nz = calculate_sum(x, y)\nprint(z)"
+      
+      emit "meta_language.transform_code" with {
+        source: ::test_source,
+        language: "python",
+        target_language: "python",
+        transformations: ["add_logging", "optimize_performance"],
+        options: { preserve_formatting: true }
+      }
+    }
+    
+    # Handle test results
+    listen for "ast.node_created" then {
+      say "✅ AST node created successfully"
+      set ::test_results.push({ test: "ast_creation", success: true })
+    }
+    
+    listen for "ast.valid" then {
+      say "✅ AST validation successful"
+      set ::test_results.push({ test: "ast_validation", success: true })
+    }
+    
+    listen for "ast.query_result" then {
+      say "✅ AST query successful"
+      say "📊 Matches found: $1.count"
+      set ::test_results.push({ test: "ast_query", success: true, matches: $1.count })
+    }
+    
+    listen for "python.parse_complete" then {
+      say "✅ Python parsing successful"
+      say "📊 Universal AST nodes: $1.universal_ast.body.length"
+      set ::test_results.push({ test: "python_parsing", success: true, nodes: $1.universal_ast.body.length })
+    }
+    
+    listen for "transform.analysis_complete" then {
+      say "✅ Transformation analysis successful"
+      say "💡 Suggestions: $1.suggestions.length"
+      set ::test_results.push({ test: "transformation_analysis", success: true, suggestions: $1.suggestions.length })
+    }
+    
+    listen for "meta_language.transform_complete" then {
+      say "✅ Complete transformation pipeline successful"
+      set ::test_results.push({ test: "complete_pipeline", success: true })
+      
+      # Run all tests
+      emit "test.run_all_tests"
+    }
+    
+    # Run comprehensive test suite
+    listen for "test.run_all_tests" then {
+      say "🧪 Running comprehensive meta-language test suite..."
+      
+      # Test 1: AST Schema
+      emit "test.ast_schema"
+      
+      # Test 2: Python Parser
+      emit "test.python_parser"
+      
+      # Test 3: Transformation Engine
+      emit "test.transformation_engine"
+      
+      # Test 4: Complete Pipeline
+      emit "test.complete_pipeline"
+    }
+    
+    # Generate test report
+    listen for "test.generate_report" then {
+      say "📊 Generating Meta-Language Test Report..."
+      
+      set ::report = {
+        total_tests: ::test_results.length,
+        passed_tests: 0,
+        failed_tests: 0,
+        test_details: ::test_results
+      }
+      
+      loop for ::result in ::test_results {
+        if ::result.success {
+          set ::report.passed_tests = ::report.passed_tests + 1
+        } else {
+          set ::report.failed_tests = ::report.failed_tests + 1
+        }
+      }
+      
+      say "📊 Test Report:"
+      say "✅ Passed: ::report.passed_tests"
+      say "❌ Failed: ::report.failed_tests"
+      say "📋 Total: ::report.total_tests"
+      
+      emit "test.report_complete" with { report: ::report }
+    }
+  }
+
+  memory {
+    ::status = ""
+    ::test_results = []
+  }
+}
+
+# Test execution
+component ::test.executor {
+  init {
+    say "🚀 Starting Meta-Language System Tests..."
+    emit "test.run_all_tests"
+  }
+  
+  behavior {
+    listen for "test.report_complete" then {
+      say "🎉 Meta-Language System Test Suite Complete!"
+      say "📊 Final Results:"
+      say "✅ Passed: $1.report.passed_tests"
+      say "❌ Failed: $1.report.failed_tests"
+      say "📋 Total: $1.report.total_tests"
+      
+      if $1.report.failed_tests == 0 {
+        say "🎉 All tests passed! Meta-language system is working correctly."
+      } else {
+        say "⚠️ Some tests failed. Review the results for issues."
+      }
+    }
+  }
+} 

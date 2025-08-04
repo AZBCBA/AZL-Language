@@ -1,0 +1,273 @@
+# AZME Behavior Manager with ABA Integration
+# Manages behavior execution, chaining, and ABA trial logging
+
+component ::azme.behavior_manager {
+  init {
+    set ::status = "initializing"
+    set ::behavior_chains = {}
+    set ::current_behavior = {}
+    set ::behavior_history = []
+    set ::aba_trials = []
+    
+    # Link to AZL ABA functions
+    link ::aba_trial_engine
+    link ::aba_discrete_trial_training
+    
+    # Link to AZME components
+    link ::azme.cognitive.cognitive_loop
+    link ::azme.planning.goal_system
+    
+    emit "azme.behavior_manager.initialized" with {
+      status: ::status,
+      behavior_chains: ::behavior_chains.length
+    }
+    
+    set ::status = "ready"
+    say "🎭 AZME BehaviorManager initialized with ABA integration"
+  }
+
+  # Behavior execution with ABA integration
+  behavior {
+    listen for "behavior.execute" then {
+      execute_behavior($1)
+    }
+    
+    listen for "behavior.complete" then {
+      process_behavior_outcome($1)
+    }
+    
+    listen for "behavior.chain.define" then {
+      define_behavior_chain($1)
+    }
+    
+    listen for "behavior.shape" then {
+      shape_behavior($1)
+    }
+  }
+
+  # Execute a behavior with ABA trial logging
+  function execute_behavior(behavior_data) {
+    say "🎭 Executing behavior: " + behavior_data.behavior
+    say "📊 Complexity: " + behavior_data.complexity
+    say "🎯 Target: " + behavior_data.target
+    
+    # Set current behavior
+    set ::current_behavior = behavior_data
+    
+    # Log ABA trial for behavior execution
+    let trial_data = "antecedent: behavior_request; behavior: " + behavior_data.behavior + "; consequence: executing"
+    emit "azl.execute_command" with { command: "apply_trial \"" + trial_data + "\"" }
+    
+    # Check if this is a complex behavior that needs chaining
+    if behavior_data.complexity == "high" || behavior_data.complexity == "very_high" {
+      say "🔗 Complex behavior detected - using behavior chaining..."
+      
+      # Define behavior chain for complex behaviors
+      let chain_name = behavior_data.behavior + "_chain"
+      let chain_steps = generate_behavior_chain_steps(behavior_data)
+      let chain_definition = chain_name + ": " + chain_steps
+      
+      emit "azl.execute_command" with { command: "define_chain \"" + chain_definition + "\"" }
+      say "🔗 Behavior chain defined for complex behavior"
+    }
+    
+    # Execute the behavior
+    let result = perform_behavior_execution(behavior_data)
+    
+    # Log outcome
+    emit "behavior.complete" with {
+      behavior: behavior_data.behavior,
+      success: result.success,
+      score: result.score,
+      duration: result.duration
+    }
+    
+    say "✅ Behavior execution completed"
+  }
+
+  # Generate behavior chain steps for complex behaviors
+  function generate_behavior_chain_steps(behavior_data) {
+    let steps = []
+    
+    if behavior_data.behavior.includes("learning") {
+      steps = ["step1=analyze_requirements", "step2=create_plan", "step3=execute_learning", "step4=evaluate_progress", "step5=adjust_strategy"]
+    } else if behavior_data.behavior.includes("problem_solving") {
+      steps = ["step1=identify_problem", "step2=analyze_constraints", "step3=generate_solutions", "step4=test_solutions", "step5=implement_best"]
+    } else if behavior_data.behavior.includes("communication") {
+      steps = ["step1=understand_context", "step2=formulate_message", "step3=deliver_communication", "step4=monitor_response", "step5=adapt_approach"]
+    } else {
+      steps = ["step1=prepare", "step2=execute", "step3=monitor", "step4=adjust", "step5=complete"]
+    }
+    
+    return steps.join(", ")
+  }
+
+  # Process behavior outcome with ABA reinforcement
+  function process_behavior_outcome(outcome_data) {
+    say "📊 Processing behavior outcome..."
+    say "🎭 Behavior: " + outcome_data.behavior
+    say "✅ Success: " + outcome_data.success
+    say "📈 Score: " + outcome_data.score
+    
+    # Log ABA trial for behavior outcome
+    let trial_data = "antecedent: behavior_execution; behavior: " + outcome_data.behavior + "; consequence: " + (outcome_data.success ? "success" : "failure")
+    emit "azl.execute_command" with { command: "apply_trial \"" + trial_data + "\"" }
+    
+    # Apply reinforcement based on outcome
+    if outcome_data.success {
+      increment ::successful_behaviors
+      emit "azl.execute_command" with { command: "reinforce_behavior successful_behavior" }
+      say "🎁 Reinforcing successful behavior"
+    } else {
+      increment ::failed_behaviors
+      emit "azl.execute_command" with { command: "reinforce_behavior failed_behavior" }
+      say "🎁 Reinforcing failed behavior (for learning)"
+    }
+    
+    # Analyze consequences
+    emit "azl.execute_command" with { command: "analyze_consequence" }
+    
+    # Store in behavior history
+    store ::behavior_history from ::behavior_history.push({
+      behavior: outcome_data.behavior,
+      success: outcome_data.success,
+      score: outcome_data.score,
+      duration: outcome_data.duration,
+      timestamp: now()
+    })
+    
+    # Update shaping progress if applicable
+    if ::current_behavior && ::current_behavior.shaping_target {
+      update_shaping_progress(outcome_data)
+    }
+    
+    say "📊 Behavior outcome processed with ABA integration"
+  }
+
+  # Define a behavior chain using ABA principles
+  function define_behavior_chain(chain_data) {
+    say "🔗 Defining behavior chain..."
+    say "📋 Chain: " + chain_data.name
+    say "🔢 Steps: " + chain_data.steps.length
+    
+    # Create behavior chain
+    let chain = {
+      name: chain_data.name,
+      steps: chain_data.steps,
+      current_step: 0,
+      success_count: 0,
+      total_attempts: 0
+    }
+    
+    # Add to behavior chains
+    store ::behavior_chains from ::behavior_chains.push(chain)
+    
+    # Log ABA trial for chain definition
+    let trial_data = "antecedent: chain_definition; behavior: define_chain; consequence: chain_created"
+    emit "azl.execute_command" with { command: "apply_trial \"" + trial_data + "\"" }
+    
+    say "🔗 Behavior chain defined with ABA integration"
+  }
+
+  # Shape behavior using ABA principles
+  function shape_behavior(shaping_data) {
+    say "🎨 Shaping behavior..."
+    say "🎯 Target: " + shaping_data.target
+    say "📊 Current level: " + shaping_data.current_level
+    say "📈 Target level: " + shaping_data.target_level
+    
+    # Initialize shaping progress
+    if !::shaping_progress[shaping_data.target] {
+      set ::shaping_progress[shaping_data.target] = {
+        current_level: shaping_data.current_level,
+        target_level: shaping_data.target_level,
+        steps_completed: 0,
+        total_steps: shaping_data.steps.length,
+        success_rate: 0.0
+      }
+    }
+    
+    # Use AZL's shape_behavior command for advanced shaping
+    let shaping_command = "shape_behavior \"" + shaping_data.target + ": current=" + shaping_data.current_level + ", target=" + shaping_data.target_level + ", steps=" + shaping_data.steps.length + "\""
+    emit "azl.execute_command" with { command: shaping_command }
+    
+    # Execute shaping steps
+    for (let step of shaping_data.steps) {
+      say "🎨 Executing shaping step: " + step.behavior
+      
+      # Log ABA trial for shaping step
+      let trial_data = "antecedent: behavior_shaping; behavior: " + step.behavior + "; consequence: shaping_step"
+      emit "azl.execute_command" with { command: "apply_trial \"" + trial_data + "\"" }
+      
+      # Execute the step
+      let step_result = perform_behavior_execution({
+        behavior: step.behavior,
+        complexity: step.complexity,
+        target: shaping_data.target
+      })
+      
+      # Update shaping progress
+      if step_result.success {
+        increment ::shaping_progress[shaping_data.target].steps_completed
+        emit "azl.execute_command" with { command: "reinforce_behavior shaping_step_success" }
+        say "🎁 Reinforcing successful shaping step"
+      }
+    }
+    
+    # Calculate success rate
+    let progress = ::shaping_progress[shaping_data.target]
+    progress.success_rate = progress.steps_completed / progress.total_steps
+    
+    say "🎨 Behavior shaping completed with ABA integration"
+  }
+
+  # Perform actual behavior execution (simulated)
+  function perform_behavior_execution(behavior_data) {
+    // Simulate behavior execution
+    let success = Math.random() > 0.3  // 70% success rate
+    let score = success ? Math.random() * 0.5 + 0.5 : Math.random() * 0.3
+    let duration = Math.random() * 1000 + 500  // 500-1500ms
+    
+    return {
+      success: success,
+      score: score,
+      duration: duration
+    }
+  }
+
+  # Update shaping progress
+  function update_shaping_progress(outcome_data) {
+    let target = ::current_behavior.shaping_target
+    let progress = ::shaping_progress[target]
+    
+    if outcome_data.success {
+      increment progress.steps_completed
+    }
+    
+    progress.success_rate = progress.steps_completed / progress.total_steps
+    
+    say "📈 Shaping progress updated for " + target + ": " + progress.success_rate
+  }
+
+  # Get behavior manager statistics
+  function get_behavior_stats() {
+    return {
+      successful_behaviors: ::successful_behaviors,
+      failed_behaviors: ::failed_behaviors,
+      success_rate: ::successful_behaviors / (::successful_behaviors + ::failed_behaviors + 1),
+      behavior_chains: ::behavior_chains.length,
+      behavior_history_length: ::behavior_history.length,
+      shaping_targets: Object.keys(::shaping_progress).length
+    }
+  }
+
+  memory {
+    status
+    behavior_chains
+    current_behavior
+    behavior_history
+    successful_behaviors
+    failed_behaviors
+    shaping_progress
+  }
+} 

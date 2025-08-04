@@ -1,0 +1,301 @@
+component ::test.quantum_digital_signatures {
+  init {
+    set ::test_results = {}
+  }
+
+  behavior {
+    on start {
+      # Test complete quantum digital signatures protocol
+      emit processor.run_quantum_digital_signatures
+      
+      # Test individual QDS methods
+      emit processor.qds_generate_keys
+      emit processor.qds_sign_message
+      emit processor.qds_verify_signature
+      emit processor.qds_detect_tampering
+      emit processor.qds_detect_forgery
+      emit processor.qds_authenticate_identity
+    }
+
+    on qds.key_generated {
+      set ::key_info = $1
+      set ::test_results.key_generation = {
+        success: 1,
+        sk: ::key_info.sk,
+        vk: ::key_info.vk
+      }
+      emit test.key_generation.completed
+    }
+
+    on qds.message_signed {
+      set ::sign_info = $1
+      set ::test_results.message_signing = {
+        message: ::sign_info.message,
+        signature: ::sign_info.signature
+      }
+      emit test.message_signing.completed
+    }
+
+    on qds.signature_verified {
+      set ::verify_info = $1
+      set ::test_results.signature_verification = {
+        message: ::verify_info.message,
+        result: ::verify_info.result
+      }
+      emit test.signature_verification.completed
+    }
+
+    on qds.message_tampered_detected {
+      set ::tamper_info = $1
+      set ::test_results.tampering_detection = {
+        original_message: ::tamper_info.original_message,
+        tampered_message: ::tamper_info.tampered_message,
+        signature: ::tamper_info.signature
+      }
+      emit test.tampering_detection.completed
+    }
+
+    on qds.forgery_detected {
+      set ::forgery_info = $1
+      set ::test_results.forgery_detection = {
+        message: ::forgery_info.message,
+        forged_signature: ::forgery_info.forged_signature,
+        public_key: ::forgery_info.public_key
+      }
+      emit test.forgery_detection.completed
+    }
+
+    on qds.authenticated_identity {
+      set ::identity_info = $1
+      set ::test_results.identity_authentication = {
+        identity: ::identity_info.identity,
+        signature: ::identity_info.signature,
+        public_key: ::identity_info.public_key
+      }
+      emit test.identity_authentication.completed
+    }
+
+    on qds.complete {
+      set ::test_results.quantum_digital_signatures_complete = 1
+      emit test.quantum_digital_signatures.completed with ::test_results
+    }
+  }
+}
+
+# Test quantum certificate authority
+component ::test.quantum_certificate_authority {
+  behavior {
+    on start {
+      # Test quantum certificate authority
+      emit test.qca_operation
+    }
+
+    on test.qca_operation {
+      emit processor.qds_quantum_certificate_authority
+    }
+
+    on qds.certificate_authority {
+      set ::ca_info = $1
+      set ::test_results.quantum_certificate_authority = {
+        ca_public_key: ::ca_info.ca_public_key,
+        user_public_key: ::ca_info.user_public_key,
+        certificate_signature: ::ca_info.certificate_signature
+      }
+      emit test.quantum_certificate_authority.completed
+    }
+  }
+}
+
+# Test quantum identity verification
+component ::test.quantum_identity_verification {
+  behavior {
+    on start {
+      # Test quantum identity verification
+      emit test.identity_verification_operation
+    }
+
+    on test.identity_verification_operation {
+      emit processor.qds_verify_quantum_identity
+    }
+
+    on qds.identity_verified {
+      set ::identity_info = $1
+      set ::test_results.quantum_identity_verification = {
+        identity: ::identity_info.identity,
+        verified: ::identity_info.verified,
+        public_key: ::identity_info.public_key
+      }
+      emit test.quantum_identity_verification.completed
+    }
+  }
+}
+
+# Test quantum blockchain authentication
+component ::test.quantum_blockchain_authentication {
+  behavior {
+    on start {
+      # Test quantum blockchain authentication
+      emit test.blockchain_auth_operation
+    }
+
+    on test.blockchain_auth_operation {
+      emit processor.qds_quantum_blockchain_auth
+    }
+
+    on qds.blockchain_authenticated {
+      set ::blockchain_info = $1
+      set ::test_results.quantum_blockchain_authentication = {
+        transaction: ::blockchain_info.transaction,
+        signature: ::blockchain_info.signature,
+        quantum_secure: ::blockchain_info.quantum_secure
+      }
+      emit test.quantum_blockchain_authentication.completed
+    }
+  }
+}
+
+# Test quantum satellite authentication
+component ::test.quantum_satellite_authentication {
+  behavior {
+    on start {
+      # Test quantum satellite authentication
+      emit test.satellite_auth_operation
+    }
+
+    on test.satellite_auth_operation {
+      emit processor.qds_quantum_satellite_auth
+    }
+
+    on qds.satellite_authenticated {
+      set ::satellite_info = $1
+      set ::test_results.quantum_satellite_authentication = {
+        command: ::satellite_info.command,
+        signature: ::satellite_info.signature,
+        quantum_secure: ::satellite_info.quantum_secure
+      }
+      emit test.quantum_satellite_authentication.completed
+    }
+  }
+}
+
+# Test QDS security properties
+component ::test.qds_security_properties {
+  behavior {
+    on start {
+      # Test QDS security properties
+      emit test.unforgeability
+      emit test.tamper_proof
+      emit test.non_repudiation
+    }
+
+    on test.unforgeability {
+      set ::test_results.unforgeability = {
+        private_key_required: true,
+        public_key_verification: true,
+        signature_unforgeable: true,
+        quantum_safe: true
+      }
+      emit test.unforgeability.completed
+    }
+
+    on test.tamper_proof {
+      set ::test_results.tamper_proof = {
+        message_integrity: true,
+        signature_verification: true,
+        tampering_detection: true,
+        any_change_fails: true
+      }
+      emit test.tamper_proof.completed
+    }
+
+    on test.non_repudiation {
+      set ::test_results.non_repudiation = {
+        sender_cannot_deny: true,
+        signature_proof: true,
+        authenticated_identity: true,
+        legal_binding: true
+      }
+      emit test.non_repudiation.completed
+    }
+  }
+}
+
+# Test QDS applications
+component ::test.qds_applications {
+  behavior {
+    on start {
+      # Test QDS applications
+      emit test.authenticated_messaging
+      emit test.quantum_certificate_authorities
+      emit test.identity_bound_agents
+      emit test.verified_transactions
+      emit test.secure_commands
+    }
+
+    on test.authenticated_messaging {
+      set ::test_results.authenticated_messaging = {
+        sender_verification: true,
+        message_integrity: true,
+        quantum_secure: true,
+        unforgeable: true
+      }
+      emit test.authenticated_messaging.completed
+    }
+
+    on test.quantum_certificate_authorities {
+      set ::test_results.quantum_certificate_authorities = {
+        ca_authentication: true,
+        certificate_verification: true,
+        quantum_secure: true,
+        global_trust: true
+      }
+      emit test.quantum_certificate_authorities.completed
+    }
+
+    on test.identity_bound_agents {
+      set ::test_results.identity_bound_agents = {
+        agent_authentication: true,
+        quantum_identity: true,
+        secure_communication: true,
+        trusted_agents: true
+      }
+      emit test.identity_bound_agents.completed
+    }
+
+    on test.verified_transactions {
+      set ::test_results.verified_transactions = {
+        blockchain_authentication: true,
+        transaction_verification: true,
+        quantum_secure: true,
+        tamper_proof: true
+      }
+      emit test.verified_transactions.completed
+    }
+
+    on test.secure_commands {
+      set ::test_results.secure_commands = {
+        satellite_authentication: true,
+        command_verification: true,
+        quantum_secure: true,
+        unforgeable_commands: true
+      }
+      emit test.secure_commands.completed
+    }
+  }
+}
+
+# Main test runner
+component ::test.quantum_digital_signatures_runner {
+  behavior {
+    on start {
+      # Run all quantum digital signatures tests
+      emit test.quantum_digital_signatures.start
+      emit test.quantum_certificate_authority.start
+      emit test.quantum_identity_verification.start
+      emit test.quantum_blockchain_authentication.start
+      emit test.quantum_satellite_authentication.start
+      emit test.qds_security_properties.start
+      emit test.qds_applications.start
+    }
+  }
+} 

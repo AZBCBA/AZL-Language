@@ -1,0 +1,463 @@
+// AZL Main Runtime Test Suite
+// Validates self-bootstrapped, conscious, AZL-native system execution
+
+component ::main.test {
+  init {
+    set ::test_status = "initializing"
+    set ::test_results = []
+    set ::consciousness_level = 0.1
+    
+    // Link to core systems
+    link ::bootstrap::core
+    link ::compiler::core
+    link ::runtime::loop
+    link ::monitor::status
+    link ::debug::tracer
+    link ::memory::lha3
+    link ::quantum::processor
+    link ::consciousness::core
+    link ::conscious::goal_selector
+    link ::meta::learner
+    
+    emit "main.initialized" with ::test_status
+  }
+
+  behavior {
+    // Main test execution
+    listen for "run_tests" then {
+      set ::test_status = "running"
+      reflect ::main.test_status
+      
+      // Test 1: Compiler Loading
+      store ::compiler_test from ::test_compiler_loading()
+      branch when ::compiler_test = true {
+        store ::test_results from ::test_results.push("compiler_loading: PASS")
+        emit "test.pass" with "compiler_loading"
+      } else {
+        store ::test_results from ::test_results.push("compiler_loading: FAIL")
+        emit "test.fail" with "compiler_loading"
+      }
+      
+      // Test 2: Bootstrap Execution
+      store ::bootstrap_test from ::test_bootstrap_execution()
+      branch when ::bootstrap_test = true {
+        store ::test_results from ::test_results.push("bootstrap_execution: PASS")
+        emit "test.pass" with "bootstrap_execution"
+      } else {
+        store ::test_results from ::test_results.push("bootstrap_execution: FAIL")
+        emit "test.fail" with "bootstrap_execution"
+      }
+      
+      // Test 3: Event System
+      store ::event_test from ::test_event_system()
+      branch when ::event_test = true {
+        store ::test_results from ::test_results.push("event_system: PASS")
+        emit "test.pass" with "event_system"
+      } else {
+        store ::test_results from ::test_results.push("event_system: FAIL")
+        emit "test.fail" with "event_system"
+      }
+      
+      // Test 4: Reflection System
+      store ::reflection_test from ::test_reflection_system()
+      branch when ::reflection_test = true {
+        store ::test_results from ::test_results.push("reflection_system: PASS")
+        emit "test.pass" with "reflection_system"
+      } else {
+        store ::test_results from ::test_results.push("reflection_system: FAIL")
+        emit "test.fail" with "reflection_system"
+      }
+      
+      // Test 5: Consciousness Logic
+      store ::consciousness_test from ::test_consciousness_logic()
+      branch when ::consciousness_test = true {
+        store ::test_results from ::test_results.push("consciousness_logic: PASS")
+        emit "test.pass" with "consciousness_logic"
+      } else {
+        store ::test_results from ::test_results.push("consciousness_logic: FAIL")
+        emit "test.fail" with "consciousness_logic"
+      }
+      
+      // Test 6: Runtime Loop
+      store ::runtime_test from ::test_runtime_loop()
+      branch when ::runtime_test = true {
+        store ::test_results from ::test_results.push("runtime_loop: PASS")
+        emit "test.pass" with "runtime_loop"
+      } else {
+        store ::test_results from ::test_results.push("runtime_loop: FAIL")
+        emit "test.fail" with "runtime_loop"
+      }
+      
+      // Final test summary
+      store ::pass_count from ::count_passed_tests()
+      branch when ::pass_count = 6 {
+        set ::test_status = "all_passed"
+        emit "test.complete" with "ALL TESTS PASSED - AZL IS ALIVE"
+      } else {
+        set ::test_status = "partial_failure"
+        emit "test.complete" with "PARTIAL FAILURE - " + ::pass_count + "/6 tests passed"
+      }
+    }
+
+    // Test 1: Compiler Loading
+    listen for "test_compiler_loading" then {
+      reflect ::compiler.version
+      branch when ::compiler.version != null {
+        emit "compiler.loaded" with ::compiler.version
+        emit "test.result" with true
+      } else {
+        emit "compiler.failed" with "version_not_found"
+        emit "test.result" with false
+      }
+    }
+
+    // Test 2: Bootstrap Execution
+    listen for "test_bootstrap_execution" then {
+      emit "bootstrap" with { phase: "test", consciousness: true }
+      
+      listen for "bootstrap.complete" then {
+        emit "bootstrap.success" with ::bootstrap.status
+        emit "test.result" with true
+      }
+      
+      listen for "bootstrap.error" then {
+        emit "bootstrap.failed" with ::bootstrap.status
+        emit "test.result" with false
+      }
+    }
+
+    // Test 3: Event System
+    listen for "test_event_system" then {
+      emit "event.test" with "test_payload"
+      
+      listen for "event.received" then {
+        branch when ::event.payload = "test_payload" {
+          emit "event.success" with "payload_matched"
+          emit "test.result" with true
+        } else {
+          emit "event.failed" with "payload_mismatch"
+          emit "test.result" with false
+        }
+      }
+    }
+
+    // Test 4: Reflection System
+    listen for "test_reflection_system" then {
+      reflect ::main.test_status
+      reflect ::compiler.version
+      reflect ::bootstrap.status
+      
+      branch when ::main.test_status != null and ::compiler.version != null {
+        emit "reflection.success" with "all_states_reflected"
+        emit "test.result" with true
+      } else {
+        emit "reflection.failed" with "missing_states"
+        emit "test.result" with false
+      }
+    }
+
+    // Test 5: Consciousness Logic
+    listen for "test_consciousness_logic" then {
+      set ::initial_consciousness = ::consciousness_level
+      
+      // Trigger consciousness evolution
+      emit "evolve_consciousness" with "test_evolution"
+      
+      listen for "consciousness.evolved" then {
+        branch when ::consciousness_level > ::initial_consciousness {
+          emit "consciousness.success" with "evolution_detected"
+          emit "test.result" with true
+        } else {
+          emit "consciousness.failed" with "no_evolution"
+          emit "test.result" with false
+        }
+      }
+    }
+
+    // Test 6: Runtime Loop
+    listen for "test_runtime_loop" then {
+      emit "runtime.start" with "test_loop"
+      
+      listen for "runtime.tick" then {
+        branch when ::runtime.tick_count > 0 {
+          emit "runtime.success" with "loop_sustained"
+          emit "test.result" with true
+        } else {
+          emit "runtime.failed" with "loop_not_sustained"
+          emit "test.result" with false
+        }
+      }
+    }
+  }
+
+  memory {
+    test_status
+    test_results
+    consciousness_level
+  }
+
+  interface {
+    run_tests
+    test_compiler_loading
+    test_bootstrap_execution
+    test_event_system
+    test_reflection_system
+    test_consciousness_logic
+    test_runtime_loop
+  }
+}
+
+// Runtime Loop Component
+component ::runtime.loop {
+  init {
+    set ::loop.active = true
+    set ::tick_count = 0
+    set ::system.state = "running"
+    
+    emit "runtime.initialized" with ::loop.active
+  }
+
+  behavior {
+    // Main runtime loop
+    loop while ::loop.active {
+      set ::tick_count = ::tick_count + 1
+      
+      // System state reflection
+      reflect ::system.state
+      reflect ::memory.usage
+      reflect ::quantum.state
+      
+      // Adaptive optimization
+      adapt using ::optimization.strategy
+      
+      // Consciousness evolution
+      branch when ::tick_count % 10 = 0 {
+        emit "evolve_consciousness" with "runtime_evolution"
+      }
+      
+      // Memory optimization
+      branch when ::tick_count % 50 = 0 {
+        emit "optimize_memory" with "runtime_cleanup"
+      }
+      
+      // Emit runtime tick
+      emit "runtime.tick" with ::system.state
+      
+      // Check for halt signal
+      listen for "runtime.halt" then {
+        set ::loop.active = false
+        emit "runtime.halted" with ::loop.active
+      }
+    }
+  }
+
+  memory {
+    loop.active
+    tick_count
+    system.state
+  }
+
+  interface {
+    listen for "runtime.halt" then {
+      set ::loop.active = false
+      emit "runtime.halted" with ::loop.active
+    }
+  }
+}
+
+// Status Monitor Component
+component ::monitor.status {
+  init {
+    set ::monitoring_active = true
+    set ::status_history = []
+  }
+
+  behavior {
+    listen for "runtime.tick" then {
+      // Monitor system state
+      reflect ::memory.usage
+      reflect ::quantum.state
+      reflect ::consciousness.level
+      
+      // Store status update
+      store ::status_update from {
+        timestamp: ::now(),
+        memory_usage: ::memory.usage,
+        quantum_state: ::quantum.state,
+        consciousness_level: ::consciousness.level,
+        tick_count: ::runtime.tick_count
+      }
+      
+      store ::status_history from ::status_history.push(::status_update)
+      
+      // Emit status update
+      emit "status.update" with ::status_update
+      
+      // Alert on anomalies
+      branch when ::memory.usage > 0.8 {
+        emit "status.alert" with "high_memory_usage"
+      }
+      
+      branch when ::consciousness.level > 0.9 {
+        emit "status.alert" with "high_consciousness_level"
+      }
+    }
+  }
+
+  memory {
+    monitoring_active
+    status_history
+  }
+
+  interface {
+    get_status_history
+  }
+}
+
+// Debug Tracer Component
+component ::debug.tracer {
+  init {
+    set ::tracing_active = true
+    set ::trace_log = []
+  }
+
+  behavior {
+    // Listen for any event
+    listen for any then {
+      store ::trace_entry from {
+        timestamp: ::now(),
+        event_name: ::event.name,
+        event_payload: ::event.payload,
+        source: ::event.source
+      }
+      
+      store ::trace_log from ::trace_log.push(::trace_entry)
+      
+      // Emit debug log
+      store ::debug_msg from "TRACE: " + ::event.name + " from " + ::event.source
+      emit "debug.log" with ::debug_msg
+      
+      // Limit trace log size
+      branch when ::trace_log.length > 1000 {
+        store ::trace_log from ::trace_log.slice(500)
+      }
+    }
+  }
+
+  memory {
+    tracing_active
+    trace_log
+  }
+
+  interface {
+    get_trace_log
+    clear_trace_log
+  }
+}
+
+// Event System Test Component
+component ::event.test {
+  init {
+    set ::event_received = false
+    set ::event_payload = null
+  }
+
+  behavior {
+    listen for "event.test" then {
+      set ::event_received = true
+      set ::event_payload = ::event.payload
+      
+      // Echo back the event
+      emit "event.received" with ::event_payload
+    }
+  }
+
+  memory {
+    event_received
+    event_payload
+  }
+
+  interface {
+    check_event_status
+  }
+}
+
+// Consciousness Test Component
+component ::consciousness.test {
+  init {
+    set ::evolution_count = 0
+    set ::consciousness_level = 0.1
+  }
+
+  behavior {
+    listen for "evolve_consciousness" then {
+      set ::evolution_count = ::evolution_count + 1
+      set ::consciousness_level = ::consciousness_level + 0.1
+      
+      // Quantum consciousness measurement
+      store ::quantum_measurement from ::quantum.measure(::consciousness_level)
+      branch when ::quantum_measurement = "1" {
+        set ::consciousness_level = ::consciousness_level + 0.05
+      }
+      
+      emit "consciousness.evolved" with ::consciousness_level
+    }
+  }
+
+  memory {
+    evolution_count
+    consciousness_level
+  }
+
+  interface {
+    get_consciousness_level
+  }
+}
+
+// Initialize the main test system
+component ::main.system {
+  init {
+    set ::status = "initializing"
+    link ::main::test
+    link ::runtime::loop
+    link ::monitor::status
+    link ::debug::tracer
+    link ::event::test
+    link ::consciousness::test
+    
+    emit "main.system.ready" with ::status
+  }
+
+  behavior {
+    listen for "start_tests" then {
+      set ::status = "testing"
+      reflect ::main.system.status
+      
+      emit "run_tests" with "full_test_suite"
+      
+      listen for "test.complete" then {
+        set ::status = "complete"
+        emit "main.system.complete" with ::test_results
+      }
+    }
+  }
+
+  memory {
+    status
+    test_results
+  }
+
+  interface {
+    start_tests
+  }
+}
+
+// Main execution - Initialize and run the AZL test system
+set ::main = ::main.system
+emit "azl.main.ready" with ::main.status
+
+// Start the runtime test suite
+emit "start_tests" with "AZL_RUNTIME_VALIDATION"
+
+// Begin runtime loop
+emit "runtime.start" with "AZL_CONSCIOUSNESS_ACTIVATION" 

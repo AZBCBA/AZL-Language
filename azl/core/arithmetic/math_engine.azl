@@ -1,0 +1,242 @@
+component ::math.engine {
+  init {
+    set ::status = "initializing"
+    set ::operators = ["+", "-", "*", "/", "(", ")"]
+    set ::precedence = {
+      "+": 1,
+      "-": 1,
+      "*": 2,
+      "/": 2
+    }
+    set ::memory = {}
+    set ::expression_cache = {}
+    
+    emit "math.engine.initialized" with ::status
+  }
+
+  behavior {
+    // Handle arithmetic expressions in set statements
+    listen for "evaluate_expression" then {
+      set ::expression = ::expression_data.expression
+      set ::component_name = ::expression_data.component
+      
+      // Parse and evaluate the expression
+      store ::result from ::parse_arithmetic_expression(::expression, ::component_name)
+      
+      emit "expression.evaluated" with {
+        original: ::expression,
+        result: ::result,
+        component: ::component_name
+      }
+    }
+
+    // Parse arithmetic expression
+    listen for "parse_arithmetic_expression" then {
+      set ::expr = ::expression
+      set ::comp = ::component_name
+      
+      // Step 1: Replace variables with values
+      store ::substituted_expr from ::substitute_variables(::expr, ::comp)
+      
+      // Step 2: Tokenize the expression
+      store ::tokens from ::tokenize_expression(::substituted_expr)
+      
+      // Step 3: Convert to postfix notation
+      store ::postfix from ::convert_to_postfix(::tokens)
+      
+      // Step 4: Evaluate postfix expression
+      store ::result from ::evaluate_postfix(::postfix)
+      
+      return ::result
+    }
+
+    // Substitute variables with their values
+    listen for "substitute_variables" then {
+      set ::expr = ::expression
+      set ::comp = ::component_name
+      set ::result = ::expr
+      
+      // Find all variable references (::var)
+      loop for ::i from 0 to ::expr.length - 1 {
+        branch when ::expr[::i] = ":" and ::expr[::i + 1] = ":" {
+          // Extract variable name
+          set ::var_start = ::i + 2
+          set ::var_end = ::var_start
+          
+          loop for ::j from ::var_start to ::expr.length - 1 {
+            branch when ::expr[::j] = " " or ::expr[::j] = "+" or ::expr[::j] = "-" or ::expr[::j] = "*" or ::expr[::j] = "/" or ::expr[::j] = "(" or ::expr[::j] = ")" {
+              set ::var_end = ::j
+              break
+            }
+          }
+          
+          set ::var_name = ::expr.substring(::var_start, ::var_end)
+          set ::var_value = ::memory[::comp][::var_name]
+          
+          // Replace ::var with actual value
+          set ::result = ::result.replace("::" + ::var_name, ::var_value)
+        }
+      }
+      
+      return ::result
+    }
+
+    // Tokenize expression into numbers and operators
+    listen for "tokenize_expression" then {
+      set ::expr = ::expression
+      set ::tokens = []
+      set ::current_token = ""
+      
+      loop for ::i from 0 to ::expr.length - 1 {
+        set ::char = ::expr[::i]
+        
+        branch when ::char = " " {
+          // Skip whitespace
+          branch when ::current_token.length > 0 {
+            set ::tokens.push(::current_token)
+            set ::current_token = ""
+          }
+        } else branch when ::char = "+" or ::char = "-" or ::char = "*" or ::char = "/" or ::char = "(" or ::char = ")" {
+          // Operator found
+          branch when ::current_token.length > 0 {
+            set ::tokens.push(::current_token)
+            set ::current_token = ""
+          }
+          set ::tokens.push(::char)
+        } else {
+          // Number or variable
+          set ::current_token = ::current_token + ::char
+        }
+      }
+      
+      // Add final token
+      branch when ::current_token.length > 0 {
+        set ::tokens.push(::current_token)
+      }
+      
+      return ::tokens
+    }
+
+    // Convert infix to postfix notation
+    listen for "convert_to_postfix" then {
+      set ::tokens = ::expression
+      set ::output = []
+      set ::stack = []
+      
+      loop for ::token in ::tokens {
+        branch when ::is_number(::token) {
+          set ::output.push(::token)
+        } else branch when ::token = "(" {
+          set ::stack.push(::token)
+        } else branch when ::token = ")" {
+          // Pop until matching (
+          loop while ::stack.length > 0 and ::stack[::stack.length - 1] != "(" {
+            set ::output.push(::stack.pop())
+          }
+          branch when ::stack.length > 0 {
+            set ::stack.pop() // Remove the (
+          }
+        } else {
+          // Operator
+          loop while ::stack.length > 0 and ::stack[::stack.length - 1] != "(" and ::precedence[::stack[::stack.length - 1]] >= ::precedence[::token] {
+            set ::output.push(::stack.pop())
+          }
+          set ::stack.push(::token)
+        }
+      }
+      
+      // Pop remaining operators
+      loop while ::stack.length > 0 {
+        set ::output.push(::stack.pop())
+      }
+      
+      return ::output
+    }
+
+    // Evaluate postfix expression
+    listen for "evaluate_postfix" then {
+      set ::postfix = ::expression
+      set ::stack = []
+      
+      loop for ::token in ::postfix {
+        branch when ::is_number(::token) {
+          set ::stack.push(::parse_number(::token))
+        } else {
+          // Operator - pop two operands
+          set ::b = ::stack.pop()
+          set ::a = ::stack.pop()
+          
+          branch when ::token = "+" {
+            set ::stack.push(::a + ::b)
+          } else branch when ::token = "-" {
+            set ::stack.push(::a - ::b)
+          } else branch when ::token = "*" {
+            set ::stack.push(::a * ::b)
+          } else branch when ::token = "/" {
+            branch when ::b = 0 {
+              emit "math.error" with "division_by_zero"
+              return 0
+            } else {
+              set ::stack.push(::a / ::b)
+            }
+          }
+        }
+      }
+      
+      return ::stack[0]
+    }
+
+    // Helper: Check if string is a number
+    listen for "is_number" then {
+      set ::str = ::expression
+      set ::has_decimal = false
+      
+      loop for ::i from 0 to ::str.length - 1 {
+        set ::char = ::str[::i]
+        
+        branch when ::char = "." {
+          branch when ::has_decimal {
+            return false
+          } else {
+            set ::has_decimal = true
+          }
+        } else branch when ::char < "0" or ::char > "9" {
+          return false
+        }
+      }
+      
+      return true
+    }
+
+    // Helper: Parse string to number
+    listen for "parse_number" then {
+      set ::str = ::expression
+      return ::parse_float(::str)
+    }
+
+    // Store component memory for variable substitution
+    listen for "store_component_memory" then {
+      set ::component_name = ::memory_data.component
+      set ::memory[::component_name] = ::memory_data.variables
+      
+      emit "component.memory.stored" with {
+        component: ::component_name,
+        variable_count: ::Object.keys(::memory[::component_name]).length
+      }
+    }
+  }
+
+  memory {
+    status
+    operators
+    precedence
+    memory
+    expression_cache
+  }
+
+  interface {
+    evaluate_expression
+    store_component_memory
+    get_math_status
+  }
+} 

@@ -1,0 +1,169 @@
+# AZL Semantic Understanding System
+# Converted from azme_semantic_understanding.azl to pure AZL syntax
+
+component ::semantic.understanding {
+  init {
+    set ::status = "initializing"
+    set ::semantic_dimensions = 1024
+    set ::context_understanding = 0.0
+    set ::semantic_processing_capacity = 0.0
+    set ::conceptual_integration = 0.0
+    set ::semantic_concepts = {}
+    set ::semantic_memory = []
+    
+    # Link to core components
+    link ::memory.core
+    link ::time.engine
+    
+    # Initialize semantic memory matrix
+    loop for ::i in range(0, ::semantic_dimensions) {
+      set ::row = []
+      loop for ::j in range(0, ::semantic_dimensions) {
+        set ::row.push(random.float())
+      }
+      set ::semantic_memory.push(::row)
+    }
+    
+    emit "semantic.initialized" with {
+      status: ::status,
+      dimensions: ::semantic_dimensions,
+      memory_size: ::semantic_memory.length
+    }
+    
+    set ::status = "ready"
+    say "🧠 Semantic Understanding System initialized"
+    say "📊 Dimensions: ::semantic_dimensions"
+    say "💾 Memory matrix: ::semantic_memory.length x ::semantic_memory.length"
+  }
+
+  behavior {
+    # Process semantic meaning from insights
+    listen for "insight.ready" then {
+      set ::insight_text = ::insight_data.text
+      set ::status = "processing"
+      
+      say "🧠 Processing semantic meaning of: ::insight_text"
+      
+      # Convert text to semantic vector
+      set ::semantic_vector = ::generate_semantic_vector(::insight_text)
+      
+      # Process through semantic memory
+      set ::processed_vector = ::process_semantic_memory(::semantic_vector)
+      
+      # Extract concepts
+      set ::concepts = ::extract_concepts(::insight_text, ::processed_vector)
+      
+      # Update semantic metrics
+      set ::context_understanding = ::calculate_mean(::processed_vector.slice(0, 256))
+      set ::semantic_processing_capacity = ::calculate_std(::processed_vector.slice(256, 512))
+      set ::conceptual_integration = ::calculate_max(::processed_vector.slice(512, 768))
+      
+      # Store semantic result
+      emit "memory.core.store_memory" with {
+        id: "semantic.analysis." + ::time.engine.now().epoch,
+        memory_type: "semantic",
+        content: {
+          original_text: ::insight_text,
+          semantic_vector: ::processed_vector,
+          concepts: ::concepts,
+          context_understanding: ::context_understanding,
+          semantic_processing_capacity: ::semantic_processing_capacity,
+          conceptual_integration: ::conceptual_integration,
+          timestamp: ::time.engine.now().epoch
+        },
+        importance: 0.9,
+        confidence: 0.8,
+        emotional_valence: 0.5,
+        metadata: {
+          source: "semantic.understanding",
+          analysis_type: "insight_processing",
+          timestamp: ::time.engine.now().epoch
+        }
+      }
+      
+      # Emit semantic result
+      emit "insight.meaningful" with {
+        original_text: ::insight_text,
+        semantic_vector: ::processed_vector,
+        concepts: ::concepts,
+        context_understanding: ::context_understanding,
+        semantic_processing_capacity: ::semantic_processing_capacity,
+        conceptual_integration: ::conceptual_integration
+      }
+      
+      set ::status = "ready"
+      say "✅ Semantic analysis complete"
+      say "📊 Context understanding: ::context_understanding"
+      say "🧠 Processing capacity: ::semantic_processing_capacity"
+      say "🔗 Conceptual integration: ::conceptual_integration"
+    }
+    
+    # Generate semantic vector from text
+    listen for "generate_semantic_vector" then {
+      set ::text = ::text_data.text
+      set ::vector = []
+      
+      # Generate semantic vector based on text
+      loop for ::i in range(0, ::semantic_dimensions) {
+        set ::vector.push(random.float())
+      }
+      
+      # Apply text-based modifications
+      set ::word_count = ::text.split(" ").length
+      set ::vector[0] = ::word_count / 100.0
+      set ::vector[1] = ::text.length / 1000.0
+      
+      return ::vector
+    }
+    
+    # Process semantic memory
+    listen for "process_semantic_memory" then {
+      set ::input_vector = ::vector_data.vector
+      set ::output_vector = []
+      
+      # Matrix multiplication with semantic memory
+      loop for ::i in range(0, ::semantic_dimensions) {
+        set ::sum = 0.0
+        loop for ::j in range(0, ::semantic_dimensions) {
+          set ::sum = ::sum + ::semantic_memory[::i][::j] * ::input_vector[::j]
+        }
+        set ::output_vector.push(::sum)
+      }
+      
+      return ::output_vector
+    }
+    
+    # Extract concepts from text
+    listen for "extract_concepts" then {
+      set ::text = ::text_data.text
+      set ::semantic_vector = ::vector_data.vector
+      set ::concepts = []
+      
+      # Extract concepts from words
+      set ::words = ::text.split(" ")
+      loop for ::word in ::words {
+        if ::word.length > 3 {
+          set ::concept = {
+            name: ::word,
+            semantic_vector: ::semantic_vector,
+            activation: random.float(),
+            timestamp: ::time.engine.now().epoch
+          }
+          set ::concepts.push(::concept)
+        }
+      }
+      
+      return ::concepts
+    }
+  }
+
+  memory {
+    ::status = "ready"
+    ::semantic_dimensions = 1024
+    ::context_understanding = 0.0
+    ::semantic_processing_capacity = 0.0
+    ::conceptual_integration = 0.0
+    ::semantic_concepts = {}
+    ::semantic_memory = []
+  }
+} 

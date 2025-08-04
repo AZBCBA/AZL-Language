@@ -1,0 +1,751 @@
+# AZL v2 Parser - Parse New AZL v2 Syntax
+# Handles let, fn, if, loop, and other modern syntax
+
+component ::parser.v2 {
+  init {
+    set ::status = "initializing"
+    set ::current_token = 0
+    set ::tokens = []
+    set ::ast = {}
+    
+    say "📝 AZL v2 Parser initializing..."
+    emit parser.initializing
+  }
+
+  # Parse variable declaration (let x = value)
+  on parse_variable_declaration {
+    set ::tokens = $1
+    set ::current_token = $2
+    
+    # Expect: let identifier = expression
+    set ::let_token = ::tokens[::current_token]
+    set ::current_token = ::current_token + 1
+    
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "variable declaration"
+      return
+    }
+    
+    set ::name_token = ::tokens[::current_token]
+    if ::name_token.type != "identifier" {
+      emit error.expected_identifier with ::name_token
+      return
+    }
+    set ::current_token = ::current_token + 1
+    
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "assignment operator"
+      return
+    }
+    
+    set ::equals_token = ::tokens[::current_token]
+    if ::equals_token.type != "operator" or ::equals_token.value != "=" {
+      emit error.expected_equals with ::equals_token
+      return
+    }
+    set ::current_token = ::current_token + 1
+    
+    # Parse the value expression
+    emit parse_expression with ::tokens ::current_token
+    set ::value = ::result
+    set ::current_token = ::next_token
+    
+    set ::statement = {
+      type: "variable_declaration",
+      name: ::name_token.value,
+      value: ::value
+    }
+    
+    emit statement.parsed with ::statement
+  }
+
+  # Parse function declaration (fn name(params) { body })
+  on parse_function_declaration {
+    set ::tokens = $1
+    set ::current_token = $2
+    
+    # Expect: fn identifier(params) { body }
+    set ::fn_token = ::tokens[::current_token]
+    set ::current_token = ::current_token + 1
+    
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "function name"
+      return
+    }
+    
+    set ::name_token = ::tokens[::current_token]
+    if ::name_token.type != "identifier" {
+      emit error.expected_identifier with ::name_token
+      return
+    }
+    set ::current_token = ::current_token + 1
+    
+    # Parse parameters
+    emit parse_function_parameters with ::tokens ::current_token
+    set ::parameters = ::result
+    set ::current_token = ::next_token
+    
+    # Parse function body
+    emit parse_function_body with ::tokens ::current_token
+    set ::body = ::result
+    set ::current_token = ::next_token
+    
+    set ::statement = {
+      type: "function_declaration",
+      name: ::name_token.value,
+      parameters: ::parameters,
+      body: ::body
+    }
+    
+    emit statement.parsed with ::statement
+  }
+
+  # Parse function parameters
+  on parse_function_parameters {
+    set ::tokens = $1
+    set ::current_token = $2
+    set ::parameters = []
+    
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "opening parenthesis"
+      return
+    }
+    
+    set ::open_paren = ::tokens[::current_token]
+    if ::open_paren.type != "operator" or ::open_paren.value != "(" {
+      emit error.expected_opening_paren with ::open_paren
+      return
+    }
+    set ::current_token = ::current_token + 1
+    
+    # Parse parameter list
+    loop while ::current_token < ::tokens.length {
+      set ::token = ::tokens[::current_token]
+      
+      if ::token.type == "operator" and ::token.value == ")" {
+        set ::current_token = ::current_token + 1
+        break
+      }
+      
+      if ::token.type != "identifier" {
+        emit error.expected_identifier with ::token
+        return
+      }
+      
+      set ::parameters = ::parameters + [::token.value]
+      set ::current_token = ::current_token + 1
+      
+      # Check for comma separator
+      if ::current_token < ::tokens.length {
+        set ::next_token = ::tokens[::current_token]
+        if ::next_token.type == "operator" and ::next_token.value == "," {
+          set ::current_token = ::current_token + 1
+        } else if ::next_token.type == "operator" and ::next_token.value == ")" {
+          # End of parameters
+        } else {
+          emit error.expected_comma_or_paren with ::next_token
+          return
+        }
+      }
+    }
+    
+    set ::result = ::parameters
+    set ::next_token = ::current_token
+  }
+
+  # Parse function body
+  on parse_function_body {
+    set ::tokens = $1
+    set ::current_token = $2
+    set ::body = []
+    
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "opening brace"
+      return
+    }
+    
+    set ::open_brace = ::tokens[::current_token]
+    if ::open_brace.type != "operator" or ::open_brace.value != "{" {
+      emit error.expected_opening_brace with ::open_brace
+      return
+    }
+    set ::current_token = ::current_token + 1
+    
+    # Parse statements until closing brace
+    loop while ::current_token < ::tokens.length {
+      set ::token = ::tokens[::current_token]
+      
+      if ::token.type == "operator" and ::token.value == "}" {
+        set ::current_token = ::current_token + 1
+        break
+      }
+      
+      # Parse individual statement
+      emit parse_statement with ::tokens ::current_token
+      set ::statement = ::result
+      set ::current_token = ::next_token
+      
+      if ::statement {
+        set ::body = ::body + [::statement]
+      }
+    }
+    
+    set ::result = ::body
+    set ::next_token = ::current_token
+  }
+
+  # Parse if statement (if condition { body } else { body })
+  on parse_if_statement {
+    set ::tokens = $1
+    set ::current_token = $2
+    
+    # Expect: if condition { body } else { body }
+    set ::if_token = ::tokens[::current_token]
+    set ::current_token = ::current_token + 1
+    
+    # Parse condition
+    emit parse_expression with ::tokens ::current_token
+    set ::condition = ::result
+    set ::current_token = ::next_token
+    
+    # Parse if body
+    emit parse_block with ::tokens ::current_token
+    set ::if_body = ::result
+    set ::current_token = ::next_token
+    
+    # Check for else
+    set ::else_body = null
+    if ::current_token < ::tokens.length {
+      set ::token = ::tokens[::current_token]
+      if ::token.type == "keyword" and ::token.value == "else" {
+        set ::current_token = ::current_token + 1
+        emit parse_block with ::tokens ::current_token
+        set ::else_body = ::result
+        set ::current_token = ::next_token
+      }
+    }
+    
+    set ::statement = {
+      type: "if_statement",
+      condition: ::condition,
+      if_body: ::if_body,
+      else_body: ::else_body
+    }
+    
+    emit statement.parsed with ::statement
+  }
+
+  # Parse loop statement (loop for item in collection { body })
+  on parse_loop_statement {
+    set ::tokens = $1
+    set ::current_token = $2
+    
+    # Expect: loop for identifier in expression { body }
+    set ::loop_token = ::tokens[::current_token]
+    set ::current_token = ::current_token + 1
+    
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "for keyword"
+      return
+    }
+    
+    set ::for_token = ::tokens[::current_token]
+    if ::for_token.type != "keyword" or ::for_token.value != "for" {
+      emit error.expected_for_keyword with ::for_token
+      return
+    }
+    set ::current_token = ::current_token + 1
+    
+    # Parse iterator variable
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "iterator variable"
+      return
+    }
+    
+    set ::iterator_token = ::tokens[::current_token]
+    if ::iterator_token.type != "identifier" {
+      emit error.expected_identifier with ::iterator_token
+      return
+    }
+    set ::current_token = ::current_token + 1
+    
+    # Expect "in" keyword
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "in keyword"
+      return
+    }
+    
+    set ::in_token = ::tokens[::current_token]
+    if ::in_token.type != "keyword" or ::in_token.value != "in" {
+      emit error.expected_in_keyword with ::in_token
+      return
+    }
+    set ::current_token = ::current_token + 1
+    
+    # Parse collection expression
+    emit parse_expression with ::tokens ::current_token
+    set ::collection = ::result
+    set ::current_token = ::next_token
+    
+    # Parse loop body
+    emit parse_block with ::tokens ::current_token
+    set ::body = ::result
+    set ::current_token = ::next_token
+    
+    set ::statement = {
+      type: "loop_statement",
+      iterator: ::iterator_token.value,
+      collection: ::collection,
+      body: ::body
+    }
+    
+    emit statement.parsed with ::statement
+  }
+
+  # Parse assignment (set variable = value)
+  on parse_assignment {
+    set ::tokens = $1
+    set ::current_token = $2
+    
+    # Expect: set identifier = expression
+    set ::set_token = ::tokens[::current_token]
+    set ::current_token = ::current_token + 1
+    
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "variable name"
+      return
+    }
+    
+    set ::name_token = ::tokens[::current_token]
+    if ::name_token.type != "identifier" {
+      emit error.expected_identifier with ::name_token
+      return
+    }
+    set ::current_token = ::current_token + 1
+    
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "assignment operator"
+      return
+    }
+    
+    set ::equals_token = ::tokens[::current_token]
+    if ::equals_token.type != "operator" or ::equals_token.value != "=" {
+      emit error.expected_equals with ::equals_token
+      return
+    }
+    set ::current_token = ::current_token + 1
+    
+    # Parse the value expression
+    emit parse_expression with ::tokens ::current_token
+    set ::value = ::result
+    set ::current_token = ::next_token
+    
+    set ::statement = {
+      type: "assignment",
+      name: ::name_token.value,
+      value: ::value
+    }
+    
+    emit statement.parsed with ::statement
+  }
+
+  # Parse emit statement (emit event_name with payload)
+  on parse_emit_statement {
+    set ::tokens = $1
+    set ::current_token = $2
+    
+    # Expect: emit identifier with expression
+    set ::emit_token = ::tokens[::current_token]
+    set ::current_token = ::current_token + 1
+    
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "event name"
+      return
+    }
+    
+    set ::event_token = ::tokens[::current_token]
+    if ::event_token.type != "identifier" {
+      emit error.expected_identifier with ::event_token
+      return
+    }
+    set ::current_token = ::current_token + 1
+    
+    # Check for "with" keyword
+    set ::payload = null
+    if ::current_token < ::tokens.length {
+      set ::with_token = ::tokens[::current_token]
+      if ::with_token.type == "keyword" and ::with_token.value == "with" {
+        set ::current_token = ::current_token + 1
+        emit parse_expression with ::tokens ::current_token
+        set ::payload = ::result
+        set ::current_token = ::next_token
+      }
+    }
+    
+    set ::statement = {
+      type: "emit_statement",
+      event_name: ::event_token.value,
+      payload: ::payload
+    }
+    
+    emit statement.parsed with ::statement
+  }
+
+  # Parse say statement (say expression)
+  on parse_say_statement {
+    set ::tokens = $1
+    set ::current_token = $2
+    
+    # Expect: say expression
+    set ::say_token = ::tokens[::current_token]
+    set ::current_token = ::current_token + 1
+    
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "message expression"
+      return
+    }
+    
+    # Parse the message expression
+    emit parse_expression with ::tokens ::current_token
+    set ::message = ::result
+    set ::current_token = ::next_token
+    
+    set ::statement = {
+      type: "say_statement",
+      message: ::message
+    }
+    
+    emit statement.parsed with ::statement
+  }
+
+  # Parse event handler (on event_name(params) { body })
+  on parse_event_handler {
+    set ::tokens = $1
+    set ::current_token = $2
+    
+    # Expect: on identifier(params) { body }
+    set ::on_token = ::tokens[::current_token]
+    set ::current_token = ::current_token + 1
+    
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "event name"
+      return
+    }
+    
+    set ::event_token = ::tokens[::current_token]
+    if ::event_token.type != "identifier" {
+      emit error.expected_identifier with ::event_token
+      return
+    }
+    set ::current_token = ::current_token + 1
+    
+    # Parse parameters
+    emit parse_function_parameters with ::tokens ::current_token
+    set ::parameters = ::result
+    set ::current_token = ::next_token
+    
+    # Parse handler body
+    emit parse_function_body with ::tokens ::current_token
+    set ::body = ::result
+    set ::current_token = ::next_token
+    
+    set ::statement = {
+      type: "event_handler",
+      event_name: ::event_token.value,
+      parameters: ::parameters,
+      body: ::body
+    }
+    
+    emit statement.parsed with ::statement
+  }
+
+  # Parse expression (values, operators, function calls)
+  on parse_expression {
+    set ::tokens = $1
+    set ::current_token = $2
+    
+    set ::token = ::tokens[::current_token]
+    
+    if ::token.type == "string" or ::token.type == "number" {
+      set ::expression = {
+        type: "literal",
+        value: ::token.value
+      }
+      set ::current_token = ::current_token + 1
+    } else if ::token.type == "identifier" {
+      # Check if it's a function call
+      if ::current_token + 1 < ::tokens.length {
+        set ::next_token = ::tokens[::current_token + 1]
+        if ::next_token.type == "operator" and ::next_token.value == "(" {
+          emit parse_function_call with ::tokens ::current_token
+          set ::expression = ::result
+          set ::current_token = ::next_token
+        } else {
+          set ::expression = {
+            type: "identifier",
+            name: ::token.value
+          }
+          set ::current_token = ::current_token + 1
+        }
+      } else {
+        set ::expression = {
+          type: "identifier",
+          name: ::token.value
+        }
+        set ::current_token = ::current_token + 1
+      }
+    } else {
+      emit error.unexpected_token with ::token
+      return
+    }
+    
+    # Check for binary operators
+    if ::current_token < ::tokens.length {
+      set ::operator_token = ::tokens[::current_token]
+      if ::operator_token.type == "operator" {
+        set ::operators = ["+", "-", "*", "/", "==", "!=", ">", "<", ">=", "<="]
+        if ::operator_token.value in ::operators {
+          set ::current_token = ::current_token + 1
+          emit parse_expression with ::tokens ::current_token
+          set ::right = ::result
+          set ::current_token = ::next_token
+          
+          set ::expression = {
+            type: "binary_expression",
+            operator: ::operator_token.value,
+            left: ::expression,
+            right: ::right
+          }
+        }
+      }
+    }
+    
+    set ::result = ::expression
+    set ::next_token = ::current_token
+  }
+
+  # Parse function call
+  on parse_function_call {
+    set ::tokens = $1
+    set ::current_token = $2
+    
+    set ::name_token = ::tokens[::current_token]
+    set ::current_token = ::current_token + 1
+    
+    # Parse arguments
+    set ::arguments = []
+    
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "opening parenthesis"
+      return
+    }
+    
+    set ::open_paren = ::tokens[::current_token]
+    if ::open_paren.type != "operator" or ::open_paren.value != "(" {
+      emit error.expected_opening_paren with ::open_paren
+      return
+    }
+    set ::current_token = ::current_token + 1
+    
+    # Parse argument list
+    loop while ::current_token < ::tokens.length {
+      set ::token = ::tokens[::current_token]
+      
+      if ::token.type == "operator" and ::token.value == ")" {
+        set ::current_token = ::current_token + 1
+        break
+      }
+      
+      # Parse argument expression
+      emit parse_expression with ::tokens ::current_token
+      set ::argument = ::result
+      set ::current_token = ::next_token
+      
+      set ::arguments = ::arguments + [::argument]
+      
+      # Check for comma separator
+      if ::current_token < ::tokens.length {
+        set ::next_token = ::tokens[::current_token]
+        if ::next_token.type == "operator" and ::next_token.value == "," {
+          set ::current_token = ::current_token + 1
+        } else if ::next_token.type == "operator" and ::next_token.value == ")" {
+          # End of arguments
+        } else {
+          emit error.expected_comma_or_paren with ::next_token
+          return
+        }
+      }
+    }
+    
+    set ::result = {
+      type: "function_call",
+      name: ::name_token.value,
+      arguments: ::arguments
+    }
+    set ::next_token = ::current_token
+  }
+
+  # Parse block (statements between braces)
+  on parse_block {
+    set ::tokens = $1
+    set ::current_token = $2
+    set ::body = []
+    
+    if ::current_token >= ::tokens.length {
+      emit error.unexpected_eof with "opening brace"
+      return
+    }
+    
+    set ::open_brace = ::tokens[::current_token]
+    if ::open_brace.type != "operator" or ::open_brace.value != "{" {
+      emit error.expected_opening_brace with ::open_brace
+      return
+    }
+    set ::current_token = ::current_token + 1
+    
+    # Parse statements until closing brace
+    loop while ::current_token < ::tokens.length {
+      set ::token = ::tokens[::current_token]
+      
+      if ::token.type == "operator" and ::token.value == "}" {
+        set ::current_token = ::current_token + 1
+        break
+      }
+      
+      # Parse individual statement
+      emit parse_statement with ::tokens ::current_token
+      set ::statement = ::result
+      set ::current_token = ::next_token
+      
+      if ::statement {
+        set ::body = ::body + [::statement]
+      }
+    }
+    
+    set ::result = ::body
+    set ::next_token = ::current_token
+  }
+
+  # Parse individual statement
+  on parse_statement {
+    set ::tokens = $1
+    set ::current_token = $2
+    
+    if ::current_token >= ::tokens.length {
+      set ::result = null
+      set ::next_token = ::current_token
+      return
+    }
+    
+    set ::token = ::tokens[::current_token]
+    
+    if ::token.type == "keyword" {
+      if ::token.value == "let" {
+        emit parse_variable_declaration with ::tokens ::current_token
+        set ::result = ::statement
+        set ::next_token = ::current_token
+      } else if ::token.value == "fn" {
+        emit parse_function_declaration with ::tokens ::current_token
+        set ::result = ::statement
+        set ::next_token = ::current_token
+      } else if ::token.value == "if" {
+        emit parse_if_statement with ::tokens ::current_token
+        set ::result = ::statement
+        set ::next_token = ::current_token
+      } else if ::token.value == "loop" {
+        emit parse_loop_statement with ::tokens ::current_token
+        set ::result = ::statement
+        set ::next_token = ::current_token
+      } else if ::token.value == "set" {
+        emit parse_assignment with ::tokens ::current_token
+        set ::result = ::statement
+        set ::next_token = ::current_token
+      } else if ::token.value == "emit" {
+        emit parse_emit_statement with ::tokens ::current_token
+        set ::result = ::statement
+        set ::next_token = ::current_token
+      } else if ::token.value == "say" {
+        emit parse_say_statement with ::tokens ::current_token
+        set ::result = ::statement
+        set ::next_token = ::current_token
+      } else if ::token.value == "on" {
+        emit parse_event_handler with ::tokens ::current_token
+        set ::result = ::statement
+        set ::next_token = ::current_token
+      } else {
+        emit error.unexpected_keyword with ::token
+        set ::result = null
+        set ::next_token = ::current_token
+      }
+    } else {
+      # Try to parse as expression statement
+      emit parse_expression with ::tokens ::current_token
+      set ::expression = ::result
+      set ::current_token = ::next_token
+      
+      set ::result = {
+        type: "expression_statement",
+        expression: ::expression
+      }
+      set ::next_token = ::current_token
+    }
+  }
+
+  # Error handling
+  on error.unexpected_eof {
+    set ::expected = $1
+    say "❌ Error: Unexpected end of file, expected ::expected"
+  }
+
+  on error.expected_identifier {
+    set ::token = $1
+    say "❌ Error: Expected identifier, got ::token.value at line ::token.line"
+  }
+
+  on error.expected_equals {
+    set ::token = $1
+    say "❌ Error: Expected '=', got ::token.value at line ::token.line"
+  }
+
+  on error.expected_for_keyword {
+    set ::token = $1
+    say "❌ Error: Expected 'for', got ::token.value at line ::token.line"
+  }
+
+  on error.expected_in_keyword {
+    set ::token = $1
+    say "❌ Error: Expected 'in', got ::token.value at line ::token.line"
+  }
+
+  on error.expected_opening_paren {
+    set ::token = $1
+    say "❌ Error: Expected '(', got ::token.value at line ::token.line"
+  }
+
+  on error.expected_opening_brace {
+    set ::token = $1
+    say "❌ Error: Expected '{', got ::token.value at line ::token.line"
+  }
+
+  on error.expected_comma_or_paren {
+    set ::token = $1
+    say "❌ Error: Expected ',' or ')', got ::token.value at line ::token.line"
+  }
+
+  on error.unexpected_token {
+    set ::token = $1
+    say "❌ Error: Unexpected token ::token.value at line ::token.line"
+  }
+
+  on error.unexpected_keyword {
+    set ::token = $1
+    say "❌ Error: Unexpected keyword ::token.value at line ::token.line"
+  }
+
+  memory {
+    ::status = "ready"
+    ::current_token = 0
+    ::tokens = []
+    ::ast = {}
+  }
+} 

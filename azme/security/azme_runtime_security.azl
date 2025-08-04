@@ -1,0 +1,339 @@
+# AZME Runtime Security Core
+# Main security engine
+
+# Core state variables
+set ::security_policy_map = { system_core: ["azme.*"], trusted_plugin: ["azme.goal_triggered", "azme.skill_learned", "azme.intent_resolved"], external_agent: ["azme.intent_resolved", "azme.perception_received"], diagnostic_ui: ["azme.journal_entry_created", "azme.memory_accessed"], neural_loader: ["azme.model_switched", "azme.optimization_applied"], quantum_core: ["azme.quantum_state_changed", "azme.quantum_teleportation"], simulation_engine: ["azme.simulation_completed", "azme.sandbox_simulation"], collaboration_interface: ["azme.collaboration_event", "azme.peer_communication"], unauthorized: [], quantum_enhanced: true }
+set ::active_sessions = {}
+set ::intrusion_log = []
+set ::secure_zones = { system_core: ["azme.*"], quantum_core: ["azme.quantum_*"], neural_core: ["azme.neural_*"], quantum_enhanced: true }
+set ::security_alert_flags = { replay_detected: false, tamper_detected: false, unauthorized_access: false, module_isolation: false, quantum_enhanced: true }
+set ::verified_event_sources = {}
+set ::security_settings = { enable_replay_detection: true, enable_tamper_detection: true, enable_zone_protection: true, quantum_enhanced: true }
+set ::security_count = 0
+set ::events_validated = 0
+set ::security_violations = 0
+
+# Event handlers for security validation
+on azme.intent_resolved with ::result:
+  emit azme.validate_event with { event_info: result }
+
+on azme.emotion_updated with ::result:
+  emit azme.validate_event with { event_info: result }
+
+on azme.model_switched with ::result:
+  emit azme.validate_event with { event_info: result }
+
+on azme.goal_triggered with ::result:
+  emit azme.validate_event with { event_info: result }
+
+on azme.skill_learned with ::result:
+  emit azme.validate_event with { event_info: result }
+
+on azme.decision_made with ::result:
+  emit azme.validate_event with { event_info: result }
+
+on azme.perception_received with ::result:
+  emit azme.validate_event with { event_info: result }
+
+on azme.memory_accessed with ::result:
+  emit azme.validate_event with { event_info: result }
+
+on azme.simulation_completed with ::result:
+  emit azme.validate_event with { event_info: result }
+
+on azme.optimization_applied with ::result:
+  emit azme.validate_event with { event_info: result }
+
+on azme.error_occurred with ::result:
+  emit azme.validate_event with { event_info: result }
+
+on azme.recovery_initiated with ::result:
+  emit azme.validate_event with { event_info: result }
+
+on azme.collaboration_event with ::result:
+  emit azme.validate_event with { event_info: result }
+
+on azme.quantum_state_changed with ::result:
+  emit azme.validate_event with { event_info: result }
+
+# Validate event
+on azme.validate_event with ::result:
+  set ::event_info = result.event_info
+  set event_type = ::event_info.type or "unknown"
+  set source = ::event_info.source or "unknown"
+  set timestamp = ::event_info.timestamp or get_current_time()
+  
+  # Verify source
+  emit azme.verify_source with { source: source, event_type: event_type }
+  
+  # Check event validation
+  emit azme.check_event_validation with { event_info: ::event_info }
+
+# Verify source
+on azme.verify_source with ::result:
+  set ::source = result.source
+  set ::event_type = result.event_type
+  set source_verified = false
+  set source_info = ::verified_event_sources[::source] or { trust_level: "none", allowed_events: [] }
+  set allowed_events = source_info.allowed_events
+  
+  # Check if source has permission for this event
+  emit azme.check_event_permission with { event_type: ::event_type, allowed_events: allowed_events, index: 0, source_verified: source_verified }
+
+# Check event permission
+on azme.check_event_permission with ::result:
+  set ::event_type = result.event_type
+  set ::allowed_events = result.allowed_events
+  set ::index = result.index
+  set ::source_verified = result.source_verified
+  
+  if ::index >= ::allowed_events.length:
+    emit azme.source_verification_complete with { source_verified: ::source_verified }
+  
+  if ::index < ::allowed_events.length:
+    set allowed_event = ::allowed_events[::index]
+    if allowed_event == ::event_type or allowed_event == "azme.*":
+      set ::source_verified = true
+      emit azme.source_verification_complete with { source_verified: ::source_verified }
+    else:
+      set next_index = ::index + 1
+      emit azme.check_event_permission with { event_type: ::event_type, allowed_events: ::allowed_events, index: next_index, source_verified: ::source_verified }
+
+# Source verification complete
+on azme.source_verification_complete with ::result:
+  set ::source_verified = result.source_verified
+  
+  if ::source_verified:
+    emit azme.source_verified with { verified: true }
+  else:
+    emit azme.source_verified with { verified: false }
+
+# Source verified
+on azme.source_verified with ::result:
+  set ::verified = result.verified
+  
+  if ::verified:
+    emit azme.event_validated with { event_info: ::event_info }
+  else:
+    emit azme.event_rejected with { event_info: ::event_info }
+
+# Check event validation
+on azme.check_event_validation with ::result:
+  set ::event_info = result.event_info
+  set event_type = ::event_info.type or "unknown"
+  set payload = ::event_info.payload or {}
+  set timestamp = ::event_info.timestamp or get_current_time()
+  
+  # Check for replay attacks
+  emit azme.check_replay_attack with { event_type: event_type, timestamp: timestamp }
+  
+  # Check for tampering
+  emit azme.check_tampering with { payload: payload }
+  
+  # Check for unauthorized access
+  emit azme.check_unauthorized_access with { event_type: event_type, payload: payload }
+
+# Check replay attack
+on azme.check_replay_attack with ::result:
+  set ::event_type = result.event_type
+  set ::timestamp = result.timestamp
+  set current_time = get_current_time()
+  set time_diff = current_time - ::timestamp
+  
+  if time_diff > 300:  # 5 minutes threshold
+    emit azme.replay_attack_detected with { event_type: ::event_type, timestamp: ::timestamp }
+  else:
+    emit azme.replay_check_passed with { event_type: ::event_type }
+
+# Check tampering
+on azme.check_tampering with ::result:
+  set ::payload = result.payload
+  set tamper_detected = false
+  
+  # Check for tampering indicators
+  if ::payload.tampered:
+    set tamper_detected = true
+  if ::payload.integrity_hash:
+    set tamper_detected = true
+  if ::payload.unauthorized_modification:
+    set tamper_detected = true
+  
+  if tamper_detected:
+    emit azme.tampering_detected with { payload: ::payload }
+  else:
+    emit azme.tampering_check_passed with { payload: ::payload }
+
+# Check unauthorized access
+on azme.check_unauthorized_access with ::result:
+  set ::event_type = result.event_type
+  set ::payload = result.payload
+  set unauthorized = false
+  set zone = ::payload.zone or "default"
+  set allowed_zones = ::secure_zones[::event_type] or []
+  
+  # Check zone access
+  emit azme.check_zone_access with { zone: zone, allowed_zones: allowed_zones, index: 0, unauthorized: unauthorized }
+
+# Check zone access
+on azme.check_zone_access with ::result:
+  set ::zone = result.zone
+  set ::allowed_zones = result.allowed_zones
+  set ::index = result.index
+  set ::unauthorized = result.unauthorized
+  
+  if ::index >= ::allowed_zones.length:
+    emit azme.unauthorized_access_check with { event_type: ::event_type, unauthorized: ::unauthorized }
+  
+  if ::index < ::allowed_zones.length:
+    set allowed_zone = ::allowed_zones[::index]
+    if allowed_zone == ::zone or allowed_zone == "*":
+      emit azme.unauthorized_access_check with { event_type: ::event_type, unauthorized: false }
+    else:
+      set next_index = ::index + 1
+      emit azme.check_zone_access with { zone: ::zone, allowed_zones: ::allowed_zones, index: next_index, unauthorized: ::unauthorized }
+
+# Unauthorized access check
+on azme.unauthorized_access_check with ::result:
+  set ::event_type = result.event_type
+  set ::unauthorized = result.unauthorized
+  
+  if ::unauthorized:
+    emit azme.unauthorized_access_detected with { event_type: ::event_type }
+  else:
+    emit azme.unauthorized_access_check_passed with { event_type: ::event_type }
+
+# Handle security violations
+on azme.replay_attack_detected with ::result:
+  set ::event_type = result.event_type
+  set ::timestamp = result.timestamp
+  set ::security_alert_flags.replay_detected = true
+  set ::security_violations = ::security_violations + 1
+  emit azme.security_violation with { violation_type: "replay_attack", event_type: ::event_type, details: ::timestamp }
+
+on azme.tampering_detected with ::result:
+  set ::payload = result.payload
+  set ::security_alert_flags.tamper_detected = true
+  set ::security_violations = ::security_violations + 1
+  emit azme.security_violation with { violation_type: "tampering", details: ::payload }
+
+on azme.unauthorized_access_detected with ::result:
+  set ::event_type = result.event_type
+  set ::security_alert_flags.unauthorized_access = true
+  set ::security_violations = ::security_violations + 1
+  emit azme.security_violation with { violation_type: "unauthorized_access", event_type: ::event_type }
+
+# Security violation handler
+on azme.security_violation with ::result:
+  set ::violation_type = result.violation_type
+  set ::details = result.details
+  set violation = { type: ::violation_type, details: ::details, timestamp: get_current_time() }
+  set ::intrusion_log = ::intrusion_log + [violation]
+  
+  # Log violation
+  emit azme.violation_logged with { violation: violation }
+  
+  # Trigger security alert
+  emit azme.security_alert with { violation: violation }
+
+# Violation logged
+on azme.violation_logged with ::result:
+  set ::violation = result.violation
+  emit azme.violation_ready with { violation: ::violation }
+
+# Security alert
+on azme.security_alert with ::result:
+  set ::violation = result.violation
+  set alert_type = ::violation.type
+  
+  if alert_type == "replay_attack":
+    emit azme.handle_replay_attack with { violation: ::violation }
+  if alert_type == "tampering":
+    emit azme.handle_tampering with { violation: ::violation }
+  if alert_type == "unauthorized_access":
+    emit azme.handle_unauthorized_access with { violation: ::violation }
+
+# Handle replay attack
+on azme.handle_replay_attack with ::result:
+  set ::violation = result.violation
+  set source = ::violation.details.source or "unknown"
+  
+  # Block source
+  emit azme.block_source with { source: source }
+
+# Handle tampering
+on azme.handle_tampering with ::result:
+  set ::violation = result.violation
+  set module = ::violation.details.module or "unknown"
+  
+  # Isolate module
+  emit azme.isolate_module with { module: module }
+
+# Handle unauthorized access
+on azme.handle_unauthorized_access with ::result:
+  set ::violation = result.violation
+  set source = ::violation.details.source or "unknown"
+  
+  # Revoke permissions
+  emit azme.revoke_permissions with { source: source }
+
+# Block source
+on azme.block_source with ::result:
+  set ::source = result.source
+  set ::active_sessions[::source] = { blocked: true, timestamp: get_current_time() }
+  emit azme.source_blocked with { source: ::source }
+
+# Isolate module
+on azme.isolate_module with ::result:
+  set ::module = result.module
+  set ::security_alert_flags.module_isolation = true
+  emit azme.module_isolated with { module: ::module }
+
+# Revoke permissions
+on azme.revoke_permissions with ::result:
+  set ::source = result.source
+  set ::verified_event_sources[::source].trust_level = "none"
+  emit azme.permissions_revoked with { source: ::source }
+
+# Security response complete
+on azme.source_blocked with ::result:
+  set ::source = result.source
+  emit azme.security_response_complete with { response_type: "source_blocked", target: ::source }
+
+on azme.module_isolated with ::result:
+  set ::module = result.module
+  emit azme.security_response_complete with { response_type: "module_isolated", target: ::module }
+
+on azme.permissions_revoked with ::result:
+  set ::source = result.source
+  emit azme.security_response_complete with { response_type: "permissions_revoked", target: ::source }
+
+# Security response complete
+on azme.security_response_complete with ::result:
+  set ::response_type = result.response_type
+  set ::target = result.target
+  set response = { type: ::response_type, target: ::target, timestamp: get_current_time() }
+  
+  # Log response
+  emit azme.security_response_logged with { response: response }
+  
+  # Update security status
+  emit azme.security_status_updated with { response: response }
+
+# Security response logged
+on azme.security_response_logged with ::result:
+  set ::response = result.response
+  emit azme.response_ready with { response: ::response }
+
+# Security status updated
+on azme.security_status_updated with ::result:
+  set ::response = result.response
+  emit azme.status_updated with { response: ::response }
+
+# Utility functions
+on azme.get_current_time:
+  set current_time = system_time()
+  emit azme.current_time_retrieved with { current_time: current_time }
+
+on azme.system_time:
+  set time = now()
+  emit azme.system_time_retrieved with { time: time } 

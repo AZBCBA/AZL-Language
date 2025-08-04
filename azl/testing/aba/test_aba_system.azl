@@ -1,0 +1,299 @@
+// ABA System Test Runner
+// Tests the enhanced ABA components we've built
+
+component ::test.aba_system_test {
+  init {
+    set ::test_results = {}
+    set ::test_phase = "initializing"
+    set ::reinforcement_tests = []
+    set ::dtt_tests = []
+    set ::function_analysis_tests = []
+    set ::language_shaping_tests = []
+  }
+
+  behavior {
+    listen for "start_test" then {
+      set ::test_phase = "running"
+      emit "test_phase_started" with { phase: "reinforcement_schedule" }
+      test_reinforcement_schedule()
+    }
+
+    listen for "reinforcement_test_complete" then {
+      emit "test_phase_started" with { phase: "discrete_trial_training" }
+      test_discrete_trial_training()
+    }
+
+    listen for "dtt_test_complete" then {
+      emit "test_phase_started" with { phase: "function_identifier" }
+      test_function_identifier()
+    }
+
+    listen for "function_test_complete" then {
+      emit "test_phase_started" with { phase: "language_shaper" }
+      test_language_shaper()
+    }
+
+    listen for "language_test_complete" then {
+      generate_final_report()
+    }
+  }
+
+  memory {
+    test_results
+    test_phase
+    reinforcement_tests
+    dtt_tests
+    function_analysis_tests
+    language_shaping_tests
+  }
+
+  interface {
+    start_test
+    test_reinforcement_schedule
+    test_discrete_trial_training
+    test_function_identifier
+    test_language_shaper
+    generate_final_report
+  }
+}
+
+// Test Reinforcement Schedule
+function test_reinforcement_schedule() {
+  print("🧠 Testing Reinforcement Schedule...")
+  
+  // Test 1: Continuous Reinforcement
+  print("Testing Continuous Reinforcement")
+  emit "response_occurred" with {
+    behavior: "greeting",
+    context: "test",
+    learner_id: "test_learner_1",
+    response_time: 1500
+  }
+  
+  // Test 2: Fixed Ratio
+  print("Testing Fixed Ratio Schedule")
+  set ::aba.reinforcement_schedule.schedule_type = "fixed_ratio"
+  set ::aba.reinforcement_schedule.parameter = 3
+  
+  loop from 1 to 6 {
+    emit "response_occurred" with {
+      behavior: "greeting",
+      context: "test",
+      learner_id: "test_learner_1",
+      response_time: 2000
+    }
+  }
+  
+  // Test 3: Variable Ratio
+  print("Testing Variable Ratio Schedule")
+  set ::aba.reinforcement_schedule.schedule_type = "variable_ratio"
+  set ::aba.reinforcement_schedule.parameter = 3
+  
+  loop from 1 to 10 {
+    emit "response_occurred" with {
+      behavior: "greeting",
+      context: "test",
+      learner_id: "test_learner_1",
+      response_time: 1800
+    }
+  }
+  
+  // Test 4: CLI Integration
+  print("Testing CLI Integration")
+  emit "cli.command" with "status"
+  
+  store ::reinforcement_tests from {
+    schedule_types_tested: ["continuous", "fixed_ratio", "variable_ratio"],
+    reinforcement_count: ::aba.reinforcement_schedule.reinforcement_history.length,
+    session_duration: now() - ::aba.reinforcement_schedule.session_start,
+    goal_progress: ::aba.reinforcement_schedule.goal_meta.goal_progress
+  }
+  
+  print("✅ Reinforcement Schedule Test Complete")
+  emit "reinforcement_test_complete"
+}
+
+// Test Discrete Trial Training
+function test_discrete_trial_training() {
+  print("🧠 Testing Discrete Trial Training...")
+  
+  // Test 1: Start Session
+  print("Starting DTT Session")
+  emit "start_session"
+  
+  // Test 2: Run Trials
+  print("Running Trials")
+  loop from 1 to 5 {
+    emit "agent_responded" with {
+      behavior: "touch_nose",
+      response: "touch_nose",
+      context: "test",
+      response_time: 2500,
+      correct: true
+    }
+  }
+  
+  // Test 3: Test Error Correction
+  print("Testing Error Correction")
+  emit "agent_responded" with {
+    behavior: "touch_nose",
+    response: "touch_ear",
+    context: "test",
+    response_time: 3000,
+    correct: false
+  }
+  
+  // Test 4: Check Progress
+  let progress = ::aba.discrete_trial_training.session_data
+  store ::dtt_tests from {
+    total_trials: progress.total_trials,
+    correct_responses: progress.correct_responses,
+    accuracy_rate: progress.correct_responses / (progress.total_trials + 1),
+    current_trial: ::aba.discrete_trial_training.current_trial,
+    goal_progress: ::aba.discrete_trial_training.goal_meta.goal_progress
+  }
+  
+  print("✅ Discrete Trial Training Test Complete")
+  emit "dtt_test_complete"
+}
+
+// Test Function Identifier
+function test_function_identifier() {
+  print("🧠 Testing Function Identifier...")
+  
+  // Test 1: Escape Function
+  print("Testing Escape Function Analysis")
+  emit "behavior_observed" with {
+    behavior: "tantrum",
+    antecedent: "task_demand",
+    consequence: "task_removed",
+    context: "difficult_activity",
+    timestamp: now()
+  }
+  
+  // Test 2: Attention Function
+  print("Testing Attention Function Analysis")
+  emit "behavior_observed" with {
+    behavior: "calling_out",
+    antecedent: "alone",
+    consequence: "adult_attention",
+    context: "quiet_environment",
+    timestamp: now()
+  }
+  
+  // Test 3: Access Function
+  print("Testing Access Function Analysis")
+  emit "behavior_observed" with {
+    behavior: "grabbing",
+    antecedent: "desired_item_visible",
+    consequence: "item_given",
+    context: "waiting",
+    timestamp: now()
+  }
+  
+  // Test 4: Multi-Function Detection
+  print("Testing Multi-Function Detection")
+  emit "multi_function_detected" with {
+    behavior: "screaming",
+    antecedents: ["task_demand", "alone"],
+    consequences: ["task_removed", "adult_attention"],
+    context: "mixed",
+    timestamp: now()
+  }
+  
+  store ::function_analysis_tests from {
+    function_scores: ::aba.function_identifier.function_scores,
+    behavior_history_length: ::aba.function_identifier.behavior_history.length,
+    confidence_threshold: ::aba.function_identifier.confidence_threshold,
+    goal_progress: ::aba.function_identifier.goal_meta.goal_progress
+  }
+  
+  print("✅ Function Identifier Test Complete")
+  emit "function_test_complete"
+}
+
+// Test Language Shaper
+function test_language_shaper() {
+  print("🧠 Testing Language Shaper...")
+  
+  // Test 1: Basic Language Response
+  print("Testing Basic Language Response")
+  emit "agent_responded" with {
+    behavior: "greeting",
+    utterance: "Hello!",
+    context: "social",
+    response_time: 1500,
+    success: true,
+    expected_intent: "greeting"
+  }
+  
+  // Test 2: Language Error Detection
+  print("Testing Language Error Detection")
+  emit "agent_responded" with {
+    behavior: "greeting",
+    utterance: "Me want cookie",
+    context: "social",
+    response_time: 2000,
+    success: false,
+    expected_intent: "polite_request"
+  }
+  
+  // Test 3: Expressive Type Analysis
+  print("Testing Expressive Type Analysis")
+  emit "expressive_type_analysis" with {
+    behavior: "greeting",
+    utterance: "Can I have a cookie, please?",
+    context: "social",
+    response_time: 1800,
+    success: true
+  }
+  
+  // Test 4: Goal-Based Shaping
+  print("Testing Goal-Based Shaping")
+  emit "goal_activated" with {
+    goal_id: "goal_ask_question",
+    target_behavior: "question_asking"
+  }
+  
+  store ::language_shaping_tests from {
+    current_target_behavior: ::aba.language_shaper.current_target_behavior,
+    shaping_progress: ::aba.language_shaper.shaping_progress,
+    expressive_types: ::aba.language_shaper.expressive_types,
+    goal_progress: ::aba.language_shaper.goal_meta.goal_progress
+  }
+  
+  print("✅ Language Shaper Test Complete")
+  emit "language_test_complete"
+}
+
+// Generate Final Test Report
+function generate_final_report() {
+  print("📊 Generating Final Test Report...")
+  
+  set ::test_results = {
+    reinforcement_schedule: ::reinforcement_tests,
+    discrete_trial_training: ::dtt_tests,
+    function_identifier: ::function_analysis_tests,
+    language_shaper: ::language_shaping_tests,
+    test_timestamp: now(),
+    overall_status: "completed"
+  }
+  
+  print("🎉 ABA System Test Complete!")
+  print("Reinforcement Schedule Tests:", ::reinforcement_tests)
+  print("DTT Tests:", ::dtt_tests)
+  print("Function Analysis Tests:", ::function_analysis_tests)
+  print("Language Shaping Tests:", ::language_shaping_tests)
+  
+  emit "test_complete" with ::test_results
+}
+
+// Helper function for printing
+function print(message) {
+  // In a real AZL runtime, this would output to console
+  // For now, we'll use emit to simulate printing
+  emit "console.log" with { message: message, timestamp: now() }
+}
+
+// Start the test
+emit "start_test" 

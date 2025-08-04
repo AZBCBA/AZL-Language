@@ -1,0 +1,133 @@
+// EO/AO State Detector - MO System Component
+// Detects Establishing Operations (EO) and Abolishing Operations (AO) states
+
+component ::mo.modulator {
+  init {
+    set ::current_state = {
+      interaction: "AO",
+      praise: "AO", 
+      attention: "AO"
+    }
+    set ::eo_threshold = 1.2
+    set ::ao_threshold = 0.8
+    set ::emotional_state = "neutral"
+    set ::last_state_change = now()
+    
+    emit "mo.modulator.initialized" with ::current_state
+  }
+
+  behavior {
+    // Listen for motivation updates and detect EO/AO states
+    listen for "mo.updated" then {
+      set ::value_map = ::mo.updated_data
+      
+      // Check interaction state
+      branch when ::value_map.interaction > ::eo_threshold {
+        set ::current_state.interaction = "EO"
+        emit "mo.state.eo" with { type: "interaction", value: ::value_map.interaction }
+      } else branch when ::value_map.interaction < ::ao_threshold {
+        set ::current_state.interaction = "AO"
+        emit "mo.state.ao" with { type: "interaction", value: ::value_map.interaction }
+      } else {
+        set ::current_state.interaction = "NEUTRAL"
+        emit "mo.state.neutral" with { type: "interaction", value: ::value_map.interaction }
+      }
+
+      // Check praise state
+      branch when ::value_map.praise > ::eo_threshold {
+        set ::current_state.praise = "EO"
+        emit "mo.state.eo" with { type: "praise", value: ::value_map.praise }
+      } else branch when ::value_map.praise < ::ao_threshold {
+        set ::current_state.praise = "AO"
+        emit "mo.state.ao" with { type: "praise", value: ::value_map.praise }
+      } else {
+        set ::current_state.praise = "NEUTRAL"
+        emit "mo.state.neutral" with { type: "praise", value: ::value_map.praise }
+      }
+
+      // Check attention state
+      branch when ::value_map.attention > ::eo_threshold {
+        set ::current_state.attention = "EO"
+        emit "mo.state.eo" with { type: "attention", value: ::value_map.attention }
+      } else branch when ::value_map.attention < ::ao_threshold {
+        set ::current_state.attention = "AO"
+        emit "mo.state.ao" with { type: "attention", value: ::value_map.attention }
+      } else {
+        set ::current_state.attention = "NEUTRAL"
+        emit "mo.state.neutral" with { type: "attention", value: ::value_map.attention }
+      }
+
+      // Update emotional state based on EO/AO balance
+      set ::eo_count = 0
+      set ::ao_count = 0
+      
+      loop for ::state_type in Object.keys(::current_state) {
+        branch when ::current_state[::state_type] = "EO" {
+          set ::eo_count = ::eo_count + 1
+        } else branch when ::current_state[::state_type] = "AO" {
+          set ::ao_count = ::ao_count + 1
+        }
+      }
+      
+      // Determine emotional state
+      branch when ::eo_count > ::ao_count {
+        set ::emotional_state = "motivated"
+        emit "mo.emotion.motivated" with { eo_count: ::eo_count, ao_count: ::ao_count }
+      } else branch when ::ao_count > ::eo_count {
+        set ::emotional_state = "frustrated"
+        emit "mo.emotion.frustrated" with { eo_count: ::eo_count, ao_count: ::ao_count }
+      } else {
+        set ::emotional_state = "neutral"
+        emit "mo.emotion.neutral" with { eo_count: ::eo_count, ao_count: ::ao_count }
+      }
+      
+      set ::last_state_change = now()
+      emit "mo.state.updated" with ::current_state
+    }
+
+    // Handle hunger level changes
+    listen for "mo.hunger.updated" then {
+      set ::hunger_level = ::mo.hunger.updated_data.hunger_level
+      
+      branch when ::hunger_level > 0.8 {
+        set ::current_state.hunger = "EO"
+        emit "mo.state.eo" with { type: "hunger", value: ::hunger_level }
+      } else branch when ::hunger_level < 0.3 {
+        set ::current_state.hunger = "AO"
+        emit "mo.state.ao" with { type: "hunger", value: ::hunger_level }
+      } else {
+        set ::current_state.hunger = "NEUTRAL"
+        emit "mo.state.neutral" with { type: "hunger", value: ::hunger_level }
+      }
+      
+      emit "mo.state.updated" with ::current_state
+    }
+
+    // Handle success/failure events
+    listen for "mo.success.recorded" then {
+      set ::emotional_state = "satisfied"
+      emit "mo.emotion.satisfied" with { success: true, timestamp: now() }
+    }
+
+    listen for "mo.failure.recorded" then {
+      set ::emotional_state = "disappointed"
+      emit "mo.emotion.disappointed" with { success: false, timestamp: now() }
+    }
+  }
+
+  memory {
+    current_state
+    eo_threshold
+    ao_threshold
+    emotional_state
+    last_state_change
+  }
+
+  interface {
+    get_current_state
+    get_emotional_state
+    get_eo_count
+    get_ao_count
+    set_thresholds
+  }
+} 

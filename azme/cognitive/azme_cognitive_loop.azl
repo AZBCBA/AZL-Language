@@ -1,0 +1,222 @@
+# AZME Cognitive Loop with ABA Integration
+# Manages cognitive cycles, action selection, and ABA reinforcement
+
+component ::azme.cognitive_loop {
+  init {
+    set ::status = "initializing"
+    set ::cycle_count = 0
+    set ::successful_actions = 0
+    set ::failed_actions = 0
+    set ::meta_memory = []
+    set ::reinforcement_history = []
+    
+    # Link to AZL ABA functions
+    link ::aba_trial_engine
+    link ::aba_reinforcement_schedule
+    
+    # Link to AZME components
+    link ::azme.planning.goal_system
+    link ::azme.cognitive.cognitive_engine
+    link ::azme.learning.learning_system
+    
+    emit "azme.cognitive_loop.initialized" with {
+      status: ::status,
+      cycle_count: ::cycle_count
+    }
+    
+    set ::status = "ready"
+    say "🧠 AZME CognitiveLoop initialized with ABA integration"
+  }
+
+  # Main cognitive cycle with ABA integration
+  behavior {
+    listen for "cognitive_cycle.start" then {
+      start_cognitive_cycle()
+    }
+    
+    listen for "action.completed" then {
+      process_action_outcome($1)
+    }
+    
+    listen for "goal.attempted" then {
+      log_goal_attempt($1)
+    }
+    
+    listen for "insight.generated" then {
+      reinforce_insight($1)
+    }
+  }
+
+  # Start a cognitive cycle
+  function start_cognitive_cycle() {
+    increment ::cycle_count
+    
+    say "🧠 Starting cognitive cycle #::cycle_count"
+    
+    # Log ABA trial for cycle start
+    let cycle_trial = "antecedent: cognitive_cycle_start; behavior: cycle_initiation; consequence: cycle_ready"
+    emit "azl.execute_command" with { command: "apply_trial \"" + cycle_trial + "\"" }
+    
+    # Generate candidate actions
+    let actions = generate_candidate_actions()
+    
+    # Score actions using ABA history
+    let scored_actions = score_actions_with_aba(actions)
+    
+    # Select best action
+    let selected_action = select_best_action(scored_actions)
+    
+    # Execute action
+    emit "action.execute" with { action: selected_action, cycle: ::cycle_count }
+    
+    say "🎯 Selected action: " + selected_action
+  }
+
+  # Process action outcome with ABA reinforcement
+  function process_action_outcome(outcome_data) {
+    say "📊 Processing action outcome..."
+    say "🎯 Action: " + outcome_data.action
+    say "✅ Success: " + outcome_data.success
+    say "📈 Score: " + outcome_data.score
+    
+    # Log ABA trial for action outcome
+    let trial_data = "antecedent: action_execution; behavior: " + outcome_data.action + "; consequence: " + (outcome_data.success ? "success" : "failure")
+    emit "azl.execute_command" with { command: "apply_trial \"" + trial_data + "\"" }
+    
+    # Apply reinforcement based on outcome
+    if outcome_data.success {
+      increment ::successful_actions
+      emit "azl.execute_command" with { command: "reinforce_behavior successful_action" }
+      say "🎁 Reinforcing successful action behavior"
+    } else {
+      increment ::failed_actions
+      emit "azl.execute_command" with { command: "reinforce_behavior failed_action" }
+      say "🎁 Reinforcing failed action behavior (for learning)"
+    }
+    
+    # Analyze consequences
+    emit "azl.execute_command" with { command: "analyze_consequence" }
+    
+    # Store in meta-memory
+    store ::meta_memory from ::meta_memory.push({
+      action: outcome_data.action,
+      success: outcome_data.success,
+      score: outcome_data.score,
+      cycle: ::cycle_count,
+      timestamp: now()
+    })
+    
+    # Update reinforcement history
+    store ::reinforcement_history from ::reinforcement_history.push({
+      action: outcome_data.action,
+      reinforcement: outcome_data.success ? "positive" : "negative",
+      timestamp: now()
+    })
+    
+    say "📊 Action outcome processed with ABA integration"
+  }
+
+  # Log goal attempt with ABA trial
+  function log_goal_attempt(goal_data) {
+    say "🎯 Logging goal attempt..."
+    say "📋 Goal: " + goal_data.goal
+    say "📊 Priority: " + goal_data.priority
+    
+    # Log ABA trial for goal attempt
+    let trial_data = "antecedent: goal_selection; behavior: goal_attempt; consequence: attempted"
+    emit "azl.execute_command" with { command: "apply_trial \"" + trial_data + "\"" }
+    
+    say "📝 Goal attempt logged with ABA trial"
+  }
+
+  # Reinforce insight generation
+  function reinforce_insight(insight_data) {
+    say "💡 Reinforcing insight generation..."
+    say "🧠 Insight: " + insight_data.insight
+    say "📊 Confidence: " + insight_data.confidence
+    
+    # Apply reinforcement based on insight quality
+    if insight_data.confidence > 0.8 {
+      emit "azl.execute_command" with { command: "reinforce_behavior high_confidence_insight" }
+      say "🎁 Reinforcing high-confidence insight behavior"
+    } else if insight_data.confidence > 0.5 {
+      emit "azl.execute_command" with { command: "reinforce_behavior medium_confidence_insight" }
+      say "🎁 Reinforcing medium-confidence insight behavior"
+    }
+    
+    # Log ABA trial for insight
+    let trial_data = "antecedent: cognitive_processing; behavior: insight_generation; consequence: " + insight_data.confidence
+    emit "azl.execute_command" with { command: "apply_trial \"" + trial_data + "\"" }
+    
+    say "💡 Insight reinforcement applied"
+  }
+
+  # Generate candidate actions
+  function generate_candidate_actions() {
+    let actions = [
+      "Learn new concept",
+      "Practice existing skill", 
+      "Explore novel idea",
+      "Optimize current process",
+      "Reflect on recent experience"
+    ]
+    
+    return actions
+  }
+
+  # Score actions using ABA history
+  function score_actions_with_aba(actions) {
+    let scored = {}
+    
+    for (let action of actions) {
+      let base_score = 0.5
+      
+      # Check reinforcement history for this action
+      let positive_reinforcements = ::reinforcement_history.filter(r => r.action == action && r.reinforcement == "positive").length
+      let negative_reinforcements = ::reinforcement_history.filter(r => r.action == action && r.reinforcement == "negative").length
+      
+      # Calculate ABA-based score
+      let aba_score = base_score + (positive_reinforcements * 0.1) - (negative_reinforcements * 0.05)
+      scored[action] = Math.max(0.1, Math.min(1.0, aba_score))
+    }
+    
+    return scored
+  }
+
+  # Select best action based on ABA scoring
+  function select_best_action(scored_actions) {
+    let best_action = "default_action"
+    let best_score = 0
+    
+    for (let action in scored_actions) {
+      if (scored_actions[action] > best_score) {
+        best_score = scored_actions[action]
+        best_action = action
+      }
+    }
+    
+    return best_action
+  }
+
+  # Get cognitive loop statistics
+  function get_cognitive_stats() {
+    return {
+      cycle_count: ::cycle_count,
+      successful_actions: ::successful_actions,
+      failed_actions: ::failed_actions,
+      success_rate: ::successful_actions / (::successful_actions + ::failed_actions + 1),
+      reinforcement_history_length: ::reinforcement_history.length,
+      meta_memory_length: ::meta_memory.length
+    }
+  }
+
+  memory {
+    status
+    cycle_count
+    successful_actions
+    failed_actions
+    reinforcement_history
+    consequence_analysis
+    meta_memory
+  }
+} 

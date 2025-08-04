@@ -1,0 +1,37 @@
+say "🧪 Testing AZL v2 Compiler Capabilities...";
+
+let x = 42;
+say x;
+
+if x > 40 {
+    say "x is greater than 40";
+} else {
+    say "x is not greater than 40";
+}
+
+loop x > 0 {
+    say x;
+    set x = x - 1;
+}
+
+fn add(a, b) {
+    return a + b;
+}
+
+let result = add(5, 3);
+say result;
+
+module test {
+    fn test_function() {
+        say "module function works";
+    }
+}
+
+test::test_function();
+
+struct TestStruct {
+    value: 42
+}
+
+let test_obj = TestStruct::new();
+say test_obj.value; 

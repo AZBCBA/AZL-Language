@@ -1,0 +1,376 @@
+# AZME Plugin Host
+# Core logic for plugin execution
+
+component ::azme.plugin_host {
+  init {
+    # Core state variables
+    set ::plugin_registry = {
+      summarizer: {
+        type: "python",
+        path: "/tools/summarizer.py",
+        description: "Summarizes input text",
+        permissions: ["read_files", "process_text"],
+        timeout: 30,
+        sandboxed: true
+      },
+      translate_ar: {
+        type: "bash",
+        path: "/tools/translate_ar.sh",
+        description: "Translates text to Arabic",
+        permissions: ["read_files", "process_text"],
+        timeout: 15,
+        sandboxed: true
+      },
+      hash_file: {
+        type: "binary",
+        path: "/tools/hash_file",
+        description: "SHA256 hashing tool",
+        permissions: ["read_files", "file_operations"],
+        timeout: 10,
+        sandboxed: true
+      },
+      data_analyzer: {
+        type: "python",
+        path: "/tools/data_analyzer.py",
+        description: "Analyzes data files and generates reports",
+        permissions: ["read_files", "process_data"],
+        timeout: 60,
+        sandboxed: true
+      },
+      image_processor: {
+        type: "python",
+        path: "/tools/image_processor.py",
+        description: "Processes and analyzes images",
+        permissions: ["read_files", "process_images"],
+        timeout: 45,
+        sandboxed: true
+      }
+    }
+    set ::plugin_execution_history = []
+    set ::active_plugin_processes = {}
+    set ::plugin_permission_map = {
+      global_allowed: ["summarizer", "translate_ar", "data_analyzer", "image_processor"],
+      global_denied: ["hash_file"],
+      task_specific: {
+        text_processing: ["summarizer", "translate_ar"],
+        data_analysis: ["data_analyzer"],
+        image_processing: ["image_processor"],
+        security_operations: []
+      }
+    }
+    set ::plugin_failures = {}
+    set ::execution_count = 0
+    set ::successful_executions = 0
+    set ::failed_executions = 0
+    set ::blocked_executions = 0
+  }
+
+  behavior {
+    on azme.intent_resolved {
+      set ::intent = $1
+      set ::intent_type = ::intent.type
+      
+      if ::intent_type == "run_plugin" {
+        set ::plugin_id = ::intent.plugin_id
+        set ::plugin_args = ::intent.args or []
+        
+        say "🛠️ Plugin Host: Processing plugin execution request"
+        say "🔧 Plugin: " + ::plugin_id
+        say "📝 Args: " + ::plugin_args
+        
+        if is_allowed(::plugin_id) {
+          set ::output = run_plugin(::plugin_id, ::plugin_args)
+          
+          set ::execution_entry = {
+            id: "exec_" + ::execution_count,
+            plugin_id: ::plugin_id,
+            args: ::plugin_args,
+            output: ::output,
+            timestamp: ::internal.now(),
+            success: ::output.success,
+            quantum_enhanced: true
+          }
+          
+          set ::plugin_execution_history = ::plugin_execution_history.push(::execution_entry)
+          set ::execution_count = ::execution_count + 1
+          
+          if ::output.success {
+            set ::successful_executions = ::successful_executions + 1
+          } else {
+            set ::failed_executions = ::failed_executions + 1
+            
+            # Track failures
+            if not ::plugin_id in ::plugin_failures {
+              set ::plugin_failures[::plugin_id] = []
+            }
+            set ::plugin_failures[::plugin_id] = ::plugin_failures[::plugin_id].push({
+              timestamp: ::internal.now(),
+              error: ::output.error,
+              args: ::plugin_args
+            })
+          }
+          
+          emit azme.plugin_executed with {
+            plugin: ::plugin_id,
+            output: ::output,
+            execution_entry: ::execution_entry
+          }
+        } else {
+          set ::blocked_entry = {
+            id: "blocked_" + ::execution_count,
+            plugin_id: ::plugin_id,
+            args: ::plugin_args,
+            timestamp: ::internal.now(),
+            reason: "not_allowed",
+            quantum_enhanced: true
+          }
+          
+          set ::plugin_execution_history = ::plugin_execution_history.push(::blocked_entry)
+          set ::execution_count = ::execution_count + 1
+          set ::blocked_executions = ::blocked_executions + 1
+          
+          emit azme.plugin_blocked with {
+            plugin: ::plugin_id,
+            reason: "not_allowed",
+            blocked_entry: ::blocked_entry
+          }
+        }
+      }
+    }
+
+    on run_plugin {
+      set ::run_request = $1
+      set ::plugin_id = ::run_request.plugin_id
+      set ::args = ::run_request.args
+      
+      say "🚀 Running plugin: " + ::plugin_id
+      
+      # Get plugin configuration
+      set ::config = ::plugin_registry[::plugin_id]
+      set ::plugin_type = ::config.type
+      set ::plugin_path = ::config.path
+      set ::timeout = ::config.timeout
+      set ::sandboxed = ::config.sandboxed
+      
+      # Simulate plugin execution
+      set ::execution_result = {
+        success: true,
+        output: "Plugin " + ::plugin_id + " executed successfully",
+        error: null,
+        execution_time: ::internal.random() * ::timeout + 1,
+        memory_usage: ::internal.random() * 100 + 50,
+        quantum_enhanced: true
+      }
+      
+      # Simulate different plugin types
+      if ::plugin_type == "python" {
+        set ::execution_result.output = "Python plugin " + ::plugin_id + " completed with output: Processed " + ::args.length + " arguments"
+      } else if ::plugin_type == "bash" {
+        set ::execution_result.output = "Bash script " + ::plugin_id + " executed: " + ::args.join(" ")
+      } else if ::plugin_type == "binary" {
+        set ::execution_result.output = "Binary " + ::plugin_id + " processed: " + ::args.length + " files"
+      }
+      
+      # Simulate occasional failures
+      if ::internal.random() < 0.1 {
+        set ::execution_result.success = false
+        set ::execution_result.error = "Plugin execution failed: timeout or error"
+      }
+      
+      emit azme.plugin_execution_complete with {
+        plugin_id: ::plugin_id,
+        result: ::execution_result
+      }
+    }
+
+    on is_allowed {
+      set ::permission_request = $1
+      set ::plugin_id = ::permission_request.plugin_id
+      
+      say "🔐 Checking permissions for plugin: " + ::plugin_id
+      
+      set ::allowed = false
+      set ::reason = "not_found"
+      
+      # Check global permissions
+      if ::plugin_id in ::plugin_permission_map.global_allowed {
+        set ::allowed = true
+        set ::reason = "globally_allowed"
+      } else if ::plugin_id in ::plugin_permission_map.global_denied {
+        set ::allowed = false
+        set ::reason = "globally_denied"
+      } else if ::plugin_id in ::plugin_registry {
+        # Check if plugin exists in registry
+        set ::allowed = true
+        set ::reason = "registry_allowed"
+      }
+      
+      emit azme.plugin_permission_checked with {
+        plugin_id: ::plugin_id,
+        allowed: ::allowed,
+        reason: ::reason
+      }
+    }
+
+    on register_plugin {
+      set ::registration_request = $1
+      set ::plugin_id = ::registration_request.plugin_id
+      set ::plugin_config = ::registration_request.plugin_config
+      
+      say "📝 Registering plugin: " + ::plugin_id
+      
+      if ::plugin_id in ::plugin_registry {
+        set ::registration_result = {
+          plugin_id: ::plugin_id,
+          success: false,
+          reason: "plugin_already_exists",
+          quantum_enhanced: true
+        }
+      } else {
+        # Add plugin to registry
+        set ::plugin_registry[::plugin_id] = ::plugin_config
+        
+        set ::registration_result = {
+          plugin_id: ::plugin_id,
+          success: true,
+          reason: "plugin_registered",
+          quantum_enhanced: true
+        }
+      }
+      
+      emit azme.plugin_registered with {
+        plugin_id: ::plugin_id,
+        result: ::registration_result
+      }
+    }
+
+    on unregister_plugin {
+      set ::unregistration_request = $1
+      set ::plugin_id = ::unregistration_request.plugin_id
+      
+      say "🗑️ Unregistering plugin: " + ::plugin_id
+      
+      if ::plugin_id in ::plugin_registry {
+        # Remove plugin from registry
+        set ::removed_config = ::plugin_registry[::plugin_id]
+        set ::plugin_registry = ::plugin_registry.remove(::plugin_id)
+        
+        set ::unregistration_result = {
+          plugin_id: ::plugin_id,
+          success: true,
+          reason: "plugin_unregistered",
+          removed_config: ::removed_config,
+          quantum_enhanced: true
+        }
+      } else {
+        set ::unregistration_result = {
+          plugin_id: ::plugin_id,
+          success: false,
+          reason: "plugin_not_found",
+          quantum_enhanced: true
+        }
+      }
+      
+      emit azme.plugin_unregistered with {
+        plugin_id: ::plugin_id,
+        result: ::unregistration_result
+      }
+    }
+
+    on get_plugin_info {
+      set ::info_request = $1
+      set ::plugin_id = ::info_request.plugin_id
+      
+      say "📋 Getting plugin info for: " + ::plugin_id
+      
+      if ::plugin_id in ::plugin_registry {
+        set ::plugin_info = ::plugin_registry[::plugin_id]
+        
+        # Add execution statistics
+        set ::execution_stats = {
+          total_executions: 0,
+          successful_executions: 0,
+          failed_executions: 0,
+          average_execution_time: 0,
+          last_executed: null
+        }
+        
+        # Calculate statistics from execution history
+        loop for ::entry in ::plugin_execution_history {
+          if ::entry.plugin_id == ::plugin_id {
+            set ::execution_stats.total_executions = ::execution_stats.total_executions + 1
+            
+            if ::entry.success {
+              set ::execution_stats.successful_executions = ::execution_stats.successful_executions + 1
+            } else {
+              set ::execution_stats.failed_executions = ::execution_stats.failed_executions + 1
+            }
+            
+            set ::execution_stats.last_executed = ::entry.timestamp
+          }
+        }
+        
+        set ::full_info = {
+          plugin_id: ::plugin_id,
+          config: ::plugin_info,
+          statistics: ::execution_stats,
+          quantum_enhanced: true
+        }
+        
+        emit azme.plugin_info_retrieved with {
+          plugin_id: ::plugin_id,
+          info: ::full_info
+        }
+      } else {
+        emit azme.plugin_info_not_found with {
+          plugin_id: ::plugin_id
+        }
+      }
+    }
+
+    on list_available_plugins {
+      set ::list_request = $1
+      
+      say "📋 Listing available plugins"
+      
+      set ::plugin_list = []
+      loop for ::plugin_id in ::plugin_registry.keys() {
+        set ::plugin_config = ::plugin_registry[::plugin_id]
+        set ::list_entry = {
+          plugin_id: ::plugin_id,
+          type: ::plugin_config.type,
+          description: ::plugin_config.description,
+          sandboxed: ::plugin_config.sandboxed,
+          allowed: is_allowed(::plugin_id),
+          quantum_enhanced: true
+        }
+        set ::plugin_list = ::plugin_list.push(::list_entry)
+      }
+      
+      emit azme.available_plugins_listed with {
+        plugins: ::plugin_list,
+        total_count: ::plugin_list.length
+      }
+    }
+
+    # Plugin host monitoring
+    on azme.monitor_plugin_host {
+      set ::monitor_request = $1
+      
+      set ::host_metrics = {
+        total_executions: ::execution_count,
+        successful_executions: ::successful_executions,
+        failed_executions: ::failed_executions,
+        blocked_executions: ::blocked_executions,
+        plugin_registry_size: ::plugin_registry.keys().length,
+        execution_history_size: ::plugin_execution_history.length,
+        active_processes: ::active_plugin_processes.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.plugin_host_metrics with {
+        metrics: ::host_metrics
+      }
+    }
+  }
+} 

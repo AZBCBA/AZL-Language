@@ -1,0 +1,15 @@
+say "🧪 Testing Module Access Parsing";
+
+// Test basic module access
+say "Testing math::PI";
+say math::PI;
+
+// Test multiple module accesses
+say "Testing multiple accesses";
+say math::sin;
+say math::cos;
+
+// Test with different module names
+say "Testing different modules";
+say quantum::entangle;
+say neural::activate; 

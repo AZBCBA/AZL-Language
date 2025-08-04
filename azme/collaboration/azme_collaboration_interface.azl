@@ -1,0 +1,464 @@
+# AZME Collaboration Interface
+# Main communication protocol
+
+component ::azme.collaboration_interface {
+  init {
+    # Core state variables
+    set ::peer_list = []
+    set ::shared_goals = []
+    set ::incoming_message_queue = []
+    set ::outgoing_message_queue = []
+    set ::peer_capability_map = {}
+    set ::collaboration_sessions = {}
+    set ::agent_identity = {
+      id: "azme_primary",
+      capabilities: [
+        "vision_processing",
+        "text_analysis",
+        "skill_training",
+        "goal_management",
+        "memory_integration",
+        "quantum_enhanced"
+      ],
+      location: "localhost:8080",
+      version: "1.0.0",
+      quantum_enhanced: true
+    }
+    set ::collaboration_settings = {
+      max_peers: 10,
+      message_timeout: 30,
+      encryption_enabled: true,
+      authentication_required: true,
+      task_permission_filters: [
+        "system_maintenance",
+        "data_analysis",
+        "vision_processing",
+        "skill_training",
+        "goal_planning"
+      ]
+    }
+    set ::collaboration_count = 0
+    set ::successful_collaborations = 0
+    set ::failed_collaborations = 0
+  }
+
+  behavior {
+    on azme.intent_resolved {
+      set ::intent = $1
+      
+      say "🤝 Collaboration Interface: Processing intent"
+      say "📋 Intent type: " + ::intent.type
+      
+      if requires_collaboration(::intent) {
+        set ::peers = select_peers(::intent)
+        
+        if ::peers.length > 0 {
+          say "👥 Collaboration required with " + ::peers.length + " peers"
+          
+          emit azme.collaboration_initiated with {
+            intent: ::intent,
+            peers: ::peers,
+            collaboration_id: "collab_" + ::collaboration_count
+          }
+          
+          initiate_collaboration(::intent, ::peers)
+          
+          set ::collaboration_count = ::collaboration_count + 1
+        } else {
+          say "❌ No suitable peers found for collaboration"
+        }
+      } else {
+        say "✅ Intent can be handled locally"
+      }
+    }
+
+    on requires_collaboration {
+      set ::check_request = $1
+      set ::intent = ::check_request.intent
+      
+      say "🔍 Checking if collaboration is required"
+      
+      set ::requires_collab = false
+      set ::reason = ""
+      
+      # Check intent type for collaboration requirements
+      if ::intent.type == "distributed_task" {
+        set ::requires_collab = true
+        set ::reason = "Distributed task requires multiple agents"
+      } else if ::intent.type == "multi_agent_planning" {
+        set ::requires_collab = true
+        set ::reason = "Multi-agent planning requires collaboration"
+      } else if ::intent.type == "shared_goal_creation" {
+        set ::requires_collab = true
+        set ::reason = "Shared goal creation requires peer consensus"
+      } else if ::intent.type == "capability_request" {
+        set ::requires_collab = true
+        set ::reason = "Capability request requires peer communication"
+      }
+      
+      # Check for specific collaboration triggers
+      if ::intent.complexity and ::intent.complexity > 8 {
+        set ::requires_collab = true
+        set ::reason = "High complexity task requires collaboration"
+      }
+      
+      if ::intent.scope and ::intent.scope == "distributed" {
+        set ::requires_collab = true
+        set ::reason = "Distributed scope requires peer coordination"
+      }
+      
+      emit azme.collaboration_check_complete with {
+        intent: ::intent,
+        requires_collaboration: ::requires_collab,
+        reason: ::reason
+      }
+    }
+
+    on select_peers {
+      set ::selection_request = $1
+      set ::intent = ::selection_request.intent
+      
+      say "👥 Selecting peers for collaboration"
+      
+      set ::selected_peers = []
+      set ::required_capabilities = get_required_capabilities(::intent)
+      
+      loop for ::peer_id in ::peer_list {
+        set ::peer_capabilities = ::peer_capability_map[::peer_id]
+        set ::capability_match = 0
+        
+        loop for ::required_cap in ::required_capabilities {
+          if ::required_cap in ::peer_capabilities {
+            set ::capability_match = ::capability_match + 1
+          }
+        }
+        
+        # Select peers with at least 50% capability match
+        if ::capability_match >= ::required_capabilities.length * 0.5 {
+          set ::selected_peers = ::selected_peers.push(::peer_id)
+        }
+      }
+      
+      # Limit to max peers
+      if ::selected_peers.length > ::collaboration_settings.max_peers {
+        set ::selected_peers = ::selected_peers.slice(0, ::collaboration_settings.max_peers)
+      }
+      
+      emit azme.peers_selected with {
+        intent: ::intent,
+        selected_peers: ::selected_peers,
+        required_capabilities: ::required_capabilities
+      }
+    }
+
+    on get_required_capabilities {
+      set ::capability_request = $1
+      set ::intent = ::capability_request.intent
+      
+      say "🎯 Getting required capabilities for intent"
+      
+      set ::required_capabilities = []
+      
+      # Map intent types to required capabilities
+      if ::intent.type == "vision_analysis" {
+        set ::required_capabilities = ["vision_processing", "object_detection"]
+      } else if ::intent.type == "text_processing" {
+        set ::required_capabilities = ["text_analysis", "ocr_processing"]
+      } else if ::intent.type == "skill_training" {
+        set ::required_capabilities = ["skill_training", "memory_integration"]
+      } else if ::intent.type == "goal_planning" {
+        set ::required_capabilities = ["goal_management", "planning"]
+      } else if ::intent.type == "distributed_task" {
+        set ::required_capabilities = ["task_execution", "coordination"]
+      } else {
+        # Default capabilities
+        set ::required_capabilities = ["quantum_enhanced", "communication"]
+      }
+      
+      emit azme.required_capabilities_determined with {
+        intent: ::intent,
+        required_capabilities: ::required_capabilities
+      }
+    }
+
+    on initiate_collaboration {
+      set ::collaboration_request = $1
+      set ::intent = ::collaboration_request.intent
+      set ::peers = ::collaboration_request.peers
+      
+      say "🚀 Initiating collaboration with peers"
+      
+      set ::session_id = "session_" + ::collaboration_count
+      
+      # Create collaboration session
+      set ::collaboration_sessions[::session_id] = {
+        id: ::session_id,
+        intent: ::intent,
+        peers: ::peers,
+        status: "active",
+        created_at: ::internal.now(),
+        messages_sent: 0,
+        messages_received: 0,
+        quantum_enhanced: true
+      }
+      
+      # Send intent share messages to all peers
+      loop for ::peer in ::peers {
+        set ::message = {
+          type: "intent_share",
+          data: ::intent,
+          session_id: ::session_id,
+          sender_id: ::agent_identity.id,
+          timestamp: ::internal.now(),
+          quantum_enhanced: true
+        }
+        
+        send_message(::peer, ::message)
+        
+        emit azme.intent_shared with {
+          peer_id: ::peer,
+          intent: ::intent,
+          session_id: ::session_id
+        }
+      }
+      
+      emit azme.collaboration_session_created with {
+        session_id: ::session_id,
+        intent: ::intent,
+        peers: ::peers
+      }
+    }
+
+    on send_message {
+      set ::send_request = $1
+      set ::peer_id = ::send_request.peer_id
+      set ::message = ::send_request.message
+      
+      say "📤 Sending message to peer: " + ::peer_id
+      
+      # Add message to outgoing queue
+      set ::outgoing_entry = {
+        id: "msg_out_" + ::internal.now(),
+        peer_id: ::peer_id,
+        message: ::message,
+        timestamp: ::internal.now(),
+        status: "queued",
+        quantum_enhanced: true
+      }
+      
+      set ::outgoing_message_queue = ::outgoing_message_queue.push(::outgoing_entry)
+      
+      # Simulate network transmission
+      set ::transmission_result = {
+        success: true,
+        peer_id: ::peer_id,
+        message_id: ::outgoing_entry.id,
+        transmission_time: ::internal.random() * 2 + 0.1,
+        quantum_enhanced: true
+      }
+      
+      emit azme.message_sent with {
+        peer_id: ::peer_id,
+        message: ::message,
+        result: ::transmission_result
+      }
+    }
+
+    on system.message_received {
+      set ::received_message = $1
+      
+      say "📥 Message received from peer"
+      
+      # Add to incoming queue
+      set ::incoming_entry = {
+        id: "msg_in_" + ::internal.now(),
+        sender_id: ::received_message.sender_id,
+        message: ::received_message,
+        timestamp: ::internal.now(),
+        status: "received",
+        quantum_enhanced: true
+      }
+      
+      set ::incoming_message_queue = ::incoming_message_queue.push(::incoming_entry)
+      
+      # Handle the message
+      handle_message(::received_message)
+      
+      emit azme.message_received with {
+        sender_id: ::received_message.sender_id,
+        message: ::received_message
+      }
+    }
+
+    on handle_message {
+      set ::message_request = $1
+      set ::message = ::message_request.message
+      
+      say "🔧 Handling received message"
+      say "📋 Message type: " + ::message.type
+      
+      if ::message.type == "intent_share" {
+        merge_shared_intent(::message)
+      } else if ::message.type == "goal_proposal" {
+        process_shared_goal(::message)
+      } else if ::message.type == "capability_request" {
+        respond_with_capabilities(::message)
+      } else if ::message.type == "collaboration_response" {
+        process_collaboration_response(::message)
+      } else {
+        say "❌ Unknown message type: " + ::message.type
+      }
+    }
+
+    on merge_shared_intent {
+      set ::merge_request = $1
+      set ::message = ::merge_request.message
+      
+      say "🔄 Merging shared intent from peer"
+      
+      set ::shared_intent = ::message.data
+      set ::sender_id = ::message.sender_id
+      set ::session_id = ::message.session_id
+      
+      # Update collaboration session
+      if ::session_id in ::collaboration_sessions {
+        set ::session = ::collaboration_sessions[::session_id]
+        set ::session.messages_received = ::session.messages_received + 1
+        set ::collaboration_sessions[::session_id] = ::session
+      }
+      
+      emit azme.shared_intent_merged with {
+        intent: ::shared_intent,
+        sender_id: ::sender_id,
+        session_id: ::session_id
+      }
+    }
+
+    on process_shared_goal {
+      set ::goal_request = $1
+      set ::message = ::goal_request.message
+      
+      say "🎯 Processing shared goal proposal"
+      
+      set ::proposed_goal = ::message.goal
+      set ::sender_id = ::message.sender_id
+      
+      # Evaluate goal proposal
+      set ::goal_evaluation = evaluate_goal_proposal(::proposed_goal)
+      
+      if ::goal_evaluation.acceptable {
+        set ::shared_goals = ::shared_goals.push(::proposed_goal)
+        
+        emit azme.shared_goal_accepted with {
+          goal: ::proposed_goal,
+          sender_id: ::sender_id,
+          evaluation: ::goal_evaluation
+        }
+      } else {
+        emit azme.shared_goal_rejected with {
+          goal: ::proposed_goal,
+          sender_id: ::sender_id,
+          reason: ::goal_evaluation.reason
+        }
+      }
+    }
+
+    on respond_with_capabilities {
+      set ::capability_request = $1
+      set ::message = ::capability_request.message
+      
+      say "📋 Responding with capabilities"
+      
+      set ::response_message = {
+        type: "capability_response",
+        capabilities: ::agent_identity.capabilities,
+        agent_id: ::agent_identity.id,
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      send_message(::message.sender_id, ::response_message)
+      
+      emit azme.capabilities_shared with {
+        recipient_id: ::message.sender_id,
+        capabilities: ::agent_identity.capabilities
+      }
+    }
+
+    on evaluate_goal_proposal {
+      set ::evaluation_request = $1
+      set ::proposed_goal = ::evaluation_request.proposed_goal
+      
+      say "🔍 Evaluating goal proposal"
+      
+      set ::evaluation = {
+        acceptable: true,
+        reason: "goal_accepted",
+        confidence: 0.8,
+        quantum_enhanced: true
+      }
+      
+      # Check goal permissions
+      if not ::proposed_goal.type in ::collaboration_settings.task_permission_filters {
+        set ::evaluation.acceptable = false
+        set ::evaluation.reason = "goal_type_not_permitted"
+        set ::evaluation.confidence = 0.0
+      }
+      
+      # Check goal complexity
+      if ::proposed_goal.complexity and ::proposed_goal.complexity > 10 {
+        set ::evaluation.acceptable = false
+        set ::evaluation.reason = "goal_too_complex"
+        set ::evaluation.confidence = 0.2
+      }
+      
+      emit azme.goal_evaluation_complete with {
+        proposed_goal: ::proposed_goal,
+        evaluation: ::evaluation
+      }
+    }
+
+    on get_collaboration_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Getting collaboration statistics"
+      
+      set ::collaboration_stats = {
+        total_collaborations: ::collaboration_count,
+        successful_collaborations: ::successful_collaborations,
+        failed_collaborations: ::failed_collaborations,
+        active_sessions: ::collaboration_sessions.keys().length,
+        peer_count: ::peer_list.length,
+        shared_goals_count: ::shared_goals.length,
+        incoming_messages: ::incoming_message_queue.length,
+        outgoing_messages: ::outgoing_message_queue.length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.collaboration_statistics_retrieved with {
+        statistics: ::collaboration_stats
+      }
+    }
+
+    # Collaboration interface monitoring
+    on azme.monitor_collaboration_interface {
+      set ::monitor_request = $1
+      
+      set ::interface_metrics = {
+        total_collaborations: ::collaboration_count,
+        successful_collaborations: ::successful_collaborations,
+        failed_collaborations: ::failed_collaborations,
+        active_sessions: ::collaboration_sessions.keys().length,
+        peer_count: ::peer_list.length,
+        shared_goals_count: ::shared_goals.length,
+        incoming_messages: ::incoming_message_queue.length,
+        outgoing_messages: ::outgoing_message_queue.length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.collaboration_interface_metrics with {
+        metrics: ::interface_metrics
+      }
+    }
+  }
+} 

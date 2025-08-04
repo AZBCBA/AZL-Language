@@ -1,0 +1,304 @@
+# Neural + AZL Orchestrated Model Training Pipeline
+
+## System Architecture Flow
+
+```mermaid
+graph TD
+    A[AZL Program] --> B[Parser]
+    B --> C[AST Nodes]
+    C --> D[Interpreter]
+    
+    D --> E{Statement Type}
+    E -->|Model Declaration| F[NeuralEngine.register_model]
+    E -->|Train Command| G[NeuralEngine.train]
+    E -->|Eval Command| H[NeuralEngine.eval]
+    
+    F --> I[Model Registry]
+    G --> J[Training Loop]
+    H --> K[Evaluation Engine]
+    
+    J --> L[ExecutionTrace]
+    K --> M[ExecutionTrace]
+    
+    L --> N[ReflectionEngine]
+    M --> O{Threshold Check}
+    
+    O -->|Success| P[Model Promoted]
+    O -->|Failure| Q[Thought Queue]
+    
+    N --> R[ScoreVector Analysis]
+    Q --> S[Reflection Trigger]
+    
+    R --> T[Adaptive Strategy]
+    S --> U[Goal Rerouting]
+    
+    T --> V[Model Evolution]
+    U --> W[Strategy Adjustment]
+    
+    V --> X[Improved Model]
+    W --> Y[New Training Config]
+    
+    X --> Z[Next Training Cycle]
+    Y --> Z
+```
+
+## AZL Grammar Specification
+
+### Model Declaration
+```azl
+model "model_name" {
+    input(dimensions),
+    linear(input_dim, output_dim),
+    relu(),
+    linear(hidden_dim, output_dim),
+    softmax()
+}
+```
+
+### Training Command
+```azl
+train "model_name" with {
+    loss: "crossentropy",
+    optimizer: "adam", 
+    epochs: 10
+}
+```
+
+### Evaluation Command
+```azl
+eval "model_name" when accuracy < 0.9 {
+    reflect("optimize_model")
+}
+```
+
+## AST Structure
+
+### ModelDeclaration
+```rust
+pub struct ModelDeclaration {
+    pub name: String,
+    pub layers: Vec<LayerSpec>,
+}
+```
+
+### LayerSpec
+```rust
+pub struct LayerSpec {
+    pub kind: LayerType,
+    pub params: Vec<Expression>,
+}
+```
+
+### TrainCommand
+```rust
+pub struct TrainCommand {
+    pub model_name: String,
+    pub loss: String,
+    pub optimizer: String,
+    pub epochs: u32,
+}
+```
+
+### EvalCommand
+```rust
+pub struct EvalCommand {
+    pub model_name: String,
+    pub metric: String,
+    pub threshold: f64,
+    pub on_fail: Option<String>,
+}
+```
+
+## Runtime Engine Functions
+
+### NeuralEngine Core Methods
+- `register_model(decl: &ModelDeclaration)` - Register new model architecture
+- `train(config: &TrainCommand) -> ExecutionTrace` - Execute training loop
+- `eval(config: &EvalCommand) -> ExecutionTrace` - Evaluate model performance
+- `get_model_stats(name: &str) -> Option<(f64, f64)>` - Get accuracy/loss
+- `list_models() -> Vec<String>` - List all registered models
+
+### Integration Points
+- **ReflectionEngine**: Training traces trigger self-evaluation
+- **ThoughtQueue**: Failed evaluations add thoughts for retraining
+- **ScoreVector**: Multi-dimensional performance analysis
+- **ExecutionTrace**: Comprehensive training/evaluation metrics
+
+## Training Flow Details
+
+### 1. Model Registration
+```rust
+// AZL declares model architecture
+model "mnist_classifier" {
+    input(784),
+    linear(784, 128),
+    relu(),
+    linear(128, 10),
+    softmax()
+}
+
+// Rust runtime registers model
+NeuralEngine::register_model(&declaration)
+```
+
+### 2. Training Execution
+```rust
+// AZL initiates training
+train "mnist_classifier" with {
+    loss: "crossentropy",
+    optimizer: "adam",
+    epochs: 10
+}
+
+// Rust executes training loop
+let trace = NeuralEngine::train(&config)
+```
+
+### 3. Evaluation & Reflection
+```rust
+// AZL evaluates performance
+eval "mnist_classifier" when accuracy < 0.9 {
+    reflect("optimize_architecture")
+}
+
+// Rust evaluates and triggers reflection
+let trace = NeuralEngine::eval(&config)
+if trace.success_rate < threshold {
+    ThoughtQueue::add("optimize_architecture")
+}
+```
+
+## Testing Strategy
+
+### Parser Tests
+- Model declaration parsing
+- Training command syntax
+- Evaluation command parsing
+- Layer specification parsing
+
+### Runtime Tests
+- Model registration and storage
+- Training loop execution
+- Evaluation metrics calculation
+- Reflection system integration
+
+### Integration Tests
+- Complete workflow: declare → train → evaluate → reflect
+- Failure scenarios and recovery
+- Performance optimization loops
+
+## Performance Characteristics
+
+### Training Metrics
+- **Duration**: Simulated based on epochs and model complexity
+- **Memory Usage**: Tracked per model and training session
+- **Success Rate**: Accuracy-based performance measurement
+- **Error Count**: Failed training attempts or evaluation failures
+
+### Reflection Integration
+- **Confidence**: Based on training accuracy and consistency
+- **Novelty**: Higher for new architectures or training approaches
+- **Salience**: High for critical model performance issues
+- **Impact**: Measured by improvement in model performance
+
+## Extensibility Points
+
+### Custom Layer Types
+```rust
+pub enum LayerType {
+    Input,
+    Linear,
+    Conv2D,
+    Relu,
+    Softmax,
+    Dropout,
+    TransformerBlock,
+    Custom(String), // Extensible for new layer types
+}
+```
+
+### Advanced Training Features
+- Custom loss functions
+- Advanced optimizers (Adam, SGD, RMSprop)
+- Learning rate scheduling
+- Early stopping mechanisms
+- Cross-validation support
+
+### Evaluation Metrics
+- Accuracy, Precision, Recall, F1-Score
+- Loss functions (CrossEntropy, MSE, MAE)
+- Custom metric definitions
+- Multi-class and regression support
+
+## Usage Examples
+
+### Basic Classification Model
+```azl
+// Define model architecture
+model "iris_classifier" {
+    input(4),
+    linear(4, 8),
+    relu(),
+    linear(8, 3),
+    softmax()
+}
+
+// Train the model
+train "iris_classifier" with {
+    loss: "crossentropy",
+    optimizer: "adam",
+    epochs: 100
+}
+
+// Evaluate performance
+eval "iris_classifier" when accuracy < 0.95 {
+    reflect("increase_epochs")
+}
+```
+
+### Advanced Model with Reflection
+```azl
+// Complex model with multiple layers
+model "deep_classifier" {
+    input(784),
+    linear(784, 256),
+    relu(),
+    linear(256, 128),
+    relu(),
+    linear(128, 64),
+    relu(),
+    linear(64, 10),
+    softmax()
+}
+
+// Training with reflection
+train "deep_classifier" with {
+    loss: "crossentropy",
+    optimizer: "adam",
+    epochs: 50
+}
+
+// Adaptive evaluation
+eval "deep_classifier" when accuracy < 0.85 {
+    reflect("add_dropout_layers")
+}
+
+// Goal-driven optimization
+goal "high_accuracy" => accuracy > 0.95
+thought "optimize_architecture" {
+    modify(learning_rate, 0.001)
+    add_dropout(0.3)
+}
+```
+
+## Integration with AZME Consciousness
+
+The neural training pipeline is fully integrated with AZME's consciousness system:
+
+1. **Self-Evaluation**: Models evaluate their own performance
+2. **Adaptive Learning**: Failed evaluations trigger reflection and strategy changes
+3. **Goal Evolution**: Training goals adapt based on performance feedback
+4. **Memory Integration**: Successful training patterns are stored for future reference
+5. **Autonomous Optimization**: The system can modify its own training strategies
+
+This creates a complete self-improving neural intelligence system that can declare, train, evaluate, and evolve its own models autonomously. 

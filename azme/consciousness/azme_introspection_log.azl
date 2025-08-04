@@ -1,0 +1,383 @@
+# AZME Introspection Log
+# Reflection journal and trace log
+
+component ::azme.introspection_log {
+  init {
+    set ::introspection_log = [
+      {
+        task: "document_summarization",
+        result: "incomplete",
+        regret_score: 0.72,
+        justification: "insufficient memory activation",
+        reflection_goals: ["optimize summarizer model usage"],
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      },
+      {
+        task: "data_analysis",
+        result: "successful",
+        regret_score: 0.15,
+        justification: "used appropriate statistical methods",
+        reflection_goals: ["continue using this approach"],
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      },
+      {
+        task: "text_generation",
+        result: "partial_success",
+        regret_score: 0.45,
+        justification: "model selection could have been better",
+        reflection_goals: ["improve model selection criteria"],
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+    ]
+    set ::log_settings = {
+      max_entries: 1000,
+      auto_cleanup: true,
+      entry_retention_days: 30,
+      quantum_enhanced: true
+    }
+    set ::log_statistics = {
+      total_entries: 0,
+      entries_added: 0,
+      entries_removed: 0,
+      average_regret_score: 0,
+      quantum_enhanced: true
+    }
+    set ::log_count = 0
+    set ::entries_added = 0
+    set ::entries_removed = 0
+  }
+
+  behavior {
+    on write_log_entry {
+      set ::entry_request = $1
+      set ::entry = ::entry_request.entry
+      
+      say "📝 Writing introspection log entry"
+      
+      # Add timestamp if not present
+      if not ::entry.timestamp {
+        set ::entry.timestamp = ::internal.now()
+      }
+      
+      # Add quantum enhanced flag if not present
+      if not ::entry.quantum_enhanced {
+        set ::entry.quantum_enhanced = true
+      }
+      
+      set ::introspection_log = ::introspection_log.push(::entry)
+      set ::entries_added = ::entries_added + 1
+      set ::log_count = ::log_count + 1
+      
+      # Update statistics
+      update_log_statistics()
+      
+      # Check if cleanup is needed
+      if ::log_settings.auto_cleanup and ::introspection_log.length > ::log_settings.max_entries {
+        cleanup_old_entries()
+      }
+      
+      emit azme.reflection_logged with {
+        entry: ::entry,
+        log_length: ::introspection_log.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on update_log_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Updating log statistics"
+      
+      set ::log_statistics.total_entries = ::introspection_log.length
+      set ::log_statistics.entries_added = ::entries_added
+      set ::log_statistics.entries_removed = ::entries_removed
+      
+      # Calculate average regret score
+      set ::total_regret = 0
+      set ::regret_count = 0
+      
+      loop for ::entry in ::introspection_log {
+        if ::entry.regret_score {
+          set ::total_regret = ::total_regret + ::entry.regret_score
+          set ::regret_count = ::regret_count + 1
+        }
+      }
+      
+      if ::regret_count > 0 {
+        set ::log_statistics.average_regret_score = ::total_regret / ::regret_count
+      }
+      
+      emit azme.log_statistics_updated with {
+        statistics: ::log_statistics,
+        quantum_enhanced: true
+      }
+    }
+
+    on cleanup_old_entries {
+      set ::cleanup_request = $1
+      
+      say "🧹 Cleaning up old log entries"
+      
+      set ::current_time = ::internal.now()
+      set ::retention_threshold = ::current_time - (::log_settings.entry_retention_days * 24 * 60 * 60 * 1000)
+      set ::removed_count = 0
+      
+      set ::filtered_entries = []
+      
+      loop for ::entry in ::introspection_log {
+        if ::entry.timestamp > ::retention_threshold {
+          set ::filtered_entries = ::filtered_entries.push(::entry)
+        } else {
+          set ::removed_count = ::removed_count + 1
+        }
+      }
+      
+      set ::introspection_log = ::filtered_entries
+      set ::entries_removed = ::entries_removed + ::removed_count
+      set ::log_count = ::introspection_log.length
+      
+      emit azme.old_entries_cleaned with {
+        removed_count: ::removed_count,
+        remaining_count: ::introspection_log.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on get_recent_entries {
+      set ::recent_request = $1
+      set ::count = ::recent_request.count or 10
+      
+      say "📝 Getting recent log entries"
+      
+      set ::recent_entries = ::introspection_log.slice(-::count)
+      
+      emit azme.recent_entries_retrieved with {
+        entries: ::recent_entries,
+        count: ::recent_entries.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on get_entries_by_task_type {
+      set ::task_request = $1
+      set ::task_type = ::task_request.task_type
+      
+      say "📝 Getting entries by task type: " + ::task_type
+      
+      set ::filtered_entries = []
+      
+      loop for ::entry in ::introspection_log {
+        if ::entry.task == ::task_type {
+          set ::filtered_entries = ::filtered_entries.push(::entry)
+        }
+      }
+      
+      emit azme.entries_by_task_type_retrieved with {
+        task_type: ::task_type,
+        entries: ::filtered_entries,
+        count: ::filtered_entries.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on get_entries_by_regret_score {
+      set ::regret_request = $1
+      set ::min_regret = ::regret_request.min_regret or 0.5
+      
+      say "📝 Getting entries by regret score: " + ::min_regret
+      
+      set ::filtered_entries = []
+      
+      loop for ::entry in ::introspection_log {
+        if ::entry.regret_score and ::entry.regret_score >= ::min_regret {
+          set ::filtered_entries = ::filtered_entries.push(::entry)
+        }
+      }
+      
+      emit azme.entries_by_regret_score_retrieved with {
+        min_regret: ::min_regret,
+        entries: ::filtered_entries,
+        count: ::filtered_entries.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on search_log_entries {
+      set ::search_request = $1
+      set ::query = ::search_request.query
+      
+      say "🔍 Searching log entries: " + ::query
+      
+      set ::matching_entries = []
+      
+      loop for ::entry in ::introspection_log {
+        if ::entry.task.contains(::query) or ::entry.justification.contains(::query) {
+          set ::matching_entries = ::matching_entries.push(::entry)
+        }
+      }
+      
+      emit azme.log_search_results with {
+        query: ::query,
+        matching_entries: ::matching_entries,
+        count: ::matching_entries.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on get_log_summary {
+      set ::summary_request = $1
+      
+      say "📋 Getting log summary"
+      
+      set ::task_types = {}
+      set ::regret_ranges = {
+        low: 0,
+        medium: 0,
+        high: 0
+      }
+      
+      # Count entries by task type
+      loop for ::entry in ::introspection_log {
+        set ::task_type = ::entry.task
+        if ::task_type in ::task_types {
+          set ::task_types[::task_type] = ::task_types[::task_type] + 1
+        } else {
+          set ::task_types[::task_type] = 1
+        }
+        
+        # Count entries by regret range
+        if ::entry.regret_score {
+          if ::entry.regret_score < 0.3 {
+            set ::regret_ranges.low = ::regret_ranges.low + 1
+          } else if ::entry.regret_score < 0.7 {
+            set ::regret_ranges.medium = ::regret_ranges.medium + 1
+          } else {
+            set ::regret_ranges.high = ::regret_ranges.high + 1
+          }
+        }
+      }
+      
+      set ::log_summary = {
+        total_entries: ::introspection_log.length,
+        task_types: ::task_types,
+        regret_ranges: ::regret_ranges,
+        average_regret_score: ::log_statistics.average_regret_score,
+        quantum_enhanced: true
+      }
+      
+      emit azme.log_summary_retrieved with {
+        summary: ::log_summary,
+        quantum_enhanced: true
+      }
+    }
+
+    on export_log_entries {
+      set ::export_request = $1
+      set ::format = ::export_request.format or "json"
+      set ::filter = ::export_request.filter or {}
+      
+      say "📤 Exporting log entries"
+      
+      set ::export_entries = []
+      
+      # Apply filters if specified
+      if ::filter.task_type {
+        loop for ::entry in ::introspection_log {
+          if ::entry.task == ::filter.task_type {
+            set ::export_entries = ::export_entries.push(::entry)
+          }
+        }
+      } else if ::filter.min_regret {
+        loop for ::entry in ::introspection_log {
+          if ::entry.regret_score and ::entry.regret_score >= ::filter.min_regret {
+            set ::export_entries = ::export_entries.push(::entry)
+          }
+        }
+      } else {
+        set ::export_entries = ::introspection_log
+      }
+      
+      emit azme.log_entries_exported with {
+        entries: ::export_entries,
+        format: ::format,
+        count: ::export_entries.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on get_log_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Getting log statistics"
+      
+      set ::log_stats = {
+        total_entries: ::introspection_log.length,
+        entries_added: ::entries_added,
+        entries_removed: ::entries_removed,
+        average_regret_score: ::log_statistics.average_regret_score,
+        settings: ::log_settings,
+        quantum_enhanced: true
+      }
+      
+      emit azme.log_statistics_retrieved with {
+        statistics: ::log_stats
+      }
+    }
+
+    on update_log_settings {
+      set ::settings_request = $1
+      set ::new_settings = ::settings_request.settings
+      
+      say "⚙️ Updating log settings"
+      
+      loop for ::key in ::new_settings.keys() {
+        if ::key in ::log_settings {
+          set ::log_settings[::key] = ::new_settings[::key]
+        }
+      }
+      
+      emit azme.log_settings_updated with {
+        settings: ::log_settings,
+        quantum_enhanced: true
+      }
+    }
+
+    on clear_log {
+      set ::clear_request = $1
+      set ::reason = ::clear_request.reason or "manual_clear"
+      
+      say "🗑️ Clearing introspection log"
+      
+      set ::cleared_count = ::introspection_log.length
+      set ::introspection_log = []
+      set ::log_count = 0
+      
+      emit azme.log_cleared with {
+        cleared_count: ::cleared_count,
+        reason: ::reason,
+        quantum_enhanced: true
+      }
+    }
+
+    # Introspection log monitoring
+    on azme.monitor_introspection_log {
+      set ::monitor_request = $1
+      
+      set ::log_metrics = {
+        total_entries: ::introspection_log.length,
+        entries_added: ::entries_added,
+        entries_removed: ::entries_removed,
+        average_regret_score: ::log_statistics.average_regret_score,
+        settings: ::log_settings,
+        quantum_enhanced: true
+      }
+      
+      emit azme.introspection_log_metrics with {
+        metrics: ::log_metrics
+      }
+    }
+  }
+} 

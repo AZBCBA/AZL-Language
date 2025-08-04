@@ -1,0 +1,33 @@
+say "🧪 Testing Module System";
+
+// Test 1: Basic module import
+say "=== Test 1: Basic Module Import ===";
+import "modules/math" as math;
+
+say "Math module imported successfully!";
+say "PI constant:";
+say math::PI;
+
+// Test 2: Function calls from module
+say "=== Test 2: Module Function Calls ===";
+let sine_result = math::sin(math::PI / 2);
+say "sin(PI/2) =";
+say sine_result;
+
+let cosine_result = math::cos(0);
+say "cos(0) =";
+say cosine_result;
+
+// Test 3: Nested module dependencies
+say "=== Test 3: Nested Dependencies ===";
+import "modules/quantum";
+
+let entanglement = quantum::entangle(1, 2);
+say "Entanglement result:";
+say entanglement;
+
+let measurement = quantum::measure(0.7);
+say "Measurement result:";
+say measurement;
+
+say "✅ Module system test completed!"; 

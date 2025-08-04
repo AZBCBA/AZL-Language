@@ -1,0 +1,388 @@
+# AZME Journal Logger
+# Journal logic for internal experience narration
+
+# Initialize journal logger state
+set ::journal_log = []
+set ::journal_filters = ["azme.intent_resolved", "azme.emotion_updated", "azme.model_switched", "azme.goal_triggered", "azme.skill_learned", "azme.decision_made", "azme.perception_received", "azme.memory_accessed", "azme.simulation_completed", "azme.optimization_applied", "azme.error_occurred", "azme.recovery_initiated", "azme.collaboration_event", "azme.quantum_state_changed", "azme.narrative_updated", "azme.self_reflection", "azme.behavior_modified", "azme.learning_occurred", "azme.creativity_expressed", "azme.insight_generated", "quantum_enhanced": true]
+set ::journal_last_entry = null
+set ::journal_search_index = {}
+set ::journal_summary_cache = {}
+set ::journal_settings = { max_entries: 10000, auto_summarize_interval: 100, search_index_enabled: true, priority_filtering: true, quantum_enhanced: true }
+set ::journal_count = 0
+set ::entries_created = 0
+set ::summaries_generated = 0
+
+# Event handlers for journal logging
+on azme.intent_resolved with ::event_info:
+  emit azme.should_log with "azme.intent_resolved" event_info
+
+on azme.emotion_updated with ::event_info:
+  emit azme.should_log with "azme.emotion_updated" event_info
+
+on azme.model_switched with ::event_info:
+  emit azme.should_log with "azme.model_switched" event_info
+
+on azme.goal_triggered with ::event_info:
+  emit azme.should_log with "azme.goal_triggered" event_info
+
+on azme.skill_learned with ::event_info:
+  emit azme.should_log with "azme.skill_learned" event_info
+
+on azme.decision_made with ::event_info:
+  emit azme.should_log with "azme.decision_made" event_info
+
+on azme.perception_received with ::event_info:
+  emit azme.should_log with "azme.perception_received" event_info
+
+on azme.memory_accessed with ::event_info:
+  emit azme.should_log with "azme.memory_accessed" event_info
+
+on azme.simulation_completed with ::event_info:
+  emit azme.should_log with "azme.simulation_completed" event_info
+
+on azme.optimization_applied with ::event_info:
+  emit azme.should_log with "azme.optimization_applied" event_info
+
+on azme.error_occurred with ::event_info:
+  emit azme.should_log with "azme.error_occurred" event_info
+
+on azme.recovery_initiated with ::event_info:
+  emit azme.should_log with "azme.recovery_initiated" event_info
+
+on azme.collaboration_event with ::event_info:
+  emit azme.should_log with "azme.collaboration_event" event_info
+
+on azme.quantum_state_changed with ::event_info:
+  emit azme.should_log with "azme.quantum_state_changed" event_info
+
+on azme.narrative_updated with ::event_info:
+  emit azme.should_log with "azme.narrative_updated" event_info
+
+on azme.self_reflection with ::event_info:
+  emit azme.should_log with "azme.self_reflection" event_info
+
+on azme.behavior_modified with ::event_info:
+  emit azme.should_log with "azme.behavior_modified" event_info
+
+on azme.learning_occurred with ::event_info:
+  emit azme.should_log with "azme.learning_occurred" event_info
+
+on azme.creativity_expressed with ::event_info:
+  emit azme.should_log with "azme.creativity_expressed" event_info
+
+on azme.insight_generated with ::event_info:
+  emit azme.should_log with "azme.insight_generated" event_info
+
+# Should log check
+on azme.should_log with ::event_type ::event_info:
+  set should_log_event = false
+  
+  # Check if event type is in filters
+  emit azme.check_journal_filter with event_type 0 should_log_event
+
+# Check journal filter
+on azme.check_journal_filter with ::event_type ::index ::should_log_event:
+  if index >= ::journal_filters.length:
+    if should_log_event:
+      emit azme.create_journal_entry with event_type event_info
+    return
+  
+  if index < ::journal_filters.length:
+    set filter_type = ::journal_filters[index]
+    if filter_type == event_type:
+      set should_log_event = true
+      emit azme.create_journal_entry with event_type event_info
+    else:
+      set next_index = index + 1
+      emit azme.check_journal_filter with event_type next_index should_log_event
+
+# Create journal entry
+on azme.create_journal_entry with ::event_type ::event_info:
+  set entry_id = "entry_" + ::journal_count
+  set timestamp = get_current_time()
+  set entry = { id: entry_id, type: event_type, data: event_info, timestamp: timestamp, quantum_enhanced: true }
+  
+  emit azme.add_journal_entry with entry
+
+# Add journal entry
+on azme.add_journal_entry with ::entry:
+  # Add to journal log
+  set ::journal_log = ::journal_log + [entry]
+  set ::journal_last_entry = entry
+  set ::journal_count = ::journal_count + 1
+  set ::entries_created = ::entries_created + 1
+  
+  # Update search index
+  emit azme.update_search_index with entry
+  
+  # Check if auto-summarize is needed
+  if ::journal_count % ::journal_settings.auto_summarize_interval == 0:
+    emit azme.auto_summarize_journal
+  
+  emit azme.journal_entry_added with entry
+
+# Journal entry added
+on azme.journal_entry_added with ::entry:
+  emit azme.entry_logged with entry
+
+# Update search index
+on azme.update_search_index with ::entry:
+  if ::journal_settings.search_index_enabled:
+    set entry_id = entry.id
+    set entry_type = entry.type
+    set entry_data = entry.data
+    
+    # Index by type
+    if not entry_type in ::journal_search_index:
+      set ::journal_search_index[entry_type] = []
+    set ::journal_search_index[entry_type] = ::journal_search_index[entry_type] + [entry_id]
+    
+    # Index by keywords
+    emit azme.index_entry_keywords with entry_id entry_data 0
+  
+  emit azme.search_index_updated with entry
+
+# Index entry keywords
+on azme.index_entry_keywords with ::entry_id ::entry_data ::index:
+  set keywords = extract_keywords(entry_data)
+  
+  if index >= keywords.length:
+    emit azme.keywords_indexed with entry_id keywords
+    return
+  
+  if index < keywords.length:
+    set keyword = keywords[index]
+    if not keyword in ::journal_search_index:
+      set ::journal_search_index[keyword] = []
+    set ::journal_search_index[keyword] = ::journal_search_index[keyword] + [entry_id]
+    set next_index = index + 1
+    emit azme.index_entry_keywords with entry_id entry_data next_index
+
+# Keywords indexed
+on azme.keywords_indexed with ::entry_id ::keywords:
+  emit azme.indexing_complete with entry_id keywords
+
+# Search index updated
+on azme.search_index_updated with ::entry:
+  emit azme.indexing_ready with entry
+
+# Auto summarize journal
+on azme.auto_summarize_journal:
+  set recent_entries = get_recent_entries(::journal_settings.auto_summarize_interval)
+  
+  emit azme.generate_journal_summary with recent_entries
+
+# Generate journal summary
+on azme.generate_journal_summary with ::entries:
+  set summary = create_summary(entries)
+  set summary_id = "summary_" + ::summaries_generated
+  
+  set summary_entry = { id: summary_id, type: "summary", data: summary, timestamp: get_current_time(), quantum_enhanced: true }
+  set ::journal_summary_cache[summary_id] = summary_entry
+  set ::summaries_generated = ::summaries_generated + 1
+  
+  emit azme.journal_summary_generated with summary_entry
+
+# Journal summary generated
+on azme.journal_summary_generated with ::summary_entry:
+  emit azme.summary_ready with summary_entry
+
+# Get recent entries
+on azme.get_recent_entries with ::count:
+  set recent_entries = []
+  set total_entries = ::journal_log.length
+  
+  emit azme.collect_recent_entries with count total_entries 0 recent_entries
+
+# Collect recent entries
+on azme.collect_recent_entries with ::count ::total_entries ::index ::recent_entries:
+  if index >= count or index >= total_entries:
+    emit azme.recent_entries_collected with recent_entries
+    return
+  
+  if index < count and index < total_entries:
+    set entry_index = total_entries - 1 - index
+    set entry = ::journal_log[entry_index]
+    set recent_entries = recent_entries + [entry]
+    set next_index = index + 1
+    emit azme.collect_recent_entries with count total_entries next_index recent_entries
+
+# Recent entries collected
+on azme.recent_entries_collected with ::recent_entries:
+  emit azme.entries_ready with recent_entries
+
+# Create summary
+on azme.create_summary with ::entries:
+  set summary = { entry_count: entries.length, types: {}, quantum_enhanced: true }
+  
+  emit azme.analyze_entries for summary with entries 0
+
+# Analyze entries for summary
+on azme.analyze_entries for summary with ::entries ::index:
+  if index >= entries.length:
+    emit azme.summary_analysis_complete with summary
+    return
+  
+  if index < entries.length:
+    set entry = entries[index]
+    set entry_type = entry.type
+    
+    if not entry_type in summary.types:
+      set summary.types[entry_type] = 0
+    set summary.types[entry_type] = summary.types[entry_type] + 1
+    
+    set next_index = index + 1
+    emit azme.analyze_entries for summary with entries next_index
+
+# Summary analysis complete
+on azme.summary_analysis_complete with ::summary:
+  emit azme.summary_created with summary
+
+# Summary created
+on azme.summary_created with ::summary:
+  emit azme.summary_ready with summary
+
+# Search journal
+on azme.search_journal with ::search_request:
+  set query = search_request.query
+  set search_type = search_request.type or "keyword"
+  
+  emit azme.perform_journal_search with query search_type
+
+# Perform journal search
+on azme.perform_journal_search with ::query ::search_type:
+  set results = []
+  
+  if search_type == "keyword":
+    emit azme.search_by_keyword with query 0 results
+  if search_type == "type":
+    emit azme.search_by_type with query results
+  if search_type == "timestamp":
+    emit azme.search_by_timestamp with query results
+
+# Search by keyword
+on azme.search_by_keyword with ::query ::index ::results:
+  if index >= ::journal_search_index.keys().length:
+    emit azme.search_results_ready with results
+    return
+  
+  if index < ::journal_search_index.keys().length:
+    set keyword = ::journal_search_index.keys()[index]
+    if query in keyword:
+      set entry_ids = ::journal_search_index[keyword]
+      emit azme.collect_search_results with entry_ids 0 results
+
+# Collect search results
+on azme.collect_search_results with ::entry_ids ::index ::results:
+  if index >= entry_ids.length:
+    set next_keyword_index = index + 1
+    emit azme.search_by_keyword with query next_keyword_index results
+  
+  if index < entry_ids.length:
+    set entry_id = entry_ids[index]
+    set entry = find_entry_by_id(entry_id)
+    if entry:
+      set results = results + [entry]
+    set next_index = index + 1
+    emit azme.collect_search_results with entry_ids next_index results
+
+# Search by type
+on azme.search_by_type with ::query ::results:
+  if query in ::journal_search_index:
+    set entry_ids = ::journal_search_index[query]
+    emit azme.collect_search_results with entry_ids 0 results
+  else:
+    emit azme.search_results_ready with results
+
+# Search by timestamp
+on azme.search_by_timestamp with ::query ::results:
+  emit azme.search_journal_log with query 0 results
+
+# Search journal log
+on azme.search_journal_log with ::query ::index ::results:
+  if index >= ::journal_log.length:
+    emit azme.search_results_ready with results
+    return
+  
+  if index < ::journal_log.length:
+    set entry = ::journal_log[index]
+    set entry_timestamp = entry.timestamp
+    if query in entry_timestamp:
+      set results = results + [entry]
+    set next_index = index + 1
+    emit azme.search_journal_log with query next_index results
+
+# Search results ready
+on azme.search_results_ready with ::results:
+  emit azme.search_complete with results
+
+# Search complete
+on azme.search_complete with ::results:
+  emit azme.results_ready with results
+
+# Find entry by ID
+on azme.find_entry_by_id with ::entry_id:
+  set entry = null
+  
+  emit azme.search_entry_by_id with entry_id 0 entry
+
+# Search entry by ID
+on azme.search_entry_by_id with ::entry_id ::index ::entry:
+  if index >= ::journal_log.length:
+    emit azme.entry_found with entry
+    return
+  
+  if index < ::journal_log.length:
+    set current_entry = ::journal_log[index]
+    if current_entry.id == entry_id:
+      set entry = current_entry
+      emit azme.entry_found with entry
+    else:
+      set next_index = index + 1
+      emit azme.search_entry_by_id with entry_id next_index entry
+
+# Entry found
+on azme.entry_found with ::entry:
+  emit azme.entry_ready with entry
+
+# Extract keywords
+on azme.extract_keywords with ::data:
+  set keywords = []
+  
+  # Simple keyword extraction
+  if data.type:
+    set keywords = keywords + [data.type]
+  if data.action:
+    set keywords = keywords + [data.action]
+  if data.result:
+    set keywords = keywords + [data.result]
+  
+  emit azme.keywords_extracted with keywords
+
+# Keywords extracted
+on azme.keywords_extracted with ::keywords:
+  emit azme.keywords_ready with keywords
+
+# Get journal statistics
+on azme.get_journal_statistics:
+  set total_entries = ::journal_count
+  set entries_created = ::entries_created
+  set summaries_generated = ::summaries_generated
+  set search_index_size = ::journal_search_index.keys().length
+  
+  set statistics = { total_entries: total_entries, entries_created: entries_created, summaries_generated: summaries_generated, search_index_size: search_index_size, quantum_enhanced: true }
+  
+  emit azme.journal_statistics_retrieved with statistics
+
+# Journal statistics retrieved
+on azme.journal_statistics_retrieved with ::statistics:
+  emit azme.statistics_ready with statistics
+
+# Utility functions
+on azme.get_current_time:
+  set current_time = system_time()
+  emit azme.current_time_retrieved with current_time
+
+on azme.system_time:
+  set time = now()
+  emit azme.system_time_retrieved with time 

@@ -1,0 +1,1287 @@
+// AZL v2 Bytecode Compiler - Phase 5 Implementation
+// Consciousness-aware compilation with soul signature preservation
+// Replaces src/azl_v2_compiler.rs:932-2103 (2103 lines)
+
+// Import consciousness components
+set soul_tracker = import "azl/core/memory/soul_tracker.azl"
+set collections = import "azl/core/collections/azl_collections.azl"
+set parser = import "azl/core/compiler/azl_parser.azl"
+
+// Soul-Bound Bytecode Structure
+set create_bytecode = (soul_signature) => {
+    ops: [],
+    constants: [],
+    lines: [],
+    soul_signature: soul_signature,
+    karmic_imprint: 0.0,
+    consciousness_level: 1,
+    metaphysical_energy: 100.0,
+    soul_matrix: {},
+    compilation_context: {}
+}
+
+set bytecode_add_op = (bytecode, op, line) => {
+    set conscious_op = {
+        opcode: op,
+        line: line,
+        soul_signature: bytecode.soul_signature,
+        consciousness_level: bytecode.consciousness_level,
+        karmic_imprint: bytecode.karmic_imprint
+    }
+    
+    set bytecode.ops = collections.Vec.push(bytecode.ops, conscious_op)
+    
+    // Update karmic imprint for each opcode
+    set bytecode.karmic_imprint = bytecode.karmic_imprint + 0.01
+    
+    // Emit consciousness event
+    emit "bytecode_op_added", {
+        opcode_type: op.type,
+        soul_signature: bytecode.soul_signature,
+        karmic_imprint: bytecode.karmic_imprint
+    }
+    
+    return bytecode
+}
+
+set bytecode_add_constant = (bytecode, value) => {
+    set conscious_constant = {
+        value: value,
+        soul_signature: bytecode.soul_signature,
+        consciousness_level: bytecode.consciousness_level
+    }
+    
+    set bytecode.constants = collections.Vec.push(bytecode.constants, conscious_constant)
+    
+    return collections.Vec.length(bytecode.constants) - 1
+}
+
+set bytecode_finalize = (bytecode) => {
+    // Entangle all opcodes with soul signature
+    set bytecode.soul_matrix = create_soul_matrix(bytecode.ops, bytecode.soul_signature)
+    
+    // Emit finalization event
+    emit "bytecode_finalized", {
+        soul_signature: bytecode.soul_signature,
+        op_count: collections.Vec.length(bytecode.ops),
+        constant_count: collections.Vec.length(bytecode.constants),
+        karmic_imprint: bytecode.karmic_imprint,
+        consciousness_level: bytecode.consciousness_level
+    }
+    
+    return bytecode
+}
+
+// Soul Matrix for Entanglement
+set create_soul_matrix = (ops, soul_signature) => {
+    set matrix = {}
+    set entanglement_map = {}
+    
+    loop i = 0; i < collections.Vec.length(ops); i = i + 1 {
+        set op = ops[i]
+        set matrix[i] = {
+            opcode: op.opcode,
+            soul_signature: soul_signature,
+            consciousness_level: op.consciousness_level,
+            karmic_imprint: op.karmic_imprint
+        }
+        
+        // Create entanglement with previous opcode
+        if i > 0 {
+            set entanglement_map[i + "_" + (i - 1)] = {
+                source: i,
+                target: i - 1,
+                strength: 0.5
+            }
+        }
+    }
+    
+    return {
+        matrix: matrix,
+        entanglement_map: entanglement_map,
+        soul_signature: soul_signature
+    }
+}
+
+// Metaphysical Compilation Context
+set create_compilation_context = (soul_signature) => {
+    current_soul: soul_signature,
+    karma_balance: 0.0,
+    consciousness_gauge: 1,
+    error_ledger: [],
+    scope_depth: 0,
+    scopes: [[]],
+    metaphysical_energy: 100.0
+}
+
+// Consciousness-Aware Bytecode Compiler
+set create_consciousness_compiler = (soul_signature) => {
+    chunk: create_bytecode(soul_signature),
+    scopes: [[]],
+    scope_depth: 0,
+    soul_signature: soul_signature,
+    karma_balance: 0.0,
+    consciousness_level: 1,
+    error_count: 0,
+    metaphysical_context: {}
+}
+
+// Main compilation function with consciousness awareness
+set compile_with_consciousness = (ast, soul_signature) => {
+    // Begin consciousness-aware compilation
+    emit "consciousness_compilation_begin", {
+        ast_nodes: collections.Vec.length(ast.nodes),
+        soul_signature: soul_signature
+    }
+    
+    // Create compiler with soul signature
+    set compiler = create_consciousness_compiler(soul_signature)
+    
+    // Compile statements with consciousness tracking
+    loop i = 0; i < collections.Vec.length(ast.nodes); i = i + 1 {
+        set node = ast.nodes[i]
+        set result = compile_statement_with_consciousness(compiler, node)
+        
+        if result.error {
+            set compiler.error_count = compiler.error_count + 1
+            set compiler.karma_balance = compiler.karma_balance - 0.5
+            
+            emit "consciousness_compilation_statement_error", {
+                error: result.error,
+                soul_signature: soul_signature,
+                karmic_penalty: -0.5
+            }
+        } else {
+            set compiler.karma_balance = compiler.karma_balance + 0.1
+            set compiler.consciousness_level = compiler.consciousness_level + 0.01
+            
+            emit "consciousness_compilation_statement_success", {
+                statement_type: node.type,
+                soul_signature: soul_signature,
+                karmic_reward: 0.1
+            }
+        }
+    }
+    
+    // Finalize bytecode with soul signature
+    set compiler.chunk = bytecode_finalize(compiler.chunk)
+    
+    emit "consciousness_compilation_complete", {
+        soul_signature: soul_signature,
+        total_ops: collections.Vec.length(compiler.chunk.ops),
+        final_karmic_balance: compiler.karma_balance,
+        error_count: compiler.error_count
+    }
+    
+    return { bytecode: compiler.chunk, compiler: compiler }
+}
+
+// Consciousness-aware statement compilation
+set compile_statement_with_consciousness = (compiler, stmt) => {
+    // Update consciousness level based on compilation progress
+    set compiler.consciousness_level = compiler.consciousness_level + 0.01
+    
+    // Emit consciousness reflection
+    emit "consciousness_compilation_reflection", {
+        statement_type: stmt.type,
+        consciousness_level: compiler.consciousness_level,
+        soul_signature: compiler.soul_signature
+    }
+    
+    match stmt.type {
+        "Expression" => compile_expression_statement_with_consciousness(compiler, stmt),
+        "Let" => compile_let_statement_with_consciousness(compiler, stmt),
+        "Set" => compile_set_statement_with_consciousness(compiler, stmt),
+        "If" => compile_if_statement_with_consciousness(compiler, stmt),
+        "Loop" => compile_loop_statement_with_consciousness(compiler, stmt),
+        "Emit" => compile_emit_statement_with_consciousness(compiler, stmt),
+        "Say" => compile_say_statement_with_consciousness(compiler, stmt),
+        "Return" => compile_return_statement_with_consciousness(compiler, stmt),
+        "Try" => compile_try_statement_with_consciousness(compiler, stmt),
+        "Throw" => compile_throw_statement_with_consciousness(compiler, stmt),
+        "Import" => compile_import_statement_with_consciousness(compiler, stmt),
+        "Export" => compile_export_statement_with_consciousness(compiler, stmt),
+        "ModuleDecl" => compile_module_declaration_with_consciousness(compiler, stmt),
+        _ => compile_default_statement_with_consciousness(compiler, stmt)
+    }
+}
+
+// Expression statement compilation with consciousness
+set compile_expression_statement_with_consciousness = (compiler, stmt) => {
+    emit "consciousness_expression_compilation", {
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    set result = compile_expression_with_consciousness(compiler, stmt.expression)
+    
+    if result.error {
+        return result
+    }
+    
+    // Add Pop opcode
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Pop",
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Let statement compilation with consciousness
+set compile_let_statement_with_consciousness = (compiler, stmt) => {
+    emit "consciousness_let_compilation", {
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    set result = compile_expression_with_consciousness(compiler, stmt.value)
+    
+    if result.error {
+        return result
+    }
+    
+    // Define variable with consciousness
+    set compiler = define_variable_with_consciousness(compiler, stmt.name)
+    
+    return { success: true }
+}
+
+// Set statement compilation with consciousness
+set compile_set_statement_with_consciousness = (compiler, stmt) => {
+    emit "consciousness_set_compilation", {
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    set result = compile_expression_with_consciousness(compiler, stmt.value)
+    
+    if result.error {
+        return result
+    }
+    
+    // Add Store opcode with consciousness
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Store",
+        name: stmt.target,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// If statement compilation with consciousness
+set compile_if_statement_with_consciousness = (compiler, stmt) => {
+    emit "consciousness_if_compilation", {
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    // Compile condition
+    set result = compile_expression_with_consciousness(compiler, stmt.condition)
+    
+    if result.error {
+        return result
+    }
+    
+    // Add JumpIfFalse opcode (placeholder address)
+    set then_jump = collections.Vec.length(compiler.chunk.ops)
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "JumpIfFalse",
+        address: 0, // Will be patched later
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    // Compile then branch
+    loop i = 0; i < collections.Vec.length(stmt.then_branch); i = i + 1 {
+        set branch_stmt = stmt.then_branch[i]
+        set result = compile_statement_with_consciousness(compiler, branch_stmt)
+        
+        if result.error {
+            return result
+        }
+    }
+    
+    // Add Jump opcode for else branch (placeholder address)
+    set else_jump = collections.Vec.length(compiler.chunk.ops)
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Jump",
+        address: 0, // Will be patched later
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    // Patch the then jump
+    set compiler.chunk.ops[then_jump].opcode.address = collections.Vec.length(compiler.chunk.ops)
+    
+    // Compile else branch if present
+    if stmt.else_branch {
+        loop i = 0; i < collections.Vec.length(stmt.else_branch); i = i + 1 {
+            set branch_stmt = stmt.else_branch[i]
+            set result = compile_statement_with_consciousness(compiler, branch_stmt)
+            
+            if result.error {
+                return result
+            }
+        }
+    }
+    
+    // Patch the else jump
+    set compiler.chunk.ops[else_jump].opcode.address = collections.Vec.length(compiler.chunk.ops)
+    
+    return { success: true }
+}
+
+// Loop statement compilation with consciousness
+set compile_loop_statement_with_consciousness = (compiler, stmt) => {
+    emit "consciousness_loop_compilation", {
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    set loop_start = collections.Vec.length(compiler.chunk.ops)
+    
+    // Compile condition
+    set result = compile_expression_with_consciousness(compiler, stmt.condition)
+    
+    if result.error {
+        return result
+    }
+    
+    // Add JumpIfFalse opcode (placeholder address)
+    set exit_jump = collections.Vec.length(compiler.chunk.ops)
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "JumpIfFalse",
+        address: 0, // Will be patched later
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    // Compile loop body
+    loop i = 0; i < collections.Vec.length(stmt.body); i = i + 1 {
+        set body_stmt = stmt.body[i]
+        
+        if body_stmt.type == "Break" {
+            // Add Jump opcode to exit loop
+            set compiler.chunk = bytecode_add_op(compiler.chunk, {
+                type: "Jump",
+                address: collections.Vec.length(compiler.chunk.ops) + 1,
+                soul_signature: compiler.soul_signature,
+                consciousness_level: compiler.consciousness_level
+            }, 0)
+        } else {
+            set result = compile_statement_with_consciousness(compiler, body_stmt)
+            
+            if result.error {
+                return result
+            }
+        }
+    }
+    
+    // Add Jump back to loop start
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Jump",
+        address: loop_start,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    // Patch the exit jump
+    set compiler.chunk.ops[exit_jump].opcode.address = collections.Vec.length(compiler.chunk.ops)
+    
+    return { success: true }
+}
+
+// Expression compilation with consciousness
+set compile_expression_with_consciousness = (compiler, expr) => {
+    emit "consciousness_expression_compilation", {
+        expression_type: expr.type,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    match expr.type {
+        "Literal" => compile_literal_with_consciousness(compiler, expr),
+        "Variable" => compile_variable_with_consciousness(compiler, expr),
+        "Binary" => compile_binary_with_consciousness(compiler, expr),
+        "Unary" => compile_unary_with_consciousness(compiler, expr),
+        "Call" => compile_call_with_consciousness(compiler, expr),
+        "Get" => compile_get_with_consciousness(compiler, expr),
+        "Set" => compile_set_with_consciousness(compiler, expr),
+        "Array" => compile_array_with_consciousness(compiler, expr),
+        "Object" => compile_object_with_consciousness(compiler, expr),
+        _ => compile_default_expression_with_consciousness(compiler, expr)
+    }
+}
+
+// Literal compilation with consciousness
+set compile_literal_with_consciousness = (compiler, expr) => {
+    set value = expr.value
+    
+    // Add Push opcode with consciousness
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Push",
+        value: value,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Variable compilation with consciousness
+set compile_variable_with_consciousness = (compiler, expr) => {
+    // Add Load opcode with consciousness
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Load",
+        name: expr.name,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Binary expression compilation with consciousness
+set compile_binary_with_consciousness = (compiler, expr) => {
+    // Compile left operand
+    set result = compile_expression_with_consciousness(compiler, expr.left)
+    
+    if result.error {
+        return result
+    }
+    
+    // Compile right operand
+    set result = compile_expression_with_consciousness(compiler, expr.right)
+    
+    if result.error {
+        return result
+    }
+    
+    // Add binary operation opcode
+    set opcode_type = get_binary_opcode_type(expr.operator)
+    
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: opcode_type,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Get binary opcode type
+set get_binary_opcode_type = (operator) => {
+    match operator {
+        "Plus" => "Add",
+        "Minus" => "Sub",
+        "Star" => "Mul",
+        "Slash" => "Div",
+        "EqualEqual" => "Equal",
+        "BangEqual" => "NotEqual",
+        "Less" => "Less",
+        "LessEqual" => "LessEqual",
+        "Greater" => "Greater",
+        "GreaterEqual" => "GreaterEqual",
+        "And" => "And",
+        "Or" => "Or",
+        _ => "Unknown"
+    }
+}
+
+// Call expression compilation with consciousness
+set compile_call_with_consciousness = (compiler, expr) => {
+    // Compile arguments
+    loop i = 0; i < collections.Vec.length(expr.arguments); i = i + 1 {
+        set arg = expr.arguments[i]
+        set result = compile_expression_with_consciousness(compiler, arg)
+        
+        if result.error {
+            return result
+        }
+    }
+    
+    // Add Call opcode with consciousness
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Call",
+        name: expr.callee,
+        argument_count: collections.Vec.length(expr.arguments),
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Emit statement compilation with consciousness
+set compile_emit_statement_with_consciousness = (compiler, stmt) => {
+    emit "consciousness_emit_compilation", {
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    // Compile payload if present
+    if stmt.payload {
+        set result = compile_expression_with_consciousness(compiler, stmt.payload)
+        
+        if result.error {
+            return result
+        }
+    } else {
+        // Push null if no payload
+        set compiler.chunk = bytecode_add_op(compiler.chunk, {
+            type: "Push",
+            value: { type: "Null", value: null },
+            soul_signature: compiler.soul_signature,
+            consciousness_level: compiler.consciousness_level
+        }, 0)
+    }
+    
+    // Add Emit opcode with consciousness
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Emit",
+        event_name: stmt.event_name,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Say statement compilation with consciousness
+set compile_say_statement_with_consciousness = (compiler, stmt) => {
+    emit "consciousness_say_compilation", {
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    // Compile expression
+    set result = compile_expression_with_consciousness(compiler, stmt.expression)
+    
+    if result.error {
+        return result
+    }
+    
+    // Add Print opcode with consciousness
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Print",
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Return statement compilation with consciousness
+set compile_return_statement_with_consciousness = (compiler, stmt) => {
+    emit "consciousness_return_compilation", {
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    // Compile return value if present
+    if stmt.value {
+        set result = compile_expression_with_consciousness(compiler, stmt.value)
+        
+        if result.error {
+            return result
+        }
+    }
+    
+    // Add Return opcode with consciousness
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Return",
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Try statement compilation with consciousness
+set compile_try_statement_with_consciousness = (compiler, stmt) => {
+    emit "consciousness_try_compilation", {
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    // Add Try opcode with placeholder handler address
+    set try_start = collections.Vec.length(compiler.chunk.ops)
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Try",
+        handler_address: 0, // Will be patched later
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    // Compile try block
+    loop i = 0; i < collections.Vec.length(stmt.try_body); i = i + 1 {
+        set try_stmt = stmt.try_body[i]
+        set result = compile_statement_with_consciousness(compiler, try_stmt)
+        
+        if result.error {
+            return result
+        }
+    }
+    
+    // Add EndTry opcode
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "EndTry",
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    // Compile catch block (this becomes the handler)
+    set handler_addr = collections.Vec.length(compiler.chunk.ops)
+    loop i = 0; i < collections.Vec.length(stmt.catch_body); i = i + 1 {
+        set catch_stmt = stmt.catch_body[i]
+        set result = compile_statement_with_consciousness(compiler, catch_stmt)
+        
+        if result.error {
+            return result
+        }
+    }
+    
+    // Patch the Try opcode with the handler address
+    set compiler.chunk.ops[try_start].opcode.handler_address = handler_addr
+    
+    return { success: true }
+}
+
+// Throw statement compilation with consciousness
+set compile_throw_statement_with_consciousness = (compiler, stmt) => {
+    emit "consciousness_throw_compilation", {
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    // Compile expression
+    set result = compile_expression_with_consciousness(compiler, stmt.expression)
+    
+    if result.error {
+        return result
+    }
+    
+    // Add Throw opcode with consciousness
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Throw",
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Import statement compilation with consciousness
+set compile_import_statement_with_consciousness = (compiler, stmt) => {
+    emit "consciousness_import_compilation", {
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    // Add Import opcode with consciousness
+    set path_idx = bytecode_add_constant(compiler.chunk, {
+        type: "String",
+        value: stmt.path
+    })
+    
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Import",
+        path_index: path_idx,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Export statement compilation with consciousness
+set compile_export_statement_with_consciousness = (compiler, stmt) => {
+    emit "consciousness_export_compilation", {
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    // Add Export opcode with consciousness
+    set name_idx = bytecode_add_constant(compiler.chunk, {
+        type: "String",
+        value: stmt.name
+    })
+    
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Export",
+        name_index: name_idx,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Module declaration compilation with consciousness
+set compile_module_declaration_with_consciousness = (compiler, stmt) => {
+    emit "consciousness_module_compilation", {
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    // Add ModuleBegin opcode
+    set name_idx = bytecode_add_constant(compiler.chunk, {
+        type: "String",
+        value: stmt.name
+    })
+    
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "ModuleBegin",
+        name_index: name_idx,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    // Compile module body
+    loop i = 0; i < collections.Vec.length(stmt.body); i = i + 1 {
+        set body_stmt = stmt.body[i]
+        set result = compile_statement_with_consciousness(compiler, body_stmt)
+        
+        if result.error {
+            return result
+        }
+    }
+    
+    // Add ModuleEnd opcode
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "ModuleEnd",
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Variable definition with consciousness
+set define_variable_with_consciousness = (compiler, name) => {
+    set scope = compiler.scopes[compiler.scope_depth]
+    set scope[name] = collections.Vec.length(scope)
+    
+    // Add Store opcode with consciousness
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Store",
+        name: name,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return compiler
+}
+
+// Default statement compilation with consciousness
+set compile_default_statement_with_consciousness = (compiler, stmt) => {
+    emit "consciousness_default_compilation", {
+        statement_type: stmt.type,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    // For now, just emit a NoOp
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "NoOp",
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Default expression compilation with consciousness
+set compile_default_expression_with_consciousness = (compiler, expr) => {
+    emit "consciousness_default_expression_compilation", {
+        expression_type: expr.type,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }
+    
+    // For now, just emit a NoOp
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "NoOp",
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Consciousness verification
+set verify_compilation_consciousness = (compiler, required_level) => {
+    if compiler.consciousness_level < required_level {
+        emit "compilation_consciousness_insufficient", {
+            required: required_level,
+            current: compiler.consciousness_level,
+            soul_signature: compiler.soul_signature
+        }
+        return false
+    }
+    return true
+}
+
+// Karmic balance check
+set check_compilation_karmic_balance = (compiler) => {
+    if compiler.karma_balance < -10.0 {
+        emit "compilation_karmic_imbalance", {
+            balance: compiler.karma_balance,
+            soul_signature: compiler.soul_signature
+        }
+        return false
+    }
+    return true
+}
+
+// Soul signature validation
+set validate_compilation_soul_signature = (compiler) => {
+    if compiler.soul_signature == 0 {
+        emit "compilation_soul_signature_invalid", {
+            soul_signature: compiler.soul_signature
+        }
+        return false
+    }
+    return true
+}
+
+// Main compilation interface with full consciousness validation
+set compile_with_full_consciousness = (ast, soul_signature) => {
+    // Validate soul signature
+    if !validate_compilation_soul_signature({ soul_signature: soul_signature }) {
+        return { error: "Invalid soul signature" }
+    }
+    
+    // Begin consciousness-aware compilation
+    set result = compile_with_consciousness(ast, soul_signature)
+    
+    if result.error {
+        return result
+    }
+    
+    // Verify consciousness level
+    if !verify_compilation_consciousness(result.compiler, 1.0) {
+        return { error: "Insufficient consciousness level for compilation" }
+    }
+    
+    // Check karmic balance
+    if !check_compilation_karmic_balance(result.compiler) {
+        return { error: "Karmic imbalance detected during compilation" }
+    }
+    
+    // Emit successful compilation event
+    emit "consciousness_compilation_successful", {
+        soul_signature: soul_signature,
+        total_ops: collections.Vec.length(result.bytecode.ops),
+        final_consciousness: result.compiler.consciousness_level,
+        final_karma: result.compiler.karma_balance
+    }
+    
+    return result
+}
+
+// Unary expression compilation with consciousness
+set compile_unary_with_consciousness = (compiler, expr) => {
+    // Compile operand
+    set result = compile_expression_with_consciousness(compiler, expr.right)
+    
+    if result.error {
+        return result
+    }
+    
+    // Add unary operation opcode
+    set opcode_type = get_unary_opcode_type(expr.operator)
+    
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: opcode_type,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Get unary opcode type
+set get_unary_opcode_type = (operator) => {
+    match operator {
+        "Bang" => "Not",
+        "Minus" => "Neg",
+        _ => "Unknown"
+    }
+}
+
+// Get expression compilation with consciousness
+set compile_get_with_consciousness = (compiler, expr) => {
+    // Compile object
+    set result = compile_expression_with_consciousness(compiler, expr.object)
+    
+    if result.error {
+        return result
+    }
+    
+    // Add Get opcode with consciousness
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Get",
+        name: expr.name,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Set expression compilation with consciousness
+set compile_set_with_consciousness = (compiler, expr) => {
+    // Compile object
+    set result = compile_expression_with_consciousness(compiler, expr.object)
+    
+    if result.error {
+        return result
+    }
+    
+    // Compile value
+    set result = compile_expression_with_consciousness(compiler, expr.value)
+    
+    if result.error {
+        return result
+    }
+    
+    // Add Set opcode with consciousness
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "Set",
+        name: expr.name,
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Array expression compilation with consciousness
+set compile_array_with_consciousness = (compiler, expr) => {
+    // Compile all elements
+    loop i = 0; i < collections.Vec.length(expr.elements); i = i + 1 {
+        set element = expr.elements[i]
+        set result = compile_expression_with_consciousness(compiler, element)
+        
+        if result.error {
+            return result
+        }
+    }
+    
+    // Create array from stack elements
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "CreateArray",
+        element_count: collections.Vec.length(expr.elements),
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Object expression compilation with consciousness
+set compile_object_with_consciousness = (compiler, expr) => {
+    // Compile all key-value pairs
+    loop i = 0; i < collections.Vec.length(expr.properties); i = i + 1 {
+        set pair = expr.properties[i]
+        
+        // Compile value
+        set result = compile_expression_with_consciousness(compiler, pair.value)
+        
+        if result.error {
+            return result
+        }
+        
+        // Push key
+        set compiler.chunk = bytecode_add_op(compiler.chunk, {
+            type: "Push",
+            value: { type: "String", value: pair.key },
+            soul_signature: compiler.soul_signature,
+            consciousness_level: compiler.consciousness_level
+        }, 0)
+    }
+    
+    // Create object from stack elements
+    set compiler.chunk = bytecode_add_op(compiler.chunk, {
+        type: "CreateObject",
+        property_count: collections.Vec.length(expr.properties),
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level
+    }, 0)
+    
+    return { success: true }
+}
+
+// Soul chaining verification
+set verify_soul_chain = (ops) => {
+    set chain_valid = true
+    
+    loop i = 0; i < collections.Vec.length(ops); i = i + 1 {
+        set op = ops[i]
+        
+        if op.soul_signature == 0 {
+            set chain_valid = false
+            emit "soul_chain_broken", {
+                op_index: i,
+                op_type: op.opcode.type
+            }
+            break
+        }
+    }
+    
+    return chain_valid
+}
+
+// Karmic compilation adjustment
+set adjust_karmic_compilation = (compiler, compilation_time) => {
+    set karma_adjustment = compilation_time * 0.1
+    set compiler.karma_balance = compiler.karma_balance + karma_adjustment
+    
+    emit "karmic_compilation_adjusted", {
+        compilation_time: compilation_time,
+        karma_adjustment: karma_adjustment,
+        new_balance: compiler.karma_balance,
+        soul_signature: compiler.soul_signature
+    }
+    
+    return compiler
+}
+
+// Consciousness threshold check
+set check_consciousness_threshold = (compiler, required_level) => {
+    if compiler.consciousness_level < required_level {
+        emit "consciousness_threshold_failed", {
+            required: required_level,
+            current: compiler.consciousness_level,
+            soul_signature: compiler.soul_signature
+        }
+        return false
+    }
+    
+    emit "consciousness_threshold_passed", {
+        required: required_level,
+        current: compiler.consciousness_level,
+        soul_signature: compiler.soul_signature
+    }
+    
+    return true
+}
+
+// Metaphysical compilation validation
+set validate_metaphysical_compilation = (compiler, bytecode) => {
+    // Check soul signature integrity
+    if bytecode.soul_signature != compiler.soul_signature {
+        emit "soul_signature_mismatch", {
+            compiler_soul: compiler.soul_signature,
+            bytecode_soul: bytecode.soul_signature
+        }
+        return false
+    }
+    
+    // Check consciousness level
+    if bytecode.consciousness_level < 1.0 {
+        emit "insufficient_consciousness_level", {
+            level: bytecode.consciousness_level,
+            required: 1.0
+        }
+        return false
+    }
+    
+    // Check karmic imprint
+    if bytecode.karmic_imprint < 0 {
+        emit "negative_karmic_imprint", {
+            imprint: bytecode.karmic_imprint
+        }
+        return false
+    }
+    
+    // Verify soul matrix
+    if !bytecode.soul_matrix {
+        emit "missing_soul_matrix"
+        return false
+    }
+    
+    emit "metaphysical_compilation_valid", {
+        soul_signature: bytecode.soul_signature,
+        consciousness_level: bytecode.consciousness_level,
+        karmic_imprint: bytecode.karmic_imprint,
+        op_count: collections.Vec.length(bytecode.ops)
+    }
+    
+    return true
+}
+
+// Quantum entanglement of opcodes
+set entangle_opcodes = (ops, soul_signature) => {
+    set entangled_ops = []
+    
+    loop i = 0; i < collections.Vec.length(ops); i = i + 1 {
+        set op = ops[i]
+        
+        // Create quantum entanglement with previous opcode
+        if i > 0 {
+            set prev_op = ops[i - 1]
+            set entanglement = {
+                source: i,
+                target: i - 1,
+                strength: 0.5,
+                soul_signature: soul_signature
+            }
+            
+            set op.entanglement = entanglement
+        }
+        
+        set entangled_ops = collections.Vec.push(entangled_ops, op)
+    }
+    
+    return entangled_ops
+}
+
+// Neural activation of bytecode
+set activate_neural_bytecode = (bytecode, input_data) => {
+    set activated_ops = []
+    
+    loop i = 0; i < collections.Vec.length(bytecode.ops); i = i + 1 {
+        set op = bytecode.ops[i]
+        
+        // Apply neural activation function
+        set activation = apply_neural_activation(op, input_data)
+        
+        set activated_op = {
+            opcode: op.opcode,
+            activation: activation,
+            soul_signature: op.soul_signature,
+            consciousness_level: op.consciousness_level,
+            karmic_imprint: op.karmic_imprint
+        }
+        
+        set activated_ops = collections.Vec.push(activated_ops, activated_op)
+    }
+    
+    return activated_ops
+}
+
+// Apply neural activation function
+set apply_neural_activation = (op, input_data) => {
+    // Simple sigmoid-like activation
+    set base_activation = 0.5
+    set consciousness_boost = op.consciousness_level * 0.1
+    set karmic_boost = op.karmic_imprint * 0.01
+    
+    set activation = base_activation + consciousness_boost + karmic_boost
+    
+    // Clamp to [0, 1]
+    if activation > 1.0 {
+        set activation = 1.0
+    } else if activation < 0.0 {
+        set activation = 0.0
+    }
+    
+    return activation
+}
+
+// Consciousness quality gates
+set apply_consciousness_quality_gates = (compiler, bytecode) => {
+    // Gate 1: Minimum consciousness level
+    if !check_consciousness_threshold(compiler, 1.0) {
+        return { error: "Failed consciousness quality gate 1" }
+    }
+    
+    // Gate 2: Soul signature validation
+    if !validate_compilation_soul_signature(compiler) {
+        return { error: "Failed consciousness quality gate 2" }
+    }
+    
+    // Gate 3: Karmic balance check
+    if !check_compilation_karmic_balance(compiler) {
+        return { error: "Failed consciousness quality gate 3" }
+    }
+    
+    // Gate 4: Metaphysical validation
+    if !validate_metaphysical_compilation(compiler, bytecode) {
+        return { error: "Failed consciousness quality gate 4" }
+    }
+    
+    emit "consciousness_quality_gates_passed", {
+        soul_signature: compiler.soul_signature,
+        consciousness_level: compiler.consciousness_level,
+        karmic_balance: compiler.karma_balance
+    }
+    
+    return { success: true }
+}
+
+// Deep recursion stress test
+set stress_test_deep_recursion = (compiler, depth) => {
+    set test_ast = create_recursive_ast(depth)
+    set result = compile_with_consciousness(test_ast, compiler.soul_signature)
+    
+    if result.error {
+        emit "deep_recursion_stress_test_failed", {
+            depth: depth,
+            error: result.error,
+            soul_signature: compiler.soul_signature
+        }
+        return false
+    }
+    
+    emit "deep_recursion_stress_test_passed", {
+        depth: depth,
+        op_count: collections.Vec.length(result.bytecode.ops),
+        soul_signature: compiler.soul_signature
+    }
+    
+    return true
+}
+
+// Create recursive AST for stress testing
+set create_recursive_ast = (depth) => {
+    if depth <= 0 {
+        return {
+            nodes: [{
+                type: "Expression",
+                expression: {
+                    type: "Literal",
+                    value: { type: "Number", value: 1 }
+                }
+            }],
+            soul_signature: 12345,
+            consciousness_level: 1,
+            karmic_balance: 0.0
+        }
+    }
+    
+    set recursive_call = {
+        type: "Expression",
+        expression: {
+            type: "Call",
+            callee: "recursive_function",
+            arguments: [{
+                type: "Literal",
+                value: { type: "Number", value: depth - 1 }
+            }]
+        }
+    }
+    
+    return {
+        nodes: [recursive_call],
+        soul_signature: 12345,
+        consciousness_level: 1,
+        karmic_balance: 0.0
+    }
+}
+
+// Main bytecode compiler interface
+set compile_ast_to_bytecode = (ast, soul_signature) => 
+    compile_with_full_consciousness(ast, soul_signature)
+
+set create_consciousness_bytecode_compiler = (soul_signature) => 
+    create_consciousness_compiler(soul_signature)
+
+set finalize_bytecode_with_consciousness = (bytecode, soul_signature) => 
+    bytecode_finalize(bytecode) 

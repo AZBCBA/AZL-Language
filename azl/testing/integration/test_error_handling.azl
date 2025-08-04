@@ -1,0 +1,34 @@
+# Test AZL Error Handling + Diagnostics
+# Tests error handling for undefined variables, type mismatches, and invalid operations
+
+# Test 1: Valid operations (should work)
+set ::valid_number = 42
+set ::valid_string = "Hello Error Handling!"
+set ::valid_float = 3.14159
+
+say "✅ Valid operations completed"
+
+# Test 2: Typeof with valid variables
+typeof ::valid_number
+typeof ::valid_string
+typeof ::valid_float
+
+say "✅ Typeof with valid variables completed"
+
+# Test 3: Mathematical operations
+set ::sum = ::valid_number + 8
+say "📊 Sum: ::sum = ::sum"
+
+# Test 4: Error cases (should trigger errors)
+# This should trigger VariableNotFound error
+set ::error_var = ::undefined_var
+
+# This should trigger InvalidOperation error
+invalid_command_that_does_not_exist
+
+# This should trigger TypeMismatch error (if we had type checking)
+set ::string_var = "Hello"
+set ::number_var = 42
+# set ::result = ::string_var + ::number_var  # Would be type mismatch
+
+say "✅ Error handling test completed" 

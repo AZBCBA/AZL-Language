@@ -1,0 +1,89 @@
+say "🎉 COMPREHENSIVE CONTROL FLOW TEST 🎉";
+
+let x = 10;
+let y = 5;
+let z = 15;
+
+say "";
+say "=== BASIC IF STATEMENTS ===";
+
+if x > y {
+    say "✅ x > y is true";
+} else {
+    say "❌ x > y is false";
+}
+
+if x < y {
+    say "❌ x < y is true";
+} else {
+    say "✅ x < y is false";
+}
+
+if x == y {
+    say "❌ x == y is true";
+} else {
+    say "✅ x == y is false";
+}
+
+say "";
+say "=== IF-ELSE STATEMENTS ===";
+
+if x > z {
+    say "❌ x > z is true";
+} else {
+    say "✅ x > z is false";
+}
+
+if x == 10 {
+    say "✅ x == 10 is true";
+} else {
+    say "❌ x == 10 is false";
+}
+
+say "";
+say "=== COMPLEX CONDITIONS ===";
+
+if x > y && x < z {
+    say "✅ x > y && x < z is true";
+} else {
+    say "❌ x > y && x < z is false";
+}
+
+if x > y || x < 0 {
+    say "✅ x > y || x < 0 is true";
+} else {
+    say "❌ x > y || x < 0 is false";
+}
+
+say "";
+say "=== NESTED IF STATEMENTS ===";
+
+if x > y {
+    if y < z {
+        say "✅ Nested: x > y && y < z";
+    } else {
+        say "❌ Nested: x > y but y >= z";
+    }
+} else {
+    say "❌ Nested: x <= y";
+}
+
+say "";
+say "=== VARIABLE ASSIGNMENT IN BRANCHES ===";
+
+let result = 0;
+if x > y {
+    let result = 42;
+    say "✅ Inside if: result = ";
+    say result;
+} else {
+    let result = 99;
+    say "❌ Inside else: result = ";
+    say result;
+}
+
+say "After if: result = ";
+say result;
+
+say "";
+say "🎉 CONTROL FLOW TEST COMPLETE! 🎉"; 

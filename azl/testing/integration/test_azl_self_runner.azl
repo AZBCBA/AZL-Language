@@ -1,0 +1,80 @@
+component ::test.azl_self_runner {
+  init {
+    set ::test_name = "AZL Self-Runner Test"
+    set ::test_version = 1
+    set ::status = "initializing"
+    say "🚀 Starting AZL Self-Runner Test v1..."
+  }
+
+  # Link to self-runner
+  link ::azl.self_runner
+
+  on test.start {
+    say "🚀 Starting AZL Self-Runner Test..."
+    emit test.trigger_self_runner
+  }
+
+  on test.trigger_self_runner {
+    say "🧪 Testing AZL self-runner..."
+    
+    # Test 1: Run a simple program
+    say "📤 Test 1: Running simple program..."
+    emit azl.self_runner.azl.run_program with {
+      program_name: "test_simple",
+      program_path: "test_simple.azl"
+    }
+  }
+
+  on azl.program_executed {
+    say "✅ Program executed successfully"
+    say "📦 Program: $1.program_name"
+    say "📊 Success: $1.success"
+    say "📈 Result: $1.result"
+    emit test.trigger_list_programs
+  }
+
+  on test.trigger_list_programs {
+    say "📤 Test 2: Listing loaded programs..."
+    emit azl.self_runner.azl.list_programs
+  }
+
+  on azl.programs_listed {
+    say "✅ Programs listed successfully"
+    say "📋 Program count: $1.count"
+    say "📦 Programs: $1.programs"
+    emit test.trigger_get_history
+  }
+
+  on test.trigger_get_history {
+    say "📤 Test 3: Getting execution history..."
+    emit azl.self_runner.azl.get_history
+  }
+
+  on azl.history_retrieved {
+    say "✅ History retrieved successfully"
+    say "📜 History count: $1.count"
+    say "📅 History: $1.history"
+    emit test.complete
+  }
+
+  on test.complete {
+    say "🎉 AZL Self-Runner Test COMPLETE!"
+    say "✅ Self-runner working"
+    say "✅ Program execution working"
+    say "✅ Program listing working"
+    say "✅ History tracking working"
+    say "🚀 AZL can run AZL!"
+  }
+
+  behavior {
+    on system.start {
+      emit test.start
+    }
+  }
+
+  memory {
+    ::test_name = ""
+    ::test_version = 1
+    ::status = ""
+  }
+} 

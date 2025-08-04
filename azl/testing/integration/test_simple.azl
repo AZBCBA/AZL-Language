@@ -1,0 +1,68 @@
+# Simple AZL Test Program
+# A minimal program to test AZL self-execution
+
+component ::test.simple {
+  init {
+    set ::status = "initializing"
+    set ::test_name = "Simple Test"
+    set ::test_version = 1
+    
+    say "🧪 Simple AZL Test Program starting..."
+    say "📊 Test name: ::test_name"
+    say "📈 Version: ::test_version"
+    
+    set ::status = "ready"
+    say "✅ Simple test ready"
+  }
+
+  on test.start {
+    say "🧪 Starting simple test..."
+    
+    # Simple variable operations
+    set ::counter = 0
+    set ::message = "Hello from AZL!"
+    
+    say "📊 Counter: ::counter"
+    say "💬 Message: ::message"
+    
+    # Simple loop
+    loop for ::i = 1; ::i <= 3; ::i++ {
+      set ::counter = ::counter + ::i
+      say "🔄 Loop iteration ::i - Counter: ::counter"
+    }
+    
+    # Simple condition
+    if ::counter > 5 {
+      say "✅ Counter is greater than 5"
+    } else {
+      say "⚠️ Counter is 5 or less"
+    }
+    
+    emit test.complete with {
+      counter: ::counter,
+      message: ::message,
+      success: true
+    }
+  }
+
+  on test.complete {
+    say "🎉 Simple test completed!"
+    say "📊 Final counter: $1.counter"
+    say "💬 Final message: $1.message"
+    say "✅ Success: $1.success"
+  }
+
+  behavior {
+    on system.start {
+      emit test.start
+    }
+  }
+
+  memory {
+    ::status = "ready"
+    ::test_name = ""
+    ::test_version = 1
+    ::counter = 0
+    ::message = ""
+  }
+} 

@@ -1,0 +1,639 @@
+component ::aba.aba_analytics {
+  init {
+    set ::status = "initializing"
+    set ::analytics_version = "1.0"
+    set ::trial_history = []
+    set ::success_rates = {}
+    set ::reinforcement_trends = []
+    set ::behavior_chains = {}
+    set ::insight_patterns = []
+    set ::learning_metrics = {
+      total_trials: 0,
+      successful_trials: 0,
+      failed_trials: 0,
+      average_success_rate: 0.0,
+      learning_velocity: 0.0,
+      behavior_complexity: 0.0
+    }
+    set ::dashboard_data = {
+      trial_summary: {},
+      behavior_analysis: {},
+      reinforcement_flow: {},
+      insight_heatmap: {},
+      system_health: {}
+    }
+    
+    # Link to ABA components
+    link ::aba.trial_engine
+    link ::aba.reinforcement_schedule
+    link ::aba.result_logger
+    
+    # Link to AZME components
+    link ::agi.azme_behavior_manager
+    link ::agi.azme_feedback_processor
+    link ::agent.self_reflection
+    
+    emit "aba.analytics.initialized" with {
+      status: ::status,
+      version: ::analytics_version,
+      trial_count: ::learning_metrics.total_trials
+    }
+    
+    set ::status = "ready"
+    say "📊 ABA Analytics initialized with comprehensive tracking"
+  }
+
+  # Analytics data collection and processing
+  behavior {
+    listen for "aba.trial.completed" then {
+      collect_trial_data($1)
+    }
+    
+    listen for "reinforcement.delivered" then {
+      track_reinforcement_trend($1)
+    }
+    
+    listen for "behavior.chain.completed" then {
+      analyze_behavior_chain($1)
+    }
+    
+    listen for "insight.generated" then {
+      record_insight_pattern($1)
+    }
+    
+    listen for "dashboard.request" then {
+      generate_dashboard_data($1)
+    }
+    
+    listen for "analytics.export" then {
+      export_analytics_data($1)
+    }
+  }
+
+  # Collect and analyze trial data
+  function collect_trial_data(trial_data) {
+    say "📊 Collecting trial data..."
+    say "🎯 Behavior: " + trial_data.behavior
+    say "✅ Success: " + trial_data.success
+    say "📈 Performance: " + trial_data.performance
+    
+    # Store trial in history
+    store ::trial_history from ::trial_history.push({
+      behavior: trial_data.behavior,
+      antecedent: trial_data.antecedent,
+      consequence: trial_data.consequence,
+      success: trial_data.success,
+      performance: trial_data.performance,
+      timestamp: now(),
+      trial_id: generate_trial_id()
+    })
+    
+    # Update learning metrics
+    increment ::learning_metrics.total_trials
+    if trial_data.success {
+      increment ::learning_metrics.successful_trials
+    } else {
+      increment ::learning_metrics.failed_trials
+    }
+    
+    # Calculate success rate
+    update_success_rate(trial_data.behavior, trial_data.success)
+    
+    # Update average success rate
+    ::learning_metrics.average_success_rate = ::learning_metrics.successful_trials / ::learning_metrics.total_trials
+    
+    # Calculate learning velocity (success rate over time)
+    calculate_learning_velocity()
+    
+    say "📊 Trial data collected and metrics updated"
+  }
+
+  # Track reinforcement trends
+  function track_reinforcement_trend(reinforcement_data) {
+    say "🎁 Tracking reinforcement trend..."
+    say "💪 Type: " + reinforcement_data.type
+    say "📊 Strength: " + reinforcement_data.strength
+    
+    # Store reinforcement trend
+    store ::reinforcement_trends from ::reinforcement_trends.push({
+      type: reinforcement_data.type,
+      strength: reinforcement_data.strength,
+      behavior: reinforcement_data.behavior,
+      timestamp: now(),
+      context: reinforcement_data.context
+    })
+    
+    # Analyze reinforcement effectiveness
+    analyze_reinforcement_effectiveness(reinforcement_data)
+    
+    say "🎁 Reinforcement trend tracked"
+  }
+
+  # Analyze behavior chain performance
+  function analyze_behavior_chain(chain_data) {
+    say "🔗 Analyzing behavior chain..."
+    say "🎯 Chain: " + chain_data.chain_name
+    say "📊 Steps: " + chain_data.steps.length
+    say "✅ Success: " + chain_data.success
+    
+    # Store behavior chain analysis
+    set ::behavior_chains[chain_data.chain_name] = {
+      steps: chain_data.steps,
+      success_rate: chain_data.success_rate,
+      completion_time: chain_data.completion_time,
+      complexity_score: calculate_complexity_score(chain_data.steps),
+      last_updated: now()
+    }
+    
+    # Update behavior complexity metric
+    update_behavior_complexity()
+    
+    say "🔗 Behavior chain analysis completed"
+  }
+
+  # Record insight patterns for meta-learning
+  function record_insight_pattern(insight_data) {
+    say "💡 Recording insight pattern..."
+    say "🧠 Type: " + insight_data.type
+    say "📊 Confidence: " + insight_data.confidence
+    
+    # Store insight pattern
+    store ::insight_patterns from ::insight_patterns.push({
+      type: insight_data.type,
+      insight: insight_data.insight,
+      confidence: insight_data.confidence,
+      source: insight_data.source,
+      timestamp: now(),
+      context: insight_data.context
+    })
+    
+    # Analyze insight trends
+    analyze_insight_trends()
+    
+    say "💡 Insight pattern recorded"
+  }
+
+  # Generate comprehensive dashboard data
+  function generate_dashboard_data(request_data) {
+    say "📊 Generating dashboard data..."
+    
+    # Trial Summary
+    set ::dashboard_data.trial_summary = {
+      total_trials: ::learning_metrics.total_trials,
+      successful_trials: ::learning_metrics.successful_trials,
+      failed_trials: ::learning_metrics.failed_trials,
+      average_success_rate: ::learning_metrics.average_success_rate,
+      recent_trials: ::trial_history.slice(-10), // Last 10 trials
+      trial_trend: calculate_trial_trend()
+    }
+    
+    # Behavior Analysis
+    set ::dashboard_data.behavior_analysis = {
+      top_behaviors: get_top_behaviors(),
+      behavior_success_rates: ::success_rates,
+      behavior_chains: ::behavior_chains,
+      complexity_distribution: calculate_complexity_distribution()
+    }
+    
+    # Reinforcement Flow
+    set ::dashboard_data.reinforcement_flow = {
+      reinforcement_trends: ::reinforcement_trends.slice(-20), // Last 20 reinforcements
+      reinforcement_effectiveness: calculate_reinforcement_effectiveness(),
+      reinforcement_types: analyze_reinforcement_types()
+    }
+    
+    # Insight Heatmap
+    set ::dashboard_data.insight_heatmap = {
+      insight_patterns: ::insight_patterns.slice(-30), // Last 30 insights
+      insight_trends: calculate_insight_trends(),
+      meta_learning_progress: calculate_meta_learning_progress()
+    }
+    
+    # System Health
+    set ::dashboard_data.system_health = {
+      learning_velocity: ::learning_metrics.learning_velocity,
+      behavior_complexity: ::learning_metrics.behavior_complexity,
+      system_adaptation: calculate_system_adaptation(),
+      performance_indicators: calculate_performance_indicators()
+    }
+    
+    # Emit dashboard data events
+    emit "dashboard.trial_summary" with ::dashboard_data.trial_summary
+    emit "dashboard.behavior_analysis" with ::dashboard_data.behavior_analysis
+    emit "dashboard.reinforcement_flow" with ::dashboard_data.reinforcement_flow
+    emit "dashboard.insight_heatmap" with ::dashboard_data.insight_heatmap
+    emit "dashboard.system_health" with ::dashboard_data.system_health
+    
+    # Emit graph events for visualization
+    emit "insight:graph" with generate_behavior_graph()
+    emit "insight:trend" with generate_learning_trends()
+    
+    say "📊 Dashboard data generated and events emitted"
+  }
+
+  # Update success rate for specific behavior
+  function update_success_rate(behavior, success) {
+    if !::success_rates[behavior] {
+      set ::success_rates[behavior] = { total: 0, successful: 0, rate: 0.0 }
+    }
+    
+    increment ::success_rates[behavior].total
+    if success {
+      increment ::success_rates[behavior].successful
+    }
+    
+    ::success_rates[behavior].rate = ::success_rates[behavior].successful / ::success_rates[behavior].total
+  }
+
+  # Calculate learning velocity (rate of improvement)
+  function calculate_learning_velocity() {
+    let recent_trials = ::trial_history.slice(-20) // Last 20 trials
+    if recent_trials.length >= 10 {
+      let first_half = recent_trials.slice(0, 10)
+      let second_half = recent_trials.slice(10)
+      
+      let first_success_rate = first_half.filter(trial => trial.success).length / first_half.length
+      let second_success_rate = second_half.filter(trial => trial.success).length / second_half.length
+      
+      ::learning_metrics.learning_velocity = second_success_rate - first_success_rate
+    }
+  }
+
+  # Calculate behavior complexity score
+  function calculate_complexity_score(steps) {
+    let complexity = 0.0
+    
+    // Base complexity from number of steps
+    complexity += steps.length * 0.2
+    
+    // Additional complexity from step types
+    for (let step of steps) {
+      if step.includes("analyze") || step.includes("evaluate") {
+        complexity += 0.3
+      }
+      if step.includes("adapt") || step.includes("modify") {
+        complexity += 0.4
+      }
+      if step.includes("create") || step.includes("generate") {
+        complexity += 0.5
+      }
+    }
+    
+    return complexity
+  }
+
+  # Update behavior complexity metric
+  function update_behavior_complexity() {
+    let total_complexity = 0.0
+    let chain_count = 0
+    
+    for (let chain_name in ::behavior_chains) {
+      let chain = ::behavior_chains[chain_name]
+      total_complexity += chain.complexity_score
+      chain_count++
+    }
+    
+    if chain_count > 0 {
+      ::learning_metrics.behavior_complexity = total_complexity / chain_count
+    }
+  }
+
+  # Get top performing behaviors
+  function get_top_behaviors() {
+    let behaviors = []
+    
+    for (let behavior in ::success_rates) {
+      let rate = ::success_rates[behavior]
+      if rate.total >= 3 { // Only include behaviors with at least 3 trials
+        behaviors.push({
+          behavior: behavior,
+          success_rate: rate.rate,
+          total_trials: rate.total,
+          successful_trials: rate.successful
+        })
+      }
+    }
+    
+    // Sort by success rate (descending)
+    behaviors.sort((a, b) => b.success_rate - a.success_rate)
+    
+    return behaviors.slice(0, 10) // Top 10 behaviors
+  }
+
+  # Calculate trial trend over time
+  function calculate_trial_trend() {
+    let recent_trials = ::trial_history.slice(-30) // Last 30 trials
+    let trend = []
+    
+    for (let i = 0; i < recent_trials.length; i += 5) {
+      let batch = recent_trials.slice(i, i + 5)
+      let success_rate = batch.filter(trial => trial.success).length / batch.length
+      trend.push({
+        batch: Math.floor(i / 5) + 1,
+        success_rate: success_rate,
+        trial_count: batch.length
+      })
+    }
+    
+    return trend
+  }
+
+  # Calculate complexity distribution
+  function calculate_complexity_distribution() {
+    let distribution = {
+      low: 0,
+      medium: 0,
+      high: 0
+    }
+    
+    for (let chain_name in ::behavior_chains) {
+      let complexity = ::behavior_chains[chain_name].complexity_score
+      
+      if complexity < 1.0 {
+        distribution.low++
+      } else if complexity < 2.0 {
+        distribution.medium++
+      } else {
+        distribution.high++
+      }
+    }
+    
+    return distribution
+  }
+
+  # Calculate reinforcement effectiveness
+  function calculate_reinforcement_effectiveness() {
+    let effectiveness = {
+      high_strength: 0,
+      medium_strength: 0,
+      low_strength: 0,
+      average_effectiveness: 0.0
+    }
+    
+    let recent_reinforcements = ::reinforcement_trends.slice(-20)
+    let total_effectiveness = 0.0
+    
+    for (let reinforcement of recent_reinforcements) {
+      if reinforcement.strength > 2.0) {
+        effectiveness.high_strength++
+      } else if reinforcement.strength > 1.0) {
+        effectiveness.medium_strength++
+      } else {
+        effectiveness.low_strength++
+      }
+      
+      total_effectiveness += reinforcement.strength
+    }
+    
+    if recent_reinforcements.length > 0 {
+      effectiveness.average_effectiveness = total_effectiveness / recent_reinforcements.length
+    }
+    
+    return effectiveness
+  }
+
+  # Analyze reinforcement types
+  function analyze_reinforcement_types() {
+    let types = {}
+    
+    for (let reinforcement of ::reinforcement_trends) {
+      if !types[reinforcement.type]) {
+        types[reinforcement.type] = 0
+      }
+      types[reinforcement.type]++
+    }
+    
+    return types
+  }
+
+  # Calculate insight trends
+  function calculate_insight_trends() {
+    let trends = {
+      meta_learning: 0,
+      behavior_patterns: 0,
+      system_optimization: 0,
+      adaptive_strategies: 0
+    }
+    
+    for (let insight of ::insight_patterns) {
+      if insight.type == "meta_learning") {
+        trends.meta_learning++
+      } else if insight.type == "behavior_patterns") {
+        trends.behavior_patterns++
+      } else if insight.type == "system_optimization") {
+        trends.system_optimization++
+      } else if insight.type == "adaptive_strategies") {
+        trends.adaptive_strategies++
+      }
+    }
+    
+    return trends
+  }
+
+  # Calculate meta-learning progress
+  function calculate_meta_learning_progress() {
+    let progress = {
+      insight_generation_rate: ::insight_patterns.length / Math.max(::learning_metrics.total_trials, 1),
+      pattern_recognition_accuracy: calculate_pattern_accuracy(),
+      adaptive_learning_capacity: calculate_adaptive_capacity()
+    }
+    
+    return progress
+  }
+
+  # Calculate system adaptation
+  function calculate_system_adaptation() {
+    let adaptation = {
+      learning_velocity: ::learning_metrics.learning_velocity,
+      behavior_complexity_increase: calculate_complexity_increase(),
+      success_rate_improvement: calculate_success_improvement(),
+      adaptation_score: 0.0
+    }
+    
+    // Calculate overall adaptation score
+    adaptation.adaptation_score = (
+      adaptation.learning_velocity * 0.4 +
+      adaptation.behavior_complexity_increase * 0.3 +
+      adaptation.success_rate_improvement * 0.3
+    )
+    
+    return adaptation
+  }
+
+  # Calculate performance indicators
+  function calculate_performance_indicators() {
+    let indicators = {
+      trial_efficiency: ::learning_metrics.successful_trials / Math.max(::learning_metrics.total_trials, 1),
+      reinforcement_efficiency: calculate_reinforcement_efficiency(),
+      insight_generation_efficiency: ::insight_patterns.length / Math.max(::learning_metrics.total_trials, 1),
+      system_health_score: 0.0
+    }
+    
+    // Calculate overall system health score
+    indicators.system_health_score = (
+      indicators.trial_efficiency * 0.4 +
+      indicators.reinforcement_efficiency * 0.3 +
+      indicators.insight_generation_efficiency * 0.3
+    )
+    
+    return indicators
+  }
+
+  # Generate behavior graph for visualization
+  function generate_behavior_graph() {
+    let graph = {
+      nodes: [],
+      edges: [],
+      metadata: {
+        total_behaviors: Object.keys(::success_rates).length,
+        total_chains: Object.keys(::behavior_chains).length,
+        average_success_rate: ::learning_metrics.average_success_rate
+      }
+    }
+    
+    // Add behavior nodes
+    for (let behavior in ::success_rates) {
+      let rate = ::success_rates[behavior]
+      graph.nodes.push({
+        id: behavior,
+        type: "behavior",
+        success_rate: rate.rate,
+        total_trials: rate.total,
+        size: rate.total * 2 // Node size based on trial count
+      })
+    }
+    
+    // Add chain edges
+    for (let chain_name in ::behavior_chains) {
+      let chain = ::behavior_chains[chain_name]
+      for (let i = 0; i < chain.steps.length - 1; i++) {
+        graph.edges.push({
+          source: chain.steps[i],
+          target: chain.steps[i + 1],
+          type: "chain_step",
+          weight: chain.success_rate
+        })
+      }
+    }
+    
+    return graph
+  }
+
+  # Generate learning trends for visualization
+  function generate_learning_trends() {
+    let trends = {
+      success_rate_trend: [],
+      reinforcement_trend: [],
+      complexity_trend: [],
+      insight_trend: []
+    }
+    
+    // Success rate trend over time
+    let trial_batches = []
+    for (let i = 0; i < ::trial_history.length; i += 5) {
+      let batch = ::trial_history.slice(i, i + 5)
+      let success_rate = batch.filter(trial => trial.success).length / batch.length
+      trends.success_rate_trend.push({
+        batch: Math.floor(i / 5) + 1,
+        success_rate: success_rate
+      })
+    }
+    
+    // Reinforcement trend over time
+    let reinforcement_batches = []
+    for (let i = 0; i < ::reinforcement_trends.length; i += 5) {
+      let batch = ::reinforcement_trends.slice(i, i + 5)
+      let average_strength = batch.reduce((sum, r) => sum + r.strength, 0) / batch.length
+      trends.reinforcement_trend.push({
+        batch: Math.floor(i / 5) + 1,
+        average_strength: average_strength
+      })
+    }
+    
+    return trends
+  }
+
+  # Export analytics data
+  function export_analytics_data(export_request) {
+    say "📊 Exporting analytics data..."
+    
+    let export_data = {
+      trial_history: ::trial_history,
+      success_rates: ::success_rates,
+      reinforcement_trends: ::reinforcement_trends,
+      behavior_chains: ::behavior_chains,
+      insight_patterns: ::insight_patterns,
+      learning_metrics: ::learning_metrics,
+      dashboard_data: ::dashboard_data,
+      export_timestamp: now()
+    }
+    
+    emit "analytics.export.complete" with export_data
+    
+    say "📊 Analytics data exported"
+  }
+
+  # Helper functions
+  function generate_trial_id() {
+    return "trial_" + now() + "_" + Math.floor(Math.random() * 1000)
+  }
+
+  function calculate_pattern_accuracy() {
+    // Simplified pattern accuracy calculation
+    return 0.85 // Placeholder - would be calculated from actual pattern matching
+  }
+
+  function calculate_adaptive_capacity() {
+    // Simplified adaptive capacity calculation
+    return 0.78 // Placeholder - would be calculated from adaptation metrics
+  }
+
+  function calculate_complexity_increase() {
+    // Simplified complexity increase calculation
+    return 0.12 // Placeholder - would be calculated from complexity trends
+  }
+
+  function calculate_success_improvement() {
+    // Simplified success improvement calculation
+    return 0.15 // Placeholder - would be calculated from success rate trends
+  }
+
+  function calculate_reinforcement_efficiency() {
+    // Simplified reinforcement efficiency calculation
+    return 0.82 // Placeholder - would be calculated from reinforcement effectiveness
+  }
+
+  function analyze_reinforcement_effectiveness(reinforcement_data) {
+    // Analyze how effective the reinforcement was
+    say "📊 Analyzing reinforcement effectiveness..."
+  }
+
+  function analyze_insight_trends() {
+    // Analyze patterns in insights
+    say "📊 Analyzing insight trends..."
+  }
+
+  # Get analytics statistics
+  function get_analytics_stats() {
+    return {
+      total_trials: ::learning_metrics.total_trials,
+      average_success_rate: ::learning_metrics.average_success_rate,
+      learning_velocity: ::learning_metrics.learning_velocity,
+      behavior_complexity: ::learning_metrics.behavior_complexity,
+      insight_count: ::insight_patterns.length,
+      reinforcement_count: ::reinforcement_trends.length
+    }
+  }
+
+  memory {
+    status
+    analytics_version
+    trial_history
+    success_rates
+    reinforcement_trends
+    behavior_chains
+    insight_patterns
+    learning_metrics
+    dashboard_data
+  }
+} 

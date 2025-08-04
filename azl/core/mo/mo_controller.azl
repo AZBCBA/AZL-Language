@@ -1,0 +1,307 @@
+// MO Controller - Composite Motivating Operation System
+// Links all five MO components into a unified system
+
+component ::mo.controller {
+  init {
+    set ::status = "initializing"
+    set ::components_loaded = 0
+    set ::total_components = 5
+    set ::system_ready = false
+    
+    // Initialize MO components
+    set ::mo_tracker = ::mo.tracker
+    set ::mo_modulator = ::mo.modulator
+    set ::prompting_agent = ::prompting.agent
+    set ::goal_manager = ::goal.manager
+    set ::drive_regulator = ::drive.regulator
+    
+    emit "mo.controller.initializing" with { components: ::total_components }
+  }
+
+  behavior {
+    // System initialization
+    listen for "azl.system.ready" then {
+      set ::status = "bootstrapping"
+      emit "mo.boot.start" with { timestamp: now() }
+      
+      // Initialize all MO components
+      initialize_mo_components()
+    }
+
+    // MO component initialization
+    listen for "mo.tracker.initialized" then {
+      set ::components_loaded = ::components_loaded + 1
+      emit "mo.component.ready" with { component: "tracker", count: ::components_loaded }
+      check_system_ready()
+    }
+
+    listen for "mo.modulator.initialized" then {
+      set ::components_loaded = ::components_loaded + 1
+      emit "mo.component.ready" with { component: "modulator", count: ::components_loaded }
+      check_system_ready()
+    }
+
+    listen for "prompting.agent.initialized" then {
+      set ::components_loaded = ::components_loaded + 1
+      emit "mo.component.ready" with { component: "prompting_agent", count: ::components_loaded }
+      check_system_ready()
+    }
+
+    listen for "goal.manager.initialized" then {
+      set ::components_loaded = ::components_loaded + 1
+      emit "mo.component.ready" with { component: "goal_manager", count: ::components_loaded }
+      check_system_ready()
+    }
+
+    listen for "drive.regulator.initialized" then {
+      set ::components_loaded = ::components_loaded + 1
+      emit "mo.component.ready" with { component: "drive_regulator", count: ::components_loaded }
+      check_system_ready()
+    }
+
+    // System ready check
+    listen for "mo.system.ready" then {
+      set ::status = "ready"
+      set ::system_ready = true
+      emit "mo.boot.complete" with { timestamp: now() }
+      emit "system.log" with "✅ Motivating Operation system initialized"
+      emit "mo.boot.ok"
+    }
+
+    // MO synchronization trigger
+    listen for "mo.sync.trigger" then {
+      branch when ::system_ready = true {
+        emit "mo.updated" with ::mo_tracker.value_map
+        emit "mo.sync.complete" with { timestamp: now() }
+      } else {
+        emit "mo.sync.error" with { error: "system_not_ready" }
+      }
+    }
+
+    // User response handling
+    listen for "user.response" then {
+      branch when ::system_ready = true {
+        // Route to drive regulator
+        emit "user.response" with ::user.response_data
+        
+        // Route to goal manager for completion
+        emit "goal.completed" with {
+          goal_name: "UserEngagement",
+          completion_data: ::user.response_data,
+          timestamp: now()
+        }
+        
+        emit "mo.user_response.processed" with { timestamp: now() }
+      }
+    }
+
+    // Reinforcement handling
+    listen for "reinforcement.given" then {
+      branch when ::system_ready = true {
+        // Route to drive regulator
+        emit "reinforcement.given" with ::reinforcement.given_data
+        
+        // Route to goal manager for completion
+        emit "goal.completed" with {
+          goal_name: "ProvideReinforcement",
+          completion_data: ::reinforcement.given_data,
+          timestamp: now()
+        }
+        
+        emit "mo.reinforcement.processed" with { timestamp: now() }
+      }
+    }
+
+    // Food provision handling
+    listen for "food.provided" then {
+      branch when ::system_ready = true {
+        // Route to drive regulator
+        emit "food.provided" with ::food.provided_data
+        
+        // Route to goal manager for completion
+        emit "goal.completed" with {
+          goal_name: "RequestFood",
+          completion_data: ::food.provided_data,
+          timestamp: now()
+        }
+        
+        emit "mo.food.processed" with { timestamp: now() }
+      }
+    }
+
+    // Attention handling
+    listen for "attention.received" then {
+      branch when ::system_ready = true {
+        // Route to drive regulator
+        emit "attention.received" with ::attention.received_data
+        
+        // Route to goal manager for completion
+        emit "goal.completed" with {
+          goal_name: "GainAttention",
+          completion_data: ::attention.received_data,
+          timestamp: now()
+        }
+        
+        emit "mo.attention.processed" with { timestamp: now() }
+      }
+    }
+
+    // Success handling
+    listen for "success.achieved" then {
+      branch when ::system_ready = true {
+        // Route to drive regulator
+        emit "success.achieved" with ::success.achieved_data
+        
+        // Route to goal manager for completion
+        emit "goal.completed" with {
+          goal_name: "AchieveSuccess",
+          completion_data: ::success.achieved_data,
+          timestamp: now()
+        }
+        
+        emit "mo.success.processed" with { timestamp: now() }
+      }
+    }
+
+    // Failure handling
+    listen for "failure.occurred" then {
+      branch when ::system_ready = true {
+        // Route to drive regulator
+        emit "failure.occurred" with ::failure.occurred_data
+        
+        emit "mo.failure.processed" with { timestamp: now() }
+      }
+    }
+
+    // System idle handling
+    listen for "system.idle" then {
+      branch when ::system_ready = true {
+        // Route to MO tracker
+        emit "system.idle" with ::system.idle_data
+        
+        emit "mo.idle.processed" with { timestamp: now() }
+      }
+    }
+
+    // Dashboard integration
+    listen for "dashboard.request.mo_status" then {
+      branch when ::system_ready = true {
+        emit "dashboard.mo_status" with {
+          tracker_values: ::mo_tracker.value_map,
+          modulator_state: ::mo_modulator.current_state,
+          active_goals: ::goal_manager.goals,
+          last_prompt: ::prompting_agent.last_prompt,
+          regulation_history: ::drive_regulator.regulation_history,
+          system_status: ::status,
+          timestamp: now()
+        }
+      }
+    }
+
+    // Test integration
+    listen for "test.mo_system" then {
+      branch when ::system_ready = true {
+        emit "mo.test.start" with { timestamp: now() }
+        
+        // Simulate user interaction
+        emit "user.response" with {
+          context: "test_interaction",
+          response: "Hello!",
+          timestamp: now()
+        }
+        
+        // Simulate reinforcement
+        emit "reinforcement.given" with {
+          type: "praise",
+          magnitude: "high",
+          timestamp: now()
+        }
+        
+        // Simulate food provision
+        emit "food.provided" with {
+          type: "snack",
+          quantity: "medium",
+          timestamp: now()
+        }
+        
+        emit "mo.test.complete" with { timestamp: now() }
+      }
+    }
+  }
+
+  memory {
+    status
+    components_loaded
+    total_components
+    system_ready
+    mo_tracker
+    mo_modulator
+    prompting_agent
+    goal_manager
+    drive_regulator
+  }
+
+  interface {
+    initialize_mo_components
+    check_system_ready
+    get_mo_status
+    trigger_mo_sync
+    process_user_response
+    process_reinforcement
+    process_food_provision
+    process_attention
+    process_success
+    process_failure
+    process_idle
+    get_dashboard_data
+    run_test_sequence
+  }
+}
+
+// Initialize all MO components
+function initialize_mo_components() {
+  emit "console.log" with { message: "🧠 Initializing MO Components...", timestamp: now() }
+  
+  // Initialize MO Tracker
+  emit "mo.tracker.init" with { timestamp: now() }
+  
+  // Initialize MO Modulator
+  emit "mo.modulator.init" with { timestamp: now() }
+  
+  // Initialize Prompting Agent
+  emit "prompting.agent.init" with { timestamp: now() }
+  
+  // Initialize Goal Manager
+  emit "goal.manager.init" with { timestamp: now() }
+  
+  // Initialize Drive Regulator
+  emit "drive.regulator.init" with { timestamp: now() }
+  
+  emit "mo.components.initializing" with { timestamp: now() }
+}
+
+// Check if all components are ready
+function check_system_ready() {
+  branch when ::components_loaded >= ::total_components {
+    emit "mo.system.ready" with { 
+      components_loaded: ::components_loaded,
+      total_components: ::total_components,
+      timestamp: now()
+    }
+  } else {
+    emit "mo.system.partial" with {
+      components_loaded: ::components_loaded,
+      total_components: ::total_components,
+      remaining: ::total_components - ::components_loaded
+    }
+  }
+}
+
+// Initialize the MO Controller
+set ::mo_controller = ::mo.controller
+emit "mo.controller.ready" with ::mo_controller.status
+
+// Listen for system ready to start MO system
+listen for "azl.system.ready" then {
+  emit "mo.boot.start"
+} 

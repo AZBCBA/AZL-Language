@@ -1,0 +1,746 @@
+# AZL JavaScript Parser Adapter
+# Wraps tree-sitter-javascript/acorn and converts JavaScript AST to Universal AST format
+
+component ::meta_language.javascript_parser {
+  init {
+    set ::status = "initializing"
+    set ::language = "javascript"
+    set ::parser_name = "tree-sitter-javascript"
+    set ::supported_features = ["functions", "classes", "modules", "control_flow", "expressions"]
+    set ::ast_conversions = {}
+    set ::parse_cache = {}
+    
+    # Link to universal AST schema
+    link ::meta_language.universal_ast
+    
+    # Initialize JavaScript-specific AST conversions
+    set ::ast_conversions = {
+      # JavaScript AST node types to Universal AST
+      "Program": "Program",
+      "FunctionDeclaration": "FunctionDeclaration",
+      "FunctionExpression": "FunctionDeclaration",
+      "ClassDeclaration": "ClassDeclaration",
+      "ClassExpression": "ClassDeclaration",
+      "ImportDeclaration": "ImportDeclaration",
+      "ExportNamedDeclaration": "ExportDeclaration",
+      "ExportDefaultDeclaration": "ExportDeclaration",
+      "IfStatement": "IfStatement",
+      "ForStatement": "ForStatement",
+      "ForInStatement": "ForStatement",
+      "ForOfStatement": "ForStatement",
+      "WhileStatement": "WhileStatement",
+      "TryStatement": "TryStatement",
+      "ReturnStatement": "ReturnStatement",
+      "ExpressionStatement": "ExpressionStatement",
+      "AssignmentExpression": "AssignmentExpression",
+      "CallExpression": "CallExpression",
+      "BinaryExpression": "BinaryExpression",
+      "UnaryExpression": "UnaryExpression",
+      "Identifier": "Identifier",
+      "StringLiteral": "Literal",
+      "NumericLiteral": "Literal",
+      "BooleanLiteral": "Literal",
+      "ArrayExpression": "ArrayExpression",
+      "ObjectExpression": "ObjectExpression",
+      "ArrowFunctionExpression": "ArrowFunctionExpression",
+      "AwaitExpression": "AwaitExpression",
+      "YieldExpression": "YieldExpression",
+      "ThrowStatement": "ThrowStatement",
+      "BreakStatement": "BreakStatement",
+      "ContinueStatement": "ContinueStatement",
+      "SwitchStatement": "SwitchStatement",
+      "SwitchCase": "SwitchCase",
+      "CatchClause": "CatchClause",
+      "VariableDeclaration": "VariableDeclaration",
+      "VariableDeclarator": "VariableDeclaration",
+      "Property": "Property",
+      "MethodDefinition": "MethodDefinition",
+      "MemberExpression": "MemberExpression",
+      "TemplateLiteral": "Literal",
+      "TaggedTemplateExpression": "CallExpression",
+      "SpreadElement": "UnaryExpression",
+      "RestElement": "UnaryExpression",
+      "DestructuringAssignment": "AssignmentExpression",
+      "ObjectPattern": "ObjectExpression",
+      "ArrayPattern": "ArrayExpression"
+    }
+    
+    # JavaScript-specific transformations
+    set ::javascript_transformations = {
+      # Convert ES6+ features to Universal AST
+      arrow_function: {
+        pattern: { type: "ArrowFunctionExpression" },
+        action: "convert_to_function",
+        target: "FunctionDeclaration"
+      },
+      # Convert template literals
+      template_literal: {
+        pattern: { type: "TemplateLiteral" },
+        action: "convert_to_string",
+        target: "Literal"
+      },
+      # Convert destructuring
+      destructuring: {
+        pattern: { type: "ObjectPattern" },
+        action: "convert_destructuring",
+        target: "VariableDeclaration"
+      },
+      # Convert async/await
+      async_function: {
+        pattern: { type: "FunctionDeclaration", async: true },
+        action: "mark_async",
+        target: "FunctionDeclaration"
+      }
+    }
+    
+    emit "javascript_parser.initialized" with {
+      status: ::status,
+      language: ::language,
+      parser: ::parser_name,
+      conversions: ::ast_conversions.length,
+      transformations: ::javascript_transformations.length
+    }
+    
+    set ::status = "ready"
+    say "🟨 JavaScript Parser Adapter initialized"
+    say "📊 AST conversions: ::ast_conversions.length"
+    say "🔧 JavaScript transformations: ::javascript_transformations.length"
+  }
+
+  behavior {
+    # Parse JavaScript source code
+    listen for "javascript.parse_source" then {
+      set ::source_code = ::parse_data.source
+      set ::file_path = ::parse_data.file_path || "unknown.js"
+      set ::status = "parsing"
+      
+      say "🟨 Parsing JavaScript source code..."
+      say "📁 File: ::file_path"
+      say "📏 Length: ::source_code.length characters"
+      
+      # Parse with tree-sitter-javascript (backend call)
+      set ::javascript_ast = ::parse_javascript_source(::source_code)
+      
+      # Convert to universal AST
+      set ::universal_ast = ::convert_to_universal_ast(::javascript_ast)
+      
+      # Validate universal AST
+      emit "ast.validate" with { ast: ::universal_ast }
+      
+      # Cache parsed result
+      set ::parse_cache[::file_path] = {
+        source: ::source_code,
+        javascript_ast: ::javascript_ast,
+        universal_ast: ::universal_ast,
+        timestamp: ::time.engine.now().epoch
+      }
+      
+      emit "javascript.parse_complete" with {
+        file_path: ::file_path,
+        source: ::source_code,
+        javascript_ast: ::javascript_ast,
+        universal_ast: ::universal_ast,
+        parse_time: ::time.engine.now().epoch
+      }
+      
+      set ::status = "ready"
+      say "✅ JavaScript parsing complete"
+      say "📊 AST nodes: ::universal_ast.body.length"
+    }
+    
+    # Transform JavaScript-specific constructs
+    listen for "javascript.transform" then {
+      set ::transformation = ::transform_data
+      set ::ast_node = ::transform_data.node
+      
+      say "🟨 Applying JavaScript-specific transformation..."
+      
+      set ::transformed_node = ::apply_javascript_transformation(::transformation, ::ast_node)
+      
+      emit "javascript.transformed" with {
+        original: ::ast_node,
+        transformed: ::transformed_node,
+        transformation: ::transformation
+      }
+    }
+    
+    # Generate JavaScript code from universal AST
+    listen for "javascript.generate_code" then {
+      set ::universal_ast = ::generate_data.ast
+      set ::options = ::generate_data.options || {}
+      
+      say "🟨 Generating JavaScript code from universal AST..."
+      
+      set ::javascript_code = ::generate_javascript_code(::universal_ast, ::options)
+      
+      emit "javascript.code_generated" with {
+        ast: ::universal_ast,
+        code: ::javascript_code,
+        options: ::options
+      }
+    }
+    
+    # Query JavaScript-specific patterns
+    listen for "javascript.query_pattern" then {
+      set ::pattern = ::query_data.pattern
+      set ::ast_data = ::query_data.ast
+      
+      say "🟨 Querying JavaScript-specific patterns..."
+      
+      set ::matches = ::query_javascript_patterns(::pattern, ::ast_data)
+      
+      emit "javascript.query_result" with {
+        pattern: ::pattern,
+        matches: ::matches,
+        count: ::matches.length
+      }
+    }
+  }
+
+  # Helper functions
+  function ::parse_javascript_source(source_code) {
+    # This would call the Rust backend with tree-sitter-javascript
+    # For now, return a mock AST structure
+    return {
+      type: "Program",
+      body: [
+        {
+          type: "FunctionDeclaration",
+          id: { type: "Identifier", name: "exampleFunction" },
+          params: [
+            { type: "Identifier", name: "x" },
+            { type: "Identifier", name: "y" }
+          ],
+          body: {
+            type: "BlockStatement",
+            body: [
+              {
+                type: "ReturnStatement",
+                argument: {
+                  type: "BinaryExpression",
+                  operator: "+",
+                  left: { type: "Identifier", name: "x" },
+                  right: { type: "Identifier", name: "y" }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+  
+  function ::convert_to_universal_ast(javascript_ast) {
+    set ::universal_ast = {
+      type: "Program",
+      body: [],
+      source_type: "javascript",
+      comments: []
+    }
+    
+    # Convert JavaScript AST nodes to universal format
+    loop for ::node in ::javascript_ast.body {
+      set ::converted_node = ::convert_javascript_node(::node)
+      if ::converted_node {
+        set ::universal_ast.body.push(::converted_node)
+      }
+    }
+    
+    return ::universal_ast
+  }
+  
+  function ::convert_javascript_node(javascript_node) {
+    set ::node_type = ::javascript_node.type
+    set ::universal_type = ::ast_conversions[::node_type]
+    
+    if not ::universal_type {
+      say "⚠️ Unknown JavaScript node type: ::node_type"
+      return null
+    }
+    
+    # Convert based on node type
+    if ::node_type == "FunctionDeclaration" {
+      return ::convert_function_declaration(::javascript_node)
+    } else if ::node_type == "ClassDeclaration" {
+      return ::convert_class_declaration(::javascript_node)
+    } else if ::node_type == "ImportDeclaration" {
+      return ::convert_import_declaration(::javascript_node)
+    } else if ::node_type == "IfStatement" {
+      return ::convert_if_statement(::javascript_node)
+    } else if ::node_type == "ForStatement" {
+      return ::convert_for_statement(::javascript_node)
+    } else if ::node_type == "ReturnStatement" {
+      return ::convert_return_statement(::javascript_node)
+    } else if ::node_type == "BinaryExpression" {
+      return ::convert_binary_expression(::javascript_node)
+    } else if ::node_type == "Identifier" {
+      return ::convert_identifier(::javascript_node)
+    } else if ::node_type == "StringLiteral" or ::node_type == "NumericLiteral" {
+      return ::convert_literal(::javascript_node)
+    }
+    
+    # Default conversion
+    return {
+      type: ::universal_type,
+      original_type: ::node_type,
+      ...::javascript_node
+    }
+  }
+  
+  function ::convert_function_declaration(javascript_node) {
+    return {
+      type: "FunctionDeclaration",
+      name: ::javascript_node.id ? ::javascript_node.id.name : "anonymous",
+      params: ::convert_parameters(::javascript_node.params),
+      body: ::convert_body(::javascript_node.body),
+      async: ::javascript_node.async || false,
+      generator: ::javascript_node.generator || false
+    }
+  }
+  
+  function ::convert_class_declaration(javascript_node) {
+    return {
+      type: "ClassDeclaration",
+      name: ::javascript_node.id ? ::javascript_node.id.name : "anonymous",
+      super_class: ::javascript_node.super_class,
+      body: ::convert_class_body(::javascript_node.body),
+      decorators: ::javascript_node.decorators || []
+    }
+  }
+  
+  function ::convert_import_declaration(javascript_node) {
+    return {
+      type: "ImportDeclaration",
+      source: ::javascript_node.source.value,
+      specifiers: ::convert_import_specifiers(::javascript_node.specifiers),
+      default: ::javascript_node.default || null
+    }
+  }
+  
+  function ::convert_if_statement(javascript_node) {
+    return {
+      type: "IfStatement",
+      test: ::convert_expression(::javascript_node.test),
+      consequent: ::convert_statement(::javascript_node.consequent),
+      alternate: ::javascript_node.alternate ? ::convert_statement(::javascript_node.alternate) : null
+    }
+  }
+  
+  function ::convert_for_statement(javascript_node) {
+    return {
+      type: "ForStatement",
+      init: ::convert_expression(::javascript_node.init),
+      test: ::convert_expression(::javascript_node.test),
+      update: ::convert_expression(::javascript_node.update),
+      body: ::convert_statement(::javascript_node.body)
+    }
+  }
+  
+  function ::convert_return_statement(javascript_node) {
+    return {
+      type: "ReturnStatement",
+      argument: ::javascript_node.argument ? ::convert_expression(::javascript_node.argument) : null
+    }
+  }
+  
+  function ::convert_binary_expression(javascript_node) {
+    return {
+      type: "BinaryExpression",
+      operator: ::javascript_node.operator,
+      left: ::convert_expression(::javascript_node.left),
+      right: ::convert_expression(::javascript_node.right)
+    }
+  }
+  
+  function ::convert_identifier(javascript_node) {
+    return {
+      type: "Identifier",
+      name: ::javascript_node.name
+    }
+  }
+  
+  function ::convert_literal(javascript_node) {
+    return {
+      type: "Literal",
+      value: ::javascript_node.value,
+      raw: ::javascript_node.raw || ::javascript_node.value.toString()
+    }
+  }
+  
+  function ::convert_parameters(parameters) {
+    set ::converted_params = []
+    
+    loop for ::param in ::parameters {
+      set ::converted_params.push({
+        type: "Identifier",
+        name: ::param.name || ::param.id.name,
+        default: ::param.default ? ::convert_expression(::param.default) : null
+      })
+    }
+    
+    return ::converted_params
+  }
+  
+  function ::convert_body(body) {
+    if ::body.type == "BlockStatement" {
+      return ::convert_statement_list(::body.body)
+    } else {
+      return [::convert_statement(::body)]
+    }
+  }
+  
+  function ::convert_statement_list(statements) {
+    set ::converted_statements = []
+    
+    loop for ::statement in ::statements {
+      set ::converted_statement = ::convert_javascript_node(::statement)
+      if ::converted_statement {
+        set ::converted_statements.push(::converted_statement)
+      }
+    }
+    
+    return ::converted_statements
+  }
+  
+  function ::convert_expression(expression) {
+    if not ::expression {
+      return null
+    }
+    
+    return ::convert_javascript_node(::expression)
+  }
+  
+  function ::convert_statement(statement) {
+    if not ::statement {
+      return null
+    }
+    
+    return ::convert_javascript_node(::statement)
+  }
+  
+  function ::convert_class_body(class_body) {
+    set ::converted_body = []
+    
+    loop for ::member in ::class_body.body {
+      set ::converted_member = ::convert_javascript_node(::member)
+      if ::converted_member {
+        set ::converted_body.push(::converted_member)
+      }
+    }
+    
+    return ::converted_body
+  }
+  
+  function ::convert_import_specifiers(specifiers) {
+    set ::converted_specifiers = []
+    
+    loop for ::specifier in ::specifiers {
+      set ::converted_specifiers.push({
+        type: "ImportSpecifier",
+        local: ::specifier.local.name,
+        imported: ::specifier.imported ? ::specifier.imported.name : ::specifier.local.name
+      })
+    }
+    
+    return ::converted_specifiers
+  }
+  
+  function ::apply_javascript_transformation(transformation, node) {
+    set ::rule = ::javascript_transformations[::transformation.type]
+    set ::transformed_node = ::node
+    
+    if ::rule {
+      if ::transformation.type == "arrow_function" {
+        set ::transformed_node = ::convert_arrow_function(::node, ::transformation)
+      } else if ::transformation.type == "template_literal" {
+        set ::transformed_node = ::convert_template_literal(::node, ::transformation)
+      } else if ::transformation.type == "destructuring" {
+        set ::transformed_node = ::convert_destructuring(::node, ::transformation)
+      } else if ::transformation.type == "async_function" {
+        set ::transformed_node.async = true
+      }
+    }
+    
+    return ::transformed_node
+  }
+  
+  function ::convert_arrow_function(node, transformation) {
+    return {
+      type: "ArrowFunctionExpression",
+      params: ::node.params,
+      body: ::node.body,
+      async: ::node.async || false
+    }
+  }
+  
+  function ::convert_template_literal(node, transformation) {
+    set ::template_string = ""
+    
+    loop for ::quasi in ::node.quasis {
+      set ::template_string = ::template_string + ::quasi.value.raw
+    }
+    
+    return {
+      type: "Literal",
+      value: ::template_string,
+      raw: "\"" + ::template_string + "\""
+    }
+  }
+  
+  function ::convert_destructuring(node, transformation) {
+    return {
+      type: "VariableDeclaration",
+      kind: "const",
+      declarations: [
+        {
+          type: "VariableDeclarator",
+          id: ::node,
+          init: null
+        }
+      ]
+    }
+  }
+  
+  function ::generate_javascript_code(universal_ast, options) {
+    set ::javascript_code = ""
+    set ::indent_level = 0
+    
+    # Generate JavaScript code from universal AST
+    loop for ::node in ::universal_ast.body {
+      set ::node_code = ::generate_javascript_node(::node, ::indent_level)
+      set ::javascript_code = ::javascript_code + ::node_code + "\n"
+    }
+    
+    return ::javascript_code
+  }
+  
+  function ::generate_javascript_node(node, indent_level) {
+    set ::indent = "  ".repeat(::indent_level)
+    
+    if ::node.type == "FunctionDeclaration" {
+      return ::generate_javascript_function(::node, ::indent)
+    } else if ::node.type == "ClassDeclaration" {
+      return ::generate_javascript_class(::node, ::indent)
+    } else if ::node.type == "ImportDeclaration" {
+      return ::generate_javascript_import(::node, ::indent)
+    } else if ::node.type == "IfStatement" {
+      return ::generate_javascript_if(::node, ::indent, ::indent_level)
+    } else if ::node.type == "ForStatement" {
+      return ::generate_javascript_for(::node, ::indent, ::indent_level)
+    } else if ::node.type == "ReturnStatement" {
+      return ::indent + "return " + ::generate_javascript_expression(::node.argument) + ";\n"
+    } else if ::node.type == "ExpressionStatement" {
+      return ::indent + ::generate_javascript_expression(::node.expression) + ";\n"
+    }
+    
+    return ::indent + "// Unknown node type: " + ::node.type + "\n"
+  }
+  
+  function ::generate_javascript_function(node, indent) {
+    set ::function_code = ::indent
+    
+    if ::node.async {
+      set ::function_code = ::function_code + "async "
+    }
+    
+    set ::function_code = ::function_code + "function " + ::node.name + "("
+    
+    # Add parameters
+    set ::params = []
+    loop for ::param in ::node.params {
+      set ::param_code = ::param.name
+      if ::param.default {
+        set ::param_code = ::param_code + " = " + ::generate_javascript_expression(::param.default)
+      }
+      set ::params.push(::param_code)
+    }
+    
+    set ::function_code = ::function_code + ::params.join(", ") + ") {\n"
+    
+    # Add function body
+    loop for ::statement in ::node.body {
+      set ::function_code = ::function_code + ::generate_javascript_node(::statement, 1)
+    }
+    
+    set ::function_code = ::function_code + ::indent + "}\n"
+    return ::function_code
+  }
+  
+  function ::generate_javascript_class(node, indent) {
+    set ::class_code = ::indent + "class " + ::node.name
+    
+    if ::node.super_class {
+      set ::class_code = ::class_code + " extends " + ::generate_javascript_expression(::node.super_class)
+    }
+    
+    set ::class_code = ::class_code + " {\n"
+    
+    # Add class body
+    loop for ::statement in ::node.body {
+      set ::class_code = ::class_code + ::generate_javascript_node(::statement, 1)
+    }
+    
+    set ::class_code = ::class_code + ::indent + "}\n"
+    return ::class_code
+  }
+  
+  function ::generate_javascript_import(node, indent) {
+    if ::node.default {
+      return ::indent + "import " + ::node.default + " from '" + ::node.source + "';\n"
+    } else {
+      return ::indent + "import { " + ::node.specifiers.join(", ") + " } from '" + ::node.source + "';\n"
+    }
+  }
+  
+  function ::generate_javascript_if(node, indent, indent_level) {
+    set ::if_code = ::indent + "if (" + ::generate_javascript_expression(::node.test) + ") {\n"
+    
+    # Add consequent
+    loop for ::statement in ::node.consequent {
+      set ::if_code = ::if_code + ::generate_javascript_node(::statement, ::indent_level + 1)
+    }
+    
+    set ::if_code = ::if_code + ::indent + "}"
+    
+    # Add alternate (else)
+    if ::node.alternate {
+      set ::if_code = ::if_code + " else {\n"
+      loop for ::statement in ::node.alternate {
+        set ::if_code = ::if_code + ::generate_javascript_node(::statement, ::indent_level + 1)
+      }
+      set ::if_code = ::if_code + ::indent + "}"
+    }
+    
+    set ::if_code = ::if_code + "\n"
+    return ::if_code
+  }
+  
+  function ::generate_javascript_for(node, indent, indent_level) {
+    set ::for_code = ::indent + "for ("
+    
+    if ::node.init {
+      set ::for_code = ::for_code + ::generate_javascript_expression(::node.init)
+    }
+    set ::for_code = ::for_code + "; "
+    
+    if ::node.test {
+      set ::for_code = ::for_code + ::generate_javascript_expression(::node.test)
+    }
+    set ::for_code = ::for_code + "; "
+    
+    if ::node.update {
+      set ::for_code = ::for_code + ::generate_javascript_expression(::node.update)
+    }
+    
+    set ::for_code = ::for_code + ") {\n"
+    
+    # Add loop body
+    loop for ::statement in ::node.body {
+      set ::for_code = ::for_code + ::generate_javascript_node(::statement, ::indent_level + 1)
+    }
+    
+    set ::for_code = ::for_code + ::indent + "}\n"
+    return ::for_code
+  }
+  
+  function ::generate_javascript_expression(expression) {
+    if not ::expression {
+      return ""
+    }
+    
+    if ::expression.type == "Identifier" {
+      return ::expression.name
+    } else if ::expression.type == "Literal" {
+      return ::expression.raw || ::expression.value.toString()
+    } else if ::expression.type == "BinaryExpression" {
+      return ::generate_javascript_expression(::expression.left) + " " + ::expression.operator + " " + ::generate_javascript_expression(::expression.right)
+    } else if ::expression.type == "CallExpression" {
+      return ::generate_javascript_expression(::expression.callee) + "(" + ::generate_javascript_arguments(::expression.arguments) + ")"
+    }
+    
+    return "/* Unknown expression type: " + ::expression.type + " */"
+  }
+  
+  function ::generate_javascript_arguments(arguments) {
+    set ::arg_codes = []
+    
+    loop for ::arg in ::arguments {
+      set ::arg_codes.push(::generate_javascript_expression(::arg))
+    }
+    
+    return ::arg_codes.join(", ")
+  }
+  
+  function ::query_javascript_patterns(pattern, ast) {
+    set ::matches = []
+    
+    # Query for JavaScript-specific patterns
+    if ::pattern.type == "FunctionDeclaration" {
+      set ::matches = ::query_function_patterns(::pattern, ::ast)
+    } else if ::pattern.type == "ClassDeclaration" {
+      set ::matches = ::query_class_patterns(::pattern, ::ast)
+    } else if ::pattern.type == "ImportDeclaration" {
+      set ::matches = ::query_import_patterns(::pattern, ::ast)
+    }
+    
+    return ::matches
+  }
+  
+  function ::query_function_patterns(pattern, ast) {
+    set ::matches = []
+    
+    loop for ::node in ::ast.body {
+      if ::node.type == "FunctionDeclaration" {
+        if ::pattern.name and ::node.name == ::pattern.name {
+          set ::matches.push(::node)
+        } else if not ::pattern.name {
+          set ::matches.push(::node)
+        }
+      }
+    }
+    
+    return ::matches
+  }
+  
+  function ::query_class_patterns(pattern, ast) {
+    set ::matches = []
+    
+    loop for ::node in ::ast.body {
+      if ::node.type == "ClassDeclaration" {
+        if ::pattern.name and ::node.name == ::pattern.name {
+          set ::matches.push(::node)
+        } else if not ::pattern.name {
+          set ::matches.push(::node)
+        }
+      }
+    }
+    
+    return ::matches
+  }
+  
+  function ::query_import_patterns(pattern, ast) {
+    set ::matches = []
+    
+    loop for ::node in ::ast.body {
+      if ::node.type == "ImportDeclaration" {
+        if ::pattern.source and ::node.source == ::pattern.source {
+          set ::matches.push(::node)
+        } else if not ::pattern.source {
+          set ::matches.push(::node)
+        }
+      }
+    }
+    
+    return ::matches
+  }
+
+  memory {
+    ::status = ""
+    ::language = ""
+    ::parser_name = ""
+    ::supported_features = []
+    ::ast_conversions = {}
+    ::parse_cache = {}
+    ::javascript_transformations = {}
+  }
+} 

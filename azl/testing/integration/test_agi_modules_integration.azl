@@ -1,0 +1,115 @@
+component ::test.agi_modules_integration {
+  init {
+    set ::test_name = "AGI Modules Integration Test"
+    set ::test_version = 1
+    set ::status = "initializing"
+    say "🧠 Starting AGI Modules Integration Test v1..."
+  }
+
+  # Link to all AZME modules
+  link ::azme.core.aba_bridge
+  link ::azme.planning.goal_system
+  link ::azme.cognitive.cognitive_engine
+  link ::azme.learning.learning_system
+  link ::azme.cognitive.semantic_engine
+
+  on test.start {
+    say "🧠 Starting AGI Modules Integration Test..."
+    emit test.trigger_goal_planning
+  }
+
+  on test.trigger_goal_planning {
+    say "🧪 Testing goal planning module..."
+    
+    emit azme.planning.goal_system.create_goal with {
+      category: "learning",
+      specific_goal: "Master quantum mathematics",
+      priority_override: 0.9
+    }
+  }
+
+  on azme.goal_planning.goal_created {
+    say "✅ Goal planning module working"
+    say "📋 Goal: $1.goal"
+    say "📊 Priority: $1.priority"
+    say "🔗 Category: $1.category"
+    emit test.trigger_cognitive_reasoning
+  }
+
+  on test.trigger_cognitive_reasoning {
+    say "🧪 Testing cognitive reasoning module..."
+    
+    emit azme.cognitive.cognitive_engine.cognitive_tick
+  }
+
+  on azme.cognitive_reasoning.insight_generated {
+    say "✅ Cognitive reasoning module working"
+    say "🎯 Goal: $1.goal"
+    say "📊 Result: $1.result"
+    say "🔬 Confidence: $1.confidence"
+    emit test.trigger_learning
+  }
+
+  on test.trigger_learning {
+    say "🧪 Testing learning module..."
+    
+    set ::test_input = []
+    loop for ::i = 0; ::i < 64; ::i++ {
+      set ::test_input[::i] = (random.float() - 0.5) * 2.0
+    }
+    
+    emit azme.learning.learning_system.process_learning with {
+      input_data: ::test_input,
+      learning_type: "quantum"
+    }
+  }
+
+  on azme.learning.learning_complete {
+    say "✅ Learning module working"
+    say "📖 Topic: $1.topic"
+    say "📈 Success rate: $1.success_rate"
+    say "📊 Adaptation capacity: $1.adaptation_capacity"
+    say "🔗 Knowledge integration: $1.knowledge_integration"
+    emit test.trigger_semantic_understanding
+  }
+
+  on test.trigger_semantic_understanding {
+    say "🧪 Testing semantic understanding module..."
+    
+    emit azme.cognitive.semantic_engine.process_semantics with {
+      input_text: "Quantum semantic understanding for AGI"
+    }
+  }
+
+  on azme.semantic_understanding.pattern_recognized {
+    say "✅ Semantic understanding module working"
+    say "🎯 Pattern: $1.pattern"
+    say "📊 Recognition strength: $1.recognition_strength"
+    say "📊 Context understanding: $1.context_understanding"
+    say "🧠 Processing capacity: $1.semantic_processing_capacity"
+    emit test.complete
+  }
+
+  on test.complete {
+    say "🎉 AGI Modules Integration Test COMPLETE!"
+    say "✅ Goal Planning module working"
+    say "✅ Cognitive Reasoning module working"
+    say "✅ Learning module working"
+    say "✅ Semantic Understanding module working"
+    say "✅ ABA Bridge integration working"
+    say "🚀 ALL AZME MODULES ARE FULLY CONVERTED AND OPERATIONAL!"
+  }
+
+  behavior {
+    on system.start {
+      emit test.start
+    }
+  }
+
+  memory {
+    ::test_name = ""
+    ::test_version = 1
+    ::status = ""
+    ::test_results = []
+  }
+} 

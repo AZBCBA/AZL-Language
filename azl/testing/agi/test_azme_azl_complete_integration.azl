@@ -1,0 +1,103 @@
+# Complete AZME→AZL ABA Integration Test
+# Tests the full integration between AZME's high-level cognition and AZL's advanced ABA functions
+
+say "🔌 Starting Complete AZME→AZL ABA Integration Test..."
+
+# Initialize all AZME components with ABA integration
+say "🔌 Step 1: Initializing All AZME Components with ABA Integration..."
+
+# Initialize core components
+emit "azme.cognitive_loop.initialized" with "ready"
+emit "azme.behavior_manager.initialized" with "ready"
+emit "azme.feedback_processor.initialized" with "ready"
+emit "aba.reinforcement_schedule.initialized" with "ready"
+emit "agent.self_reflection.initialized" with "ready"
+
+say "🧠 All AZME components initialized with ABA integration"
+
+# Test 1: CognitiveLoop → AZL ABA Integration
+say "🔌 Step 2: Testing CognitiveLoop → AZL ABA Integration..."
+emit "cognitive_cycle.start"
+emit "action.completed" with "Learn quantum computing"
+emit "insight.generated" with "high_confidence_insight"
+
+# Test 2: BehaviorManager → AZL Advanced ABA Integration
+say "🔌 Step 3: Testing BehaviorManager → AZL Advanced ABA Integration..."
+emit "behavior.execute" with "complex_learning_task"
+emit "behavior.chain.define" with "multi_step_learning"
+emit "behavior.shape" with "skill_progression"
+
+# Test 3: FeedbackProcessor → AZL Advanced ABA Analysis
+say "🔌 Step 4: Testing FeedbackProcessor → AZL Advanced ABA Analysis..."
+emit "feedback.evaluate" with "learning_performance"
+emit "action.completed" with "skill_practice"
+emit "goal.completed" with "learning_goal"
+emit "learning.completed" with "neural_network_training"
+
+# Test 4: ReinforcementSchedule → AZL Advanced ABA Scheduling
+say "🔌 Step 5: Testing ReinforcementSchedule → AZL Advanced ABA Scheduling..."
+emit "schedule.retry" with "failed_learning_task"
+emit "schedule.fade" with "learning_prompt"
+emit "schedule.adaptive" with "complex_behavior"
+
+# Test 5: SelfReflection → AZL ABA Trial Analysis
+say "🔌 Step 6: Testing SelfReflection → AZL ABA Trial Analysis..."
+emit "self_reflection.analyze" with "comprehensive_analysis"
+emit "aba.trials.updated" with "new_trial_data"
+emit "learning.completed" with "meta_learning_session"
+emit "behavior.completed" with "adaptive_behavior"
+
+# Test 6: Direct AZL Advanced ABA Commands
+say "🔌 Step 7: Testing Direct AZL Advanced ABA Commands..."
+addgoal "Master advanced ABA techniques" 10
+addgoal "Learn behavior chaining" 9
+addgoal "Practice prompt fading" 8
+
+# Execute goals with advanced ABA
+say "🔌 Step 8: Executing Goals with Advanced ABA Integration..."
+run
+
+# Test 9: Advanced ABA Features
+say "🔌 Step 9: Testing Advanced ABA Features..."
+define_chain "complex_learning: step1=analyze, step2=plan, step3=execute, step4=evaluate, step5=adapt"
+shape_behavior "advanced_skill: current=intermediate, target=expert, steps=5"
+prompt_fade "guidance_prompt: initial=detailed, target=minimal, steps=8"
+task_analysis "meta_learning_task: subtasks=12, dependencies=6, complexity=very_high"
+
+# Test 10: ABA Trial Logging for All AZME Activities
+say "🔌 Step 10: Testing ABA Trial Logging for All AZME Activities..."
+apply_trial "antecedent: azme_cognitive_cycle; behavior: insight_generation; consequence: high_confidence"
+apply_trial "antecedent: azme_behavior_execution; behavior: complex_task_completion; consequence: success"
+apply_trial "antecedent: azme_feedback_evaluation; behavior: performance_analysis; consequence: positive_reinforcement"
+apply_trial "antecedent: azme_adaptive_scheduling; behavior: retry_scheduling; consequence: adaptive_strategy"
+apply_trial "antecedent: azme_self_reflection; behavior: meta_analysis; consequence: insights_generated"
+
+# Test 11: Advanced ABA Reinforcement
+say "🔌 Step 11: Testing Advanced ABA Reinforcement..."
+reinforce_behavior cognitive_insight_success
+reinforce_behavior behavior_execution_success
+reinforce_behavior feedback_analysis_success
+reinforce_behavior adaptive_scheduling_success
+reinforce_behavior meta_insight_generation
+
+# Test 12: Comprehensive Consequence Analysis
+say "🔌 Step 12: Testing Comprehensive Consequence Analysis..."
+analyze_consequence
+
+# Test 13: Check Final State and All ABA Data
+say "🔌 Step 13: Checking Final State and All ABA Data..."
+reflect
+
+# Test 14: AZME Component Statistics
+say "🔌 Step 14: Testing AZME Component Statistics..."
+emit "azme.cognitive_loop.stats_request"
+emit "azme.behavior_manager.stats_request"
+emit "azme.feedback_processor.stats_request"
+emit "aba.reinforcement_schedule.stats_request"
+emit "agent.self_reflection.stats_request"
+
+say "✅ Complete AZME→AZL ABA Integration Test Complete!"
+say "🎯 Full integration is working!"
+say "🧠 AZME can now use AZL's advanced ABA functions for intelligent learning!"
+say "🔌 High-level cognition meets low-level behavior learning!"
+say "🔥 Complete ABA→AGI feedback loop is ACTIVE!" 

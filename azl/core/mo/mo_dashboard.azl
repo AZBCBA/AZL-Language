@@ -1,0 +1,342 @@
+// MO Dashboard - Real-time Monitoring Component
+// Provides real-time updates to the AZME dashboard
+
+component ::mo.dashboard {
+  init {
+    set ::dashboard_status = "initializing"
+    set ::last_refresh = 0
+    set ::refresh_interval = 2
+    set ::data_history = []
+    set ::max_history_size = 100
+    
+    emit "mo.dashboard.initializing" with { status: ::dashboard_status }
+  }
+
+  behavior {
+    // Dashboard initialization
+    listen for "mo.boot.ok" then {
+      set ::dashboard_status = "ready"
+      emit "dashboard.ready" with "📊 MO Dashboard online"
+      emit "mo.dashboard.refresh"
+    }
+
+    // Handle MO updates and render dashboard
+    listen for "mo.updated" then {
+      set ::current_time = now()
+      
+      // Check if enough time has passed since last refresh
+      branch when ::current_time - ::last_refresh > ::refresh_interval {
+        render_dashboard_data()
+      }
+    }
+
+    // Handle dashboard refresh requests
+    listen for "mo.dashboard.refresh" then {
+      render_dashboard_data()
+    }
+
+    // Handle dashboard data requests
+    listen for "dashboard.request.mo_status" then {
+      branch when ::dashboard_status = "ready" {
+        emit "dashboard.render" with {
+          "motivating_state": ::mo.tracker.current_state,
+          "value_map": ::mo.tracker.value_map,
+          "drive_levels": ::drive.regulator.levels,
+          "emotion": ::mo.modulator.emotional_state,
+          "active_goals": ::goal.manager.active_goal,
+          "last_prompt": ::prompting.agent.last_prompt,
+          "system_status": ::dashboard_status,
+          "timestamp": now()
+        }
+      }
+    }
+
+    // Handle MO state updates
+    listen for "mo.state.updated" then {
+      set ::state_data = ::mo.state.updated_data
+      update_dashboard_state(::state_data)
+    }
+
+    // Handle drive regulation updates
+    listen for "drive.regulated" then {
+      set ::regulation_data = ::drive.regulated_data
+      update_dashboard_regulation(::regulation_data)
+    }
+
+    // Handle goal updates
+    listen for "goal.active" then {
+      set ::goal_data = ::goal.active_data
+      update_dashboard_goals(::goal_data)
+    }
+
+    // Handle prompt updates
+    listen for "prompt.issued" then {
+      set ::prompt_data = ::prompt.issued_data
+      update_dashboard_prompts(::prompt_data)
+    }
+
+    // Handle emotional state updates
+    listen for "mo.emotion.motivated" then {
+      update_dashboard_emotion("motivated")
+    }
+
+    listen for "mo.emotion.frustrated" then {
+      update_dashboard_emotion("frustrated")
+    }
+
+    listen for "mo.emotion.neutral" then {
+      update_dashboard_emotion("neutral")
+    }
+
+    listen for "mo.emotion.satisfied" then {
+      update_dashboard_emotion("satisfied")
+    }
+
+    listen for "mo.emotion.disappointed" then {
+      update_dashboard_emotion("disappointed")
+    }
+
+    // Handle success/failure events
+    listen for "mo.success.processed" then {
+      update_dashboard_success()
+    }
+
+    listen for "mo.failure.processed" then {
+      update_dashboard_failure()
+    }
+
+    // Handle user interaction events
+    listen for "mo.user_response.processed" then {
+      update_dashboard_interaction()
+    }
+
+    // Handle reinforcement events
+    listen for "mo.reinforcement.processed" then {
+      update_dashboard_reinforcement()
+    }
+
+    // Handle food provision events
+    listen for "mo.food.processed" then {
+      update_dashboard_food()
+    }
+
+    // Handle attention events
+    listen for "mo.attention.processed" then {
+      update_dashboard_attention()
+    }
+
+    // Handle idle events
+    listen for "mo.idle.processed" then {
+      update_dashboard_idle()
+    }
+
+    // Periodic dashboard updates
+    loop every 5 seconds {
+      branch when ::dashboard_status = "ready" {
+        emit "dashboard.periodic_update" with {
+          timestamp: now(),
+          data_age: now() - ::last_refresh
+        }
+      }
+    }
+  }
+
+  memory {
+    dashboard_status
+    last_refresh
+    refresh_interval
+    data_history
+    max_history_size
+  }
+
+  interface {
+    get_dashboard_status
+    set_refresh_interval
+    get_data_history
+    clear_data_history
+    request_dashboard_data
+  }
+}
+
+// Render dashboard data
+function render_dashboard_data() {
+  set ::current_time = now()
+  set ::dashboard_data = {
+    "motivating_state": ::mo.tracker.current_state,
+    "value_map": ::mo.tracker.value_map,
+    "drive_levels": {
+      "hunger": ::mo.tracker.hunger_level,
+      "interaction": ::mo.tracker.value_map.interaction,
+      "attention": ::mo.tracker.value_map.attention,
+      "praise": ::mo.tracker.value_map.praise
+    },
+    "emotion": ::mo.modulator.emotional_state,
+    "active_goals": ::goal.manager.goals,
+    "last_prompt": ::prompting.agent.last_prompt,
+    "regulation_history": ::drive.regulator.regulation_history,
+    "system_status": ::dashboard_status,
+    "timestamp": ::current_time
+  }
+  
+  // Add to history
+  store ::data_history from ::data_history.push({
+    data: ::dashboard_data,
+    timestamp: ::current_time
+  })
+  
+  // Trim history if too large
+  branch when ::data_history.length > ::max_history_size {
+    set ::data_history = ::data_history.slice(-::max_history_size)
+  }
+  
+  set ::last_refresh = ::current_time
+  emit "dashboard.render" with ::dashboard_data
+}
+
+// Update dashboard state
+function update_dashboard_state(state_data) {
+  set ::update_data = {
+    type: "state_update",
+    state: state_data,
+    timestamp: now()
+  }
+  
+  store ::data_history from ::data_history.push(::update_data)
+  emit "dashboard.state_updated" with ::update_data
+}
+
+// Update dashboard regulation
+function update_dashboard_regulation(regulation_data) {
+  set ::update_data = {
+    type: "regulation_update",
+    regulation: regulation_data,
+    timestamp: now()
+  }
+  
+  store ::data_history from ::data_history.push(::update_data)
+  emit "dashboard.regulation_updated" with ::update_data
+}
+
+// Update dashboard goals
+function update_dashboard_goals(goal_data) {
+  set ::update_data = {
+    type: "goal_update",
+    goal: goal_data,
+    timestamp: now()
+  }
+  
+  store ::data_history from ::data_history.push(::update_data)
+  emit "dashboard.goal_updated" with ::update_data
+}
+
+// Update dashboard prompts
+function update_dashboard_prompts(prompt_data) {
+  set ::update_data = {
+    type: "prompt_update",
+    prompt: prompt_data,
+    timestamp: now()
+  }
+  
+  store ::data_history from ::data_history.push(::update_data)
+  emit "dashboard.prompt_updated" with ::update_data
+}
+
+// Update dashboard emotion
+function update_dashboard_emotion(emotion) {
+  set ::update_data = {
+    type: "emotion_update",
+    emotion: emotion,
+    timestamp: now()
+  }
+  
+  store ::data_history from ::data_history.push(::update_data)
+  emit "dashboard.emotion_updated" with ::update_data
+}
+
+// Update dashboard success
+function update_dashboard_success() {
+  set ::update_data = {
+    type: "success_update",
+    success: true,
+    timestamp: now()
+  }
+  
+  store ::data_history from ::data_history.push(::update_data)
+  emit "dashboard.success_updated" with ::update_data
+}
+
+// Update dashboard failure
+function update_dashboard_failure() {
+  set ::update_data = {
+    type: "failure_update",
+    failure: true,
+    timestamp: now()
+  }
+  
+  store ::data_history from ::data_history.push(::update_data)
+  emit "dashboard.failure_updated" with ::update_data
+}
+
+// Update dashboard interaction
+function update_dashboard_interaction() {
+  set ::update_data = {
+    type: "interaction_update",
+    interaction: true,
+    timestamp: now()
+  }
+  
+  store ::data_history from ::data_history.push(::update_data)
+  emit "dashboard.interaction_updated" with ::update_data
+}
+
+// Update dashboard reinforcement
+function update_dashboard_reinforcement() {
+  set ::update_data = {
+    type: "reinforcement_update",
+    reinforcement: true,
+    timestamp: now()
+  }
+  
+  store ::data_history from ::data_history.push(::update_data)
+  emit "dashboard.reinforcement_updated" with ::update_data
+}
+
+// Update dashboard food
+function update_dashboard_food() {
+  set ::update_data = {
+    type: "food_update",
+    food: true,
+    timestamp: now()
+  }
+  
+  store ::data_history from ::data_history.push(::update_data)
+  emit "dashboard.food_updated" with ::update_data
+}
+
+// Update dashboard attention
+function update_dashboard_attention() {
+  set ::update_data = {
+    type: "attention_update",
+    attention: true,
+    timestamp: now()
+  }
+  
+  store ::data_history from ::data_history.push(::update_data)
+  emit "dashboard.attention_updated" with ::update_data
+}
+
+// Update dashboard idle
+function update_dashboard_idle() {
+  set ::update_data = {
+    type: "idle_update",
+    idle: true,
+    timestamp: now()
+  }
+  
+  store ::data_history from ::data_history.push(::update_data)
+  emit "dashboard.idle_updated" with ::update_data
+}
+
+// Initialize the MO Dashboard
+set ::mo_dashboard = ::mo.dashboard
+emit "mo.dashboard.ready" with ::mo_dashboard.dashboard_status 

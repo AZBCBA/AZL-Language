@@ -1,0 +1,362 @@
+# AZME Text Extractor
+# OCR and text parsing from images
+
+component ::azme.text_extractor {
+  init {
+    set ::ocr_models = {
+      tesseract: {
+        path: "/models/tesseract",
+        languages: ["eng", "fra", "deu", "spa", "ita"],
+        confidence_threshold: 0.7,
+        psm_mode: 6
+      },
+      paddle_ocr: {
+        path: "/models/paddle_ocr",
+        languages: ["en", "ch", "ja", "ko"],
+        confidence_threshold: 0.8,
+        det_db_thresh: 0.3
+      },
+      easy_ocr: {
+        path: "/models/easy_ocr",
+        languages: ["en", "ch_sim", "ja", "ko"],
+        confidence_threshold: 0.75,
+        gpu: true
+      }
+    }
+    set ::extraction_history = []
+    set ::text_patterns = {
+      urls: "https?://[\\w\\-._~:/?#\\[\\]@!$&'()*+,;=%]+",
+      emails: "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
+      phone_numbers: "\\+?[1-9]\\d{1,14}",
+      dates: "\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}",
+      times: "\\d{1,2}:\\d{2}(:\\d{2})?",
+      ip_addresses: "\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b"
+    }
+    set ::extraction_count = 0
+    set ::successful_extractions = 0
+    set ::failed_extractions = 0
+  }
+
+  behavior {
+    on extract_text {
+      set ::extraction_request = $1
+      set ::image_path = ::extraction_request.path
+      set ::model_name = ::extraction_request.model or "tesseract"
+      
+      say "🔤 Text Extractor: Extracting text from image"
+      say "📁 Image: " + ::image_path
+      say "🤖 Model: " + ::model_name
+      
+      # Get model configuration
+      set ::model_config = ::ocr_models[::model_name]
+      
+      # Simulate OCR text extraction
+      set ::ocr_result = {
+        success: true,
+        model_used: ::model_name,
+        processing_time: ::internal.random() * 2 + 0.5,
+        text_blocks: [
+          {
+            text: "AZME System Status",
+            confidence: 0.98,
+            bbox: [50, 50, 300, 80],
+            language: "en",
+            font_size: 24,
+            font_family: "Arial"
+          },
+          {
+            text: "All systems operational",
+            confidence: 0.92,
+            bbox: [50, 100, 350, 130],
+            language: "en",
+            font_size: 16,
+            font_family: "Arial"
+          },
+          {
+            text: "Memory: 85%",
+            confidence: 0.89,
+            bbox: [50, 150, 200, 180],
+            language: "en",
+            font_size: 14,
+            font_family: "Arial"
+          },
+          {
+            text: "CPU: 45%",
+            confidence: 0.87,
+            bbox: [50, 180, 200, 210],
+            language: "en",
+            font_size: 14,
+            font_family: "Arial"
+          },
+          {
+            text: "Network: Connected",
+            confidence: 0.91,
+            bbox: [50, 210, 250, 240],
+            language: "en",
+            font_size: 14,
+            font_family: "Arial"
+          }
+        ],
+        image_size: [800, 600],
+        quantum_enhanced: true
+      }
+      
+      # Filter by confidence threshold
+      set ::filtered_blocks = []
+      loop for ::block in ::ocr_result.text_blocks {
+        if ::block.confidence >= ::model_config.confidence_threshold {
+          set ::filtered_blocks = ::filtered_blocks.push(::block)
+        }
+      }
+      
+      set ::extraction_count = ::extraction_count + 1
+      
+      if ::filtered_blocks.length > 0 {
+        set ::successful_extractions = ::successful_extractions + 1
+        
+        # Extract patterns from text
+        set ::extracted_patterns = extract_patterns(::filtered_blocks)
+        
+        # Create extraction entry
+        set ::extraction_entry = {
+          id: "extraction_" + ::extraction_count,
+          image_path: ::image_path,
+          model_used: ::model_name,
+          text_blocks: ::filtered_blocks,
+          patterns: ::extracted_patterns,
+          processing_time: ::ocr_result.processing_time,
+          timestamp: ::internal.now(),
+          quantum_enhanced: true
+        }
+        
+        set ::extraction_history = ::extraction_history.push(::extraction_entry)
+        
+        emit azme.text_extracted with {
+          image_path: ::image_path,
+          text_blocks: ::filtered_blocks,
+          patterns: ::extracted_patterns,
+          extraction_entry: ::extraction_entry
+        }
+      } else {
+        set ::failed_extractions = ::failed_extractions + 1
+        
+        emit azme.text_extraction_failed with {
+          image_path: ::image_path,
+          model_used: ::model_name,
+          reason: "no_text_above_threshold"
+        }
+      }
+    }
+
+    on extract_patterns {
+      set ::pattern_request = $1
+      set ::text_blocks = ::pattern_request.text_blocks
+      
+      say "🔍 Extracting patterns from text"
+      
+      set ::all_text = ""
+      loop for ::block in ::text_blocks {
+        set ::all_text = ::all_text + " " + ::block.text
+      }
+      
+      set ::extracted_patterns = {
+        urls: [],
+        emails: [],
+        phone_numbers: [],
+        dates: [],
+        times: [],
+        ip_addresses: [],
+        quantum_enhanced: true
+      }
+      
+      # Extract URLs
+      set ::url_matches = find_pattern_matches(::all_text, ::text_patterns.urls)
+      set ::extracted_patterns.urls = ::url_matches
+      
+      # Extract emails
+      set ::email_matches = find_pattern_matches(::all_text, ::text_patterns.emails)
+      set ::extracted_patterns.emails = ::email_matches
+      
+      # Extract phone numbers
+      set ::phone_matches = find_pattern_matches(::all_text, ::text_patterns.phone_numbers)
+      set ::extracted_patterns.phone_numbers = ::phone_matches
+      
+      # Extract dates
+      set ::date_matches = find_pattern_matches(::all_text, ::text_patterns.dates)
+      set ::extracted_patterns.dates = ::date_matches
+      
+      # Extract times
+      set ::time_matches = find_pattern_matches(::all_text, ::text_patterns.times)
+      set ::extracted_patterns.times = ::time_matches
+      
+      # Extract IP addresses
+      set ::ip_matches = find_pattern_matches(::all_text, ::text_patterns.ip_addresses)
+      set ::extracted_patterns.ip_addresses = ::ip_matches
+      
+      emit azme.patterns_extracted with {
+        patterns: ::extracted_patterns,
+        total_text_length: ::all_text.length
+      }
+    }
+
+    on find_pattern_matches {
+      set ::match_request = $1
+      set ::text = ::match_request.text
+      set ::pattern = ::match_request.pattern
+      
+      say "🔍 Finding pattern matches in text"
+      
+      # Simulate pattern matching
+      set ::matches = []
+      
+      # For demonstration, return some sample matches
+      if ::pattern == ::text_patterns.urls {
+        set ::matches = ["https://azme.ai", "http://localhost:8080"]
+      } else if ::pattern == ::text_patterns.emails {
+        set ::matches = ["admin@azme.ai", "support@azme.ai"]
+      } else if ::pattern == ::text_patterns.phone_numbers {
+        set ::matches = ["+1-555-123-4567", "555-987-6543"]
+      } else if ::pattern == ::text_patterns.dates {
+        set ::matches = ["12/25/2024", "01-15-2024"]
+      } else if ::pattern == ::text_patterns.times {
+        set ::matches = ["14:30", "09:15:45"]
+      } else if ::pattern == ::text_patterns.ip_addresses {
+        set ::matches = ["192.168.1.1", "10.0.0.1"]
+      }
+      
+      emit azme.pattern_matches_found with {
+        pattern: ::pattern,
+        matches: ::matches,
+        match_count: ::matches.length
+      }
+    }
+
+    on analyze_text_content {
+      set ::analysis_request = $1
+      set ::text_blocks = ::analysis_request.text_blocks
+      
+      say "📊 Analyzing text content"
+      
+      set ::all_text = ""
+      loop for ::block in ::text_blocks {
+        set ::all_text = ::all_text + " " + ::block.text
+      }
+      
+      set ::analysis = {
+        total_characters: ::all_text.length,
+        total_words: ::all_text.split(" ").length,
+        average_confidence: 0,
+        languages_detected: [],
+        font_sizes: [],
+        urgency_keywords: [],
+        quantum_enhanced: true
+      }
+      
+      # Calculate average confidence
+      set ::total_confidence = 0
+      loop for ::block in ::text_blocks {
+        set ::total_confidence = ::total_confidence + ::block.confidence
+      }
+      set ::analysis.average_confidence = ::total_confidence / ::text_blocks.length
+      
+      # Detect languages
+      set ::languages = []
+      loop for ::block in ::text_blocks {
+        if not ::block.language in ::languages {
+          set ::languages = ::languages.push(::block.language)
+        }
+      }
+      set ::analysis.languages_detected = ::languages
+      
+      # Collect font sizes
+      set ::font_sizes = []
+      loop for ::block in ::text_blocks {
+        if not ::block.font_size in ::font_sizes {
+          set ::font_sizes = ::font_sizes.push(::block.font_size)
+        }
+      }
+      set ::analysis.font_sizes = ::font_sizes
+      
+      # Check for urgency keywords
+      set ::urgency_keywords = [
+        "alert", "urgent", "error", "failure", "critical", "warning",
+        "emergency", "stop", "danger", "system down", "fatal"
+      ]
+      
+      set ::found_keywords = []
+      loop for ::keyword in ::urgency_keywords {
+        if ::all_text.contains(::keyword) {
+          set ::found_keywords = ::found_keywords.push(::keyword)
+        }
+      }
+      set ::analysis.urgency_keywords = ::found_keywords
+      
+      emit azme.text_content_analyzed with {
+        analysis: ::analysis
+      }
+    }
+
+    on update_ocr_model {
+      set ::update_request = $1
+      set ::model_name = ::update_request.model_name
+      set ::model_config = ::update_request.model_config
+      
+      say "🔄 Updating OCR model: " + ::model_name
+      
+      if ::model_name in ::ocr_models {
+        # Update existing model
+        loop for ::key in ::model_config.keys() {
+          set ::ocr_models[::model_name][::key] = ::model_config[::key]
+        }
+      } else {
+        # Add new model
+        set ::ocr_models[::model_name] = ::model_config
+      }
+      
+      emit azme.ocr_model_updated with {
+        model_name: ::model_name,
+        model_config: ::ocr_models[::model_name]
+      }
+    }
+
+    on get_extraction_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Getting extraction statistics"
+      
+      set ::extraction_stats = {
+        total_extractions: ::extraction_count,
+        successful_extractions: ::successful_extractions,
+        failed_extractions: ::failed_extractions,
+        success_rate: ::successful_extractions / ::extraction_count,
+        extraction_history_size: ::extraction_history.length,
+        available_models: ::ocr_models.keys(),
+        text_patterns_count: ::text_patterns.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.extraction_statistics_retrieved with {
+        statistics: ::extraction_stats
+      }
+    }
+
+    # Text extractor monitoring
+    on azme.monitor_text_extractor {
+      set ::monitor_request = $1
+      
+      set ::extractor_metrics = {
+        total_extractions: ::extraction_count,
+        successful_extractions: ::successful_extractions,
+        failed_extractions: ::failed_extractions,
+        extraction_history_size: ::extraction_history.length,
+        available_models_count: ::ocr_models.keys().length,
+        text_patterns_count: ::text_patterns.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.text_extractor_metrics with {
+        metrics: ::extractor_metrics
+      }
+    }
+  }
+} 

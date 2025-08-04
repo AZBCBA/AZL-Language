@@ -1,0 +1,312 @@
+# AZME Runtime Configuration
+# Configurable options (modes, ports, logs)
+
+# Initialize runtime configuration
+set ::azme_runtime_mode = "daemon"
+set ::azme_runtime_ports = { websocket: 3000, cli: 7070, web: 8080, quantum_enhanced: true }
+set ::azme_runtime_log_level = "debug"
+set ::azme_runtime_autostart = true
+
+# Advanced configuration
+set ::runtime_config = { mode: ::azme_runtime_mode, ports: ::azme_runtime_ports, log_level: ::azme_runtime_log_level, autostart: ::azme_runtime_autostart, timeout_seconds: 30, retry_attempts: 3, health_check_interval: 5, max_memory_usage: 80, max_cpu_usage: 90, quantum_enhanced: true }
+
+# Configuration validation
+set ::config_errors = []
+set ::config_warnings = []
+set ::config_valid = true
+
+# Event handlers for configuration management
+on azme.load_config with ::load_request:
+  emit azme.load_runtime_mode
+  emit azme.load_runtime_ports
+  emit azme.load_runtime_log_level
+  emit azme.load_runtime_autostart
+  emit azme.load_advanced_config
+  emit azme.validate_config
+
+# Load runtime mode
+on azme.load_runtime_mode:
+  # Default to daemon mode
+  set runtime_mode = "daemon"
+  
+  # Check for CLI mode
+  if ::internal.args and "--cli" in ::internal.args:
+    set runtime_mode = "cli"
+  
+  # Check for web mode
+  if ::internal.args and "--web" in ::internal.args:
+    set runtime_mode = "web"
+  
+  # Check for service mode
+  if ::internal.args and "--service" in ::internal.args:
+    set runtime_mode = "service"
+  
+  set ::azme_runtime_mode = runtime_mode
+  set ::runtime_config.mode = runtime_mode
+  
+  emit azme.runtime_mode_loaded with runtime_mode
+
+# Runtime mode loaded
+on azme.runtime_mode_loaded with ::mode:
+  emit azme.mode_ready with mode
+
+# Load runtime ports
+on azme.load_runtime_ports:
+  set websocket_port = 3000
+  set cli_port = 7070
+  set web_port = 8080
+  
+  # Check environment variables
+  if ::internal.env.WEBSOCKET_PORT:
+    set websocket_port = ::internal.env.WEBSOCKET_PORT
+  
+  if ::internal.env.CLI_PORT:
+    set cli_port = ::internal.env.CLI_PORT
+  
+  if ::internal.env.WEB_PORT:
+    set web_port = ::internal.env.WEB_PORT
+  
+  set ::azme_runtime_ports = { websocket: websocket_port, cli: cli_port, web: web_port, quantum_enhanced: true }
+  set ::runtime_config.ports = ::azme_runtime_ports
+  
+  emit azme.runtime_ports_loaded with ::azme_runtime_ports
+
+# Runtime ports loaded
+on azme.runtime_ports_loaded with ::ports:
+  emit azme.ports_ready with ports
+
+# Load runtime log level
+on azme.load_runtime_log_level:
+  set log_level = "debug"
+  
+  # Check environment variable
+  if ::internal.env.LOG_LEVEL:
+    set log_level = ::internal.env.LOG_LEVEL
+  
+  set ::azme_runtime_log_level = log_level
+  set ::runtime_config.log_level = log_level
+  
+  emit azme.runtime_log_level_loaded with log_level
+
+# Runtime log level loaded
+on azme.runtime_log_level_loaded with ::log_level:
+  emit azme.log_level_ready with log_level
+
+# Load runtime autostart
+on azme.load_runtime_autostart:
+  set autostart = true
+  
+  # Check environment variable
+  if ::internal.env.AUTOSTART:
+    set autostart = ::internal.env.AUTOSTART == "true"
+  
+  set ::azme_runtime_autostart = autostart
+  set ::runtime_config.autostart = autostart
+  
+  emit azme.runtime_autostart_loaded with autostart
+
+# Runtime autostart loaded
+on azme.runtime_autostart_loaded with ::autostart:
+  emit azme.autostart_ready with autostart
+
+# Load advanced config
+on azme.load_advanced_config:
+  set timeout_seconds = 30
+  set retry_attempts = 3
+  set health_check_interval = 5
+  set max_memory_usage = 80
+  set max_cpu_usage = 90
+  
+  # Check environment variables
+  if ::internal.env.TIMEOUT_SECONDS:
+    set timeout_seconds = ::internal.env.TIMEOUT_SECONDS
+  
+  if ::internal.env.RETRY_ATTEMPTS:
+    set retry_attempts = ::internal.env.RETRY_ATTEMPTS
+  
+  if ::internal.env.HEALTH_CHECK_INTERVAL:
+    set health_check_interval = ::internal.env.HEALTH_CHECK_INTERVAL
+  
+  if ::internal.env.MAX_MEMORY_USAGE:
+    set max_memory_usage = ::internal.env.MAX_MEMORY_USAGE
+  
+  if ::internal.env.MAX_CPU_USAGE:
+    set max_cpu_usage = ::internal.env.MAX_CPU_USAGE
+  
+  set ::runtime_config.timeout_seconds = timeout_seconds
+  set ::runtime_config.retry_attempts = retry_attempts
+  set ::runtime_config.health_check_interval = health_check_interval
+  set ::runtime_config.max_memory_usage = max_memory_usage
+  set ::runtime_config.max_cpu_usage = max_cpu_usage
+  
+  emit azme.advanced_config_loaded with ::runtime_config
+
+# Advanced config loaded
+on azme.advanced_config_loaded with ::config:
+  emit azme.advanced_config_ready with config
+
+# Validate config
+on azme.validate_config:
+  set ::config_errors = []
+  set ::config_warnings = []
+  set ::config_valid = true
+  
+  # Validate ports
+  emit azme.validate_ports with ::azme_runtime_ports
+  
+  # Validate log level
+  emit azme.validate_log_level with ::azme_runtime_log_level
+  
+  # Validate mode
+  emit azme.validate_mode with ::azme_runtime_mode
+
+# Validate ports
+on azme.validate_ports with ::ports:
+  set valid_ports = true
+  set port_errors = []
+  
+  # Check websocket port
+  if ports.websocket < 1024 or ports.websocket > 65535:
+    set valid_ports = false
+    set port_errors = port_errors + ["Invalid websocket port: " + ports.websocket]
+  
+  # Check CLI port
+  if ports.cli < 1024 or ports.cli > 65535:
+    set valid_ports = false
+    set port_errors = port_errors + ["Invalid CLI port: " + ports.cli]
+  
+  # Check web port
+  if ports.web < 1024 or ports.web > 65535:
+    set valid_ports = false
+    set port_errors = port_errors + ["Invalid web port: " + ports.web]
+  
+  if not valid_ports:
+    set ::config_errors = ::config_errors + port_errors
+    set ::config_valid = false
+  
+  emit azme.ports_validated with valid_ports port_errors
+
+# Ports validated
+on azme.ports_validated with ::valid_ports ::port_errors:
+  emit azme.validation_complete with "ports" valid_ports port_errors
+
+# Validate log level
+on azme.validate_log_level with ::log_level:
+  set valid_levels = ["debug", "info", "warn", "error", "fatal"]
+  set valid_level = false
+  
+  emit azme.check_log_level with log_level valid_levels 0 valid_level
+
+# Check log level
+on azme.check_log_level with ::log_level ::valid_levels ::index ::valid_level:
+  if index >= valid_levels.length:
+    if not valid_level:
+      set ::config_errors = ::config_errors + ["Invalid log level: " + log_level]
+      set ::config_valid = false
+    emit azme.log_level_validated with valid_level
+    return
+  
+  if index < valid_levels.length:
+    set level = valid_levels[index]
+    if level == log_level:
+      set valid_level = true
+      emit azme.log_level_validated with valid_level
+    else:
+      set next_index = index + 1
+      emit azme.check_log_level with log_level valid_levels next_index valid_level
+
+# Log level validated
+on azme.log_level_validated with ::valid_level:
+  emit azme.validation_complete with "log_level" valid_level []
+
+# Validate mode
+on azme.validate_mode with ::mode:
+  set valid_modes = ["daemon", "cli", "web", "service"]
+  set valid_mode = false
+  
+  emit azme.check_mode with mode valid_modes 0 valid_mode
+
+# Check mode
+on azme.check_mode with ::mode ::valid_modes ::index ::valid_mode:
+  if index >= valid_modes.length:
+    if not valid_mode:
+      set ::config_errors = ::config_errors + ["Invalid mode: " + mode]
+      set ::config_valid = false
+    emit azme.mode_validated with valid_mode
+    return
+  
+  if index < valid_modes.length:
+    set valid_mode_name = valid_modes[index]
+    if valid_mode_name == mode:
+      set valid_mode = true
+      emit azme.mode_validated with valid_mode
+    else:
+      set next_index = index + 1
+      emit azme.check_mode with mode valid_modes next_index valid_mode
+
+# Mode validated
+on azme.mode_validated with ::valid_mode:
+  emit azme.validation_complete with "mode" valid_mode []
+
+# Validation complete
+on azme.validation_complete with ::component ::valid ::errors:
+  if not valid:
+    set ::config_errors = ::config_errors + errors
+  
+  # Check if all validations are complete
+  emit azme.check_all_validations_complete
+
+# Check all validations complete
+on azme.check_all_validations_complete:
+  # For now, assume all validations are complete
+  emit azme.config_validation_complete with ::config_valid ::config_errors ::config_warnings
+
+# Config validation complete
+on azme.config_validation_complete with ::valid ::errors ::warnings:
+  emit azme.config_loaded with ::runtime_config valid len(errors) len(warnings)
+
+# Config loaded
+on azme.config_loaded with ::config ::valid ::error_count ::warning_count:
+  emit azme.configuration_ready with config valid error_count warning_count
+
+# Configuration ready
+on azme.configuration_ready with ::config ::valid ::error_count ::warning_count:
+  emit azme.runtime_configured with config
+
+# Get config
+on azme.get_config with ::config_request:
+  set config_type = config_request.type or "full"
+  
+  if config_type == "full":
+    emit azme.config_retrieved with ::runtime_config
+  if config_type == "mode":
+    emit azme.config_retrieved with ::azme_runtime_mode
+  if config_type == "ports":
+    emit azme.config_retrieved with ::azme_runtime_ports
+  if config_type == "log_level":
+    emit azme.config_retrieved with ::azme_runtime_log_level
+
+# Config retrieved
+on azme.config_retrieved with ::config_data:
+  emit azme.config_data_ready with config_data
+
+# Update config
+on azme.update_config with ::update_request:
+  set config_key = update_request.key
+  set config_value = update_request.value
+  
+  if config_key == "mode":
+    set ::azme_runtime_mode = config_value
+    set ::runtime_config.mode = config_value
+  if config_key == "log_level":
+    set ::azme_runtime_log_level = config_value
+    set ::runtime_config.log_level = config_value
+  if config_key == "autostart":
+    set ::azme_runtime_autostart = config_value
+    set ::runtime_config.autostart = config_value
+  
+  emit azme.config_updated with config_key config_value
+
+# Config updated
+on azme.config_updated with ::key ::value:
+  emit azme.configuration_changed with key value 

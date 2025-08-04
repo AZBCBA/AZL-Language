@@ -1,0 +1,48 @@
+# Test AZL CLI Shell
+# Demonstrates the interactive shell capabilities
+
+component ::cli.test {
+  init {
+    say "🧪 Testing AZL CLI Shell"
+    say "🚀 Starting CLI shell test..."
+    
+    # Initialize CLI shell
+    emit "cli.shell.initialized"
+    
+    # Test basic commands
+    emit "cli.input" with { command: "help" }
+    emit "cli.input" with { command: "set ::a = 5" }
+    emit "cli.input" with { command: "set ::b = 3" }
+    emit "cli.input" with { command: "set ::sum = ::a + ::b" }
+    emit "cli.input" with { command: "assert ::sum == 8" }
+    emit "cli.input" with { command: "emit test.complete" }
+    emit "cli.input" with { command: "status" }
+    emit "cli.input" with { command: "history" }
+    emit "cli.input" with { command: "exit" }
+  }
+
+  behavior {
+    # Listen for CLI shell events
+    listen for "cli.shell.initialized" then {
+      say "✅ CLI Shell initialized successfully"
+    }
+    
+    listen for "cli.shell.exited" then {
+      say "✅ CLI Shell test completed"
+      say "📊 Final status:"
+      say "  Commands: ::command_count"
+      say "  Success: ::success_count"
+      say "  Errors: ::error_count"
+    }
+    
+    listen for "test.complete" then {
+      say "🎉 Test completed successfully!"
+    }
+  }
+
+  memory {
+    command_count: 0,
+    success_count: 0,
+    error_count: 0
+  }
+} 

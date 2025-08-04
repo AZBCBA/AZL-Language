@@ -1,0 +1,21 @@
+// Test array methods
+let numbers = [1, 2, 3, 4, 5];
+
+// Test array.length
+say array.length(numbers);
+
+// Test array.push
+let new_numbers = array.push(numbers, 6);
+say new_numbers;
+
+// Test array.pop
+let popped = array.pop(new_numbers);
+say popped;
+
+// Test array.find
+let index = array.find(numbers, 3);
+say index;
+
+// Test array.find with non-existent value
+let not_found = array.find(numbers, 99);
+say not_found; 

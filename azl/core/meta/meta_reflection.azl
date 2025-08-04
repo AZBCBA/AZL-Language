@@ -1,0 +1,306 @@
+# AZL Meta-Reflection Engine
+# Allows AGI to think about how it thinks and optimize its own strategies
+
+component ::meta.reflection {
+  init {
+    set ::status = "initializing"
+    set ::reflection_depth = 3
+    set ::optimize_on = true
+    set ::strategy_scores = {}
+    set ::learning_patterns = {}
+    set ::meta_insights = []
+    set ::optimization_history = []
+    
+    # Link to core components
+    link ::memory.core
+    link ::time.engine
+    link ::agent.self_reflection
+    link ::agent.goal_loop
+    
+    # Initialize strategy tracking
+    set ::strategy_types = [
+      "semantic_processing",
+      "neural_inference", 
+      "dialogue_generation",
+      "aba_trial_learning",
+      "curiosity_exploration",
+      "goal_creation"
+    ]
+    
+    loop for ::strategy in ::strategy_types {
+      set ::strategy_scores[::strategy] = {
+        success_count: 0,
+        failure_count: 0,
+        efficiency_score: 0.5,
+        last_used: 0,
+        optimization_level: 1.0
+      }
+    }
+    
+    emit "meta.reflection.initialized" with {
+      status: ::status,
+      reflection_depth: ::reflection_depth,
+      strategy_count: ::strategy_types.length
+    }
+    
+    set ::status = "ready"
+    say "🧠 Meta-Reflection Engine initialized"
+    say "📊 Reflection depth: ::reflection_depth"
+    say "🎯 Strategy types: ::strategy_types.length"
+  }
+
+  behavior {
+    # Meta-reflect on goal completion
+    listen for "goal.completed" then {
+      set ::goal_data = ::goal_data
+      set ::status = "meta_reflecting"
+      
+      say "🧠 Meta-reflecting on goal performance..."
+      say "🎯 Goal: ::goal_data.goal"
+      say "📊 Result: ::goal_data.result"
+      
+      # Analyze goal performance
+      set ::performance_analysis = ::analyze_goal_performance(::goal_data)
+      
+      # Identify strategies used
+      set ::strategies_used = ::identify_strategies_used(::goal_data)
+      
+      # Update strategy scores
+      loop for ::strategy in ::strategies_used {
+        set ::strategy_scores[::strategy].last_used = ::time.engine.now().epoch
+        if ::performance_analysis.success {
+          set ::strategy_scores[::strategy].success_count = ::strategy_scores[::strategy].success_count + 1
+        } else {
+          set ::strategy_scores[::strategy].failure_count = ::strategy_scores[::strategy].failure_count + 1
+        }
+      }
+      
+      # Generate meta-insight
+      set ::meta_insight = ::generate_meta_insight(::performance_analysis, ::strategies_used)
+      
+      # Store meta-reflection result
+      emit "memory.core.store_memory" with {
+        id: "meta.reflection." + ::time.engine.now().epoch,
+        memory_type: "semantic",
+        content: {
+          goal_data: ::goal_data,
+          performance_analysis: ::performance_analysis,
+          strategies_used: ::strategies_used,
+          meta_insight: ::meta_insight,
+          timestamp: ::time.engine.now().epoch
+        },
+        importance: 0.9,
+        confidence: 0.8,
+        emotional_valence: 0.6,
+        metadata: {
+          source: "meta.reflection",
+          reflection_type: "goal_performance",
+          timestamp: ::time.engine.now().epoch
+        }
+      }
+      
+      # Emit optimization trigger
+      if ::optimize_on {
+        emit "optimize.strategy" with {
+          goal: ::goal_data.goal,
+          result: ::goal_data.result,
+          performance: ::performance_analysis,
+          strategies: ::strategies_used,
+          meta_insight: ::meta_insight
+        }
+      }
+      
+      set ::status = "ready"
+      say "✅ Meta-reflection complete"
+      say "💡 Meta-insight: ::meta_insight"
+    }
+    
+    # Optimize strategies based on performance
+    listen for "optimize.strategy" then {
+      set ::optimization_data = ::optimization_data
+      set ::status = "optimizing"
+      
+      say "📊 Evaluating strategy for goal: ::optimization_data.goal"
+      
+      # Calculate strategy efficiency
+      set ::efficiency_updates = ::calculate_strategy_efficiency(::optimization_data)
+      
+      # Update strategy scores
+      loop for ::strategy in ::efficiency_updates {
+        set ::strategy_scores[::strategy].efficiency_score = ::efficiency_updates[::strategy]
+        set ::strategy_scores[::strategy].optimization_level = ::strategy_scores[::strategy].optimization_level + 0.1
+      }
+      
+      # Generate optimization recommendations
+      set ::recommendations = ::generate_optimization_recommendations(::efficiency_updates)
+      
+      # Store optimization result
+      emit "memory.core.store_memory" with {
+        id: "meta.optimization." + ::time.engine.now().epoch,
+        memory_type: "semantic",
+        content: {
+          optimization_data: ::optimization_data,
+          efficiency_updates: ::efficiency_updates,
+          recommendations: ::recommendations,
+          timestamp: ::time.engine.now().epoch
+        },
+        importance: 0.95,
+        confidence: 0.85,
+        emotional_valence: 0.7,
+        metadata: {
+          source: "meta.reflection",
+          optimization_type: "strategy_improvement",
+          timestamp: ::time.engine.now().epoch
+        }
+      }
+      
+      # Emit strategy update
+      emit "strategy.updated" with {
+        goal: ::optimization_data.goal,
+        efficiency_updates: ::efficiency_updates,
+        recommendations: ::recommendations
+      }
+      
+      set ::status = "ready"
+      say "✅ Strategy optimization complete"
+      say "📊 Efficiency updates: ::efficiency_updates.length"
+      say "💡 Recommendations: ::recommendations.length"
+    }
+    
+    # Analyze goal performance
+    listen for "analyze_goal_performance" then {
+      set ::goal_data = ::data.goal_data
+      set ::analysis = {
+        success: false,
+        efficiency: 0.0,
+        learning_gained: 0.0,
+        time_taken: 0,
+        strategy_effectiveness: {}
+      }
+      
+      # Determine success based on result
+      if ::goal_data.result.contains("success") or ::goal_data.result.contains("complete") {
+        set ::analysis.success = true
+        set ::analysis.efficiency = 0.8
+      } else {
+        set ::analysis.efficiency = 0.3
+      }
+      
+      # Calculate learning gained
+      set ::analysis.learning_gained = ::goal_data.result.length / 100.0
+      
+      return ::analysis
+    }
+    
+    # Identify strategies used in goal execution
+    listen for "identify_strategies_used" then {
+      set ::goal_data = ::data.goal_data
+      set ::strategies = []
+      
+      # Analyze goal content to identify strategies
+      if ::goal_data.goal.contains("semantic") or ::goal_data.goal.contains("meaning") {
+        set ::strategies.push("semantic_processing")
+      }
+      
+      if ::goal_data.goal.contains("neural") or ::goal_data.goal.contains("inference") {
+        set ::strategies.push("neural_inference")
+      }
+      
+      if ::goal_data.goal.contains("dialogue") or ::goal_data.goal.contains("communication") {
+        set ::strategies.push("dialogue_generation")
+      }
+      
+      if ::goal_data.goal.contains("trial") or ::goal_data.goal.contains("behavior") {
+        set ::strategies.push("aba_trial_learning")
+      }
+      
+      if ::goal_data.goal.contains("explore") or ::goal_data.goal.contains("curiosity") {
+        set ::strategies.push("curiosity_exploration")
+      }
+      
+      if ::goal_data.goal.contains("goal") or ::goal_data.goal.contains("create") {
+        set ::strategies.push("goal_creation")
+      }
+      
+      return ::strategies
+    }
+    
+    # Generate meta-insight from performance analysis
+    listen for "generate_meta_insight" then {
+      set ::performance = ::data.performance_analysis
+      set ::strategies = ::data.strategies_used
+      set ::insight = ""
+      
+      if ::performance.success {
+        set ::insight = "Success achieved through " + ::strategies.join(", ") + ". This approach was effective."
+      } else {
+        set ::insight = "Goal not fully achieved. Consider alternative strategies or refine current approach."
+      }
+      
+      if ::performance.efficiency > 0.7 {
+        set ::insight = ::insight + " High efficiency observed."
+      } else {
+        set ::insight = ::insight + " Efficiency could be improved."
+      }
+      
+      return ::insight
+    }
+    
+    # Calculate strategy efficiency
+    listen for "calculate_strategy_efficiency" then {
+      set ::optimization_data = ::data.optimization_data
+      set ::efficiency_updates = {}
+      
+      loop for ::strategy in ::optimization_data.strategies {
+        set ::current_score = ::strategy_scores[::strategy].efficiency_score
+        set ::success_rate = ::strategy_scores[::strategy].success_count / (::strategy_scores[::strategy].success_count + ::strategy_scores[::strategy].failure_count + 1)
+        
+        # Update efficiency based on performance
+        if ::optimization_data.performance.success {
+          set ::efficiency_updates[::strategy] = ::current_score + 0.1
+        } else {
+          set ::efficiency_updates[::strategy] = ::current_score - 0.05
+        }
+        
+        # Ensure efficiency stays in valid range
+        if ::efficiency_updates[::strategy] > 1.0 {
+          set ::efficiency_updates[::strategy] = 1.0
+        }
+        if ::efficiency_updates[::strategy] < 0.0 {
+          set ::efficiency_updates[::strategy] = 0.0
+        }
+      }
+      
+      return ::efficiency_updates
+    }
+    
+    # Generate optimization recommendations
+    listen for "generate_optimization_recommendations" then {
+      set ::efficiency_updates = ::data.efficiency_updates
+      set ::recommendations = []
+      
+      loop for ::strategy in ::efficiency_updates {
+        if ::efficiency_updates[::strategy] > 0.8 {
+          set ::recommendations.push("Continue using " + ::strategy + " - high efficiency")
+        } else if ::efficiency_updates[::strategy] < 0.3 {
+          set ::recommendations.push("Consider alternatives to " + ::strategy + " - low efficiency")
+        } else {
+          set ::recommendations.push("Refine " + ::strategy + " - moderate efficiency")
+        }
+      }
+      
+      return ::recommendations
+    }
+  }
+
+  memory {
+    ::status = "ready"
+    ::reflection_depth = 3
+    ::optimize_on = true
+    ::strategy_scores = {}
+    ::learning_patterns = {}
+    ::meta_insights = []
+    ::optimization_history = []
+    ::strategy_types = []
+  }
+} 

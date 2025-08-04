@@ -1,0 +1,853 @@
+# AZL Rust Parser Adapter
+# Wraps syn crate and converts Rust AST to Universal AST format
+
+component ::meta_language.rust_parser {
+  init {
+    set ::status = "initializing"
+    set ::language = "rust"
+    set ::parser_name = "syn"
+    set ::supported_features = ["functions", "structs", "traits", "modules", "control_flow", "macros"]
+    set ::ast_conversions = {}
+    set ::parse_cache = {}
+    
+    # Link to universal AST schema
+    link ::meta_language.universal_ast
+    
+    # Initialize Rust-specific AST conversions
+    set ::ast_conversions = {
+      # Rust AST node types to Universal AST
+      "File": "Program",
+      "ItemFn": "FunctionDeclaration",
+      "ItemStruct": "ClassDeclaration",
+      "ItemTrait": "ClassDeclaration",
+      "ItemImpl": "ClassDeclaration",
+      "ItemMod": "Module",
+      "UseDecl": "ImportDeclaration",
+      "ExternCrate": "ImportDeclaration",
+      "Stmt_Expr": "ExpressionStatement",
+      "Stmt_Item": "VariableDeclaration",
+      "Expr_If": "IfStatement",
+      "Expr_ForLoop": "ForStatement",
+      "Expr_While": "WhileStatement",
+      "Expr_Loop": "WhileStatement",
+      "Expr_Match": "SwitchStatement",
+      "Expr_Return": "ReturnStatement",
+      "Expr_Assign": "AssignmentExpression",
+      "Expr_Binary": "BinaryExpression",
+      "Expr_Unary": "UnaryExpression",
+      "Expr_Call": "CallExpression",
+      "Expr_Path": "Identifier",
+      "Expr_Lit": "Literal",
+      "Expr_Array": "ArrayExpression",
+      "Expr_Struct": "ObjectExpression",
+      "Expr_Closure": "ArrowFunctionExpression",
+      "Expr_Async": "AwaitExpression",
+      "Expr_Yield": "YieldExpression",
+      "Expr_Macro": "CallExpression",
+      "Pat_Ident": "Identifier",
+      "Pat_Struct": "ObjectExpression",
+      "Pat_TupleStruct": "ArrayExpression",
+      "Type_Path": "Identifier",
+      "Type_Reference": "Identifier",
+      "Type_Slice": "ArrayExpression",
+      "Type_Tuple": "ArrayExpression",
+      "GenericParam": "Identifier",
+      "WhereClause": "ExpressionStatement",
+      "Attribute": "Comment",
+      "Visibility": "Identifier"
+    }
+    
+    # Rust-specific transformations
+    set ::rust_transformations = {
+      # Convert Rust macros to Universal AST
+      macro_to_function: {
+        pattern: { type: "Expr_Macro" },
+        action: "convert_macro",
+        target: "FunctionDeclaration"
+      },
+      # Convert Rust closures to Universal AST
+      closure_to_function: {
+        pattern: { type: "Expr_Closure" },
+        action: "convert_closure",
+        target: "ArrowFunctionExpression"
+      },
+      # Convert Rust structs to Universal AST
+      struct_to_class: {
+        pattern: { type: "ItemStruct" },
+        action: "convert_struct",
+        target: "ClassDeclaration"
+      },
+      # Convert Rust traits to Universal AST
+      trait_to_interface: {
+        pattern: { type: "ItemTrait" },
+        action: "convert_trait",
+        target: "ClassDeclaration"
+      },
+      # Convert Rust async functions
+      async_function: {
+        pattern: { type: "ItemFn", async: true },
+        action: "mark_async",
+        target: "FunctionDeclaration"
+      }
+    }
+    
+    emit "rust_parser.initialized" with {
+      status: ::status,
+      language: ::language,
+      parser: ::parser_name,
+      conversions: ::ast_conversions.length,
+      transformations: ::rust_transformations.length
+    }
+    
+    set ::status = "ready"
+    say "🦀 Rust Parser Adapter initialized"
+    say "📊 AST conversions: ::ast_conversions.length"
+    say "🔧 Rust transformations: ::rust_transformations.length"
+  }
+
+  behavior {
+    # Parse Rust source code
+    listen for "rust.parse_source" then {
+      set ::source_code = ::parse_data.source
+      set ::file_path = ::parse_data.file_path || "unknown.rs"
+      set ::status = "parsing"
+      
+      say "🦀 Parsing Rust source code..."
+      say "📁 File: ::file_path"
+      say "📏 Length: ::source_code.length characters"
+      
+      # Parse with syn crate (backend call)
+      set ::rust_ast = ::parse_rust_source(::source_code)
+      
+      # Convert to universal AST
+      set ::universal_ast = ::convert_to_universal_ast(::rust_ast)
+      
+      # Validate universal AST
+      emit "ast.validate" with { ast: ::universal_ast }
+      
+      # Cache parsed result
+      set ::parse_cache[::file_path] = {
+        source: ::source_code,
+        rust_ast: ::rust_ast,
+        universal_ast: ::universal_ast,
+        timestamp: ::time.engine.now().epoch
+      }
+      
+      emit "rust.parse_complete" with {
+        file_path: ::file_path,
+        source: ::source_code,
+        rust_ast: ::rust_ast,
+        universal_ast: ::universal_ast,
+        parse_time: ::time.engine.now().epoch
+      }
+      
+      set ::status = "ready"
+      say "✅ Rust parsing complete"
+      say "📊 AST nodes: ::universal_ast.body.length"
+    }
+    
+    # Transform Rust-specific constructs
+    listen for "rust.transform" then {
+      set ::transformation = ::transform_data
+      set ::ast_node = ::transform_data.node
+      
+      say "🦀 Applying Rust-specific transformation..."
+      
+      set ::transformed_node = ::apply_rust_transformation(::transformation, ::ast_node)
+      
+      emit "rust.transformed" with {
+        original: ::ast_node,
+        transformed: ::transformed_node,
+        transformation: ::transformation
+      }
+    }
+    
+    # Generate Rust code from universal AST
+    listen for "rust.generate_code" then {
+      set ::universal_ast = ::generate_data.ast
+      set ::options = ::generate_data.options || {}
+      
+      say "🦀 Generating Rust code from universal AST..."
+      
+      set ::rust_code = ::generate_rust_code(::universal_ast, ::options)
+      
+      emit "rust.code_generated" with {
+        ast: ::universal_ast,
+        code: ::rust_code,
+        options: ::options
+      }
+    }
+    
+    # Query Rust-specific patterns
+    listen for "rust.query_pattern" then {
+      set ::pattern = ::query_data.pattern
+      set ::ast_data = ::query_data.ast
+      
+      say "🦀 Querying Rust-specific patterns..."
+      
+      set ::matches = ::query_rust_patterns(::pattern, ::ast_data)
+      
+      emit "rust.query_result" with {
+        pattern: ::pattern,
+        matches: ::matches,
+        count: ::matches.length
+      }
+    }
+  }
+
+  # Helper functions
+  function ::parse_rust_source(source_code) {
+    # This would call the Rust backend with syn crate
+    # For now, return a mock AST structure
+    return {
+      type: "File",
+      shebang: null,
+      items: [
+        {
+          type: "ItemFn",
+          attrs: [],
+          vis: { type: "Visibility", kind: "Inherited" },
+          sig: {
+            type: "Signature",
+            constness: null,
+            asyncness: null,
+            unsafety: null,
+            abi: null,
+            fn_token: { type: "Fn" },
+            ident: { type: "Ident", ident: "example_function" },
+            generics: { type: "Generics", lt_token: null, params: [], gt_token: null, where_clause: null },
+            paren_token: { type: "Paren", token: "()" },
+            inputs: [
+              { type: "FnArg_Typed", pat: { type: "Pat_Ident", attrs: [], by_ref: null, mutability: null, ident: { type: "Ident", ident: "x" } }, colon_token: { type: "Colon" }, ty: { type: "Type_Path", qself: null, path: { type: "Path", leading_colon: null, segments: [{ type: "PathSegment", ident: { type: "Ident", ident: "i32" }, arguments: null }] } } },
+              { type: "FnArg_Typed", pat: { type: "Pat_Ident", attrs: [], by_ref: null, mutability: null, ident: { type: "Ident", ident: "y" } }, colon_token: { type: "Colon" }, ty: { type: "Type_Path", qself: null, path: { type: "Path", leading_colon: null, segments: [{ type: "PathSegment", ident: { type: "Ident", ident: "i32" }, arguments: null }] } } }
+            ],
+            variadic: null,
+            output: { type: "ReturnType_Default" }
+          },
+          block: {
+            type: "Block",
+            brace_token: { type: "Brace" },
+            stmts: [
+              {
+                type: "Stmt_Expr",
+                expr: {
+                  type: "Expr_Binary",
+                  left: { type: "Expr_Path", qself: null, attrs: [], path: { type: "Path", leading_colon: null, segments: [{ type: "PathSegment", ident: { type: "Ident", ident: "x" }, arguments: null }] } },
+                  op: { type: "Add" },
+                  right: { type: "Expr_Path", qself: null, attrs: [], path: { type: "Path", leading_colon: null, segments: [{ type: "PathSegment", ident: { type: "Ident", ident: "y" }, arguments: null }] } }
+                },
+                semi: null
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+  
+  function ::convert_to_universal_ast(rust_ast) {
+    set ::universal_ast = {
+      type: "Program",
+      body: [],
+      source_type: "rust",
+      comments: []
+    }
+    
+    # Convert Rust AST items to universal format
+    loop for ::item in ::rust_ast.items {
+      set ::converted_item = ::convert_rust_item(::item)
+      if ::converted_item {
+        set ::universal_ast.body.push(::converted_item)
+      }
+    }
+    
+    return ::universal_ast
+  }
+  
+  function ::convert_rust_item(rust_item) {
+    set ::item_type = ::rust_item.type
+    set ::universal_type = ::ast_conversions[::item_type]
+    
+    if not ::universal_type {
+      say "⚠️ Unknown Rust item type: ::item_type"
+      return null
+    }
+    
+    # Convert based on item type
+    if ::item_type == "ItemFn" {
+      return ::convert_function_item(::rust_item)
+    } else if ::item_type == "ItemStruct" {
+      return ::convert_struct_item(::rust_item)
+    } else if ::item_type == "ItemTrait" {
+      return ::convert_trait_item(::rust_item)
+    } else if ::item_type == "ItemMod" {
+      return ::convert_module_item(::rust_item)
+    } else if ::item_type == "UseDecl" {
+      return ::convert_use_declaration(::rust_item)
+    }
+    
+    # Default conversion
+    return {
+      type: ::universal_type,
+      original_type: ::item_type,
+      ...::rust_item
+    }
+  }
+  
+  function ::convert_function_item(rust_item) {
+    return {
+      type: "FunctionDeclaration",
+      name: ::rust_item.sig.ident.ident,
+      params: ::convert_function_params(::rust_item.sig.inputs),
+      body: ::convert_function_body(::rust_item.block),
+      async: ::rust_item.sig.asyncness != null,
+      return_type: ::convert_return_type(::rust_item.sig.output)
+    }
+  }
+  
+  function ::convert_struct_item(rust_item) {
+    return {
+      type: "ClassDeclaration",
+      name: ::rust_item.ident.ident,
+      super_class: null, # Rust doesn't have inheritance
+      body: ::convert_struct_fields(::rust_item.fields),
+      decorators: ::convert_attributes(::rust_item.attrs)
+    }
+  }
+  
+  function ::convert_trait_item(rust_item) {
+    return {
+      type: "ClassDeclaration",
+      name: ::rust_item.ident.ident,
+      super_class: null,
+      body: ::convert_trait_items(::rust_item.items),
+      decorators: ::convert_attributes(::rust_item.attrs)
+    }
+  }
+  
+  function ::convert_module_item(rust_item) {
+    return {
+      type: "Module",
+      name: ::rust_item.ident.ident,
+      body: ::convert_module_items(::rust_item.content),
+      imports: [],
+      exports: []
+    }
+  }
+  
+  function ::convert_use_declaration(rust_item) {
+    return {
+      type: "ImportDeclaration",
+      source: ::convert_path_to_string(::rust_item.path),
+      specifiers: ::convert_use_specifiers(::rust_item.specifiers),
+      default: null
+    }
+  }
+  
+  function ::convert_function_params(inputs) {
+    set ::converted_params = []
+    
+    loop for ::input in ::inputs {
+      if ::input.type == "FnArg_Typed" {
+        set ::converted_params.push({
+          type: "Identifier",
+          name: ::input.pat.ident.ident,
+          type_annotation: ::convert_type_to_string(::input.ty)
+        })
+      }
+    }
+    
+    return ::converted_params
+  }
+  
+  function ::convert_function_body(block) {
+    set ::converted_body = []
+    
+    loop for ::stmt in ::block.stmts {
+      set ::converted_stmt = ::convert_rust_statement(::stmt)
+      if ::converted_stmt {
+        set ::converted_body.push(::converted_stmt)
+      }
+    }
+    
+    return ::converted_body
+  }
+  
+  function ::convert_rust_statement(stmt) {
+    if ::stmt.type == "Stmt_Expr" {
+      return {
+        type: "ExpressionStatement",
+        expression: ::convert_rust_expression(::stmt.expr)
+      }
+    } else if ::stmt.type == "Stmt_Item" {
+      return ::convert_rust_item(::stmt.item)
+    }
+    
+    return null
+  }
+  
+  function ::convert_rust_expression(expr) {
+    if ::expr.type == "Expr_Binary" {
+      return {
+        type: "BinaryExpression",
+        operator: ::convert_operator(::expr.op),
+        left: ::convert_rust_expression(::expr.left),
+        right: ::convert_rust_expression(::expr.right)
+      }
+    } else if ::expr.type == "Expr_Path" {
+      return {
+        type: "Identifier",
+        name: ::convert_path_to_string(::expr.path)
+      }
+    } else if ::expr.type == "Expr_Lit" {
+      return {
+        type: "Literal",
+        value: ::expr.lit.value,
+        raw: ::expr.lit.token.to_string()
+      }
+    } else if ::expr.type == "Expr_Call" {
+      return {
+        type: "CallExpression",
+        callee: ::convert_rust_expression(::expr.func),
+        arguments: ::convert_rust_expressions(::expr.args)
+      }
+    }
+    
+    return {
+      type: "Identifier",
+      name: "unknown_expression"
+    }
+  }
+  
+  function ::convert_operator(op) {
+    if ::op.type == "Add" {
+      return "+"
+    } else if ::op.type == "Sub" {
+      return "-"
+    } else if ::op.type == "Mul" {
+      return "*"
+    } else if ::op.type == "Div" {
+      return "/"
+    }
+    
+    return "unknown"
+  }
+  
+  function ::convert_path_to_string(path) {
+    set ::segments = []
+    
+    loop for ::segment in ::path.segments {
+      set ::segments.push(::segment.ident.ident)
+    }
+    
+    return ::segments.join("::")
+  }
+  
+  function ::convert_type_to_string(ty) {
+    if ::ty.type == "Type_Path" {
+      return ::convert_path_to_string(::ty.path)
+    }
+    
+    return "unknown_type"
+  }
+  
+  function ::convert_return_type(output) {
+    if ::output.type == "ReturnType_Default" {
+      return null
+    } else if ::output.type == "ReturnType_Type" {
+      return ::convert_type_to_string(::output.ty)
+    }
+    
+    return null
+  }
+  
+  function ::convert_struct_fields(fields) {
+    set ::converted_fields = []
+    
+    if ::fields.type == "Fields_Named" {
+      loop for ::field in ::fields.named {
+        set ::converted_fields.push({
+          type: "Property",
+          key: { type: "Identifier", name: ::field.ident.ident },
+          value: { type: "Identifier", name: ::convert_type_to_string(::field.ty) },
+          kind: "init",
+          computed: false,
+          shorthand: false
+        })
+      }
+    }
+    
+    return ::converted_fields
+  }
+  
+  function ::convert_trait_items(items) {
+    set ::converted_items = []
+    
+    loop for ::item in ::items {
+      if ::item.type == "TraitItem_Fn" {
+        set ::converted_items.push({
+          type: "MethodDefinition",
+          key: { type: "Identifier", name: ::item.sig.ident.ident },
+          value: {
+            type: "FunctionDeclaration",
+            name: ::item.sig.ident.ident,
+            params: ::convert_function_params(::item.sig.inputs),
+            body: []
+          },
+          kind: "method",
+          computed: false,
+          static: false
+        })
+      }
+    }
+    
+    return ::converted_items
+  }
+  
+  function ::convert_module_items(content) {
+    if not ::content {
+      return []
+    }
+    
+    set ::converted_items = []
+    
+    loop for ::item in ::content[1] {
+      set ::converted_item = ::convert_rust_item(::item)
+      if ::converted_item {
+        set ::converted_items.push(::converted_item)
+      }
+    }
+    
+    return ::converted_items
+  }
+  
+  function ::convert_use_specifiers(specifiers) {
+    set ::converted_specifiers = []
+    
+    if ::specifiers.type == "UseTree_Path" {
+      set ::converted_specifiers.push({
+        type: "ImportSpecifier",
+        local: ::convert_path_to_string(::specifiers.path),
+        imported: ::convert_path_to_string(::specifiers.path)
+      })
+    }
+    
+    return ::converted_specifiers
+  }
+  
+  function ::convert_attributes(attrs) {
+    set ::converted_attrs = []
+    
+    loop for ::attr in ::attrs {
+      set ::converted_attrs.push({
+        type: "Comment",
+        value: ::attr.path.segments[0].ident.ident,
+        type: "Line"
+      })
+    }
+    
+    return ::converted_attrs
+  }
+  
+  function ::convert_rust_expressions(exprs) {
+    set ::converted_exprs = []
+    
+    loop for ::expr in ::exprs {
+      set ::converted_expr = ::convert_rust_expression(::expr)
+      if ::converted_expr {
+        set ::converted_exprs.push(::converted_expr)
+      }
+    }
+    
+    return ::converted_exprs
+  }
+  
+  function ::apply_rust_transformation(transformation, node) {
+    set ::rule = ::rust_transformations[::transformation.type]
+    set ::transformed_node = ::node
+    
+    if ::rule {
+      if ::transformation.type == "macro_to_function" {
+        set ::transformed_node = ::convert_macro_to_function(::node, ::transformation)
+      } else if ::transformation.type == "closure_to_function" {
+        set ::transformed_node = ::convert_closure_to_function(::node, ::transformation)
+      } else if ::transformation.type == "struct_to_class" {
+        set ::transformed_node = ::convert_struct_to_class(::node, ::transformation)
+      } else if ::transformation.type == "trait_to_interface" {
+        set ::transformed_node = ::convert_trait_to_interface(::node, ::transformation)
+      } else if ::transformation.type == "async_function" {
+        set ::transformed_node.async = true
+      }
+    }
+    
+    return ::transformed_node
+  }
+  
+  function ::convert_macro_to_function(node, transformation) {
+    return {
+      type: "FunctionDeclaration",
+      name: "macro_function",
+      params: [],
+      body: [],
+      async: false,
+      generator: false
+    }
+  }
+  
+  function ::convert_closure_to_function(node, transformation) {
+    return {
+      type: "ArrowFunctionExpression",
+      params: ::node.inputs,
+      body: ::node.body,
+      async: ::node.asyncness != null
+    }
+  }
+  
+  function ::convert_struct_to_class(node, transformation) {
+    return {
+      type: "ClassDeclaration",
+      name: ::node.ident.ident,
+      super_class: null,
+      body: ::convert_struct_fields(::node.fields),
+      decorators: ::convert_attributes(::node.attrs)
+    }
+  }
+  
+  function ::convert_trait_to_interface(node, transformation) {
+    return {
+      type: "ClassDeclaration",
+      name: ::node.ident.ident,
+      super_class: null,
+      body: ::convert_trait_items(::node.items),
+      decorators: ::convert_attributes(::node.attrs)
+    }
+  }
+  
+  function ::generate_rust_code(universal_ast, options) {
+    set ::rust_code = ""
+    set ::indent_level = 0
+    
+    # Generate Rust code from universal AST
+    loop for ::node in ::universal_ast.body {
+      set ::node_code = ::generate_rust_node(::node, ::indent_level)
+      set ::rust_code = ::rust_code + ::node_code + "\n"
+    }
+    
+    return ::rust_code
+  }
+  
+  function ::generate_rust_node(node, indent_level) {
+    set ::indent = "  ".repeat(::indent_level)
+    
+    if ::node.type == "FunctionDeclaration" {
+      return ::generate_rust_function(::node, ::indent)
+    } else if ::node.type == "ClassDeclaration" {
+      return ::generate_rust_struct(::node, ::indent)
+    } else if ::node.type == "ImportDeclaration" {
+      return ::generate_rust_use(::node, ::indent)
+    } else if ::node.type == "IfStatement" {
+      return ::generate_rust_if(::node, ::indent, ::indent_level)
+    } else if ::node.type == "ForStatement" {
+      return ::generate_rust_for(::node, ::indent, ::indent_level)
+    } else if ::node.type == "ReturnStatement" {
+      return ::indent + "return " + ::generate_rust_expression(::node.argument) + ";\n"
+    } else if ::node.type == "ExpressionStatement" {
+      return ::indent + ::generate_rust_expression(::node.expression) + ";\n"
+    }
+    
+    return ::indent + "// Unknown node type: " + ::node.type + "\n"
+  }
+  
+  function ::generate_rust_function(node, indent) {
+    set ::function_code = ::indent
+    
+    if ::node.async {
+      set ::function_code = ::function_code + "async "
+    }
+    
+    set ::function_code = ::function_code + "fn " + ::node.name + "("
+    
+    # Add parameters
+    set ::params = []
+    loop for ::param in ::node.params {
+      set ::param_code = ::param.name
+      if ::param.type_annotation {
+        set ::param_code = ::param_code + ": " + ::param.type_annotation
+      }
+      set ::params.push(::param_code)
+    }
+    
+    set ::function_code = ::function_code + ::params.join(", ") + ")"
+    
+    # Add return type
+    if ::node.return_type {
+      set ::function_code = ::function_code + " -> " + ::node.return_type
+    }
+    
+    set ::function_code = ::function_code + " {\n"
+    
+    # Add function body
+    loop for ::statement in ::node.body {
+      set ::function_code = ::function_code + ::generate_rust_node(::statement, 1)
+    }
+    
+    set ::function_code = ::function_code + ::indent + "}\n"
+    return ::function_code
+  }
+  
+  function ::generate_rust_struct(node, indent) {
+    set ::struct_code = ::indent + "struct " + ::node.name + " {\n"
+    
+    # Add struct fields
+    loop for ::field in ::node.body {
+      set ::struct_code = ::struct_code + "  " + ::field.key.name + ": " + ::field.value.name + ",\n"
+    }
+    
+    set ::struct_code = ::struct_code + ::indent + "}\n"
+    return ::struct_code
+  }
+  
+  function ::generate_rust_use(node, indent) {
+    if ::node.default {
+      return ::indent + "use " + ::node.default + ";\n"
+    } else {
+      return ::indent + "use " + ::node.source + ";\n"
+    }
+  }
+  
+  function ::generate_rust_if(node, indent, indent_level) {
+    set ::if_code = ::indent + "if " + ::generate_rust_expression(::node.test) + " {\n"
+    
+    # Add consequent
+    loop for ::statement in ::node.consequent {
+      set ::if_code = ::if_code + ::generate_rust_node(::statement, ::indent_level + 1)
+    }
+    
+    set ::if_code = ::if_code + ::indent + "}"
+    
+    # Add alternate (else)
+    if ::node.alternate {
+      set ::if_code = ::if_code + " else {\n"
+      loop for ::statement in ::node.alternate {
+        set ::if_code = ::if_code + ::generate_rust_node(::statement, ::indent_level + 1)
+      }
+      set ::if_code = ::if_code + ::indent + "}"
+    }
+    
+    set ::if_code = ::if_code + "\n"
+    return ::if_code
+  }
+  
+  function ::generate_rust_for(node, indent, indent_level) {
+    set ::for_code = ::indent + "for " + ::generate_rust_expression(::node.init) + " in " + ::generate_rust_expression(::node.test) + " {\n"
+    
+    # Add loop body
+    loop for ::statement in ::node.body {
+      set ::for_code = ::for_code + ::generate_rust_node(::statement, ::indent_level + 1)
+    }
+    
+    set ::for_code = ::for_code + ::indent + "}\n"
+    return ::for_code
+  }
+  
+  function ::generate_rust_expression(expression) {
+    if not ::expression {
+      return ""
+    }
+    
+    if ::expression.type == "Identifier" {
+      return ::expression.name
+    } else if ::expression.type == "Literal" {
+      return ::expression.raw || ::expression.value.toString()
+    } else if ::expression.type == "BinaryExpression" {
+      return ::generate_rust_expression(::expression.left) + " " + ::expression.operator + " " + ::generate_rust_expression(::expression.right)
+    } else if ::expression.type == "CallExpression" {
+      return ::generate_rust_expression(::expression.callee) + "(" + ::generate_rust_arguments(::expression.arguments) + ")"
+    }
+    
+    return "/* Unknown expression type: " + ::expression.type + " */"
+  }
+  
+  function ::generate_rust_arguments(arguments) {
+    set ::arg_codes = []
+    
+    loop for ::arg in ::arguments {
+      set ::arg_codes.push(::generate_rust_expression(::arg))
+    }
+    
+    return ::arg_codes.join(", ")
+  }
+  
+  function ::query_rust_patterns(pattern, ast) {
+    set ::matches = []
+    
+    # Query for Rust-specific patterns
+    if ::pattern.type == "FunctionDeclaration" {
+      set ::matches = ::query_function_patterns(::pattern, ::ast)
+    } else if ::pattern.type == "ClassDeclaration" {
+      set ::matches = ::query_struct_patterns(::pattern, ::ast)
+    } else if ::pattern.type == "ImportDeclaration" {
+      set ::matches = ::query_use_patterns(::pattern, ::ast)
+    }
+    
+    return ::matches
+  }
+  
+  function ::query_function_patterns(pattern, ast) {
+    set ::matches = []
+    
+    loop for ::node in ::ast.body {
+      if ::node.type == "FunctionDeclaration" {
+        if ::pattern.name and ::node.name == ::pattern.name {
+          set ::matches.push(::node)
+        } else if not ::pattern.name {
+          set ::matches.push(::node)
+        }
+      }
+    }
+    
+    return ::matches
+  }
+  
+  function ::query_struct_patterns(pattern, ast) {
+    set ::matches = []
+    
+    loop for ::node in ::ast.body {
+      if ::node.type == "ClassDeclaration" {
+        if ::pattern.name and ::node.name == ::pattern.name {
+          set ::matches.push(::node)
+        } else if not ::pattern.name {
+          set ::matches.push(::node)
+        }
+      }
+    }
+    
+    return ::matches
+  }
+  
+  function ::query_use_patterns(pattern, ast) {
+    set ::matches = []
+    
+    loop for ::node in ::ast.body {
+      if ::node.type == "ImportDeclaration" {
+        if ::pattern.source and ::node.source == ::pattern.source {
+          set ::matches.push(::node)
+        } else if not ::pattern.source {
+          set ::matches.push(::node)
+        }
+      }
+    }
+    
+    return ::matches
+  }
+
+  memory {
+    ::status = ""
+    ::language = ""
+    ::parser_name = ""
+    ::supported_features = []
+    ::ast_conversions = {}
+    ::parse_cache = {}
+    ::rust_transformations = {}
+  }
+} 

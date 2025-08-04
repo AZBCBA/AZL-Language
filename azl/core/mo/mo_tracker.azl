@@ -1,0 +1,97 @@
+// Motivation Value Tracker - MO System Component
+// Tracks motivation values and applies decay over time
+
+component ::mo.tracker {
+  init {
+    set ::value_map = {
+      interaction: 1.0,
+      praise: 1.0,
+      attention: 1.0
+    }
+    set ::decay_rate = 0.01
+    set ::hunger_level = 0.5
+    set ::recent_success = false
+    set ::last_update = now()
+    
+    emit "mo.tracker.initialized" with ::value_map
+  }
+
+  behavior {
+    // Continuous decay loop
+    loop every 5 seconds {
+      set ::value_map.interaction = ::value_map.interaction - ::decay_rate
+      set ::value_map.praise = ::value_map.praise - ::decay_rate
+      set ::value_map.attention = ::value_map.attention - ::decay_rate
+      
+      // Ensure values don't go below 0
+      branch when ::value_map.interaction < 0 {
+        set ::value_map.interaction = 0
+      }
+      branch when ::value_map.praise < 0 {
+        set ::value_map.praise = 0
+      }
+      branch when ::value_map.attention < 0 {
+        set ::value_map.attention = 0
+      }
+      
+      set ::last_update = now()
+      emit "mo.updated" with ::value_map
+    }
+
+    // Handle reinforcement success
+    listen for "reinforce.success" then {
+      set ::recent_success = true
+      emit "mo.success.recorded" with { success: true, timestamp: now() }
+    }
+
+    // Handle reinforcement failure
+    listen for "reinforce.failure" then {
+      set ::recent_success = false
+      emit "mo.failure.recorded" with { success: false, timestamp: now() }
+    }
+
+    // Handle system idle (increases hunger)
+    listen for "system.idle" then {
+      set ::hunger_level = ::hunger_level + 0.1
+      branch when ::hunger_level > 1.0 {
+        set ::hunger_level = 1.0
+      }
+      emit "mo.hunger.updated" with { hunger_level: ::hunger_level }
+    }
+
+    // Handle user interaction
+    listen for "user.interaction" then {
+      set ::value_map.interaction = 1.0
+      emit "mo.interaction.boosted" with { interaction: ::value_map.interaction }
+    }
+
+    // Handle praise given
+    listen for "praise.given" then {
+      set ::value_map.praise = 1.0
+      emit "mo.praise.boosted" with { praise: ::value_map.praise }
+    }
+
+    // Handle attention received
+    listen for "attention.received" then {
+      set ::value_map.attention = 1.0
+      emit "mo.attention.boosted" with { attention: ::value_map.attention }
+    }
+  }
+
+  memory {
+    value_map
+    decay_rate
+    hunger_level
+    recent_success
+    last_update
+  }
+
+  interface {
+    get_motivation_values
+    get_hunger_level
+    get_recent_success
+    boost_interaction
+    boost_praise
+    boost_attention
+  }
+} 

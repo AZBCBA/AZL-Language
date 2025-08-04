@@ -1,0 +1,238 @@
+component ::test.quantum_teleportation {
+  init {
+    set ::test_results = {}
+  }
+
+  behavior {
+    on start {
+      # Test complete quantum teleportation protocol
+      emit processor.run_quantum_teleportation
+      
+      # Test individual steps
+      emit processor.create_bell_pair
+      emit processor.measure_bell_state
+      emit processor.send_classical_bits
+      emit processor.apply_teleportation_correction
+      emit processor.verify_teleportation
+    }
+
+    on teleport.entangle {
+      set ::entangle_info = $1
+      set ::test_results.bell_pair_creation = {
+        success: 1,
+        pair: ::entangle_info.pair,
+        state: ::entangle_info.state,
+        bell_state: ::entangle_info.bell_state
+      }
+      emit test.teleportation_entanglement.completed
+    }
+
+    on teleport.measure_bell {
+      set ::bell_measurement_info = $1
+      set ::test_results.bell_measurement = {
+        target: ::bell_measurement_info.target,
+        entangled: ::bell_measurement_info.entangled,
+        result: ::bell_measurement_info.result,
+        bell_state: ::bell_measurement_info.bell_state
+      }
+      emit test.teleportation_bell_measurement.completed
+    }
+
+    on teleport.classical_sent {
+      set ::classical_info = $1
+      set ::test_results.classical_communication = {
+        result: ::classical_info.result,
+        bit1: ::classical_info.bit1,
+        bit2: ::classical_info.bit2
+      }
+      emit test.teleportation_classical_communication.completed
+    }
+
+    on teleport.corrected {
+      set ::correction_info = $1
+      set ::test_results.teleportation_correction = {
+        original_state: ::correction_info.original_state,
+        teleported_state: ::correction_info.teleported_state,
+        correction_applied: ::correction_info.correction_applied
+      }
+      emit test.teleportation_correction.completed
+    }
+
+    on teleport.verified {
+      set ::verification_info = $1
+      set ::test_results.teleportation_verification = {
+        fidelity: ::verification_info.fidelity,
+        original_state: ::verification_info.original_state,
+        teleported_state: ::verification_info.teleported_state,
+        success: ::verification_info.success
+      }
+      emit test.teleportation_verification.completed
+    }
+
+    on teleport.complete {
+      set ::test_results.teleportation_complete = 1
+      emit test.teleportation.completed with ::test_results
+    }
+  }
+}
+
+# Test logical teleportation using lattice surgery
+component ::test.logical_teleportation {
+  behavior {
+    on start {
+      # Test logical teleportation using patches
+      emit test.logical_teleportation_operation
+    }
+
+    on test.logical_teleportation_operation {
+      emit processor.perform_logical_teleportation
+    }
+
+    on teleport.logical_teleportation_complete {
+      set ::logical_teleportation_result = $1
+      set ::test_results.logical_teleportation = {
+        original_logical_state: ::logical_teleportation_result.original_logical_state,
+        teleported_logical_state: ::logical_teleportation_result.teleported_logical_state,
+        bell_measurement: ::logical_teleportation_result.bell_measurement
+      }
+      emit test.logical_teleportation.completed
+    }
+  }
+}
+
+# Test multi-hop teleportation network
+component ::test.multi_hop_teleportation {
+  behavior {
+    on start {
+      # Test multi-hop teleportation network
+      emit test.multi_hop_teleportation_operation
+    }
+
+    on test.multi_hop_teleportation_operation {
+      emit processor.perform_multi_hop_teleportation
+    }
+
+    on teleport.multi_hop_complete {
+      set ::multi_hop_result = $1
+      set ::test_results.multi_hop_teleportation = {
+        original_state: ::multi_hop_result.original_state,
+        final_state: ::multi_hop_result.final_state,
+        intermediate_measurements: ::multi_hop_result.intermediate_measurements,
+        hop_count: ::multi_hop_result.hop_count
+      }
+      emit test.multi_hop_teleportation.completed
+    }
+
+    on teleport.multi_hop_verified {
+      set ::multi_hop_verification = $1
+      set ::test_results.multi_hop_verification = {
+        fidelity: ::multi_hop_verification.fidelity,
+        original_state: ::multi_hop_verification.original_state,
+        final_state: ::multi_hop_verification.final_state,
+        success: ::multi_hop_verification.success
+      }
+      emit test.multi_hop_verification.completed
+    }
+  }
+}
+
+# Test different Bell measurement outcomes
+component ::test.bell_measurements {
+  behavior {
+    on start {
+      # Test different Bell measurement scenarios
+      emit test.bell_measurement_phi_plus
+      emit test.bell_measurement_phi_minus
+      emit test.bell_measurement_psi_plus
+      emit test.bell_measurement_psi_minus
+    }
+
+    on test.bell_measurement_phi_plus {
+      # Test |Φ+⟩ measurement (00)
+      emit processor.create_bell_pair
+      emit processor.measure_bell_state
+      emit processor.send_classical_bits
+      emit processor.apply_teleportation_correction
+    }
+
+    on test.bell_measurement_phi_minus {
+      # Test |Φ-⟩ measurement (01)
+      emit processor.create_bell_pair
+      emit processor.measure_bell_state
+      emit processor.send_classical_bits
+      emit processor.apply_teleportation_correction
+    }
+
+    on test.bell_measurement_psi_plus {
+      # Test |Ψ+⟩ measurement (10)
+      emit processor.create_bell_pair
+      emit processor.measure_bell_state
+      emit processor.send_classical_bits
+      emit processor.apply_teleportation_correction
+    }
+
+    on test.bell_measurement_psi_minus {
+      # Test |Ψ-⟩ measurement (11)
+      emit processor.create_bell_pair
+      emit processor.measure_bell_state
+      emit processor.send_classical_bits
+      emit processor.apply_teleportation_correction
+    }
+  }
+}
+
+# Test teleportation performance and advantages
+component ::test.teleportation_performance {
+  behavior {
+    on start {
+      # Test teleportation performance metrics
+      emit test.teleportation_advantages
+      emit test.non_local_transfer
+      emit test.quantum_communication
+    }
+
+    on test.teleportation_advantages {
+      set ::test_results.teleportation_advantages = {
+        non_local_transfer: true,
+        no_copying: true,
+        entanglement_utilization: true,
+        classical_communication: true
+      }
+      emit test.teleportation_advantages.completed
+    }
+
+    on test.non_local_transfer {
+      set ::test_results.non_local_transfer = {
+        state_transfer: true,
+        entanglement_propagation: true,
+        quantum_network: true,
+        instant_transfer: true
+      }
+      emit test.non_local_transfer.completed
+    }
+
+    on test.quantum_communication {
+      set ::test_results.quantum_communication = {
+        secure_transmission: true,
+        entanglement_distribution: true,
+        quantum_repeaters: true,
+        quantum_internet: true
+      }
+      emit test.quantum_communication.completed
+    }
+  }
+}
+
+# Main test runner
+component ::test.teleportation_runner {
+  behavior {
+    on start {
+      # Run all teleportation tests
+      emit test.quantum_teleportation.start
+      emit test.logical_teleportation.start
+      emit test.multi_hop_teleportation.start
+      emit test.bell_measurements.start
+      emit test.teleportation_performance.start
+    }
+  }
+} 

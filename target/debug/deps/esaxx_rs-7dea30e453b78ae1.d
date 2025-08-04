@@ -1,0 +1,10 @@
+/home/abdulrahman-alzalameh/azl-language/target/debug/deps/libesaxx_rs-7dea30e453b78ae1.rmeta: /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/lib.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/esa.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/sais.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/types.rs
+
+/home/abdulrahman-alzalameh/azl-language/target/debug/deps/libesaxx_rs-7dea30e453b78ae1.rlib: /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/lib.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/esa.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/sais.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/types.rs
+
+/home/abdulrahman-alzalameh/azl-language/target/debug/deps/esaxx_rs-7dea30e453b78ae1.d: /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/lib.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/esa.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/sais.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/types.rs
+
+/mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/lib.rs:
+/mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/esa.rs:
+/mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/sais.rs:
+/mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/esaxx-rs-0.1.10/src/types.rs:

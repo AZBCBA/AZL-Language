@@ -1,0 +1,18 @@
+# Debug Goals Storage Test
+# Tests to see what's actually stored in ::goals vs what's displayed
+
+say "🔍 Starting Goals Storage Debug Test..."
+
+# Add a goal
+addgoal "Test goal" 5
+
+# Check what's stored in ::goals directly
+say "🔍 Checking ::goals directly..."
+set ::debug_goals = ::goals
+say "::goals = ::debug_goals"
+
+# Check what's in current_goals
+say "🔍 Checking current_goals from self state..."
+reflect
+
+say "✅ Debug test complete" 

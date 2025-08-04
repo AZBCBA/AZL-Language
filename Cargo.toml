@@ -1,0 +1,324 @@
+[package]
+name = "azl-v2-compiler"
+version = "2.0.0"
+edition = "2021"
+authors = ["AZME Team"]
+description = "AZL v2 - Real Standalone Programming Language for Intelligent Systems"
+license = "MIT"
+repository = "https://github.com/azme/azl-v2"
+keywords = ["programming-language", "ai", "quantum", "intelligent-systems"]
+categories = ["development-tools", "language-implementations"]
+
+[dependencies]
+# Core dependencies
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4.0", features = ["derive"] }
+anyhow = "1.0"
+thiserror = "1.0"
+
+# File system and I/O
+walkdir = "2.3"
+glob = "0.3"
+
+# Logging
+log = "0.4"
+env_logger = "0.10"
+
+# Performance and utilities
+rayon = "1.7"
+dashmap = "5.4"
+indexmap = "2.0"
+rand = "0.8"
+tempfile = "3.20.0"
+
+# LLM Integration (simplified for now)
+# tokenizers = "0.15"
+# rust-bert = "0.21"
+# tch = "0.13"
+
+# Optional: WebAssembly support
+# wasm-bindgen = "0.2"
+# js-sys = "0.3"
+
+[dev-dependencies]
+criterion = "0.4"
+proptest = "1.2"
+
+# Benchmarks will be added later
+
+[features]
+default = ["std"]
+std = []
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+# Workspace configuration removed - single crate project
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.cargo-udeps.ignore]
+normal = ["criterion"]
+
+[package.metadata.release]
+# GitHub release configuration
+pre-release-commit-message = "chore: prepare for release {{version}}"
+changelog-path = "CHANGELOG.md"
+assets = [
+    "target/release/azl-v2-compiler",
+    "target/release/azl-v2-interpreter",
+    "target/release/azl-v2-runtime"
+]
+
+[package.metadata.release.pre]
+# Pre-release configuration
+enabled = true
+tag-name = "v{{version}}"
+name = "AZL v2 {{version}}"
+body = """
+# AZL v2 {{version}}
+
+## What's New
+
+- Real standalone programming language
+- Native Rust compiler and interpreter
+- Event-driven architecture for intelligent systems
+- Quantum simulation capabilities
+- Neural network support
+- Consciousness modeling
+
+## Installation
+
+```bash
+cargo install azl-v2-compiler
+```
+
+## Usage
+
+```bash
+azl-v2-compiler program.azl
+```
+
+## Examples
+
+See the `examples/` directory for sample AZL v2 programs.
+"""
+
+[package.metadata.release.post]
+# Post-release configuration
+enabled = true
+tag-name = "v{{version}}"
+name = "AZL v2 {{version}}"
+body = """
+# AZL v2 {{version}} Released! 🎉
+
+## What's New
+
+- Real standalone programming language
+- Native Rust compiler and interpreter  
+- Event-driven architecture for intelligent systems
+- Quantum simulation capabilities
+- Neural network support
+- Consciousness modeling
+
+## Quick Start
+
+```bash
+# Install
+cargo install azl-v2-compiler
+
+# Run a program
+azl-v2-compiler examples/hello.azl
+```
+
+## Documentation
+
+- [Language Specification](docs/language/azl_v2_language_specification.md)
+- [Grammar Definition](docs/language/azl_v2_grammar.bnf)
+- [Standard Library](src/azl_standard_library.azl)
+
+## Examples
+
+```azl
+# Hello World
+let name = "AZL v2"
+say "Hello, " + name
+
+# Functions
+fn greet(name) {
+  return "Hello, " + name
+}
+
+# Event handlers
+on task_completed(task) {
+  say "Task done: " + task.name
+}
+
+# Loops
+loop for item in items {
+  say "Processing: " + item
+}
+```
+
+## Features
+
+✅ **Real Programming Language** - No external dependencies
+✅ **Native Compiler** - Written in Rust for maximum performance  
+✅ **Event-Driven** - Built for intelligent systems
+✅ **Quantum Ready** - Native quantum simulation
+✅ **Neural Networks** - Built-in neural operations
+✅ **Consciousness** - Self-aware programming model
+
+## Breaking Changes
+
+This is a complete rewrite from AZL v1. The new syntax is:
+
+```azl
+# OLD (v1)
+set ::name = "AZME"
+emit event with payload
+on event with ::data:
+
+# NEW (v2)  
+let name = "AZME"
+emit event with payload
+on event(data) {
+  // handler code
+}
+```
+
+## Migration
+
+Use the migration tool to convert v1 code:
+
+```bash
+azl-v2-migrate old_program.azl > new_program.azl
+```
+
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+"""
+
+# Binary target
+[[bin]]
+name = "azl-v2"
+path = "src/main.rs"
+
+# Documentation configuration
+
+# Testing
+[package.metadata.test]
+# Test configuration
+test-timeout = 300
+test-threads = 4
+
+# Benchmarking
+[package.metadata.bench]
+# Benchmark configuration
+bench-timeout = 600
+bench-threads = 1
+
+# Development tools
+[package.metadata.dev]
+# Development tool configuration
+rustfmt = { version = "1.5", default-features = false }
+clippy = { version = "0.1", default-features = false }
+
+# CI/CD
+[package.metadata.ci]
+# CI configuration
+github-actions = true
+codecov = true
+rust-version = "1.70"
+
+# Security
+[package.metadata.security]
+# Security configuration
+audit = true
+cargo-audit = { version = "0.17" }
+
+# Performance
+[package.metadata.performance]
+# Performance configuration
+criterion = { version = "0.4" }
+flamegraph = { version = "0.4" }
+
+# Documentation
+[package.metadata.docs]
+# Documentation configuration
+mdbook = { version = "0.4" }
+rustdoc = { version = "1.70" }
+
+# Examples and tests will be added later
+
+# Documentation
+[package.metadata.book]
+# Book configuration
+title = "AZL v2 Programming Language"
+authors = ["AZME Team"]
+description = "Complete guide to AZL v2 programming language"
+src = "book/src"
+rust-version = "1.70"
+
+# Website
+[package.metadata.site]
+# Site configuration
+title = "AZL v2"
+description = "Real standalone programming language for intelligent systems"
+url = "https://azl-v2.dev"
+repository = "https://github.com/azme/azl-v2"
+
+# Package managers
+[package.metadata.crates-io]
+# Crates.io configuration
+keywords = ["programming-language", "ai", "quantum", "intelligent-systems"]
+categories = ["development-tools", "language-implementations"]
+license = "MIT"
+repository = "https://github.com/azme/azl-v2"
+homepage = "https://azl-v2.dev"
+documentation = "https://docs.rs/azl-v2"
+readme = "README.md"
+
+# GitHub
+[package.metadata.github]
+# GitHub configuration
+repository = "azme/azl-v2"
+branch = "main"
+workflow = "ci.yml"
+
+# Discord
+[package.metadata.discord]
+# Discord configuration
+server = "https://discord.gg/azl-v2"
+channel = "#general"
+
+# Twitter
+[package.metadata.twitter]
+# Twitter configuration
+handle = "@azl_v2"
+hashtag = "#azlv2"
+
+# Reddit
+[package.metadata.reddit]
+# Reddit configuration
+subreddit = "r/azlv2"
+
+# Stack Overflow
+[package.metadata.stackoverflow]
+# Stack Overflow configuration
+tag = "azl-v2" 

@@ -1,0 +1,281 @@
+# AZME Agent Network
+# Handles connections, routing, broadcasting
+
+# Initialize agent network state
+set ::network_mode = "websocket"
+set ::active_connections = {}
+set ::connection_pool = {}
+set ::message_queue = []
+set ::network_settings = { websocket_port: 3001, ipc_socket_path: "/tmp/azme.sock", localbus_channel: "azme-collaboration", connection_timeout: 30, retry_attempts: 3, max_connections: 10, quantum_enhanced: true }
+set ::network_statistics = { total_connections: 0, active_connections: 0, messages_sent: 0, messages_received: 0, failed_connections: 0, quantum_enhanced: true }
+set ::connection_count = 0
+set ::messages_routed = 0
+
+# Event handlers for agent network
+on azme.connect_to_agent with ::connection_request:
+  set agent = connection_request.agent
+  
+  emit azme.open_channel with agent
+
+# Open channel
+on azme.open_channel with ::agent:
+  set connection_info = { agent_id: agent.id, address: agent.address, protocol: "websocket", status: "connecting", created_at: get_current_time(), quantum_enhanced: true }
+  
+  # Determine protocol
+  emit azme.determine_protocol with agent.address
+
+# Determine protocol
+on azme.determine_protocol with ::address:
+  set protocol = "websocket"
+  
+  if "ws://" in address or "wss://" in address:
+    set protocol = "websocket"
+  if "ipc://" in address:
+    set protocol = "ipc"
+  if "localbus://" in address:
+    set protocol = "localbus"
+  
+  emit azme.protocol_determined with address protocol
+
+# Protocol determined
+on azme.protocol_determined with ::address ::protocol:
+  emit azme.establish_connection with address protocol
+
+# Establish connection
+on azme.establish_connection with ::address ::protocol:
+  set connection_info = { address: address, protocol: protocol, status: "connecting", created_at: get_current_time(), quantum_enhanced: true }
+  
+  if protocol == "websocket":
+    emit azme.open_websocket_connection with connection_info
+  if protocol == "ipc":
+    emit azme.open_ipc_connection with connection_info
+  if protocol == "localbus":
+    emit azme.open_localbus_connection with connection_info
+
+# Open websocket connection
+on azme.open_websocket_connection with ::connection_info:
+  set connection_info.status = "connected"
+  set connection_info.connected_at = get_current_time()
+  
+  emit azme.connection_established with connection_info
+
+# Open IPC connection
+on azme.open_ipc_connection with ::connection_info:
+  set connection_info.status = "connected"
+  set connection_info.connected_at = get_current_time()
+  
+  emit azme.connection_established with connection_info
+
+# Open localbus connection
+on azme.open_localbus_connection with ::connection_info:
+  set connection_info.status = "connected"
+  set connection_info.connected_at = get_current_time()
+  
+  emit azme.connection_established with connection_info
+
+# Connection established
+on azme.connection_established with ::connection_info:
+  set agent_id = connection_info.agent_id or "unknown"
+  set ::active_connections[agent_id] = connection_info
+  set ::connection_count = ::connection_count + 1
+  set ::network_statistics.total_connections = ::network_statistics.total_connections + 1
+  set ::network_statistics.active_connections = ::network_statistics.active_connections + 1
+  
+  emit azme.agent_connected with agent_id connection_info
+
+# Agent connected
+on azme.agent_connected with ::agent_id ::connection_info:
+  emit azme.connection_ready with agent_id connection_info
+
+# Send message
+on azme.send_message with ::message_request:
+  set recipient = message_request.recipient
+  set message_data = message_request.data
+  set message_type = message_request.type or "data"
+  
+  emit azme.route_message with recipient message_data message_type
+
+# Route message
+on azme.route_message with ::recipient ::message_data ::message_type:
+  set message = { sender: "azme", recipient: recipient, data: message_data, type: message_type, timestamp: get_current_time(), quantum_enhanced: true }
+  
+  if recipient in ::active_connections:
+    emit azme.transmit_message with message
+  else:
+    emit azme.message_delivery_failed with message "recipient_not_connected"
+
+# Transmit message
+on azme.transmit_message with ::message:
+  set ::messages_routed = ::messages_routed + 1
+  set ::network_statistics.messages_sent = ::network_statistics.messages_sent + 1
+  
+  emit azme.message_sent with message
+
+# Message sent
+on azme.message_sent with ::message:
+  emit azme.delivery_complete with message
+
+# Message delivery failed
+on azme.message_delivery_failed with ::message ::reason:
+  set ::network_statistics.failed_connections = ::network_statistics.failed_connections + 1
+  
+  emit azme.delivery_failed with message reason
+
+# Receive message
+on azme.receive_message with ::message:
+  set ::network_statistics.messages_received = ::network_statistics.messages_received + 1
+  
+  emit azme.message_received with message
+
+# Message received
+on azme.receive_message with ::message:
+  emit azme.process_received_message with message
+
+# Process received message
+on azme.process_received_message with ::message:
+  set sender = message.sender
+  set message_type = message.type
+  set message_data = message.data
+  
+  emit azme.handle_message_type with message_type message_data sender
+
+# Handle message type
+on azme.handle_message_type with ::message_type ::message_data ::sender:
+  if message_type == "data":
+    emit azme.handle_data_message with message_data sender
+  if message_type == "command":
+    emit azme.handle_command_message with message_data sender
+  if message_type == "query":
+    emit azme.handle_query_message with message_data sender
+  if message_type == "response":
+    emit azme.handle_response_message with message_data sender
+
+# Handle data message
+on azme.handle_data_message with ::message_data ::sender:
+  emit azme.data_message_processed with message_data sender
+
+# Handle command message
+on azme.handle_command_message with ::message_data ::sender:
+  emit azme.command_message_processed with message_data sender
+
+# Handle query message
+on azme.handle_query_message with ::message_data ::sender:
+  emit azme.query_message_processed with message_data sender
+
+# Handle response message
+on azme.handle_response_message with ::message_data ::sender:
+  emit azme.response_message_processed with message_data sender
+
+# Data message processed
+on azme.data_message_processed with ::message_data ::sender:
+  emit azme.message_handled with "data" sender
+
+# Command message processed
+on azme.handle_command_message with ::message_data ::sender:
+  emit azme.message_handled with "command" sender
+
+# Query message processed
+on azme.query_message_processed with ::message_data ::sender:
+  emit azme.message_handled with "query" sender
+
+# Response message processed
+on azme.response_message_processed with ::message_data ::sender:
+  emit azme.message_handled with "response" sender
+
+# Message handled
+on azme.message_handled with ::message_type ::sender:
+  emit azme.processing_complete with message_type sender
+
+# Disconnect agent
+on azme.disconnect_agent with ::disconnect_request:
+  set agent_id = disconnect_request.agent_id
+  
+  if agent_id in ::active_connections:
+    set connection_info = ::active_connections[agent_id]
+    set connection_info.status = "disconnected"
+    set connection_info.disconnected_at = get_current_time()
+    
+    set ::network_statistics.active_connections = ::network_statistics.active_connections - 1
+    
+    emit azme.agent_disconnected with agent_id connection_info
+  else:
+    emit azme.disconnect_failed with agent_id "agent_not_connected"
+
+# Agent disconnected
+on azme.agent_disconnected with ::agent_id ::connection_info:
+  emit azme.disconnection_complete with agent_id connection_info
+
+# Disconnect failed
+on azme.disconnect_failed with ::agent_id ::reason:
+  emit azme.disconnect_error with agent_id reason
+
+# Broadcast message
+on azme.broadcast_message with ::broadcast_request:
+  set message_data = broadcast_request.data
+  set message_type = broadcast_request.type or "broadcast"
+  set exclude_sender = broadcast_request.exclude_sender or false
+  
+  set broadcast_message = { sender: "azme", data: message_data, type: message_type, timestamp: get_current_time(), quantum_enhanced: true }
+  
+  emit azme.send_broadcast with broadcast_message exclude_sender
+
+# Send broadcast
+on azme.send_broadcast with ::broadcast_message ::exclude_sender:
+  set connected_agents = ::active_connections.keys()
+  
+  emit azme.broadcast_to_agents with broadcast_message connected_agents 0 exclude_sender
+
+# Broadcast to agents
+on azme.broadcast_to_agents with ::broadcast_message ::connected_agents ::index ::exclude_sender:
+  if index >= connected_agents.length:
+    emit azme.broadcast_complete with broadcast_message
+    return
+  
+  if index < connected_agents.length:
+    set agent_id = connected_agents[index]
+    
+    if not exclude_sender or agent_id != "azme":
+      emit azme.transmit_message with broadcast_message
+    
+    set next_index = index + 1
+    emit azme.broadcast_to_agents with broadcast_message connected_agents next_index exclude_sender
+
+# Broadcast complete
+on azme.broadcast_complete with ::broadcast_message:
+  emit azme.broadcast_finished with broadcast_message
+
+# Get network statistics
+on azme.get_network_statistics:
+  set statistics = ::network_statistics
+  set connection_count = ::connection_count
+  set messages_routed = ::messages_routed
+  
+  set network_info = { statistics: statistics, connection_count: connection_count, messages_routed: messages_routed, quantum_enhanced: true }
+  
+  emit azme.network_statistics_retrieved with network_info
+
+# Network statistics retrieved
+on azme.network_statistics_retrieved with ::network_info:
+  emit azme.statistics_ready with network_info
+
+# Get active connections
+on azme.get_active_connections:
+  set connections = ::active_connections
+  set connection_count = ::connection_count
+  
+  set connection_info = { connections: connections, count: connection_count, quantum_enhanced: true }
+  
+  emit azme.active_connections_retrieved with connection_info
+
+# Active connections retrieved
+on azme.active_connections_retrieved with ::connection_info:
+  emit azme.connections_ready with connection_info
+
+# Utility functions
+on azme.get_current_time:
+  set current_time = system_time()
+  emit azme.current_time_retrieved with current_time
+
+on azme.system_time:
+  set time = now()
+  emit azme.system_time_retrieved with time 

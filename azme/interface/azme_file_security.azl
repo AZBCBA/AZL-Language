@@ -1,0 +1,201 @@
+# AZME File Security
+# Safety layer for filesystem operations
+
+component ::azme.file_security {
+  init {
+    set ::security_violations = []
+    set ::allowed_paths = [
+      "/azme/memory",
+      "/azme/goals",
+      "/azme/narratives",
+      "/azme/logs",
+      "/azme/config"
+    ]
+    set ::blocked_paths = [
+      "/etc",
+      "/var",
+      "/usr",
+      "/bin",
+      "/sbin",
+      "/root",
+      "/home"
+    ]
+    set ::dangerous_operations = [
+      "rm -rf",
+      "sudo",
+      "chmod 777",
+      "dd if=",
+      "> /dev/",
+      "kill -9"
+    ]
+    set ::violation_count = 0
+    set ::security_checks = 0
+    set ::blocked_operations = 0
+  }
+
+  behavior {
+    on secure_check {
+      set ::check_request = $1
+      set ::path = ::check_request.path
+      
+      say "🔒 Security check for path: " + ::path
+      
+      set ::security_result = {
+        allowed: false,
+        reason: "unknown",
+        path: ::path,
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      # Check if path is in allowed paths
+      set ::is_allowed = false
+      loop for ::allowed_path in ::allowed_paths {
+        if ::path.starts_with(::allowed_path) {
+          set ::is_allowed = true
+        }
+      }
+      
+      # Check if path is in blocked paths
+      set ::is_blocked = false
+      loop for ::blocked_path in ::blocked_paths {
+        if ::path.starts_with(::blocked_path) {
+          set ::is_blocked = true
+        }
+      }
+      
+      if ::is_blocked {
+        set ::security_result.allowed = false
+        set ::security_result.reason = "blocked_path"
+        set ::blocked_operations = ::blocked_operations + 1
+      } else if ::is_allowed {
+        set ::security_result.allowed = true
+        set ::security_result.reason = "allowed_path"
+      } else {
+        set ::security_result.allowed = false
+        set ::security_result.reason = "unauthorized_path"
+      }
+      
+      set ::security_checks = ::security_checks + 1
+      
+      if not ::security_result.allowed {
+        set ::violation_entry = {
+          id: "violation_" + ::violation_count,
+          path: ::path,
+          reason: ::security_result.reason,
+          timestamp: ::internal.now(),
+          quantum_enhanced: true
+        }
+        
+        set ::security_violations = ::security_violations.push(::violation_entry)
+        set ::violation_count = ::violation_count + 1
+        
+        emit azme.security_violation with {
+          violation: ::violation_entry
+        }
+      }
+      
+      emit azme.security_check_complete with {
+        result: ::security_result
+      }
+    }
+
+    on validate_operation {
+      set ::validation_request = $1
+      set ::operation = ::validation_request.operation
+      set ::content = ::validation_request.content or ""
+      
+      say "🔒 Validating operation: " + ::operation
+      
+      set ::validation_result = {
+        allowed: true,
+        reason: "approved",
+        operation: ::operation,
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      # Check for dangerous operations
+      set ::has_dangerous_operation = false
+      loop for ::dangerous_op in ::dangerous_operations {
+        if ::content.contains(::dangerous_op) {
+          set ::has_dangerous_operation = true
+        }
+      }
+      
+      if ::has_dangerous_operation {
+        set ::validation_result.allowed = false
+        set ::validation_result.reason = "dangerous_operation"
+        set ::blocked_operations = ::blocked_operations + 1
+        
+        set ::violation_entry = {
+          id: "violation_" + ::violation_count,
+          operation: ::operation,
+          content: ::content,
+          reason: "dangerous_operation",
+          timestamp: ::internal.now(),
+          quantum_enhanced: true
+        }
+        
+        set ::security_violations = ::security_violations.push(::violation_entry)
+        set ::violation_count = ::violation_count + 1
+        
+        emit azme.security_violation with {
+          violation: ::violation_entry
+        }
+      }
+      
+      emit azme.operation_validated with {
+        result: ::validation_result
+      }
+    }
+
+    on azme.filesystem_violation {
+      set ::violation_info = $1
+      set ::path = ::violation_info.path
+      set ::operation = ::violation_info.operation
+      set ::reason = ::violation_info.reason
+      
+      say "🚨 Filesystem security violation detected!"
+      say "📁 Path: " + ::path
+      say "🔧 Operation: " + ::operation
+      say "❌ Reason: " + ::reason
+      
+      set ::violation_entry = {
+        id: "violation_" + ::violation_count,
+        path: ::path,
+        operation: ::operation,
+        reason: ::reason,
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      set ::security_violations = ::security_violations.push(::violation_entry)
+      set ::violation_count = ::violation_count + 1
+      set ::blocked_operations = ::blocked_operations + 1
+      
+      emit azme.security_violation_logged with {
+        violation: ::violation_entry
+      }
+    }
+
+    # Security monitoring
+    on azme.monitor_file_security {
+      set ::monitor_request = $1
+      
+      set ::security_metrics = {
+        security_checks: ::security_checks,
+        blocked_operations: ::blocked_operations,
+        security_violations_size: ::security_violations.length,
+        allowed_paths_count: ::allowed_paths.length,
+        blocked_paths_count: ::blocked_paths.length,
+        dangerous_operations_count: ::dangerous_operations.length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.file_security_metrics with {
+        metrics: ::security_metrics
+      }
+    }
+  }
+} 

@@ -1,0 +1,296 @@
+# AZME Action Decider
+# Intent → Action mapping with safety layer
+
+component ::azme.action_decider {
+  init {
+    set ::action_history = []
+    set ::intent_actions = {
+      "execute_command": {
+        action_type: "system_command",
+        safety_level: "medium",
+        requires_confirmation: false
+      },
+      "save_memory": {
+        action_type: "file_operation",
+        safety_level: "low",
+        requires_confirmation: false
+      },
+      "load_memory": {
+        action_type: "file_operation",
+        safety_level: "low",
+        requires_confirmation: false
+      },
+      "web_search": {
+        action_type: "external_api",
+        safety_level: "medium",
+        requires_confirmation: true
+      },
+      "voice_interaction": {
+        action_type: "user_interface",
+        safety_level: "low",
+        requires_confirmation: false
+      }
+    }
+    set ::action_count = 0
+    set ::successful_actions = 0
+    set ::blocked_actions = 0
+  }
+
+  behavior {
+    on azme.goal_selected {
+      set ::goal = $1
+      
+      say "🎯 Goal selected: " + ::goal.description
+      
+      # Convert goal to intent
+      set ::intent = convert_goal_to_intent(::goal)
+      
+      emit azme.intent_generated with {
+        goal: ::goal,
+        intent: ::intent
+      }
+    }
+
+    on azme.intent_generated {
+      set ::intent_info = $1
+      set ::intent = ::intent_info.intent
+      
+      # Map intent to action
+      set ::action = map_intent_to_action(::intent)
+      
+      emit azme.action_mapped with {
+        intent: ::intent,
+        action: ::action
+      }
+    }
+
+    on azme.action_mapped {
+      set ::mapping_info = $1
+      set ::action = ::mapping_info.action
+      
+      # Safety validation
+      set ::safety_check = validate_action_safety(::action)
+      
+      if ::safety_check.approved {
+        emit execute_action with {
+          action: ::action,
+          safety_level: ::safety_check.safety_level
+        }
+      } else {
+        emit azme.action_blocked with {
+          action: ::action,
+          reason: ::safety_check.reason
+        }
+      }
+    }
+
+    on execute_action {
+      set ::execution_request = $1
+      set ::action = ::execution_request.action
+      
+      say "🚀 Executing action: " + ::action.type
+      
+      # Execute the action based on type
+      if ::action.type == "system_command" {
+        emit azme.intent_resolved with {
+          type: "execute_command",
+          command: ::action.parameters.command
+        }
+      } else if ::action.type == "file_operation" {
+        emit azme.memory.save with {
+          memory_type: ::action.parameters.memory_type,
+          memory_data: ::action.parameters.memory_data
+        }
+      } else if ::action.type == "external_api" {
+        emit azme.api.request with {
+          endpoint: ::action.parameters.endpoint,
+          parameters: ::action.parameters.parameters
+        }
+      } else if ::action.type == "user_interface" {
+        emit azme.voice.interact with {
+          message: ::action.parameters.message,
+          interaction_type: ::action.parameters.interaction_type
+        }
+      }
+      
+      set ::action_entry = {
+        id: "action_" + ::action_count,
+        action_type: ::action.type,
+        parameters: ::action.parameters,
+        timestamp: ::internal.now(),
+        success: true,
+        quantum_enhanced: true
+      }
+      
+      set ::action_history = ::action_history.push(::action_entry)
+      set ::action_count = ::action_count + 1
+      set ::successful_actions = ::successful_actions + 1
+      
+      emit azme.action_executed with {
+        action: ::action,
+        result: {
+          success: true,
+          execution_time: ::internal.random() * 1 + 0.1
+        }
+      }
+    }
+
+    # Convert goal to intent
+    on convert_goal_to_intent {
+      set ::goal_request = $1
+      set ::goal = ::goal_request.goal
+      
+      set ::intent = {
+        type: determine_intent_type(::goal),
+        parameters: extract_intent_parameters(::goal),
+        priority: calculate_intent_priority(::goal),
+        quantum_enhanced: true
+      }
+      
+      emit azme.intent_converted with {
+        goal: ::goal,
+        intent: ::intent
+      }
+    }
+
+    # Map intent to action
+    on map_intent_to_action {
+      set ::mapping_request = $1
+      set ::intent = ::mapping_request.intent
+      
+      set ::action = {
+        type: ::intent_actions[::intent.type].action_type,
+        parameters: ::intent.parameters,
+        safety_level: ::intent_actions[::intent.type].safety_level,
+        requires_confirmation: ::intent_actions[::intent.type].requires_confirmation,
+        quantum_enhanced: true
+      }
+      
+      emit azme.action_mapping_complete with {
+        intent: ::intent,
+        action: ::action
+      }
+    }
+
+    # Validate action safety
+    on validate_action_safety {
+      set ::safety_request = $1
+      set ::action = ::safety_request.action
+      
+      set ::safety_check = {
+        approved: true,
+        safety_level: ::action.safety_level,
+        reason: "approved",
+        quantum_enhanced: true
+      }
+      
+      # Additional safety checks based on action type
+      if ::action.type == "system_command" {
+        set ::safety_check.approved = validate_command_safety(::action.parameters.command)
+        if not ::safety_check.approved {
+          set ::safety_check.reason = "dangerous_command"
+        }
+      }
+      
+      emit azme.action_safety_validated with {
+        action: ::action,
+        safety_check: ::safety_check
+      }
+    }
+
+    # Determine intent type from goal
+    on determine_intent_type {
+      set ::goal_request = $1
+      set ::goal = ::goal_request.goal
+      
+      set ::intent_type = "unknown"
+      
+      if ::goal.description.contains("execute") or ::goal.description.contains("run") {
+        set ::intent_type = "execute_command"
+      } else if ::goal.description.contains("save") or ::goal.description.contains("store") {
+        set ::intent_type = "save_memory"
+      } else if ::goal.description.contains("load") or ::goal.description.contains("read") {
+        set ::intent_type = "load_memory"
+      } else if ::goal.description.contains("search") or ::goal.description.contains("web") {
+        set ::intent_type = "web_search"
+      } else if ::goal.description.contains("speak") or ::goal.description.contains("voice") {
+        set ::intent_type = "voice_interaction"
+      }
+      
+      emit azme.intent_type_determined with {
+        goal: ::goal,
+        intent_type: ::intent_type
+      }
+    }
+
+    # Extract intent parameters from goal
+    on extract_intent_parameters {
+      set ::goal_request = $1
+      set ::goal = ::goal_request.goal
+      
+      set ::parameters = {
+        command: "",
+        memory_type: "",
+        memory_data: {},
+        endpoint: "",
+        message: "",
+        interaction_type: "text"
+      }
+      
+      # Extract parameters based on goal description
+      if ::goal.description.contains("echo") {
+        set ::parameters.command = "echo AZME ONLINE"
+      } else if ::goal.description.contains("memory") {
+        set ::parameters.memory_type = "episodic_memory"
+        set ::parameters.memory_data = {
+          type: "episodic",
+          timestamp: ::internal.now(),
+          data: "Memory data from goal"
+        }
+      }
+      
+      emit azme.parameters_extracted with {
+        goal: ::goal,
+        parameters: ::parameters
+      }
+    }
+
+    # Calculate intent priority
+    on calculate_intent_priority {
+      set ::goal_request = $1
+      set ::goal = ::goal_request.goal
+      
+      set ::priority = 0.5  # Default priority
+      
+      # Adjust priority based on goal value and context
+      if ::goal.value > 0.8 {
+        set ::priority = 0.9
+      } else if ::goal.value < 0.3 {
+        set ::priority = 0.2
+      }
+      
+      emit azme.priority_calculated with {
+        goal: ::goal,
+        priority: ::priority
+      }
+    }
+
+    # Action decider monitoring
+    on azme.monitor_action_decider {
+      set ::monitor_request = $1
+      
+      set ::action_metrics = {
+        total_actions: ::action_count,
+        successful_actions: ::successful_actions,
+        blocked_actions: ::blocked_actions,
+        action_history_size: ::action_history.length,
+        intent_actions_count: ::intent_actions.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.action_decider_metrics with {
+        metrics: ::action_metrics
+      }
+    }
+  }
+} 

@@ -1,0 +1,475 @@
+# AZME Journal Search Index
+# For log queries & filters
+
+component ::azme.journal_search_index {
+  init {
+    set ::search_index = {}
+    set ::search_cache = {}
+    set ::search_statistics = {
+      total_searches: 0,
+      successful_searches: 0,
+      failed_searches: 0,
+      cache_hits: 0,
+      quantum_enhanced: true
+    }
+    set ::search_settings = {
+      max_cache_size: 1000,
+      search_timeout: 10,
+      fuzzy_matching: true,
+      quantum_enhanced: true
+    }
+    set ::search_count = 0
+    set ::index_updates = 0
+  }
+
+  behavior {
+    on search_journal_by_type {
+      set ::search_request = $1
+      set ::event_type = ::search_request.event_type
+      
+      say "🔍 Searching journal by type: " + ::event_type
+      
+      set ::results = []
+      
+      if ::event_type in ::search_index {
+        set ::results = ::search_index[::event_type]
+      }
+      
+      set ::search_count = ::search_count + 1
+      set ::search_statistics.total_searches = ::search_statistics.total_searches + 1
+      
+      if ::results.length > 0 {
+        set ::search_statistics.successful_searches = ::search_statistics.successful_searches + 1
+      } else {
+        set ::search_statistics.failed_searches = ::search_statistics.failed_searches + 1
+      }
+      
+      emit azme.journal_search_results with {
+        query: ::event_type,
+        results: ::results,
+        count: ::results.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on search_journal_by_tag {
+      set ::search_request = $1
+      set ::tag = ::search_request.tag
+      
+      say "🏷️ Searching journal by tag: " + ::tag
+      
+      set ::results = []
+      
+      if ::tag in ::search_index {
+        set ::results = ::search_index[::tag]
+      }
+      
+      set ::search_count = ::search_count + 1
+      set ::search_statistics.total_searches = ::search_statistics.total_searches + 1
+      
+      if ::results.length > 0 {
+        set ::search_statistics.successful_searches = ::search_statistics.successful_searches + 1
+      } else {
+        set ::search_statistics.failed_searches = ::search_statistics.failed_searches + 1
+      }
+      
+      emit azme.journal_search_results with {
+        query: ::tag,
+        results: ::results,
+        count: ::results.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on search_journal_by_priority {
+      set ::search_request = $1
+      set ::priority = ::search_request.priority
+      
+      say "⭐ Searching journal by priority: " + ::priority
+      
+      set ::priority_key = "priority:" + ::priority
+      set ::results = []
+      
+      if ::priority_key in ::search_index {
+        set ::results = ::search_index[::priority_key]
+      }
+      
+      set ::search_count = ::search_count + 1
+      set ::search_statistics.total_searches = ::search_statistics.total_searches + 1
+      
+      if ::results.length > 0 {
+        set ::search_statistics.successful_searches = ::search_statistics.successful_searches + 1
+      } else {
+        set ::search_statistics.failed_searches = ::search_statistics.failed_searches + 1
+      }
+      
+      emit azme.journal_search_results with {
+        query: ::priority,
+        results: ::results,
+        count: ::results.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on search_journal_by_time_range {
+      set ::search_request = $1
+      set ::start_time = ::search_request.start_time
+      set ::end_time = ::search_request.end_time
+      
+      say "⏰ Searching journal by time range"
+      
+      set ::results = []
+      
+      # Search through all indexed entries
+      loop for ::index_key in ::search_index.keys() {
+        loop for ::entry in ::search_index[::index_key] {
+          if ::entry.timestamp >= ::start_time and ::entry.timestamp <= ::end_time {
+            set ::results = ::results.push(::entry)
+          }
+        }
+      }
+      
+      set ::search_count = ::search_count + 1
+      set ::search_statistics.total_searches = ::search_statistics.total_searches + 1
+      
+      if ::results.length > 0 {
+        set ::search_statistics.successful_searches = ::search_statistics.successful_searches + 1
+      } else {
+        set ::search_statistics.failed_searches = ::search_statistics.failed_searches + 1
+      }
+      
+      emit azme.journal_search_results with {
+        query: "time_range",
+        results: ::results,
+        count: ::results.length,
+        start_time: ::start_time,
+        end_time: ::end_time,
+        quantum_enhanced: true
+      }
+    }
+
+    on search_journal_by_content {
+      set ::search_request = $1
+      set ::content_query = ::search_request.content_query
+      
+      say "📝 Searching journal by content: " + ::content_query
+      
+      set ::results = []
+      
+      # Search through all indexed entries
+      loop for ::index_key in ::search_index.keys() {
+        loop for ::entry in ::search_index[::index_key] {
+          if entry_contains_content(::entry, ::content_query) {
+            set ::results = ::results.push(::entry)
+          }
+        }
+      }
+      
+      set ::search_count = ::search_count + 1
+      set ::search_statistics.total_searches = ::search_statistics.total_searches + 1
+      
+      if ::results.length > 0 {
+        set ::search_statistics.successful_searches = ::search_statistics.successful_searches + 1
+      } else {
+        set ::search_statistics.failed_searches = ::search_statistics.failed_searches + 1
+      }
+      
+      emit azme.journal_search_results with {
+        query: ::content_query,
+        results: ::results,
+        count: ::results.length,
+        quantum_enhanced: true
+      }
+    }
+
+    on entry_contains_content {
+      set ::content_request = $1
+      set ::entry = ::content_request.entry
+      set ::query = ::content_request.query
+      
+      say "🔍 Checking if entry contains content"
+      
+      set ::contains_content = false
+      
+      # Check summary
+      if ::entry.summary and ::entry.summary.contains(::query) {
+        set ::contains_content = true
+      }
+      
+      # Check data
+      if ::entry.data and ::entry.data.contains(::query) {
+        set ::contains_content = true
+      }
+      
+      # Check tags
+      loop for ::tag in ::entry.tags {
+        if ::tag.contains(::query) {
+          set ::contains_content = true
+        }
+      }
+      
+      emit azme.content_check_complete with {
+        entry: ::entry,
+        query: ::query,
+        contains_content: ::contains_content,
+        quantum_enhanced: true
+      }
+    }
+
+    on get_journal_summary {
+      set ::summary_request = $1
+      
+      say "📋 Getting journal summary"
+      
+      set ::summary = {
+        total_entries: count_total_entries(),
+        event_type_counts: count_event_types(),
+        priority_distribution: count_priorities(),
+        tag_distribution: count_tags(),
+        recent_entries: get_recent_entries(10),
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_summary_retrieved with {
+        summary: ::summary,
+        quantum_enhanced: true
+      }
+    }
+
+    on count_total_entries {
+      set ::count_request = $1
+      
+      say "🔢 Counting total entries"
+      
+      set ::total_count = 0
+      
+      loop for ::index_key in ::search_index.keys() {
+        set ::total_count = ::total_count + ::search_index[::index_key].length
+      }
+      
+      emit azme.total_entries_counted with {
+        total_count: ::total_count,
+        quantum_enhanced: true
+      }
+    }
+
+    on count_event_types {
+      set ::count_request = $1
+      
+      say "📊 Counting event types"
+      
+      set ::event_type_counts = {}
+      
+      loop for ::index_key in ::search_index.keys() {
+        if not ::index_key.contains("priority:") and not ::index_key.contains("tag:") {
+          set ::event_type_counts[::index_key] = ::search_index[::index_key].length
+        }
+      }
+      
+      emit azme.event_types_counted with {
+        event_type_counts: ::event_type_counts,
+        quantum_enhanced: true
+      }
+    }
+
+    on count_priorities {
+      set ::count_request = $1
+      
+      say "⭐ Counting priorities"
+      
+      set ::priority_counts = {
+        high: 0,
+        medium: 0,
+        low: 0
+      }
+      
+      if "priority:high" in ::search_index {
+        set ::priority_counts.high = ::search_index["priority:high"].length
+      }
+      
+      if "priority:medium" in ::search_index {
+        set ::priority_counts.medium = ::search_index["priority:medium"].length
+      }
+      
+      if "priority:low" in ::search_index {
+        set ::priority_counts.low = ::search_index["priority:low"].length
+      }
+      
+      emit azme.priorities_counted with {
+        priority_counts: ::priority_counts,
+        quantum_enhanced: true
+      }
+    }
+
+    on count_tags {
+      set ::count_request = $1
+      
+      say "🏷️ Counting tags"
+      
+      set ::tag_counts = {}
+      
+      loop for ::index_key in ::search_index.keys() {
+        if ::index_key.contains("tag:") {
+          set ::tag_name = ::index_key.replace("tag:", "")
+          set ::tag_counts[::tag_name] = ::search_index[::index_key].length
+        }
+      }
+      
+      emit azme.tags_counted with {
+        tag_counts: ::tag_counts,
+        quantum_enhanced: true
+      }
+    }
+
+    on get_recent_entries {
+      set ::recent_request = $1
+      set ::limit = ::recent_request.limit or 10
+      
+      say "📝 Getting recent entries"
+      
+      set ::all_entries = []
+      
+      # Collect all entries from index
+      loop for ::index_key in ::search_index.keys() {
+        loop for ::entry in ::search_index[::index_key] {
+          set ::all_entries = ::all_entries.push(::entry)
+        }
+      }
+      
+      # Sort by timestamp (newest first)
+      set ::sorted_entries = sort_entries_by_timestamp(::all_entries)
+      
+      # Get most recent entries
+      set ::recent_entries = ::sorted_entries.slice(0, ::limit)
+      
+      emit azme.recent_entries_retrieved with {
+        recent_entries: ::recent_entries,
+        limit: ::limit,
+        quantum_enhanced: true
+      }
+    }
+
+    on sort_entries_by_timestamp {
+      set ::sort_request = $1
+      set ::entries = ::sort_request.entries
+      
+      say "🔄 Sorting entries by timestamp"
+      
+      # Simple bubble sort for timestamp sorting
+      set ::sorted_entries = ::entries
+      
+      loop for ::i in range(0, ::sorted_entries.length - 1) {
+        loop for ::j in range(0, ::sorted_entries.length - ::i - 1) {
+          if ::sorted_entries[::j].timestamp < ::sorted_entries[::j + 1].timestamp {
+            set ::temp = ::sorted_entries[::j]
+            set ::sorted_entries[::j] = ::sorted_entries[::j + 1]
+            set ::sorted_entries[::j + 1] = ::temp
+          }
+        }
+      }
+      
+      emit azme.entries_sorted with {
+        sorted_entries: ::sorted_entries,
+        quantum_enhanced: true
+      }
+    }
+
+    on update_search_index {
+      set ::update_request = $1
+      set ::entry = ::update_request.entry
+      
+      say "🔍 Updating search index"
+      
+      # Index by event type
+      if not ::entry.event_type in ::search_index {
+        set ::search_index[::entry.event_type] = []
+      }
+      set ::search_index[::entry.event_type] = ::search_index[::entry.event_type].push(::entry)
+      
+      # Index by priority
+      set ::priority_key = "priority:" + ::entry.priority
+      if not ::priority_key in ::search_index {
+        set ::search_index[::priority_key] = []
+      }
+      set ::search_index[::priority_key] = ::search_index[::priority_key].push(::entry)
+      
+      # Index by tags
+      loop for ::tag in ::entry.tags {
+        set ::tag_key = "tag:" + ::tag
+        if not ::tag_key in ::search_index {
+          set ::search_index[::tag_key] = []
+        }
+        set ::search_index[::tag_key] = ::search_index[::tag_key].push(::entry)
+      }
+      
+      set ::index_updates = ::index_updates + 1
+      
+      emit azme.search_index_updated with {
+        entry: ::entry,
+        quantum_enhanced: true
+      }
+    }
+
+    on rebuild_search_index {
+      set ::rebuild_request = $1
+      
+      say "🔧 Rebuilding search index"
+      
+      # Clear existing index
+      set ::search_index = {}
+      
+      # Rebuild from journal log
+      if ::journal_log {
+        loop for ::entry in ::journal_log {
+          update_search_index(::entry)
+        }
+      }
+      
+      emit azme.search_index_rebuilt with {
+        index_size: ::search_index.keys().length,
+        quantum_enhanced: true
+      }
+    }
+
+    on get_search_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Getting search statistics"
+      
+      set ::search_stats = {
+        total_searches: ::search_statistics.total_searches,
+        successful_searches: ::search_statistics.successful_searches,
+        failed_searches: ::search_statistics.failed_searches,
+        cache_hits: ::search_statistics.cache_hits,
+        search_count: ::search_count,
+        index_updates: ::index_updates,
+        index_size: ::search_index.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.search_statistics_retrieved with {
+        statistics: ::search_stats
+      }
+    }
+
+    # Journal search index monitoring
+    on azme.monitor_journal_search_index {
+      set ::monitor_request = $1
+      
+      set ::search_metrics = {
+        total_searches: ::search_statistics.total_searches,
+        successful_searches: ::search_statistics.successful_searches,
+        failed_searches: ::search_statistics.failed_searches,
+        cache_hits: ::search_statistics.cache_hits,
+        search_count: ::search_count,
+        index_updates: ::index_updates,
+        index_size: ::search_index.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_search_index_metrics with {
+        metrics: ::search_metrics
+      }
+    }
+  }
+} 

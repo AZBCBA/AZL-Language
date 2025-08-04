@@ -1,0 +1,111 @@
+component ::test.debug_simple_events {
+  init {
+    set ::test_name = "Debug Simple Events Test"
+    set ::test_version = 1
+    set ::status = "initializing"
+    say "🔍 Starting Debug Simple Events Test v1..."
+  }
+
+  # Link to debug logger
+  link ::debug.event_logger
+
+  on test.start {
+    say "🔍 Starting Debug Simple Events Test..."
+    emit test.trigger_simple_events
+  }
+
+  on test.trigger_simple_events {
+    say "🧪 Testing simple event emissions..."
+    
+    # Test 1: Simple string event
+    say "📤 Emitting simple string event..."
+    emit test.simple_string_event with "hello"
+    
+    # Test 2: Simple number event
+    say "📤 Emitting simple number event..."
+    emit test.simple_number_event with 42
+    
+    # Test 3: Multiple simple parameters
+    say "📤 Emitting multiple simple parameters..."
+    emit test.multiple_params with "goal" 5 "high"
+    
+    # Test 4: Single variable parameter
+    say "📤 Emitting single variable parameter..."
+    set ::test_var = "test_value"
+    emit test.single_variable with ::test_var
+    
+    # Test 5: Multiple variable parameters
+    say "📤 Emitting multiple variable parameters..."
+    set ::param1 = "param1_value"
+    set ::param2 = 123
+    set ::param3 = "param3_value"
+    emit test.multiple_variables with ::param1 ::param2 ::param3
+  }
+
+  on test.simple_string_event {
+    say "✅ Received simple string event"
+    say "📝 Parameter: $1"
+    emit test.next_test
+  }
+
+  on test.simple_number_event {
+    say "✅ Received simple number event"
+    say "📝 Parameter: $1"
+    emit test.next_test
+  }
+
+  on test.multiple_params {
+    say "✅ Received multiple parameters event"
+    say "📝 Param1: $1"
+    say "📝 Param2: $2"
+    say "📝 Param3: $3"
+    emit test.next_test
+  }
+
+  on test.single_variable {
+    say "✅ Received single variable event"
+    say "📝 Parameter: $1"
+    emit test.next_test
+  }
+
+  on test.multiple_variables {
+    say "✅ Received multiple variables event"
+    say "📝 Param1: $1"
+    say "📝 Param2: $2"
+    say "📝 Param3: $3"
+    emit test.next_test
+  }
+
+  on test.next_test {
+    say "🔄 Moving to next test..."
+    emit debug.get_stats
+  }
+
+  on debug.stats_ready {
+    say "📊 Debug Statistics:"
+    say "📈 Total events: $1.total_events"
+    say "📋 Log entries: $1.event_log_length"
+    emit test.complete
+  }
+
+  on test.complete {
+    say "🎉 Debug Simple Events Test COMPLETE!"
+    say "✅ Simple string events working"
+    say "✅ Simple number events working"
+    say "✅ Multiple parameters working"
+    say "✅ Variable parameters working"
+    say "🔍 Debug logging working"
+  }
+
+  behavior {
+    on system.start {
+      emit test.start
+    }
+  }
+
+  memory {
+    ::test_name = ""
+    ::test_version = 1
+    ::status = ""
+  }
+} 

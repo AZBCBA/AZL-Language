@@ -1,0 +1,21 @@
+fn get_current_time() {
+  return 123
+}
+
+fn calculate_importance(item) {
+  return 0.5
+}
+
+let agent = {
+  memory: []
+}
+
+let memory_entry = {
+  content: "test",
+  category: "test", 
+  timestamp: get_current_time(),
+  importance: calculate_importance("test"),
+  accessed_count: 0
+}
+
+set agent.memory = agent.memory + [memory_entry] 

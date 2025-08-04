@@ -1,0 +1,45 @@
+// Bootstrap Compiler Test Script
+// This script tests basic AZL syntax that the bootstrap compiler can handle
+
+// Basic variable declarations
+let x = 42;
+let y = 10;
+let result = x + y;
+
+// Basic arithmetic
+let sum = x + y;
+let product = x * y;
+let quotient = x / y;
+let remainder = x % y;
+
+// Basic control flow
+if (x > 40) {
+    let message = "x is greater than 40";
+} else {
+    let message = "x is 40 or less";
+}
+
+// Basic function
+function add(a, b) {
+    return a + b;
+}
+
+// Basic loop
+let counter = 0;
+while (counter < 5) {
+    counter = counter + 1;
+}
+
+// Basic quantum operation (simplified)
+quantum q1(2);
+let quantum_result = 1;
+
+// Basic neural operation (simplified)
+neural network1([10, 5, 1]);
+let neural_result = 0.5;
+
+// Basic memory operation (simplified)
+memory_store("test_key", "test_value");
+let memory_result = "test_value";
+
+print("Bootstrap compiler test completed successfully!"); 

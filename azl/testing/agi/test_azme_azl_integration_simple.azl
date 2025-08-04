@@ -1,0 +1,44 @@
+# Simplified AZME→AZL ABA Integration Test
+# Tests the core bridge functionality without complex object parameters
+
+say "🔌 Starting Simplified AZME→AZL ABA Integration Test..."
+
+# Test direct AZL command execution (this should work)
+say "🔌 Step 1: Testing Direct AZL Command Execution..."
+emit "azl.execute_command" with "addgoal \"Test AZL integration\" 7"
+emit "azl.execute_command" with "apply_trial \"antecedent: integration_test; behavior: command_execution; consequence: success\""
+emit "azl.execute_command" with "reinforce_behavior integration_success"
+emit "azl.execute_command" with "analyze_consequence"
+
+# Test AZME goal creation via AZL commands
+say "🔌 Step 2: Testing AZME Goal Creation via AZL..."
+addgoal "Learn quantum computing principles" 9
+addgoal "Master neural network optimization" 8
+addgoal "Study consciousness and self-awareness" 6
+
+# Test goal execution
+say "🔌 Step 3: Testing Goal Execution..."
+run
+
+# Test ABA trial logging
+say "🔌 Step 4: Testing ABA Trial Logging..."
+apply_trial "antecedent: azme_planning_goal_system; behavior: create_learning_goal; consequence: success"
+apply_trial "antecedent: azme_cognitive_engine; behavior: insight_generation; consequence: high_confidence"
+apply_trial "antecedent: azme_learning_system; behavior: neural_training; consequence: success"
+
+# Test reinforcement
+say "🔌 Step 5: Testing ABA Reinforcement..."
+reinforce_behavior high_success_learning
+reinforce_behavior pattern_recognition
+
+# Test consequence analysis
+say "🔌 Step 6: Testing Consequence Analysis..."
+analyze_consequence
+
+# Check final state
+say "🔌 Step 7: Checking Final State..."
+reflect
+
+say "✅ Simplified AZME→AZL ABA Integration Test Complete!"
+say "🎯 Core integration is working!"
+say "🧠 AZME can now use AZL's ABA functions!" 

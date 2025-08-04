@@ -1,0 +1,285 @@
+// AZL Native Memory System
+// Migrated from TypeScript-style to pure AZL native constructs
+
+component ::memory.core {
+  init {
+    set ::status = "initializing"
+    set ::memories = []
+    set ::memory_by_type = {}
+    set ::associations = []
+    set ::metrics = {
+      working_memory_usage: 0,
+      episodic_memory_usage: 0,
+      semantic_memory_usage: 0,
+      procedural_memory_usage: 0,
+      total_memory_usage: 0,
+      total_memory_items: 0,
+      average_retrieval_time: 0,
+      average_storage_time: 0,
+      retrieval_success_rate: 0,
+      storage_success_rate: 0
+    }
+    set ::initialized = false
+    set ::running = false
+    set ::consolidation_interval = 300000
+    set ::last_consolidation_time = 0
+    
+    emit "memory.core.initialized" with ::status
+  }
+
+  behavior {
+    // Initialize memory system
+    listen for "initialize_memory" then {
+      set ::status = "initializing"
+      
+      // Initialize memory type maps
+      set ::memory_by_type.working = []
+      set ::memory_by_type.episodic = []
+      set ::memory_by_type.semantic = []
+      set ::memory_by_type.procedural = []
+      set ::memory_by_type.associative = []
+      set ::memory_by_type.spatial = []
+      set ::memory_by_type.emotional = []
+      set ::memory_by_type.sensory = []
+      
+      set ::initialized = true
+      set ::status = "ready"
+      
+      emit "memory.initialized" with ::status
+    }
+
+    // Store memory item
+    listen for "store_memory" then {
+      set ::status = "storing"
+      
+      store ::memory_item from {
+        id: ::id,
+        type: ::memory_type,
+        content: ::content,
+        importance: ::importance,
+        confidence: ::confidence,
+        emotional_valence: ::emotional_valence,
+        creation_time: ::now(),
+        last_access_time: ::now(),
+        access_count: 0,
+        associations: [],
+        metadata: ::metadata
+      }
+      
+      // Store in main memories array
+      store ::memories from ::memories.push(::memory_item)
+      
+      // Store in type-specific array
+      branch when ::memory_by_type[::memory_type] != null {
+        store ::memory_by_type[::memory_type] from ::memory_by_type[::memory_type].push(::memory_item)
+      }
+      
+      // Update metrics
+      set ::metrics.total_memory_items = ::metrics.total_memory_items + 1
+      set ::metrics.storage_success_rate = ::metrics.storage_success_rate + 0.01
+      branch when ::metrics.storage_success_rate > 1.0 {
+        set ::metrics.storage_success_rate = 1.0
+      }
+      
+      emit "memory.stored" with ::memory_item
+      set ::status = "ready"
+    }
+
+    // Retrieve memory item
+    listen for "retrieve_memory" then {
+      set ::status = "retrieving"
+      
+      loop for ::item in ::memories {
+        branch when ::item.id = ::id {
+          // Update access statistics
+          set ::item.last_access_time = ::now()
+          set ::item.access_count = ::item.access_count + 1
+          
+          // Update metrics
+          set ::metrics.retrieval_success_rate = ::metrics.retrieval_success_rate + 0.01
+          branch when ::metrics.retrieval_success_rate > 1.0 {
+            set ::metrics.retrieval_success_rate = 1.0
+          }
+          
+          emit "memory.retrieved" with ::item
+          set ::status = "ready"
+        }
+      }
+      
+      branch when ::status = "retrieving" {
+        emit "memory.not_found" with ::id
+        set ::status = "error"
+      }
+    }
+
+    // Query memories by type
+    listen for "query_memories" then {
+      set ::status = "querying"
+      
+      store ::results from []
+      
+      branch when ::memory_by_type[::memory_type] != null {
+        loop for ::item in ::memory_by_type[::memory_type] {
+          branch when ::item.importance >= ::min_importance {
+            store ::results from ::results.push(::item)
+          }
+        }
+      }
+      
+      emit "memory.query_results" with ::results
+      set ::status = "ready"
+    }
+
+    // Create memory association
+    listen for "create_association" then {
+      set ::status = "associating"
+      
+      store ::association from {
+        source_id: ::source_id,
+        target_id: ::target_id,
+        association_type: ::association_type,
+        strength: ::strength,
+        creation_time: ::now(),
+        last_access_time: ::now(),
+        access_count: 0
+      }
+      
+      store ::associations from ::associations.push(::association)
+      
+      // Add association to source memory
+      loop for ::item in ::memories {
+        branch when ::item.id = ::source_id {
+          store ::item.associations from ::item.associations.push(::association)
+        }
+      }
+      
+      emit "memory.association_created" with ::association
+      set ::status = "ready"
+    }
+
+    // Consolidate memories
+    listen for "consolidate_memories" then {
+      set ::status = "consolidating"
+      
+      // Remove old memories based on importance and access
+      loop for ::item in ::memories {
+        branch when ::item.importance < 0.3 and ::item.access_count < 2 {
+          store ::memories from ::memories.remove(::item)
+          set ::metrics.total_memory_items = ::metrics.total_memory_items - 1
+        }
+      }
+      
+      // Update consolidation time
+      set ::last_consolidation_time = ::now()
+      
+      emit "memory.consolidated" with {
+        remaining_items: ::memories.length,
+        consolidation_time: ::last_consolidation_time
+      }
+      set ::status = "ready"
+    }
+
+    // Get memory metrics
+    listen for "get_memory_metrics" then {
+      set ::status = "metrics"
+      
+      // Calculate current metrics
+      set ::metrics.total_memory_usage = ::memories.length
+      set ::metrics.working_memory_usage = ::memory_by_type.working.length
+      set ::metrics.episodic_memory_usage = ::memory_by_type.episodic.length
+      set ::metrics.semantic_memory_usage = ::memory_by_type.semantic.length
+      set ::metrics.procedural_memory_usage = ::memory_by_type.procedural.length
+      
+      emit "memory.metrics" with ::metrics
+      set ::status = "ready"
+    }
+
+    // Memory system monitoring
+    listen for "monitor_memory" then {
+      set ::status = "monitoring"
+      
+      reflect ::memory.core.status
+      reflect ::memory.core.metrics
+      
+      // Check if consolidation is needed
+      branch when ::now() - ::last_consolidation_time > ::consolidation_interval {
+        emit "consolidate_memories" with "routine_consolidation"
+      }
+      
+      emit "memory.monitored" with {
+        status: ::status,
+        total_items: ::memories.length,
+        associations: ::associations.length,
+        last_consolidation: ::last_consolidation_time
+      }
+      set ::status = "ready"
+    }
+  }
+
+  memory {
+    status
+    memories
+    memory_by_type
+    associations
+    metrics
+    initialized
+    running
+    consolidation_interval
+    last_consolidation_time
+  }
+
+  interface {
+    initialize_memory
+    store_memory using ::id, ::memory_type, ::content, ::importance, ::confidence, ::emotional_valence, ::metadata
+    retrieve_memory using ::id
+    query_memories using ::memory_type, ::min_importance
+    create_association using ::source_id, ::target_id, ::association_type, ::strength
+    consolidate_memories
+    get_memory_metrics
+    monitor_memory
+  }
+}
+
+// Initialize the memory system
+component ::memory.system {
+  init {
+    set ::status = "initializing"
+    link ::memory::core
+    
+    emit "memory.system.ready" with ::status
+  }
+
+  behavior {
+    listen for "start_memory_system" then {
+      set ::status = "active"
+      
+      // Initialize memory system
+      emit "initialize_memory" with "system_initialization"
+      
+      // Start memory monitoring loop
+      loop while ::status = "active" {
+        emit "monitor_memory" with "routine_monitoring"
+        
+        // Wait for monitoring completion
+        listen for "memory.monitored" then {
+          emit "memory.cycle.complete" with ::monitoring_result
+        }
+      }
+    }
+  }
+
+  memory {
+    status
+  }
+
+  interface {
+    start_memory_system
+  }
+}
+
+// Main execution - Initialize memory system
+set ::memory_system = ::memory.system
+emit "memory.system.ready" with ::memory_system.status
+
+// Start memory system
+emit "start_memory_system" with "AZL_MEMORY_SYSTEM_ACTIVATION" 

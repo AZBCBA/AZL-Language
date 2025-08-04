@@ -1,0 +1,1210 @@
+component ::aba.reinforcement_schedule {
+  init {
+    set ::schedule_type = "continuous"
+    set ::parameter = 3
+    set ::response_counter = 0
+    set ::last_reinforced = now()
+    set ::reinforcement_history = []
+    set ::learner_data = {}
+    set ::session_start = now()
+    set ::reinforcements_this_session = 0
+    set ::emotional_state = {
+      frustration: 0.0,
+      engagement: 0.8,
+      confidence: 0.7,
+      stress: 0.2
+    }
+    set ::behavior_success_rate = 0.0
+    set ::reinforcement_decay = 1.0
+    set ::schedule_weights = {
+      continuous: 0.0,
+      fixed_ratio: 0.0,
+      variable_ratio: 0.0,
+      fixed_interval: 0.0,
+      variable_interval: 0.0
+    }
+    set ::schedule_config = {
+      continuous: { every_response: true },
+      fixed_ratio: { ratio: 3, counter: 0 },
+      variable_ratio: { min_ratio: 2, max_ratio: 4, counter: 0 },
+      fixed_interval: { interval_ms: 5000, last_reinforced: 0 },
+      variable_interval: { min_interval: 4000, max_interval: 6000, last_reinforced: 0 }
+    }
+    set ::adaptive_config = {
+      strength_modifiers: {
+        verbal_praise: 1.0,
+        physical_high_five: 1.5,
+        token_reward: 2.0,
+        preferred_activity: 3.0,
+        social_attention: 1.2
+      },
+      decay_rate: 0.95,
+      adaptation_threshold: 0.7,
+      emotional_modifiers: {
+        high_frustration: 1.3,
+        low_engagement: 1.5,
+        high_confidence: 0.8,
+        high_stress: 1.4
+      },
+      reinforcement_intensity: {
+        low: 0.5,
+        medium: 1.0,
+        high: 2.0,
+        very_high: 3.0
+      },
+      response_latency_thresholds: {
+        fast: 1000,    // < 1 second
+        medium: 3000,  // 1-3 seconds
+        slow: 5000     // > 3 seconds
+      },
+      dynamic_thresholds: {
+        frustration_tolerance: 0.6,
+        engagement_minimum: 0.4,
+        confidence_threshold: 0.7
+      },
+      ethical_constraints: {
+        max_reinforcements_per_session: 50,
+        max_intensity_per_reinforcement: 5.0,
+        min_interval_between_reinforcements: 1000,  // 1 second
+        session_duration_limit: 3600000  // 1 hour
+      },
+      temporal_sensitivity: {
+        time_window_ms: 5000,  // 5 second window
+        real_time_monitoring: true,
+        adaptive_timing: true
+      }
+    }
+    
+    // Global Improvements
+    set ::introspection_state = {
+      last_review: now(),
+      decision_history: [],
+      goal_alignment: {},
+      evolution_ready: false
+    }
+    set ::goal_meta = {
+      primary_goal: "optimize_learning_efficiency",
+      subgoals: ["maintain_engagement", "prevent_burnout", "maximize_retention"],
+      goal_progress: {},
+      goal_weights: {
+        optimize_learning_efficiency: 0.4,
+        maintain_engagement: 0.3,
+        prevent_burnout: 0.2,
+        maximize_retention: 0.1
+      }
+    }
+    set ::evolution_slots = {
+      schedule_optimization: "future_enhancement",
+      emotional_intelligence: "future_enhancement",
+      predictive_adaptation: "future_enhancement",
+      multi_learner_support: "future_enhancement"
+    }
+    set ::modular_interface = {
+      submodules: ["schedule_analyzer", "emotional_processor", "ethical_monitor"],
+      external_hooks: ["cli_interface", "dashboard_integration", "api_endpoint"],
+      split_capable: true
+    }
+  }
+
+  # Enhanced adaptive scheduling with ABA integration
+  behavior {
+    listen for "response_occurred" then {
+      // Introspective state review before major decisions
+      reflect_introspective_state()
+      
+      // Check ethical constraints before processing
+      branch when check_ethical_constraints(::response_data) {
+        store ::reinforcement_decision from evaluate_adaptive_reinforcement(::response_data)
+        
+        // Goal meta integration
+        update_goal_progress(::reinforcement_decision)
+        
+        branch when ::reinforcement_decision.should_reinforce {
+          let strength = calculate_reinforcement_strength(::reinforcement_decision)
+          let type = select_reinforcement_type(::emotional_state, ::behavior_success_rate)
+          let magnitude = calculate_reinforcement_magnitude(::reinforcement_decision)
+          
+          emit "reinforce" with {
+            type: type,
+            strength: strength * ::reinforcement_decay,
+            magnitude: magnitude,
+            emotional_context: ::emotional_state,
+            schedule_type: ::schedule_type,
+            original_decision: ::reinforcement_decision,
+            learner_id: ::response_data.learner_id,
+            session_time: now() - ::session_start,
+            goal_meta: ::goal_meta.primary_goal
+          }
+          
+          store ::reinforcement_history from add_to_history(::reinforcement_decision)
+          store ::learner_data from update_learner_data(::response_data.learner_id, ::reinforcement_decision)
+          update_emotional_state(::reinforcement_decision)
+          update_success_rate(::response_data)
+          apply_reinforcement_decay()
+          increment ::reinforcements_this_session
+          
+          // Dynamic schedule adaptation based on performance
+          reflect_historical_performance()
+          
+          // Evolution slot check
+          check_evolution_readiness()
+        }
+      }
+    }
+
+    listen for "schedule_changed" then {
+      set ::schedule_type = ::new_schedule_type
+      set ::parameter = ::new_parameter
+      reset_schedule_counters()
+    }
+
+    listen for "emotional_state_changed" then {
+      set ::emotional_state = ::new_emotional_state
+      adapt_schedule_to_emotion()
+    }
+
+    listen for "success_rate_updated" then {
+      adapt_schedule_to_performance()
+    }
+
+    listen for "schedule_weights_updated" then {
+      update_schedule_weights(::new_weights)
+      apply_weighted_schedule()
+    }
+
+    # Temporal sensitivity - real-time monitoring
+    loop every ::adaptive_config.temporal_sensitivity.time_window_ms {
+      branch when ::adaptive_config.temporal_sensitivity.real_time_monitoring {
+        monitor_temporal_patterns()
+        adapt_temporal_sensitivity()
+      }
+    }
+    
+    # External hooking for CLI and dashboard integration
+    listen for "cli.command" then {
+      handle_cli_command(::cli_command)
+    }
+    
+    listen for "dashboard.request" then {
+      emit "dashboard.data" with get_dashboard_data()
+    }
+    
+    listen for "api.request" then {
+      emit "api.response" with handle_api_request(::api_request)
+    }
+    
+    # Modular interface support
+    listen for "module.split" then {
+      emit "module.split.ready" with prepare_module_split()
+    }
+    
+    listen for "evolution.trigger" then {
+      trigger_evolution(::evolution_type)
+    }
+    
+    # New adaptive scheduling behaviors
+    listen for "schedule.retry" then {
+      schedule_adaptive_retry($1)
+    }
+    
+    listen for "schedule.fade" then {
+      schedule_prompt_fade($1)
+    }
+    
+    listen for "schedule.adaptive" then {
+      schedule_adaptive_behavior($1)
+    }
+    
+    listen for "feedback.received" then {
+      adapt_schedule_based_on_feedback($1)
+    }
+  }
+
+  memory {
+    schedule_type
+    parameter
+    response_counter
+    last_reinforced
+    reinforcement_history
+    schedule_config
+  }
+
+  interface {
+    evaluate_reinforcement using ::response_data
+    change_schedule using ::schedule_type, ::parameter
+    get_schedule_status
+    get_reinforcement_history
+  }
+}
+
+# Reinforcement evaluation function
+function evaluate_reinforcement(response_data) {
+  let decision = {
+    should_reinforce: false,
+    schedule_type: ::schedule_type,
+    response_data: response_data,
+    timestamp: now()
+  }
+
+  branch when ::schedule_type == "continuous" {
+    set decision.should_reinforce = true
+  }
+
+  branch when ::schedule_type == "fixed_ratio" {
+    increment ::response_counter
+    branch when ::response_counter >= ::parameter {
+      set decision.should_reinforce = true
+      set ::response_counter = 0
+    }
+  }
+
+  branch when ::schedule_type == "variable_ratio" {
+    increment ::response_counter
+    let target_ratio = random_int(::schedule_config.variable_ratio.min_ratio, ::schedule_config.variable_ratio.max_ratio)
+    branch when ::response_counter >= target_ratio {
+      set decision.should_reinforce = true
+      set ::response_counter = 0
+    }
+  }
+
+  branch when ::schedule_type == "fixed_interval" {
+    let current_time = now()
+    let time_since_last = current_time - ::last_reinforced
+    branch when time_since_last >= ::parameter {
+      set decision.should_reinforce = true
+      set ::last_reinforced = current_time
+    }
+  }
+
+  branch when ::schedule_type == "variable_interval" {
+    let current_time = now()
+    let time_since_last = current_time - ::last_reinforced
+    let target_interval = random_int(::schedule_config.variable_interval.min_interval, ::schedule_config.variable_interval.max_interval)
+    branch when time_since_last >= target_interval {
+      set decision.should_reinforce = true
+      set ::last_reinforced = current_time
+    }
+  }
+
+  return decision
+}
+
+# Helper functions
+function random_int(min, max) {
+  return floor(random() * (max - min + 1)) + min
+}
+
+function add_to_history(decision) {
+  let history = ::reinforcement_history
+  history.push(decision)
+  return history
+}
+
+function reset_schedule_counters() {
+  set ::response_counter = 0
+  set ::last_reinforced = now()
+}
+
+# Adaptive Reinforcement Functions
+function evaluate_adaptive_reinforcement(response_data) {
+  let decision = evaluate_reinforcement(response_data)
+  
+  # Apply emotional modifiers
+  branch when ::emotional_state.frustration > 0.7 {
+    set decision.emotional_modifier = ::adaptive_config.emotional_modifiers.high_frustration
+  } else branch when ::emotional_state.engagement < 0.3 {
+    set decision.emotional_modifier = ::adaptive_config.emotional_modifiers.low_engagement
+  } else branch when ::emotional_state.confidence > 0.8 {
+    set decision.emotional_modifier = ::adaptive_config.emotional_modifiers.high_confidence
+  } else branch when ::emotional_state.stress > 0.6 {
+    set decision.emotional_modifier = ::adaptive_config.emotional_modifiers.high_stress
+  } else {
+    set decision.emotional_modifier = 1.0
+  }
+
+  # Apply success rate modifiers
+  branch when ::behavior_success_rate < 0.3 {
+    set decision.success_modifier = 1.5  # Increase reinforcement for struggling learners
+  } else branch when ::behavior_success_rate > 0.8 {
+    set decision.success_modifier = 0.8  # Reduce reinforcement for high performers
+  } else {
+    set decision.success_modifier = 1.0
+  }
+
+  set decision.final_strength = decision.emotional_modifier * decision.success_modifier
+  return decision
+}
+
+function calculate_reinforcement_strength(reinforcement_decision) {
+  let base_strength = 1.0
+  let emotional_strength = reinforcement_decision.emotional_modifier || 1.0
+  let success_strength = reinforcement_decision.success_modifier || 1.0
+  let intensity_modifier = get_reinforcement_intensity(reinforcement_decision)
+  let latency_bonus = calculate_latency_bonus(reinforcement_decision)
+  
+  let total_strength = base_strength * emotional_strength * success_strength * intensity_modifier + latency_bonus
+  
+  # Use reflect to evaluate historical effectiveness
+  let historical_effectiveness = reflect_historical_effectiveness(reinforcement_decision)
+  let adjusted_strength = total_strength * historical_effectiveness
+  
+  return adjusted_strength
+}
+
+function get_reinforcement_intensity(reinforcement_decision) {
+  let intensity = ::adaptive_config.reinforcement_intensity.medium  # Default
+  
+  branch when ::emotional_state.frustration > ::adaptive_config.dynamic_thresholds.frustration_tolerance {
+    set intensity = ::adaptive_config.reinforcement_intensity.high
+  } else branch when ::emotional_state.engagement < ::adaptive_config.dynamic_thresholds.engagement_minimum {
+    set intensity = ::adaptive_config.reinforcement_intensity.very_high
+  } else branch when ::emotional_state.confidence > ::adaptive_config.dynamic_thresholds.confidence_threshold {
+    set intensity = ::adaptive_config.reinforcement_intensity.low
+  }
+  
+  return intensity
+}
+
+function calculate_latency_bonus(reinforcement_decision) {
+  let latency = reinforcement_decision.response_data.latency || 0
+  let bonus = 0.0
+  
+  branch when latency < ::adaptive_config.response_latency_thresholds.fast {
+    set bonus = 0.5  # Fast response bonus
+  } else branch when latency < ::adaptive_config.response_latency_thresholds.medium {
+    set bonus = 0.2  # Medium response bonus
+  }
+  
+  return bonus
+}
+
+function reflect_historical_effectiveness(reinforcement_decision) {
+  let history = ::reinforcement_history
+  let recent_reinforcements = history.slice(-10)
+  let effectiveness_score = 1.0
+  
+  branch when recent_reinforcements.length > 0 {
+    let successful_reinforcements = 0
+    
+    loop for reinforcement in recent_reinforcements {
+      branch when reinforcement.effective {
+        increment successful_reinforcements
+      }
+    }
+    
+    set effectiveness_score = successful_reinforcements / recent_reinforcements.length
+  }
+  
+  return effectiveness_score
+}
+
+function select_reinforcement_type(emotional_state, success_rate) {
+  let selected_type = "verbal_praise"  # Default
+  
+  # Select based on emotional state and success rate
+  branch when emotional_state.frustration > 0.6 {
+    set selected_type = "preferred_activity"  # Strong reinforcement for frustrated learners
+  } else branch when emotional_state.engagement < 0.4 {
+    set selected_type = "physical_high_five"  # Engaging reinforcement for disengaged learners
+  } else branch when success_rate > 0.8 {
+    set selected_type = "verbal_praise"  # Light reinforcement for high performers
+  } else branch when success_rate < 0.3 {
+    set selected_type = "token_reward"  # Medium reinforcement for struggling learners
+  } else {
+    set selected_type = "social_attention"  # Balanced reinforcement
+  }
+  
+  return selected_type
+}
+
+function update_emotional_state(reinforcement_data) {
+  # Update emotional state based on reinforcement delivery
+  branch when reinforcement_data.strength > 2.0 {
+    increment ::emotional_state.confidence by 0.1
+    decrement ::emotional_state.frustration by 0.1
+  } else branch when reinforcement_data.strength < 1.0 {
+    increment ::emotional_state.frustration by 0.1
+    decrement ::emotional_state.confidence by 0.05
+  }
+  
+  # Ensure values stay in valid range
+  clamp_emotional_values()
+}
+
+function update_success_rate(behavior_data) {
+  let recent_behaviors = get_recent_behaviors(10)
+  let success_count = count_successful_behaviors(recent_behaviors)
+  set ::behavior_success_rate = success_count / recent_behaviors.length
+  
+  emit "success_rate_updated" with ::behavior_success_rate
+}
+
+function apply_reinforcement_decay() {
+  set ::reinforcement_decay = ::reinforcement_decay * ::adaptive_config.decay_rate
+  branch when ::reinforcement_decay < 0.3 {
+    set ::reinforcement_decay = 0.3  # Minimum decay level
+  }
+}
+
+function adapt_schedule_to_emotion() {
+  branch when ::emotional_state.frustration > 0.7 {
+    # Switch to more frequent reinforcement
+    set ::schedule_type = "continuous"
+  } else branch when ::emotional_state.confidence > 0.8 {
+    # Switch to variable ratio for maintenance
+    set ::schedule_type = "variable_ratio"
+    set ::parameter = 5
+  } else branch when ::emotional_state.engagement < 0.3 {
+    # Switch to fixed interval to maintain engagement
+    set ::schedule_type = "fixed_interval"
+    set ::parameter = 3000  # 3 seconds
+  }
+}
+
+function adapt_schedule_to_performance() {
+  branch when ::behavior_success_rate < 0.3 {
+    # Switch to continuous for struggling learners
+    set ::schedule_type = "continuous"
+  } else branch when ::behavior_success_rate > 0.8 {
+    # Switch to variable ratio for high performers
+    set ::schedule_type = "variable_ratio"
+    set ::parameter = 7
+  }
+}
+
+# Helper functions for adaptive system
+function get_recent_behaviors(count) {
+  let history = ::reinforcement_history
+  return history.slice(-count)
+}
+
+function count_successful_behaviors(behaviors) {
+  let count = 0
+  loop for behavior in behaviors {
+    branch when behavior.success {
+      increment count
+    }
+  }
+  return count
+}
+
+function clamp_emotional_values() {
+  let emotions = ["frustration", "engagement", "confidence", "stress"]
+  loop for emotion in emotions {
+    branch when ::emotional_state[emotion] < 0.0 {
+      set ::emotional_state[emotion] = 0.0
+    } else branch when ::emotional_state[emotion] > 1.0 {
+      set ::emotional_state[emotion] = 1.0
+    }
+  }
+}
+
+# Enhanced Reinforcement Schedule Functions
+function check_ethical_constraints(response_data) {
+  let constraints = ::adaptive_config.ethical_constraints
+  
+  # Check session duration limit
+  let session_duration = now() - ::session_start
+  branch when session_duration > constraints.session_duration_limit {
+    emit "session_limit_reached" with { session_duration: session_duration }
+    return false
+  }
+  
+  # Check max reinforcements per session
+  branch when ::reinforcements_this_session >= constraints.max_reinforcements_per_session {
+    emit "max_reinforcements_reached" with { count: ::reinforcements_this_session }
+    return false
+  }
+  
+  # Check minimum interval between reinforcements
+  let time_since_last = now() - ::last_reinforced
+  branch when time_since_last < constraints.min_interval_between_reinforcements {
+    return false
+  }
+  
+  return true
+}
+
+function calculate_reinforcement_magnitude(reinforcement_decision) {
+  let magnitude = {
+    intensity: 1.0,
+    duration: 1000,  # milliseconds
+    type: "standard"
+  }
+  
+  # Adjust intensity based on emotional state
+  branch when ::emotional_state.frustration > 0.7 {
+    set magnitude.intensity = 2.0
+    set magnitude.duration = 2000
+  } else branch when ::emotional_state.engagement < 0.3 {
+    set magnitude.intensity = 1.5
+    set magnitude.duration = 1500
+  }
+  
+  # Ensure intensity doesn't exceed ethical limit
+  let max_intensity = ::adaptive_config.ethical_constraints.max_intensity_per_reinforcement
+  branch when magnitude.intensity > max_intensity {
+    set magnitude.intensity = max_intensity
+  }
+  
+  return magnitude
+}
+
+function update_learner_data(learner_id, reinforcement_decision) {
+  let learner_data = ::learner_data
+  
+  branch when learner_data[learner_id] == null {
+    set learner_data[learner_id] = {
+      reinforcement_log: [],
+      performance_history: [],
+      emotional_trends: [],
+      session_count: 0
+    }
+  }
+  
+  # Add to reinforcement log
+  learner_data[learner_id].reinforcement_log.push({
+    timestamp: now(),
+    schedule_type: ::schedule_type,
+    strength: reinforcement_decision.final_strength,
+    emotional_state: ::emotional_state,
+    session_time: now() - ::session_start
+  })
+  
+  # Update performance history
+  learner_data[learner_id].performance_history.push({
+    timestamp: now(),
+    success_rate: ::behavior_success_rate,
+    response_latency: reinforcement_decision.response_data.latency || 0
+  })
+  
+  return learner_data
+}
+
+function reflect_historical_performance() {
+  let history = ::reinforcement_history
+  let recent_performance = history.slice(-20)  # Last 20 reinforcements
+  
+  branch when recent_performance.length >= 10 {
+    let performance_metrics = calculate_performance_metrics(recent_performance)
+    
+    # Adapt schedule based on performance
+    branch when performance_metrics.success_rate < 0.3 {
+      # Poor performance - switch to continuous
+      set ::schedule_type = "continuous"
+      emit "schedule_adapted" with { reason: "poor_performance", new_schedule: "continuous" }
+    } else branch when performance_metrics.success_rate > 0.8 {
+      # Good performance - switch to variable ratio
+      set ::schedule_type = "variable_ratio"
+      set ::parameter = 5
+      emit "schedule_adapted" with { reason: "good_performance", new_schedule: "variable_ratio" }
+    }
+    
+    # Update schedule weights based on performance
+    update_schedule_weights_based_on_performance(performance_metrics)
+  }
+}
+
+function calculate_performance_metrics(recent_performance) {
+  let metrics = {
+    success_rate: 0.0,
+    average_latency: 0.0,
+    emotional_stability: 0.0,
+    reinforcement_effectiveness: 0.0
+  }
+  
+  let total_latency = 0.0
+  let successful_reinforcements = 0
+  let emotional_variance = 0.0
+  
+  loop for reinforcement in recent_performance {
+    total_latency = total_latency + (reinforcement.response_data.latency || 0)
+    
+    branch when reinforcement.effective {
+      increment successful_reinforcements
+    }
+    
+    # Calculate emotional variance
+    let emotional_sum = reinforcement.emotional_state.frustration + 
+                       reinforcement.emotional_state.engagement + 
+                       reinforcement.emotional_state.confidence + 
+                       reinforcement.emotional_state.stress
+    emotional_variance = emotional_variance + emotional_sum
+  }
+  
+  set metrics.success_rate = successful_reinforcements / recent_performance.length
+  set metrics.average_latency = total_latency / recent_performance.length
+  set metrics.emotional_stability = 1.0 - (emotional_variance / recent_performance.length)
+  set metrics.reinforcement_effectiveness = successful_reinforcements / recent_performance.length
+  
+  return metrics
+}
+
+function update_schedule_weights_based_on_performance(performance_metrics) {
+  let weights = ::schedule_weights
+  
+  branch when performance_metrics.success_rate < 0.3 {
+    # Poor performance - favor continuous and fixed ratio
+    set weights.continuous = 0.6
+    set weights.fixed_ratio = 0.3
+    set weights.variable_ratio = 0.1
+    set weights.fixed_interval = 0.0
+    set weights.variable_interval = 0.0
+  } else branch when performance_metrics.success_rate > 0.8 {
+    # Good performance - favor variable schedules
+    set weights.continuous = 0.1
+    set weights.fixed_ratio = 0.2
+    set weights.variable_ratio = 0.4
+    set weights.fixed_interval = 0.2
+    set weights.variable_interval = 0.1
+  } else {
+    # Moderate performance - balanced approach
+    set weights.continuous = 0.2
+    set weights.fixed_ratio = 0.3
+    set weights.variable_ratio = 0.3
+    set weights.fixed_interval = 0.1
+    set weights.variable_interval = 0.1
+  }
+  
+  set ::schedule_weights = weights
+  emit "schedule_weights_updated" with weights
+}
+
+function update_schedule_weights(new_weights) {
+  set ::schedule_weights = new_weights
+}
+
+function apply_weighted_schedule() {
+  let weights = ::schedule_weights
+  let total_weight = 0.0
+  
+  loop for schedule in ["continuous", "fixed_ratio", "variable_ratio", "fixed_interval", "variable_interval"] {
+    total_weight = total_weight + weights[schedule]
+  }
+  
+  branch when total_weight > 0 {
+    # Select schedule based on weights
+    let random_value = random() * total_weight
+    let cumulative_weight = 0.0
+    
+    loop for schedule in ["continuous", "fixed_ratio", "variable_ratio", "fixed_interval", "variable_interval"] {
+      cumulative_weight = cumulative_weight + weights[schedule]
+      branch when random_value <= cumulative_weight {
+        set ::schedule_type = schedule
+        emit "weighted_schedule_applied" with { selected_schedule: schedule, weights: weights }
+        break
+      }
+    }
+  }
+}
+
+function monitor_temporal_patterns() {
+  let history = ::reinforcement_history
+  let recent_reinforcements = history.slice(-10)
+  
+  branch when recent_reinforcements.length >= 5 {
+    let temporal_analysis = analyze_temporal_patterns(recent_reinforcements)
+    
+    branch when temporal_analysis.irregular_pattern {
+      # Irregular timing - adjust temporal sensitivity
+      set ::adaptive_config.temporal_sensitivity.time_window_ms = 
+          ::adaptive_config.temporal_sensitivity.time_window_ms * 1.2
+    } else branch when temporal_analysis.regular_pattern {
+      # Regular timing - optimize temporal sensitivity
+      set ::adaptive_config.temporal_sensitivity.time_window_ms = 
+          ::adaptive_config.temporal_sensitivity.time_window_ms * 0.9
+    }
+  }
+}
+
+function adapt_temporal_sensitivity() {
+  let current_window = ::adaptive_config.temporal_sensitivity.time_window_ms
+  
+  # Ensure window stays within reasonable bounds
+  branch when current_window < 1000 {
+    set ::adaptive_config.temporal_sensitivity.time_window_ms = 1000
+  } else branch when current_window > 10000 {
+    set ::adaptive_config.temporal_sensitivity.time_window_ms = 10000
+  }
+  
+  emit "temporal_sensitivity_adapted" with {
+    new_window: ::adaptive_config.temporal_sensitivity.time_window_ms,
+    adaptive_timing: ::adaptive_config.temporal_sensitivity.adaptive_timing
+  }
+}
+
+function analyze_temporal_patterns(recent_reinforcements) {
+  let analysis = {
+    irregular_pattern: false,
+    regular_pattern: false,
+    average_interval: 0.0
+  }
+  
+  let intervals = []
+  
+  loop for i from 1 to recent_reinforcements.length - 1 {
+    let interval = recent_reinforcements[i].timestamp - recent_reinforcements[i-1].timestamp
+    intervals.push(interval)
+  }
+  
+  branch when intervals.length > 0 {
+    let total_interval = 0.0
+    loop for interval in intervals {
+      total_interval = total_interval + interval
+    }
+    set analysis.average_interval = total_interval / intervals.length
+    
+    # Check for regularity (low variance)
+    let variance = calculate_interval_variance(intervals, analysis.average_interval)
+    
+    branch when variance < analysis.average_interval * 0.2 {
+      set analysis.regular_pattern = true
+    } else branch when variance > analysis.average_interval * 0.8 {
+      set analysis.irregular_pattern = true
+    }
+  }
+  
+  return analysis
+}
+
+function calculate_interval_variance(intervals, average) {
+  let variance = 0.0
+  
+  loop for interval in intervals {
+    let diff = interval - average
+    variance = variance + (diff * diff)
+  }
+  
+  return variance / intervals.length
+}
+
+# Global Improvement Functions
+function reflect_introspective_state() {
+  let introspection = ::introspection_state
+  
+  # Record decision context
+  introspection.decision_history.push({
+    timestamp: now(),
+    emotional_state: ::emotional_state,
+    behavior_success_rate: ::behavior_success_rate,
+    schedule_type: ::schedule_type,
+    reinforcements_this_session: ::reinforcements_this_session
+  })
+  
+  # Update goal alignment
+  set introspection.goal_alignment = {
+    primary_goal_progress: calculate_goal_progress(::goal_meta.primary_goal),
+    subgoal_alignment: calculate_subgoal_alignment(),
+    overall_alignment: calculate_overall_goal_alignment()
+  }
+  
+  # Check evolution readiness
+  branch when introspection.decision_history.length >= 50 {
+    set introspection.evolution_ready = true
+    emit "evolution.ready" with { readiness_score: calculate_evolution_readiness() }
+  }
+  
+  set introspection.last_review = now()
+}
+
+function calculate_goal_progress(goal) {
+  let progress = 0.0
+  
+  branch when goal == "optimize_learning_efficiency" {
+    set progress = ::behavior_success_rate
+  } else branch when goal == "maintain_engagement" {
+    set progress = ::emotional_state.engagement
+  } else branch when goal == "prevent_burnout" {
+    set progress = 1.0 - ::emotional_state.stress
+  } else branch when goal == "maximize_retention" {
+    set progress = calculate_retention_score()
+  }
+  
+  return progress
+}
+
+function calculate_subgoal_alignment() {
+  let alignment = {}
+  let subgoals = ::goal_meta.subgoals
+  
+  loop for subgoal in subgoals {
+    set alignment[subgoal] = calculate_goal_progress(subgoal)
+  }
+  
+  return alignment
+}
+
+function calculate_overall_goal_alignment() {
+  let alignment = calculate_subgoal_alignment()
+  let total_alignment = 0.0
+  let weights = ::goal_meta.goal_weights
+  
+  loop for goal in ["optimize_learning_efficiency", "maintain_engagement", "prevent_burnout", "maximize_retention"] {
+    let weight = weights[goal] || 0.25
+    let progress = alignment[goal] || 0.0
+    total_alignment = total_alignment + (progress * weight)
+  }
+  
+  return total_alignment
+}
+
+function calculate_retention_score() {
+  let history = ::reinforcement_history
+  let recent_reinforcements = history.slice(-20)
+  let retention_score = 0.0
+  
+  branch when recent_reinforcements.length >= 10 {
+    let successful_retention = 0
+    
+    loop for reinforcement in recent_reinforcements {
+      branch when reinforcement.effective and reinforcement.retention_improved {
+        increment successful_retention
+      }
+    }
+    
+    set retention_score = successful_retention / recent_reinforcements.length
+  }
+  
+  return retention_score
+}
+
+function update_goal_progress(reinforcement_decision) {
+  let goal_progress = ::goal_meta.goal_progress
+  
+  # Update primary goal progress
+  let primary_goal = ::goal_meta.primary_goal
+  branch when goal_progress[primary_goal] == null {
+    set goal_progress[primary_goal] = 0.0
+  }
+  
+  # Update based on reinforcement effectiveness
+  branch when reinforcement_decision.effective {
+    increment goal_progress[primary_goal] by 0.01
+  } else {
+    decrement goal_progress[primary_goal] by 0.005
+  }
+  
+  # Ensure progress stays in valid range
+  branch when goal_progress[primary_goal] < 0.0 {
+    set goal_progress[primary_goal] = 0.0
+  } else branch when goal_progress[primary_goal] > 1.0 {
+    set goal_progress[primary_goal] = 1.0
+  }
+  
+  emit "goal_progress_updated" with {
+    goal: primary_goal,
+    progress: goal_progress[primary_goal],
+    overall_alignment: calculate_overall_goal_alignment()
+  }
+}
+
+function check_evolution_readiness() {
+  let evolution_slots = ::evolution_slots
+  let readiness_score = calculate_evolution_readiness()
+  
+  branch when readiness_score > 0.8 {
+    set evolution_slots.schedule_optimization = "ready"
+    set evolution_slots.emotional_intelligence = "ready"
+    emit "evolution.slots.ready" with evolution_slots
+  }
+}
+
+function calculate_evolution_readiness() {
+  let readiness = 0.0
+  
+  # Check decision history length
+  let decision_count = ::introspection_state.decision_history.length
+  branch when decision_count >= 50 {
+    increment readiness by 0.3
+  }
+  
+  # Check goal alignment
+  let goal_alignment = calculate_overall_goal_alignment()
+  increment readiness by (goal_alignment * 0.4)
+  
+  # Check emotional stability
+  let emotional_stability = 1.0 - (::emotional_state.stress + ::emotional_state.frustration)
+  increment readiness by (emotional_stability * 0.3)
+  
+  return readiness
+}
+
+function handle_cli_command(cli_command) {
+  let response = {
+    command: cli_command,
+    timestamp: now(),
+    status: "processed"
+  }
+  
+  branch when cli_command == "status" {
+    set response.data = {
+      schedule_type: ::schedule_type,
+      emotional_state: ::emotional_state,
+      success_rate: ::behavior_success_rate,
+      reinforcements_this_session: ::reinforcements_this_session
+    }
+  } else branch when cli_command == "reset" {
+    reset_schedule_counters()
+    set response.data = { message: "Schedule counters reset" }
+  } else branch when cli_command == "evolution_status" {
+    set response.data = {
+      evolution_slots: ::evolution_slots,
+      readiness_score: calculate_evolution_readiness()
+    }
+  } else {
+    set response.status = "unknown_command"
+    set response.data = { error: "Unknown command" }
+  }
+  
+  emit "cli.response" with response
+}
+
+function get_dashboard_data() {
+  return {
+    schedule_type: ::schedule_type,
+    emotional_state: ::emotional_state,
+    behavior_success_rate: ::behavior_success_rate,
+    reinforcement_history: ::reinforcement_history.slice(-10),
+    goal_progress: ::goal_meta.goal_progress,
+    evolution_readiness: calculate_evolution_readiness(),
+    session_duration: now() - ::session_start,
+    reinforcements_this_session: ::reinforcements_this_session
+  }
+}
+
+function handle_api_request(api_request) {
+  let response = {
+    request: api_request,
+    timestamp: now(),
+    status: "success"
+  }
+  
+  branch when api_request.endpoint == "reinforcement_status" {
+    set response.data = get_dashboard_data()
+  } else branch when api_request.endpoint == "update_schedule" {
+    set ::schedule_type = api_request.schedule_type
+    set ::parameter = api_request.parameter
+    set response.data = { message: "Schedule updated" }
+  } else branch when api_request.endpoint == "evolution_trigger" {
+    trigger_evolution(api_request.evolution_type)
+    set response.data = { message: "Evolution triggered" }
+  } else {
+    set response.status = "error"
+    set response.data = { error: "Unknown endpoint" }
+  }
+  
+  return response
+}
+
+function prepare_module_split() {
+  let modules = {
+    schedule_analyzer: {
+      schedule_type: ::schedule_type,
+      schedule_config: ::schedule_config,
+      schedule_weights: ::schedule_weights
+    },
+    emotional_processor: {
+      emotional_state: ::emotional_state,
+      adaptive_config: ::adaptive_config
+    },
+    ethical_monitor: {
+      ethical_constraints: ::adaptive_config.ethical_constraints,
+      session_data: {
+        start: ::session_start,
+        reinforcements: ::reinforcements_this_session
+      }
+    }
+  }
+  
+  return {
+    modules: modules,
+    split_capable: ::modular_interface.split_capable,
+    external_hooks: ::modular_interface.external_hooks
+  }
+}
+
+function trigger_evolution(evolution_type) {
+  let evolution_slots = ::evolution_slots
+  
+  branch when evolution_type == "schedule_optimization" {
+    set evolution_slots.schedule_optimization = "evolving"
+    emit "evolution.schedule_optimization" with {
+      current_schedule: ::schedule_type,
+      optimization_target: "efficiency"
+    }
+  } else branch when evolution_type == "emotional_intelligence" {
+    set evolution_slots.emotional_intelligence = "evolving"
+    emit "evolution.emotional_intelligence" with {
+      current_emotional_state: ::emotional_state,
+      intelligence_target: "stability"
+    }
+  } else branch when evolution_type == "predictive_adaptation" {
+    set evolution_slots.predictive_adaptation = "evolving"
+    emit "evolution.predictive_adaptation" with {
+      prediction_model: "future_enhancement",
+      adaptation_target: "proactive"
+    }
+  } else branch when evolution_type == "multi_learner_support" {
+    set evolution_slots.multi_learner_support = "evolving"
+    emit "evolution.multi_learner_support" with {
+      current_learners: Object.keys(::learner_data).length,
+      support_target: "scalability"
+    }
+  }
+  
+  emit "evolution.triggered" with {
+    evolution_type: evolution_type,
+    evolution_slots: evolution_slots
+  }
+} 
+
+# Schedule adaptive retry based on ABA trial outcomes
+function schedule_adaptive_retry(retry_data) {
+  say "⏰ Scheduling adaptive retry..."
+  say "🎯 Task: " + retry_data.task
+  say "📊 Previous success: " + retry_data.previous_success
+  say "🔄 Retry count: " + retry_data.retry_count
+  
+  # Log ABA trial for retry scheduling
+  let trial_data = "antecedent: retry_scheduling; behavior: " + retry_data.task + "; consequence: adaptive_retry"
+  emit "azl.execute_command" with { command: "apply_trial \"" + trial_data + "\"" }
+  
+  # Determine retry strategy based on performance
+  let retry_strategy = determine_retry_strategy(retry_data)
+  
+  # Schedule the retry with adaptive parameters
+  let scheduled_retry = {
+    task: retry_data.task,
+    strategy: retry_strategy,
+    scheduled_time: now() + retry_data.delay,
+    retry_count: retry_data.retry_count + 1,
+    adaptive_parameters: retry_strategy.parameters
+  }
+  
+  # Store retry schedule
+  if !::retry_schedule {
+    set ::retry_schedule = {}
+  }
+  set ::retry_schedule[retry_data.task] = scheduled_retry
+  
+  say "⏰ Adaptive retry scheduled with ABA integration"
+}
+
+# Schedule prompt fading based on success rates
+function schedule_prompt_fade(fade_data) {
+  say "🌅 Scheduling prompt fade..."
+  say "🎯 Prompt: " + fade_data.prompt
+  say "📊 Current success rate: " + fade_data.success_rate
+  say "📈 Target independence: " + fade_data.target_independence
+  
+  # Use AZL's prompt_fade command
+  let fade_command = "prompt_fade \"" + fade_data.prompt + ": initial=" + fade_data.current_level + ", target=" + fade_data.target_level + ", steps=" + fade_data.steps + "\""
+  emit "azl.execute_command" with { command: fade_command }
+  
+  # Log ABA trial for prompt fading
+  let trial_data = "antecedent: prompt_fade_scheduling; behavior: " + fade_data.prompt + "; consequence: fade_scheduled"
+  emit "azl.execute_command" with { command: "apply_trial \"" + trial_data + "\"" }
+  
+  # Store fading progress
+  if !::fading_progress {
+    set ::fading_progress = {}
+  }
+  set ::fading_progress[fade_data.prompt] = {
+    current_level: fade_data.current_level,
+    target_level: fade_data.target_level,
+    steps: fade_data.steps,
+    current_step: 0,
+    success_rate: fade_data.success_rate
+  }
+  
+  say "🌅 Prompt fade scheduled with ABA integration"
+}
+
+# Schedule adaptive behavior based on learning patterns
+function schedule_adaptive_behavior(behavior_data) {
+  say "🧠 Scheduling adaptive behavior..."
+  say "🎯 Behavior: " + behavior_data.behavior
+  say "📊 Learning pattern: " + behavior_data.learning_pattern
+  say "🎭 Adaptation type: " + behavior_data.adaptation_type
+  
+  # Use task analysis for complex adaptive behaviors
+  let task_analysis_command = "task_analysis \"" + behavior_data.behavior + ": subtasks=8, dependencies=4, complexity=adaptive\""
+  emit "azl.execute_command" with { command: task_analysis_command }
+  
+  # Log ABA trial for adaptive scheduling
+  let trial_data = "antecedent: adaptive_scheduling; behavior: " + behavior_data.behavior + "; consequence: adaptive_scheduled"
+  emit "azl.execute_command" with { command: "apply_trial \"" + trial_data + "\"" }
+  
+  # Store adaptive decision
+  if !::adaptive_decisions {
+    set ::adaptive_decisions = []
+  }
+  store ::adaptive_decisions from ::adaptive_decisions.push({
+    behavior: behavior_data.behavior,
+    adaptation_type: behavior_data.adaptation_type,
+    learning_pattern: behavior_data.learning_pattern,
+    scheduled_time: now(),
+    expected_outcome: behavior_data.expected_outcome
+  })
+  
+  say "🧠 Adaptive behavior scheduled with ABA integration"
+}
+
+# Adapt schedule based on feedback
+function adapt_schedule_based_on_feedback(feedback_data) {
+  say "🔄 Adapting schedule based on feedback..."
+  say "📊 Feedback performance: " + feedback_data.performance
+  say "🎯 Task type: " + feedback_data.task_type
+  
+  # Update success rates
+  if !::success_rates {
+    set ::success_rates = {}
+  }
+  if !::success_rates[feedback_data.task_type] {
+    set ::success_rates[feedback_data.task_type] = []
+  }
+  
+  store ::success_rates[feedback_data.task_type] from ::success_rates[feedback_data.task_type].push({
+    performance: feedback_data.performance,
+    timestamp: now()
+  })
+  
+  # Use ABA reinforcement based on performance
+  if feedback_data.performance > 0.8 {
+    emit "azl.execute_command" with { command: "reinforce_behavior high_performance_scheduling" }
+    say "🎁 Reinforcing high-performance scheduling behavior"
+  } else if feedback_data.performance < 0.4 {
+    emit "azl.execute_command" with { command: "reinforce_behavior low_performance_scheduling" }
+    say "🎁 Reinforcing low-performance scheduling behavior (for learning)"
+  }
+  
+  # Analyze consequences of scheduling decisions
+  emit "azl.execute_command" with { command: "analyze_consequence" }
+  
+  say "🔄 Schedule adapted based on ABA feedback"
+}
+
+# Determine retry strategy based on ABA trial data
+function determine_retry_strategy(retry_data) {
+  let strategy = {
+    type: "standard",
+    delay: 1000,
+    parameters: {}
+  }
+  
+  if retry_data.previous_success < 0.3 {
+    strategy.type = "graduated_guidance"
+    strategy.delay = 2000
+    strategy.parameters = { guidance_level: "high", step_size: "small" }
+  } else if retry_data.previous_success < 0.6 {
+    strategy.type = "shaping"
+    strategy.delay = 1500
+    strategy.parameters = { shaping_steps: 3, reinforcement_frequency: "high" }
+  } else {
+    strategy.type = "prompt_fade"
+    strategy.delay = 500
+    strategy.parameters = { fade_rate: "moderate", independence_target: "high" }
+  }
+  
+  return strategy
+} 

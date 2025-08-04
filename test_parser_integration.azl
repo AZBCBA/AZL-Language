@@ -1,0 +1,44 @@
+module math {
+    pub const PI = 3.14159
+    pub fn sin(x) { 
+        say "sin function called with: " + x
+        return x * 0.5  // Simplified sin
+    }
+    fn internal_helper() { 
+        say "Internal helper function"
+    }
+}
+
+module quantum {
+    import "math" as m
+    
+    pub fn entangle(qubit1, qubit2) {
+        say "Entangling qubits: " + qubit1 + " and " + qubit2
+        return m::sin(qubit1) + m::sin(qubit2)
+    }
+    
+    export measure
+    fn measure(qubit) {
+        say "Measuring qubit: " + qubit
+        return qubit * 2
+    }
+}
+
+// Test the module system
+say "🧪 Testing Module Parser Integration"
+
+// Test basic module access
+say "Testing math::PI"
+say math::PI
+
+// Test function calls
+say "Testing math::sin"
+let result = math::sin(1.5)
+say "Result: " + result
+
+// Test quantum module
+say "Testing quantum::entangle"
+let entangled = quantum::entangle(0.5, 0.8)
+say "Entangled result: " + entangled
+
+say "✅ Module parser integration test completed!" 

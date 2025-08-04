@@ -1,0 +1,288 @@
+# AZME Model Selector
+# Decision logic for which model to use
+
+component ::azme.model_selector {
+  init {
+    set ::task_model_mappings = {
+      code_generation: "deepseek",
+      logic_reasoning: "mistral",
+      system_check: "azme_lang",
+      file_operations: "azme_lang",
+      voice_processing: "azme_lang",
+      web_scraping: "azme_lang",
+      quantum_operations: "azme_lang",
+      mathematical_reasoning: "mistral",
+      creative_writing: "deepseek",
+      data_analysis: "azme_lang",
+      security_operations: "azme_lang",
+      network_operations: "azme_lang"
+    }
+    set ::model_capabilities = {
+      deepseek: {
+        strengths: ["code_generation", "creative_writing", "technical_documentation"],
+        weaknesses: ["real_time_operations", "system_integration"],
+        resource_intensity: "high"
+      },
+      mistral: {
+        strengths: ["logic_reasoning", "mathematical_reasoning", "analytical_thinking"],
+        weaknesses: ["creative_tasks", "code_generation"],
+        resource_intensity: "medium"
+      },
+      azme_lang: {
+        strengths: ["system_operations", "real_time_processing", "quantum_operations"],
+        weaknesses: ["complex_reasoning", "creative_tasks"],
+        resource_intensity: "low"
+      }
+    }
+    set ::fallback_chain = ["azme_lang", "mistral", "deepseek"]
+    set ::selection_count = 0
+    set ::successful_selections = 0
+    set ::failed_selections = 0
+  }
+
+  behavior {
+    on choose_model_for {
+      set ::choice_request = $1
+      set ::intent = ::choice_request.intent
+      set ::intent_type = ::intent.type
+      
+      say "🤖 Model Selector: Choosing model for intent - " + ::intent_type
+      
+      set ::chosen_model = select_optimal_model(::intent_type)
+      
+      set ::selection_entry = {
+        id: "selection_" + ::selection_count,
+        intent_type: ::intent_type,
+        chosen_model: ::chosen_model,
+        timestamp: ::internal.now(),
+        success: true,
+        quantum_enhanced: true
+      }
+      
+      set ::selection_count = ::selection_count + 1
+      set ::successful_selections = ::successful_selections + 1
+      
+      emit azme.model_selection_complete with {
+        intent_type: ::intent_type,
+        chosen_model: ::chosen_model,
+        selection_entry: ::selection_entry
+      }
+    }
+
+    on select_optimal_model {
+      set ::selection_request = $1
+      set ::task_type = ::selection_request.task_type
+      
+      say "🎯 Selecting optimal model for task: " + ::task_type
+      
+      set ::chosen_model = fallback_model()
+      
+      # Check task-specific preferences
+      if ::task_type in ::task_model_mappings {
+        set ::preferred_model = ::task_model_mappings[::task_type]
+        set ::chosen_model = ::preferred_model
+      }
+      
+      # Check model capabilities
+      set ::capability_check = check_model_capabilities(::task_type, ::chosen_model)
+      if not ::capability_check.suitable {
+        set ::chosen_model = find_alternative_model(::task_type)
+      }
+      
+      # Check resource constraints
+      set ::resource_check = check_resource_constraints(::chosen_model)
+      if not ::resource_check.available {
+        set ::chosen_model = find_resource_efficient_model(::task_type)
+      }
+      
+      emit azme.optimal_model_selected with {
+        task_type: ::task_type,
+        chosen_model: ::chosen_model,
+        reason: "capability_and_resource_optimized"
+      }
+    }
+
+    on fallback_model {
+      set ::fallback_request = $1
+      
+      say "🔄 Using fallback model"
+      
+      set ::fallback_model = "azme_lang"
+      
+      emit azme.fallback_model_selected with {
+        fallback_model: ::fallback_model,
+        reason: "default_safe_choice"
+      }
+    }
+
+    on check_model_capabilities {
+      set ::capability_request = $1
+      set ::task_type = ::capability_request.task_type
+      set ::model_id = ::capability_request.model_id
+      
+      say "🔍 Checking model capabilities for " + ::model_id + " on " + ::task_type
+      
+      set ::capability_result = {
+        suitable: true,
+        confidence: 0.8,
+        reason: "capable",
+        quantum_enhanced: true
+      }
+      
+      if ::model_id in ::model_capabilities {
+        set ::capabilities = ::model_capabilities[::model_id]
+        
+        # Check if task is in model's strengths
+        if ::task_type in ::capabilities.strengths {
+          set ::capability_result.confidence = 0.95
+          set ::capability_result.reason = "strength_match"
+        } else if ::task_type in ::capabilities.weaknesses {
+          set ::capability_result.confidence = 0.6
+          set ::capability_result.reason = "weakness_area"
+        }
+      }
+      
+      emit azme.capability_check_complete with {
+        task_type: ::task_type,
+        model_id: ::model_id,
+        result: ::capability_result
+      }
+    }
+
+    on find_alternative_model {
+      set ::alternative_request = $1
+      set ::task_type = ::alternative_request.task_type
+      
+      say "🔄 Finding alternative model for task: " + ::task_type
+      
+      set ::alternative_model = "azme_lang"
+      set ::best_score = 0
+      
+      # Check all models for this task
+      loop for ::model_id in ::model_capabilities.keys() {
+        set ::capabilities = ::model_capabilities[::model_id]
+        set ::score = 0
+        
+        if ::task_type in ::capabilities.strengths {
+          set ::score = ::score + 2
+        } else if ::task_type in ::capabilities.weaknesses {
+          set ::score = ::score - 1
+        } else {
+          set ::score = ::score + 1
+        }
+        
+        if ::score > ::best_score {
+          set ::best_score = ::score
+          set ::alternative_model = ::model_id
+        }
+      }
+      
+      emit azme.alternative_model_found with {
+        task_type: ::task_type,
+        alternative_model: ::alternative_model,
+        score: ::best_score
+      }
+    }
+
+    on check_resource_constraints {
+      set ::resource_request = $1
+      set ::model_id = ::resource_request.model_id
+      
+      say "🔍 Checking resource constraints for " + ::model_id
+      
+      set ::resource_result = {
+        available: true,
+        reason: "sufficient_resources",
+        quantum_enhanced: true
+      }
+      
+      if ::model_id in ::model_capabilities {
+        set ::capabilities = ::model_capabilities[::model_id]
+        
+        if ::capabilities.resource_intensity == "high" {
+          set ::resource_result.available = false
+          set ::resource_result.reason = "high_resource_intensity"
+        } else if ::capabilities.resource_intensity == "medium" {
+          set ::resource_result.available = true
+          set ::resource_result.reason = "medium_resource_intensity"
+        } else {
+          set ::resource_result.available = true
+          set ::resource_result.reason = "low_resource_intensity"
+        }
+      }
+      
+      emit azme.resource_constraint_check_complete with {
+        model_id: ::model_id,
+        result: ::resource_result
+      }
+    }
+
+    on find_resource_efficient_model {
+      set ::efficiency_request = $1
+      set ::task_type = ::efficiency_request.task_type
+      
+      say "⚡ Finding resource-efficient model for task: " + ::task_type
+      
+      set ::efficient_model = "azme_lang"
+      
+      # Prioritize low resource intensity models
+      loop for ::model_id in ::model_capabilities.keys() {
+        set ::capabilities = ::model_capabilities[::model_id]
+        
+        if ::capabilities.resource_intensity == "low" {
+          set ::efficient_model = ::model_id
+        }
+      }
+      
+      emit azme.resource_efficient_model_found with {
+        task_type: ::task_type,
+        efficient_model: ::efficient_model,
+        reason: "low_resource_intensity"
+      }
+    }
+
+    on azme.model.performance_feedback {
+      set ::feedback_info = $1
+      set ::model_id = ::feedback_info.model_id
+      set ::task_type = ::feedback_info.task_type
+      set ::performance_score = ::feedback_info.performance_score
+      
+      say "📊 Processing performance feedback for " + ::model_id + " on " + ::task_type
+      
+      # Update task-model mappings based on performance
+      if ::performance_score > 0.8 {
+        # Model performed well, consider it for future similar tasks
+        set ::task_model_mappings[::task_type] = ::model_id
+      } else if ::performance_score < 0.5 {
+        # Model performed poorly, look for alternatives
+        set ::alternative = find_alternative_model(::task_type)
+        set ::task_model_mappings[::task_type] = ::alternative
+      }
+      
+      emit azme.model_performance_integrated with {
+        model_id: ::model_id,
+        task_type: ::task_type,
+        performance_score: ::performance_score,
+        mapping_updated: true
+      }
+    }
+
+    # Model selector monitoring
+    on azme.monitor_model_selector {
+      set ::monitor_request = $1
+      
+      set ::selector_metrics = {
+        total_selections: ::selection_count,
+        successful_selections: ::successful_selections,
+        failed_selections: ::failed_selections,
+        task_model_mappings_count: ::task_model_mappings.keys().length,
+        model_capabilities_count: ::model_capabilities.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.model_selector_metrics with {
+        metrics: ::selector_metrics
+      }
+    }
+  }
+} 

@@ -1,0 +1,30 @@
+// Simple AZL Test Script
+// This script tests basic AZL functionality
+
+let x = 42;
+let y = 10;
+let result = x + y;
+
+print("Basic arithmetic: " + x + " + " + y + " = " + result);
+
+// Test quantum operations
+quantum hadamard("q0");
+let quantum_result = quantum_measure("q0");
+print("Quantum measurement: " + quantum_result);
+
+// Test neural operations
+neural forward([0.1, 0.2, 0.3]);
+let neural_result = neural_train([0.1, 0.2, 0.3]);
+print("Neural training loss: " + neural_result);
+
+// Test memory operations
+memory_store("test_key", "test_value");
+let retrieved = memory_retrieve("test_key");
+print("Memory test: " + retrieved);
+
+// Test consciousness
+consciousness_set_awareness(0.8);
+let awareness = consciousness_get_awareness();
+print("Consciousness awareness: " + awareness);
+
+print("✅ All tests completed successfully!"); 

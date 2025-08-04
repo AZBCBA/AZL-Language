@@ -1,0 +1,72 @@
+// Test script for AZME Provider
+
+// Test the AZME provider
+function test_azme_provider() {
+    let base_url = "http://localhost:8080"
+    
+    print("🧪 Testing AZME Provider...")
+    
+    // Test 1: Health check
+    print("\n1. Testing health endpoint...")
+    try {
+        let response = http_get(base_url + "/health")
+        if (response.status == 200) {
+            print("✅ Health check passed")
+            let status = json_parse(response.body)
+            print("   Status: " + json_stringify(status))
+        } else {
+            print("❌ Health check failed: " + response.status)
+        }
+    } catch (error) {
+        print("❌ Health check error: " + error)
+    }
+    
+    // Test 2: Models endpoint
+    print("\n2. Testing models endpoint...")
+    try {
+        let response = http_get(base_url + "/v1/models")
+        if (response.status == 200) {
+            print("✅ Models endpoint passed")
+            let models = json_parse(response.body)
+            print("   Available models: " + models.data.length)
+            for (let i = 0; i < Math.min(3, models.data.length); i++) {
+                let model = models.data[i]
+                print("   - " + model.id)
+            }
+        } else {
+            print("❌ Models endpoint failed: " + response.status)
+        }
+    } catch (error) {
+        print("❌ Models endpoint error: " + error)
+    }
+    
+    // Test 3: Chat completion
+    print("\n3. Testing chat completion...")
+    try {
+        let payload = {
+            "model": "azme-llama3:latest",
+            "messages": [
+                {"role": "user", "content": "Analyze this system for performance"}
+            ],
+            "max_tokens": 200
+        }
+        
+        let response = http_post(base_url + "/v1/chat/completions", json_stringify(payload))
+        if (response.status == 200) {
+            print("✅ Chat completion passed")
+            let result = json_parse(response.body)
+            let content = result.choices[0].message.content
+            print("   Response: " + content.substring(0, 100) + "...")
+        } else {
+            print("❌ Chat completion failed: " + response.status)
+            print("   Response: " + response.body)
+        }
+    } catch (error) {
+        print("❌ Chat completion error: " + error)
+    }
+    
+    print("\n🎯 AZME Provider Test Complete!")
+}
+
+// Execute test function
+test_azme_provider() 

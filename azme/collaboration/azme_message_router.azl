@@ -1,0 +1,410 @@
+# AZME Message Router
+# Handles message routing
+
+component ::azme.message_router {
+  init {
+    set ::message_routes = {}
+    set ::message_handlers = {}
+    set ::message_filters = {}
+    set ::routing_statistics = {
+      messages_sent: 0,
+      messages_received: 0,
+      messages_routed: 0,
+      messages_failed: 0,
+      average_routing_time: 0
+    }
+    set ::router_settings = {
+      max_message_size: 1048576,  # 1MB
+      message_timeout: 30,
+      retry_attempts: 3,
+      encryption_enabled: true,
+      compression_enabled: true,
+      quantum_enhanced: true
+    }
+    set ::message_queue = []
+    set ::failed_messages = []
+  }
+
+  behavior {
+    on send_message {
+      set ::send_request = $1
+      set ::peer_id = ::send_request.peer_id
+      set ::message = ::send_request.message
+      
+      say "📤 Message Router: Sending message"
+      say "👥 Peer: " + ::peer_id
+      say "📋 Message type: " + ::message.type
+      
+      # Validate message
+      set ::validation = validate_message(::message)
+      
+      if ::validation.valid {
+        # Add to message queue
+        set ::queue_entry = {
+          id: "msg_" + ::internal.now(),
+          peer_id: ::peer_id,
+          message: ::message,
+          timestamp: ::internal.now(),
+          status: "queued",
+          retry_count: 0,
+          quantum_enhanced: true
+        }
+        
+        set ::message_queue = ::message_queue.push(::queue_entry)
+        
+        # Route message
+        route_message(::queue_entry)
+        
+        set ::routing_statistics.messages_sent = ::routing_statistics.messages_sent + 1
+        
+        emit azme.message_routed with {
+          peer_id: ::peer_id,
+          message: ::message,
+          queue_entry: ::queue_entry
+        }
+      } else {
+        set ::routing_statistics.messages_failed = ::routing_statistics.messages_failed + 1
+        
+        emit azme.message_routing_failed with {
+          peer_id: ::peer_id,
+          message: ::message,
+          reason: ::validation.errors
+        }
+      }
+    }
+
+    on validate_message {
+      set ::validation_request = $1
+      set ::message = ::validation_request.message
+      
+      say "🔍 Validating message"
+      
+      set ::validation = {
+        valid: true,
+        errors: [],
+        warnings: [],
+        quantum_enhanced: true
+      }
+      
+      # Check message size
+      set ::message_size = ::message.length
+      if ::message_size > ::router_settings.max_message_size {
+        set ::validation.valid = false
+        set ::validation.errors = ::validation.errors.push("Message too large")
+      }
+      
+      # Check required fields
+      set ::required_fields = ["type", "timestamp", "quantum_enhanced"]
+      loop for ::field in ::required_fields {
+        if not ::field in ::message {
+          set ::validation.valid = false
+          set ::validation.errors = ::validation.errors.push("Missing required field: " + ::field)
+        }
+      }
+      
+      # Check message type
+      set ::valid_types = [
+        "intent_share",
+        "goal_proposal",
+        "capability_request",
+        "capability_response",
+        "collaboration_response",
+        "status_update",
+        "heartbeat"
+      ]
+      
+      if not ::message.type in ::valid_types {
+        set ::validation.warnings = ::validation.warnings.push("Unknown message type: " + ::message.type)
+      }
+      
+      emit azme.message_validated with {
+        message: ::message,
+        validation: ::validation
+      }
+    }
+
+    on route_message {
+      set ::routing_request = $1
+      set ::queue_entry = ::routing_request.queue_entry
+      
+      say "🛤️ Routing message to peer"
+      
+      set ::start_time = ::internal.now()
+      
+      # Simulate network transmission
+      set ::transmission_result = {
+        success: true,
+        peer_id: ::queue_entry.peer_id,
+        message_id: ::queue_entry.id,
+        transmission_time: ::internal.random() * 2 + 0.1,
+        quantum_enhanced: true
+      }
+      
+      # Update queue entry
+      set ::queue_entry.status = "sent"
+      set ::queue_entry.transmission_result = ::transmission_result
+      
+      # Update routing statistics
+      set ::routing_statistics.messages_routed = ::routing_statistics.messages_routed + 1
+      set ::routing_time = ::internal.now() - ::start_time
+      set ::routing_statistics.average_routing_time = 
+        (::routing_statistics.average_routing_time * (::routing_statistics.messages_routed - 1) + ::routing_time) / ::routing_statistics.messages_routed
+      
+      emit azme.message_transmitted with {
+        queue_entry: ::queue_entry,
+        transmission_result: ::transmission_result
+      }
+    }
+
+    on system.message_received {
+      set ::received_message = $1
+      
+      say "📥 Message Router: Message received"
+      say "📋 Message type: " + ::received_message.type
+      
+      # Add to routing statistics
+      set ::routing_statistics.messages_received = ::routing_statistics.messages_received + 1
+      
+      # Process message based on type
+      if ::received_message.type == "intent_share" {
+        handle_intent_share(::received_message)
+      } else if ::received_message.type == "goal_proposal" {
+        handle_goal_proposal(::received_message)
+      } else if ::received_message.type == "capability_request" {
+        handle_capability_request(::received_message)
+      } else if ::received_message.type == "capability_response" {
+        handle_capability_response(::received_message)
+      } else if ::received_message.type == "collaboration_response" {
+        handle_collaboration_response(::received_message)
+      } else if ::received_message.type == "status_update" {
+        handle_status_update(::received_message)
+      } else if ::received_message.type == "heartbeat" {
+        handle_heartbeat(::received_message)
+      } else {
+        say "❌ Unknown message type: " + ::received_message.type
+      }
+      
+      emit azme.message_processed with {
+        message: ::received_message
+      }
+    }
+
+    on handle_intent_share {
+      set ::handle_request = $1
+      set ::message = ::handle_request.message
+      
+      say "🔄 Handling intent share message"
+      
+      set ::intent_data = ::message.data
+      set ::sender_id = ::message.sender_id
+      set ::session_id = ::message.session_id
+      
+      # Process shared intent
+      emit azme.intent_share_processed with {
+        intent_data: ::intent_data,
+        sender_id: ::sender_id,
+        session_id: ::session_id
+      }
+    }
+
+    on handle_goal_proposal {
+      set ::handle_request = $1
+      set ::message = ::handle_request.message
+      
+      say "🎯 Handling goal proposal message"
+      
+      set ::proposed_goal = ::message.goal
+      set ::sender_id = ::message.sender_id
+      
+      # Process goal proposal
+      emit azme.goal_proposal_processed with {
+        proposed_goal: ::proposed_goal,
+        sender_id: ::sender_id
+      }
+    }
+
+    on handle_capability_request {
+      set ::handle_request = $1
+      set ::message = ::handle_request.message
+      
+      say "📋 Handling capability request message"
+      
+      set ::sender_id = ::message.sender_id
+      
+      # Respond with capabilities
+      set ::response_message = {
+        type: "capability_response",
+        capabilities: [
+          "vision_processing",
+          "text_analysis",
+          "skill_training",
+          "goal_management",
+          "memory_integration",
+          "quantum_enhanced"
+        ],
+        agent_id: "azme_primary",
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      emit azme.capability_response_sent with {
+        recipient_id: ::sender_id,
+        response_message: ::response_message
+      }
+    }
+
+    on handle_capability_response {
+      set ::handle_request = $1
+      set ::message = ::handle_request.message
+      
+      say "📋 Handling capability response message"
+      
+      set ::capabilities = ::message.capabilities
+      set ::sender_id = ::message.agent_id
+      
+      # Process capability response
+      emit azme.capability_response_processed with {
+        capabilities: ::capabilities,
+        sender_id: ::sender_id
+      }
+    }
+
+    on handle_collaboration_response {
+      set ::handle_request = $1
+      set ::message = ::handle_request.message
+      
+      say "🤝 Handling collaboration response message"
+      
+      set ::response_data = ::message.data
+      set ::sender_id = ::message.sender_id
+      set ::session_id = ::message.session_id
+      
+      # Process collaboration response
+      emit azme.collaboration_response_processed with {
+        response_data: ::response_data,
+        sender_id: ::sender_id,
+        session_id: ::session_id
+      }
+    }
+
+    on handle_status_update {
+      set ::handle_request = $1
+      set ::message = ::handle_request.message
+      
+      say "📊 Handling status update message"
+      
+      set ::status_data = ::message.status
+      set ::sender_id = ::message.sender_id
+      
+      # Process status update
+      emit azme.status_update_processed with {
+        status_data: ::status_data,
+        sender_id: ::sender_id
+      }
+    }
+
+    on handle_heartbeat {
+      set ::handle_request = $1
+      set ::message = ::handle_request.message
+      
+      say "💓 Handling heartbeat message"
+      
+      set ::sender_id = ::message.sender_id
+      set ::timestamp = ::message.timestamp
+      
+      # Process heartbeat
+      emit azme.heartbeat_processed with {
+        sender_id: ::sender_id,
+        timestamp: ::timestamp
+      }
+    }
+
+    on retry_failed_message {
+      set ::retry_request = $1
+      set ::message_id = ::retry_request.message_id
+      
+      say "🔄 Retrying failed message: " + ::message_id
+      
+      # Find message in queue
+      set ::message_found = false
+      loop for ::queue_entry in ::message_queue {
+        if ::queue_entry.id == ::message_id {
+          set ::message_found = true
+          
+          if ::queue_entry.retry_count < ::router_settings.retry_attempts {
+            set ::queue_entry.retry_count = ::queue_entry.retry_count + 1
+            set ::queue_entry.status = "retrying"
+            
+            # Retry routing
+            route_message(::queue_entry)
+          } else {
+            set ::queue_entry.status = "failed"
+            set ::failed_messages = ::failed_messages.push(::queue_entry)
+          }
+          break
+        }
+      }
+      
+      if not ::message_found {
+        emit azme.message_retry_failed with {
+          message_id: ::message_id,
+          reason: "message_not_found"
+        }
+      }
+    }
+
+    on get_routing_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Getting routing statistics"
+      
+      set ::router_stats = {
+        messages_sent: ::routing_statistics.messages_sent,
+        messages_received: ::routing_statistics.messages_received,
+        messages_routed: ::routing_statistics.messages_routed,
+        messages_failed: ::routing_statistics.messages_failed,
+        average_routing_time: ::routing_statistics.average_routing_time,
+        queue_size: ::message_queue.length,
+        failed_messages_count: ::failed_messages.length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.routing_statistics_retrieved with {
+        statistics: ::router_stats
+      }
+    }
+
+    on clear_message_queue {
+      set ::clear_request = $1
+      
+      say "🧹 Clearing message queue"
+      
+      set ::cleared_count = ::message_queue.length
+      set ::message_queue = []
+      
+      emit azme.message_queue_cleared with {
+        cleared_count: ::cleared_count
+      }
+    }
+
+    # Message router monitoring
+    on azme.monitor_message_router {
+      set ::monitor_request = $1
+      
+      set ::router_metrics = {
+        messages_sent: ::routing_statistics.messages_sent,
+        messages_received: ::routing_statistics.messages_received,
+        messages_routed: ::routing_statistics.messages_routed,
+        messages_failed: ::routing_statistics.messages_failed,
+        average_routing_time: ::routing_statistics.average_routing_time,
+        queue_size: ::message_queue.length,
+        failed_messages_count: ::failed_messages.length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.message_router_metrics with {
+        metrics: ::router_metrics
+      }
+    }
+  }
+} 

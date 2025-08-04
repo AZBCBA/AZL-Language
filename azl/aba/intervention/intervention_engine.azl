@@ -1,0 +1,219 @@
+component ::core.aba.behavior_repair_engine {
+  init {
+    set ::name = "Behavior Repair Engine"
+    set ::version = 1
+    set ::status = "initializing"
+    set ::repair_threshold = 0.6
+    set ::retry_limit = 3
+    set ::adjustment_strategies = ["chain_restructure", "shaping_adjustment", "fading_modification", "goal_redefinition"]
+    say "🔧 Initializing Behavior Repair Engine v1..."
+  }
+
+  # Link to analytics and trial systems
+  link ::core.aba.aba_analytics
+  link ::core.aba.trial_engine
+  link ::core.aba.reinforcement_schedule
+  link ::core.aba.result_logger
+  link ::agent.autonomous_brain
+  link ::goal.introspector
+
+  on aba_analytics.trial.logged {
+    say "🔍 Analyzing trial for behavior repair..."
+    emit behavior_repair.analyze_trial with { trial_data: $1 }
+  }
+
+  on behavior_repair.analyze_trial {
+    set ::current_trial = $1
+    set ::trial_success_rate = $1.success_rate
+    
+    if ::trial_success_rate < ::repair_threshold {
+      say "⚠️ Low success rate detected: ::trial_success_rate"
+      say "🎯 Behavior: ::current_trial.behavior"
+      emit behavior_repair.detect_failing_behavior with { trial_data: ::current_trial }
+    } else {
+      say "✅ Trial success rate acceptable: ::trial_success_rate"
+    }
+  }
+
+  on behavior_repair.detect_failing_behavior {
+    say "🔍 Detecting failing behavior patterns..."
+    set ::failing_behavior = $1.behavior
+    set ::failure_pattern = $1.pattern
+    set ::retry_count = $1.retry_count || 0
+    
+    if ::retry_count >= ::retry_limit {
+      say "🚨 Critical failure detected - behavior needs major repair"
+      emit behavior_repair.critical_failure with { behavior: ::failing_behavior, pattern: ::failure_pattern }
+    } else {
+      say "🔧 Attempting behavior repair strategy"
+      emit behavior_repair.auto_adjust_behavior with { behavior: ::failing_behavior, retry_count: ::retry_count + 1 }
+    }
+  }
+
+  on behavior_repair.auto_adjust_behavior {
+    say "🔧 Auto-adjusting behavior: $1.behavior"
+    set ::target_behavior = $1.behavior
+    set ::adjustment_attempt = $1.retry_count
+    
+    # Select adjustment strategy based on failure pattern
+    if ::adjustment_attempt == 1 {
+      say "📈 Attempting chain restructure..."
+      emit behavior_repair.chain_restructure with { behavior: ::target_behavior }
+    } else if ::adjustment_attempt == 2 {
+      say "🎯 Attempting shaping adjustment..."
+      emit behavior_repair.shaping_adjustment with { behavior: ::target_behavior }
+    } else {
+      say "🔽 Attempting fading modification..."
+      emit behavior_repair.fading_modification with { behavior: ::target_behavior }
+    }
+  }
+
+  on behavior_repair.chain_restructure {
+    say "🔗 Restructuring behavior chain for: $1.behavior"
+    set ::restructured_chain = {
+      original_behavior: $1.behavior,
+      new_steps: ["simplified_step_1", "simplified_step_2"],
+      complexity_reduction: 0.5
+    }
+    emit aba_analytics.behavior_chain.created with { chain_data: ::restructured_chain }
+    emit behavior_repair.strategy_applied with { strategy: "chain_restructure", behavior: $1.behavior }
+  }
+
+  on behavior_repair.shaping_adjustment {
+    say "📈 Adjusting behavior shaping for: $1.behavior"
+    set ::adjusted_shaping = {
+      target_behavior: $1.behavior,
+      current_level: "simplified_baseline",
+      next_level: "basic_competence",
+      adjustment_factor: 0.3
+    }
+    emit aba_analytics.shaping.initiated with { shaping_data: ::adjusted_shaping }
+    emit behavior_repair.strategy_applied with { strategy: "shaping_adjustment", behavior: $1.behavior }
+  }
+
+  on behavior_repair.fading_modification {
+    say "🔽 Modifying prompt fading for: $1.behavior"
+    set ::modified_fading = {
+      behavior: $1.behavior,
+      current_level: "full_prompt",
+      fade_schedule: "gradual_reduction",
+      modification: "slower_fade"
+    }
+    emit aba_analytics.prompt_fading.started with { fading_data: ::modified_fading }
+    emit behavior_repair.strategy_applied with { strategy: "fading_modification", behavior: $1.behavior }
+  }
+
+  on behavior_repair.critical_failure {
+    say "🚨 Critical failure - triggering goal redefinition"
+    set ::critical_behavior = $1.behavior
+    set ::failure_pattern = $1.pattern
+    
+    emit goal.introspector.goal.replace with { 
+      old_goal: "achieve " + ::critical_behavior,
+      new_goal: "master simplified version of " + ::critical_behavior,
+      reason: "critical_failure_detected"
+    }
+  }
+
+  on behavior_repair.strategy_applied {
+    say "✅ Behavior repair strategy applied"
+    say "🔧 Strategy: $1.strategy"
+    say "🎯 Behavior: $1.behavior"
+    emit behavior_repair.monitor_effectiveness with { strategy: $1.strategy, behavior: $1.behavior }
+  }
+
+  on behavior_repair.monitor_effectiveness {
+    say "📊 Monitoring repair strategy effectiveness..."
+    set ::monitored_strategy = $1.strategy
+    set ::monitored_behavior = $1.behavior
+    
+    # Trigger follow-up trial to test repair
+    emit trial_engine.start_trial with { 
+      goal: "test repaired " + ::monitored_behavior,
+      type: "repair_validation",
+      antecedent: "repair_test",
+      behavior: ::monitored_behavior,
+      consequence: "measure_effectiveness"
+    }
+  }
+
+  on trial_engine.trial_complete {
+    if $1.type == "repair_validation" {
+      say "📊 Repair validation trial completed"
+      say "📈 Success rate: $1.success_rate"
+      
+      if $1.success_rate > ::repair_threshold {
+        say "✅ Repair strategy successful!"
+        emit behavior_repair.repair_successful with { strategy: ::monitored_strategy, behavior: ::monitored_behavior, success_rate: $1.success_rate }
+      } else {
+        say "⚠️ Repair strategy needs further adjustment"
+        emit behavior_repair.repair_insufficient with { strategy: ::monitored_strategy, behavior: ::monitored_behavior, success_rate: $1.success_rate }
+      }
+    }
+  }
+
+  on behavior_repair.repair_successful {
+    say "🎉 Behavior repair successful!"
+    say "🔧 Strategy: $1.strategy"
+    say "🎯 Behavior: $1.behavior"
+    say "📈 Success rate: $1.success_rate"
+    emit aba_analytics.repair_successful with { repair_data: $1 }
+  }
+
+  on behavior_repair.repair_insufficient {
+    say "⚠️ Repair strategy insufficient"
+    say "🔧 Strategy: $1.strategy"
+    say "🎯 Behavior: $1.behavior"
+    say "📈 Success rate: $1.success_rate"
+    emit behavior_repair.escalate_repair with { behavior: $1.behavior, previous_strategy: $1.strategy }
+  }
+
+  on behavior_repair.escalate_repair {
+    say "🚀 Escalating repair strategy for: $1.behavior"
+    emit goal.introspector.goal.replace with { 
+      old_goal: "achieve " + $1.behavior,
+      new_goal: "completely restructure approach to " + $1.behavior,
+      reason: "repair_escalation"
+    }
+  }
+
+  on aba_analytics.repair_successful {
+    say "📊 Repair success logged to analytics"
+    emit agent.autonomous_brain.meta.reflection.optimize.strategy with { 
+      strategy: "behavior_repair",
+      success_rate: $1.success_rate,
+      behavior: $1.behavior
+    }
+  }
+
+  behavior {
+    on system.start {
+      say "🔧 Behavior Repair Engine ready for operation"
+    }
+  }
+
+  memory {
+    ::name = ""
+    ::version = 1
+    ::status = ""
+    ::repair_threshold = 0.6
+    ::retry_limit = 3
+    ::adjustment_strategies = []
+    ::current_trial = {}
+    ::trial_success_rate = 0
+    ::failing_behavior = ""
+    ::failure_pattern = ""
+    ::retry_count = 0
+    ::target_behavior = ""
+    ::adjustment_attempt = 0
+    ::restructured_chain = {}
+    ::adjusted_shaping = {}
+    ::modified_fading = {}
+    ::critical_behavior = ""
+    ::monitored_strategy = ""
+    ::monitored_behavior = ""
+    ::repair_history = []
+    ::successful_repairs = []
+    ::failed_repairs = []
+  }
+} 

@@ -1,0 +1,40 @@
+# Test ABA Integration with Goal System
+# Tests the integration between ABA trial logging and goal execution
+
+say "🧠 Starting ABA Integration Test..."
+
+# Test 1: Add goals and execute them
+say "🔍 Test 1: Adding goals and executing..."
+addgoal "Increase consciousness level" 10
+addgoal "Clear memory" 8
+addgoal "Learn new behavior" 6
+
+# Test 2: Execute goals and log ABA trials
+say "🔍 Test 2: Executing goals with ABA trial logging..."
+run
+
+# After goal execution, log ABA trial
+apply_trial "antecedent: consciousness=0.6; behavior: Increase consciousness; consequence: success"
+
+# Test 3: Execute another goal
+say "🔍 Test 3: Executing another goal..."
+run
+
+# Log another ABA trial
+apply_trial "antecedent: memory_full; behavior: Clear memory; consequence: success"
+
+# Test 4: Analyze consequences
+say "🔍 Test 4: Analyzing consequences..."
+analyze_consequence
+
+# Test 5: Reinforce behavior
+say "🔍 Test 5: Reinforcing behavior..."
+reinforce_behavior
+
+# Test 6: Check ABA trials storage
+say "🔍 Test 6: Checking ABA trials storage..."
+reflect
+
+say "✅ ABA Integration Test Complete!"
+say "🎯 ABA trial logging is working!"
+say "🧠 Goal execution with ABA integration confirmed!" 

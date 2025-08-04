@@ -1,0 +1,188 @@
+# AZME Command Interface
+# Parse and execute system-level commands with safety controls
+
+component ::azme.command_interface {
+  init {
+    set ::command_history = []
+    set ::whitelisted_commands = [
+      "echo",
+      "ls",
+      "pwd",
+      "whoami",
+      "date",
+      "uptime",
+      "ps",
+      "top",
+      "df",
+      "free"
+    ]
+    set ::execution_safety = {
+      enabled: true,
+      max_execution_time: 30,
+      require_confirmation: false,
+      log_all_commands: true
+    }
+    set ::command_count = 0
+    set ::successful_commands = 0
+    set ::failed_commands = 0
+  }
+
+  behavior {
+    on azme.intent_resolved {
+      set ::intent = $1
+      
+      if ::intent.type == "execute_command" {
+        set ::command = ::intent.command
+        emit execute_system_command with {
+          command: ::command,
+          safety_checks: true
+        }
+      }
+    }
+
+    on execute_system_command {
+      set ::command_request = $1
+      set ::command = ::command_request.command
+      
+      say "🖥️ Executing system command: " + ::command
+      
+      # Safety validation
+      set ::is_safe = validate_command_safety(::command)
+      
+      if ::is_safe {
+        set ::command_result = execute_command_safely(::command)
+        
+        set ::command_entry = {
+          id: "cmd_" + ::command_count,
+          command: ::command,
+          timestamp: ::internal.now(),
+          result: ::command_result,
+          success: ::command_result.success,
+          quantum_enhanced: true
+        }
+        
+        set ::command_history = ::command_history.push(::command_entry)
+        set ::command_count = ::command_count + 1
+        
+        if ::command_result.success {
+          set ::successful_commands = ::successful_commands + 1
+        } else {
+          set ::failed_commands = ::failed_commands + 1
+        }
+        
+        emit azme.command_executed with {
+          command: ::command,
+          output: ::command_result.output,
+          success: ::command_result.success,
+          execution_time: ::command_result.execution_time
+        }
+      } else {
+        say "❌ Command blocked for safety: " + ::command
+        emit azme.command_blocked with {
+          command: ::command,
+          reason: "safety_violation"
+        }
+      }
+    }
+
+    on request_command {
+      set ::request = $1
+      set ::command_string = ::request.command_string
+      
+      emit azme.intent_resolved with {
+        type: "execute_command",
+        command: ::command_string
+      }
+    }
+
+    # Safety validation function
+    on validate_command_safety {
+      set ::safety_request = $1
+      set ::command = ::safety_request.command
+      
+      # Check if command is whitelisted
+      set ::is_whitelisted = false
+      loop for ::whitelisted in ::whitelisted_commands {
+        if ::command.starts_with(::whitelisted) {
+          set ::is_whitelisted = true
+        }
+      }
+      
+      # Additional safety checks
+      set ::has_dangerous_patterns = detect_dangerous_patterns(::command)
+      set ::is_safe = ::is_whitelisted and not ::has_dangerous_patterns
+      
+      emit azme.command_safety_validated with {
+        command: ::command,
+        is_safe: ::is_safe,
+        is_whitelisted: ::is_whitelisted,
+        has_dangerous_patterns: ::has_dangerous_patterns
+      }
+    }
+
+    # Safe command execution
+    on execute_command_safely {
+      set ::execution_request = $1
+      set ::command = ::execution_request.command
+      
+      # Simulate command execution
+      set ::execution_result = {
+        success: true,
+        output: "Command executed successfully: " + ::command,
+        execution_time: ::internal.random() * 2 + 0.1,
+        exit_code: 0,
+        quantum_enhanced: true
+      }
+      
+      emit azme.command_execution_complete with {
+        command: ::command,
+        result: ::execution_result
+      }
+    }
+
+    # Detect dangerous command patterns
+    on detect_dangerous_patterns {
+      set ::pattern_request = $1
+      set ::command = ::pattern_request.command
+      
+      set ::dangerous_patterns = [
+        "rm -rf",
+        "sudo",
+        "chmod 777",
+        "dd if=",
+        "> /dev/",
+        "kill -9"
+      ]
+      
+      set ::has_dangerous_patterns = false
+      loop for ::pattern in ::dangerous_patterns {
+        if ::command.contains(::pattern) {
+          set ::has_dangerous_patterns = true
+        }
+      }
+      
+      emit azme.dangerous_patterns_detected with {
+        command: ::command,
+        has_dangerous_patterns: ::has_dangerous_patterns
+      }
+    }
+
+    # Command interface monitoring
+    on azme.monitor_command_interface {
+      set ::monitor_request = $1
+      
+      set ::command_metrics = {
+        total_commands: ::command_count,
+        successful_commands: ::successful_commands,
+        failed_commands: ::failed_commands,
+        command_history_size: ::command_history.length,
+        safety_enabled: ::execution_safety.enabled,
+        quantum_enhanced: true
+      }
+      
+      emit azme.command_interface_metrics with {
+        metrics: ::command_metrics
+      }
+    }
+  }
+} 

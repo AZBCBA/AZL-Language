@@ -1,0 +1,366 @@
+# AZME Simulation Monitor
+# Tracks and compares real vs simulated outcomes
+
+component ::azme.simulation_monitor {
+  init {
+    set ::simulation_accuracy_map = {}
+    set ::simulation_feedback_log = []
+    set ::real_outcome_cache = {}
+    set ::prediction_vs_reality = {}
+    set ::monitor_settings = {
+      accuracy_threshold: 0.8,
+      feedback_retention_days: 30,
+      learning_rate: 0.1,
+      quantum_enhanced: true
+    }
+    set ::monitor_count = 0
+    set ::accuracy_updates = 0
+    set ::feedback_entries = 0
+  }
+
+  behavior {
+    on azme.task_completed {
+      set ::completion_info = $1
+      set ::actual_outcome = ::completion_info.actual_outcome
+      
+      say "📊 Simulation Monitor: Task completed"
+      say "📋 Task ID: " + ::actual_outcome.task_id
+      say "📈 Success: " + ::actual_outcome.success
+      
+      # Get predicted outcome from cache
+      set ::predicted_outcome = ::real_outcome_cache[::actual_outcome.task_id]
+      
+      if ::predicted_outcome {
+        set ::accuracy = compare_prediction_vs_reality(::predicted_outcome, ::actual_outcome)
+        update_simulation_accuracy(::actual_outcome.task_type, ::accuracy)
+        log_simulation_feedback(::actual_outcome.task_id, ::predicted_outcome, ::actual_outcome)
+      } else {
+        say "⚠️ No prediction found for task: " + ::actual_outcome.task_id
+      }
+    }
+
+    on compare_prediction_vs_reality {
+      set ::comparison_request = $1
+      set ::predicted = ::comparison_request.predicted
+      set ::actual = ::comparison_request.actual
+      
+      say "🔍 Comparing prediction vs reality"
+      
+      set ::accuracy_score = 0
+      set ::comparison_details = {
+        success_match: false,
+        duration_match: false,
+        cost_match: false,
+        score_match: false,
+        quantum_enhanced: true
+      }
+      
+      # Compare success
+      if ::predicted.success == ::actual.success {
+        set ::comparison_details.success_match = true
+        set ::accuracy_score = ::accuracy_score + 0.4
+      }
+      
+      # Compare duration (within 20% tolerance)
+      set ::duration_tolerance = ::predicted.duration * 0.2
+      if abs(::predicted.duration - ::actual.duration) <= ::duration_tolerance {
+        set ::comparison_details.duration_match = true
+        set ::accuracy_score = ::accuracy_score + 0.2
+      }
+      
+      # Compare cost (within 25% tolerance)
+      set ::cost_tolerance = ::predicted.cost * 0.25
+      if abs(::predicted.cost - ::actual.cost) <= ::cost_tolerance {
+        set ::comparison_details.cost_match = true
+        set ::accuracy_score = ::accuracy_score + 0.2
+      }
+      
+      # Compare score (within 15% tolerance)
+      set ::score_tolerance = ::predicted.score * 0.15
+      if abs(::predicted.score - ::actual.score) <= ::score_tolerance {
+        set ::comparison_details.score_match = true
+        set ::accuracy_score = ::accuracy_score + 0.2
+      }
+      
+      emit azme.prediction_comparison_complete with {
+        predicted: ::predicted,
+        actual: ::actual,
+        accuracy_score: ::accuracy_score,
+        comparison_details: ::comparison_details
+      }
+    }
+
+    on update_simulation_accuracy {
+      set ::accuracy_request = $1
+      set ::task_type = ::accuracy_request.task_type
+      set ::accuracy = ::accuracy_request.accuracy
+      
+      say "📈 Updating simulation accuracy for: " + ::task_type
+      
+      if not ::task_type in ::simulation_accuracy_map {
+        set ::simulation_accuracy_map[::task_type] = {
+          total_predictions: 0,
+          total_accuracy: 0,
+          average_accuracy: 0,
+          recent_accuracy: [],
+          quantum_enhanced: true
+        }
+      }
+      
+      set ::accuracy_data = ::simulation_accuracy_map[::task_type]
+      set ::accuracy_data.total_predictions = ::accuracy_data.total_predictions + 1
+      set ::accuracy_data.total_accuracy = ::accuracy_data.total_accuracy + ::accuracy
+      set ::accuracy_data.average_accuracy = ::accuracy_data.total_accuracy / ::accuracy_data.total_predictions
+      
+      # Add to recent accuracy (keep last 10)
+      set ::accuracy_data.recent_accuracy = ::accuracy_data.recent_accuracy.push(::accuracy)
+      if ::accuracy_data.recent_accuracy.length > 10 {
+        set ::accuracy_data.recent_accuracy = ::accuracy_data.recent_accuracy.slice(1)
+      }
+      
+      set ::simulation_accuracy_map[::task_type] = ::accuracy_data
+      set ::accuracy_updates = ::accuracy_updates + 1
+      
+      emit azme.simulation_accuracy_updated with {
+        task_type: ::task_type,
+        accuracy: ::accuracy,
+        average_accuracy: ::accuracy_data.average_accuracy,
+        total_predictions: ::accuracy_data.total_predictions
+      }
+    }
+
+    on log_simulation_feedback {
+      set ::feedback_request = $1
+      set ::task_id = ::feedback_request.task_id
+      set ::predicted = ::feedback_request.predicted
+      set ::actual = ::feedback_request.actual
+      
+      say "📝 Logging simulation feedback"
+      
+      set ::feedback_entry = {
+        task_id: ::task_id,
+        task_type: ::actual.task_type,
+        predicted_outcome: ::predicted,
+        actual_outcome: ::actual,
+        timestamp: ::internal.now(),
+        accuracy_score: compare_prediction_vs_reality(::predicted, ::actual),
+        quantum_enhanced: true
+      }
+      
+      set ::simulation_feedback_log = ::simulation_feedback_log.push(::feedback_entry)
+      set ::feedback_entries = ::feedback_entries + 1
+      
+      # Store in prediction vs reality map
+      set ::prediction_vs_reality[::task_id] = {
+        predicted: ::predicted,
+        actual: ::actual,
+        accuracy: ::feedback_entry.accuracy_score,
+        timestamp: ::feedback_entry.timestamp,
+        quantum_enhanced: true
+      }
+      
+      emit azme.simulation_feedback_logged with {
+        feedback_entry: ::feedback_entry
+      }
+    }
+
+    on azme.simulation_trace_recorded {
+      set ::trace_info = $1
+      set ::intent = ::trace_info.intent
+      set ::trace = ::trace_info.trace
+      set ::score = ::trace_info.score
+      set ::cost = ::trace_info.cost
+      
+      say "📊 Recording simulation trace for future comparison"
+      
+      # Store predicted outcome for future comparison
+      set ::predicted_outcome = {
+        task_id: ::intent.id,
+        task_type: ::intent.type,
+        success: ::score >= 0.7,
+        duration: ::cost,
+        cost: ::cost,
+        score: ::score,
+        trace: ::trace,
+        predicted_at: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      set ::real_outcome_cache[::intent.id] = ::predicted_outcome
+      
+      emit azme.simulation_trace_stored with {
+        intent: ::intent,
+        predicted_outcome: ::predicted_outcome
+      }
+    }
+
+    on get_accuracy_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Getting accuracy statistics"
+      
+      set ::accuracy_stats = {
+        total_task_types: ::simulation_accuracy_map.keys().length,
+        total_predictions: 0,
+        average_accuracy: 0,
+        accuracy_updates: ::accuracy_updates,
+        feedback_entries: ::feedback_entries,
+        quantum_enhanced: true
+      }
+      
+      # Calculate overall statistics
+      set ::total_predictions = 0
+      set ::total_accuracy = 0
+      
+      loop for ::task_type in ::simulation_accuracy_map.keys() {
+        set ::accuracy_data = ::simulation_accuracy_map[::task_type]
+        set ::total_predictions = ::total_predictions + ::accuracy_data.total_predictions
+        set ::total_accuracy = ::total_accuracy + ::accuracy_data.total_accuracy
+      }
+      
+      if ::total_predictions > 0 {
+        set ::accuracy_stats.total_predictions = ::total_predictions
+        set ::accuracy_stats.average_accuracy = ::total_accuracy / ::total_predictions
+      }
+      
+      emit azme.accuracy_statistics_retrieved with {
+        statistics: ::accuracy_stats
+      }
+    }
+
+    on get_task_type_accuracy {
+      set ::accuracy_request = $1
+      set ::task_type = ::accuracy_request.task_type
+      
+      say "📈 Getting accuracy for task type: " + ::task_type
+      
+      if ::task_type in ::simulation_accuracy_map {
+        set ::accuracy_data = ::simulation_accuracy_map[::task_type]
+        
+        emit azme.task_type_accuracy_retrieved with {
+          task_type: ::task_type,
+          accuracy_data: ::accuracy_data
+        }
+      } else {
+        emit azme.task_type_accuracy_not_found with {
+          task_type: ::task_type
+        }
+      }
+    }
+
+    on get_recent_feedback {
+      set ::feedback_request = $1
+      set ::limit = ::feedback_request.limit or 10
+      
+      say "📝 Getting recent feedback entries"
+      
+      set ::recent_feedback = []
+      set ::feedback_count = ::simulation_feedback_log.length
+      
+      if ::feedback_count > 0 {
+        set ::start_index = max(0, ::feedback_count - ::limit)
+        set ::recent_feedback = ::simulation_feedback_log.slice(::start_index)
+      }
+      
+      emit azme.recent_feedback_retrieved with {
+        recent_feedback: ::recent_feedback,
+        total_entries: ::feedback_count
+      }
+    }
+
+    on cleanup_old_feedback {
+      set ::cleanup_request = $1
+      
+      say "🧹 Cleaning up old feedback entries"
+      
+      set ::current_time = ::internal.now()
+      set ::retention_threshold = ::current_time - (::monitor_settings.feedback_retention_days * 86400)
+      set ::removed_entries = []
+      set ::updated_feedback = []
+      
+      loop for ::entry in ::simulation_feedback_log {
+        if ::entry.timestamp >= ::retention_threshold {
+          set ::updated_feedback = ::updated_feedback.push(::entry)
+        } else {
+          set ::removed_entries = ::removed_entries.push(::entry)
+        }
+      }
+      
+      set ::simulation_feedback_log = ::updated_feedback
+      
+      emit azme.old_feedback_cleaned with {
+        removed_entries: ::removed_entries,
+        total_removed: ::removed_entries.length,
+        remaining_entries: ::updated_feedback.length
+      }
+    }
+
+    on learn_from_feedback {
+      set ::learning_request = $1
+      
+      say "🧠 Learning from feedback to improve simulations"
+      
+      set ::learning_insights = {
+        accuracy_trends: {},
+        common_failures: [],
+        improvement_suggestions: [],
+        quantum_enhanced: true
+      }
+      
+      # Analyze accuracy trends
+      loop for ::task_type in ::simulation_accuracy_map.keys() {
+        set ::accuracy_data = ::simulation_accuracy_map[::task_type]
+        
+        if ::accuracy_data.recent_accuracy.length >= 5 {
+          set ::recent_avg = 0
+          loop for ::acc in ::accuracy_data.recent_accuracy {
+            set ::recent_avg = ::recent_avg + ::acc
+          }
+          set ::recent_avg = ::recent_avg / ::accuracy_data.recent_accuracy.length
+          
+          set ::learning_insights.accuracy_trends[::task_type] = {
+            overall_average: ::accuracy_data.average_accuracy,
+            recent_average: ::recent_avg,
+            trend: ::recent_avg > ::accuracy_data.average_accuracy ? "improving" : "declining"
+          }
+        }
+      }
+      
+      # Analyze common failures
+      set ::failure_counts = {}
+      loop for ::entry in ::simulation_feedback_log {
+        if ::entry.accuracy_score < ::monitor_settings.accuracy_threshold {
+          set ::task_type = ::entry.task_type
+          if not ::task_type in ::failure_counts {
+            set ::failure_counts[::task_type] = 0
+          }
+          set ::failure_counts[::task_type] = ::failure_counts[::task_type] + 1
+        }
+      }
+      
+      set ::learning_insights.common_failures = ::failure_counts
+      
+      emit azme.learning_insights_generated with {
+        insights: ::learning_insights
+      }
+    }
+
+    # Simulation monitor monitoring
+    on azme.monitor_simulation_monitor {
+      set ::monitor_request = $1
+      
+      set ::monitor_metrics = {
+        accuracy_updates: ::accuracy_updates,
+        feedback_entries: ::feedback_entries,
+        accuracy_map_size: ::simulation_accuracy_map.keys().length,
+        feedback_log_size: ::simulation_feedback_log.length,
+        prediction_cache_size: ::real_outcome_cache.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.simulation_monitor_metrics with {
+        metrics: ::monitor_metrics
+      }
+    }
+  }
+} 

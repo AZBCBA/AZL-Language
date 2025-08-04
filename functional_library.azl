@@ -1,0 +1,203 @@
+// Advanced Functional Programming Library for AZL
+
+// Basic higher-order functions
+fn map(array, transform) {
+    let result = [];
+    let length = array.length(array);
+    let i = 0;
+
+    while (i < length) {
+        let element = array[i];
+        let transformed = transform(element);
+        result = array.push(result, transformed);
+        i = i + 1;
+    }
+
+    return result;
+}
+
+fn filter(array, predicate) {
+    let result = [];
+    let length = array.length(array);
+    let i = 0;
+
+    while (i < length) {
+        let element = array[i];
+        let should_include = predicate(element);
+
+        if (should_include) {
+            result = array.push(result, element);
+        }
+
+        i = i + 1;
+    }
+
+    return result;
+}
+
+fn reduce(array, reducer, initial_value) {
+    let accumulator = initial_value;
+    let length = array.length(array);
+    let i = 0;
+
+    while (i < length) {
+        let element = array[i];
+        accumulator = reducer(accumulator, element);
+        i = i + 1;
+    }
+
+    return accumulator;
+}
+
+// Utility functions
+fn is_even(n) {
+    return (n / 2) * 2 == n;
+}
+
+fn is_odd(n) {
+    return (n / 2) * 2 != n;
+}
+
+// Function composition
+fn compose(f, g) {
+    return fn(x) {
+        let temp = g(x);
+        return f(temp);
+    };
+}
+
+// Function piping (reverse composition)
+fn pipe(f, g) {
+    return fn(x) {
+        let temp = f(x);
+        return g(temp);
+    };
+}
+
+// Partial application - apply first argument to a function
+fn partial(func, arg1) {
+    return fn(arg2) {
+        return func(arg1, arg2);
+    };
+}
+
+// Currying - convert multi-parameter function to chain of single-parameter functions
+fn curry(func) {
+    return fn(arg1) {
+        return fn(arg2) {
+            return func(arg1, arg2);
+        };
+    };
+}
+
+// Advanced currying for functions with more than 2 parameters
+fn curry3(func) {
+    return fn(arg1) {
+        return fn(arg2) {
+            return fn(arg3) {
+                return func(arg1, arg2, arg3);
+            };
+        };
+    };
+}
+
+// Uncurrying - convert curried function back to multi-parameter
+fn uncurry(curried_func) {
+    return fn(arg1, arg2) {
+        return curried_func(arg1)(arg2);
+    };
+}
+
+// Flip - swap the order of first two parameters
+fn flip(func) {
+    return fn(arg1, arg2) {
+        return func(arg2, arg1);
+    };
+}
+
+// Identity function
+fn identity(x) {
+    return x;
+}
+
+// Constant function
+fn constant(value) {
+    return fn(x) {
+        return value;
+    };
+}
+
+// Function application
+fn apply(func, arg) {
+    return func(arg);
+}
+
+// Function composition with multiple functions
+fn compose_many(functions) {
+    return reduce(functions, compose, identity);
+}
+
+// Pipe with multiple functions
+fn pipe_many(functions) {
+    return reduce(functions, pipe, identity);
+}
+
+// Test the functional programming features
+say "=== Functional Programming Library Tests ===";
+
+let numbers = [1, 2, 3, 4, 5];
+say "Original array:";
+say numbers;
+
+// Test map
+say "\n--- Map Test ---";
+let doubled = map(numbers, double);
+say "Doubled:";
+say doubled;
+
+let squared = map(numbers, square);
+say "Squared:";
+say squared;
+
+// Test filter
+say "\n--- Filter Test ---";
+let evens = filter(numbers, is_even);
+say "Even numbers:";
+say evens;
+
+let odds = filter(numbers, is_odd);
+say "Odd numbers:";
+say odds;
+
+// Test reduce
+say "\n--- Reduce Test ---";
+let sum = reduce(numbers, add, 0);
+say "Sum:";
+say sum;
+
+let product = reduce(numbers, multiply, 1);
+say "Product:";
+say product;
+
+// Test compose
+say "\n--- Compose Test ---";
+let double_then_square = compose(square, double);
+let composed_result = map(numbers, double_then_square);
+say "Double then square:";
+say composed_result;
+
+// Test pipe
+say "\n--- Pipe Test ---";
+let square_then_double = pipe(square, double);
+let piped_result = map(numbers, square_then_double);
+say "Square then double:";
+say piped_result;
+
+// Test curry
+say "\n--- Curry Test ---";
+let add_five = curry(add, 5);
+let curried_result = map(numbers, add_five);
+say "Add 5 to each:";
+say curried_result;
+
+say "\n=== All Tests Complete ==="; 

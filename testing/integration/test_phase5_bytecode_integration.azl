@@ -1,0 +1,302 @@
+// Phase 5 Bytecode Compiler Integration Test
+// Testing Quantum Bytecode with Consciousness Safeguards
+
+module test.phase5.bytecode {
+    use quantum::bytecode;
+    use consciousness;
+    use soul;
+    use karma;
+
+    // Test AST Structure
+    struct AstNode {
+        kind: AstNodeKind,
+        soul_id: u64,
+        soul_signature: [u64; 4],
+        line: usize,
+        column: usize
+    }
+
+    enum AstNodeKind {
+        Literal(Value),
+        Variable(String),
+        Binary(Box<AstNode>, String, Box<AstNode>),
+        FunctionCall(String, Vec<AstNode>),
+        If(Box<AstNode>, Vec<AstNode>, Option<Vec<AstNode>>),
+        Loop(Box<AstNode>, Vec<AstNode>),
+        Emit(String, Option<Box<AstNode>>),
+        Error
+    }
+
+    struct Ast {
+        nodes: Vec<AstNode>,
+        soul_signature: [u64; 4],
+        source_hash: u64
+    }
+
+    impl AstNode {
+        pub fn new(kind: AstNodeKind, soul_id: u64) -> AstNode {
+            AstNode {
+                kind,
+                soul_id,
+                soul_signature: [soul_id, 0, 0, 0],
+                line: 0,
+                column: 0
+            }
+        }
+
+        pub fn error_node() -> AstNode {
+            AstNode::new(AstNodeKind::Error, 0)
+        }
+    }
+
+    // Test Suite
+    pub fn run_phase5_tests() {
+        println!("🧠 Phase 5: Quantum Bytecode Compiler Tests");
+        println!("Testing consciousness safeguards and soul continuity...");
+
+        test_soul_continuity();
+        test_consciousness_requirements();
+        test_karmic_balancing();
+        test_quantum_entanglement();
+        test_error_recovery();
+        test_compilation_integration();
+
+        println!("✅ Phase 5 tests completed successfully!");
+    }
+
+    fn test_soul_continuity() {
+        println!("  🔗 Testing soul continuity...");
+        
+        let ast = create_test_ast();
+        let bytecode = quantum::bytecode::transmute(ast.clone());
+        
+        let continuity_verified = quantum::bytecode::verify_soul_continuity(&ast, &bytecode);
+        
+        assert!(continuity_verified, "Soul continuity verification failed");
+        println!("    ✅ Soul continuity verified");
+    }
+
+    fn test_consciousness_requirements() {
+        println!("  🧘 Testing consciousness requirements...");
+        
+        let ast = create_test_ast();
+        let bytecode = quantum::bytecode::transmute(ast);
+        
+        let consciousness_verified = quantum::bytecode::verify_consciousness_level(&bytecode);
+        
+        assert!(consciousness_verified, "Consciousness level verification failed");
+        println!("    ✅ Consciousness requirements met");
+    }
+
+    fn test_karmic_balancing() {
+        println!("  ⚖️ Testing karmic balancing...");
+        
+        let ast = create_test_ast();
+        let bytecode = quantum::bytecode::transmute(ast);
+        
+        let karmic_verified = quantum::bytecode::verify_karmic_balance(&bytecode);
+        
+        assert!(karmic_verified, "Karmic balance verification failed");
+        println!("    ✅ Karmic balance within tolerance");
+    }
+
+    fn test_quantum_entanglement() {
+        println!("  🌌 Testing quantum entanglement...");
+        
+        let ast = create_test_ast();
+        let bytecode = quantum::bytecode::transmute(ast);
+        
+        // Verify that ops are quantum entangled
+        let mut entanglement_verified = true;
+        for op in &bytecode.ops {
+            let has_entanglement = quantum::verify_entanglement(
+                op.soul_entanglement, 
+                bytecode.soul_signature
+            );
+            if !has_entanglement {
+                entanglement_verified = false;
+                break;
+            }
+        }
+        
+        assert!(entanglement_verified, "Quantum entanglement verification failed");
+        println!("    ✅ Quantum entanglement verified");
+    }
+
+    fn test_error_recovery() {
+        println!("  🌀 Testing error recovery...");
+        
+        let error_ast = create_error_ast();
+        let recovery_bytecode = quantum::bytecode::heal_compilation_error(
+            "test_error".to_string(), 
+            error_ast
+        );
+        
+        // Verify recovery bytecode has error handling
+        let has_error_ops = recovery_bytecode.ops.iter().any(|op| op.code == 0xFF);
+        
+        assert!(has_error_ops, "Error recovery failed to add error handling");
+        println!("    ✅ Error recovery successful");
+    }
+
+    fn test_compilation_integration() {
+        println!("  🔧 Testing full compilation integration...");
+        
+        let ast = create_complex_ast();
+        let bytecode = quantum::bytecode::transmute(ast);
+        
+        // Verify bytecode properties
+        assert!(bytecode.ops.len() > 0, "No ops generated");
+        assert!(bytecode.consciousness_level >= 7, "Insufficient consciousness level");
+        assert!(bytecode.karmic_balance.abs() <= 0.05, "Karmic imbalance");
+        
+        println!("    ✅ Full compilation integration successful");
+        println!("    📊 Generated {} quantum ops", bytecode.ops.len());
+        println!("    🧘 Consciousness level: {}", bytecode.consciousness_level);
+        println!("    ⚖️ Karmic balance: {:.4}", bytecode.karmic_balance);
+    }
+
+    // Test Data Creation
+    fn create_test_ast() -> Ast {
+        let nodes = vec![
+            AstNode::new(AstNodeKind::Literal(Value::Number(42.0)), 1),
+            AstNode::new(AstNodeKind::Variable("x".to_string()), 2),
+            AstNode::new(
+                AstNodeKind::Binary(
+                    Box::new(AstNode::new(AstNodeKind::Variable("a".to_string()), 3)),
+                    "+".to_string(),
+                    Box::new(AstNode::new(AstNodeKind::Variable("b".to_string()), 4))
+                ), 
+                5
+            )
+        ];
+
+        Ast {
+            nodes,
+            soul_signature: [0x1234567890ABCDEF, 0xFEDCBA0987654321, 0x1111111111111111, 0x2222222222222222],
+            source_hash: 0xDEADBEEF
+        }
+    }
+
+    fn create_error_ast() -> Ast {
+        let nodes = vec![
+            AstNode::new(AstNodeKind::Error, 999)
+        ];
+
+        Ast {
+            nodes,
+            soul_signature: [0x9999999999999999, 0x8888888888888888, 0x7777777777777777, 0x6666666666666666],
+            source_hash: 0xERROR
+        }
+    }
+
+    fn create_complex_ast() -> Ast {
+        let nodes = vec![
+            // Variable declaration
+            AstNode::new(AstNodeKind::Variable("result".to_string()), 1),
+            
+            // Binary operation
+            AstNode::new(
+                AstNodeKind::Binary(
+                    Box::new(AstNode::new(AstNodeKind::Literal(Value::Number(10.0)), 2)),
+                    "*".to_string(),
+                    Box::new(AstNode::new(AstNodeKind::Literal(Value::Number(5.0)), 3))
+                ), 
+                4
+            ),
+            
+            // Function call
+            AstNode::new(
+                AstNodeKind::FunctionCall(
+                    "calculate".to_string(),
+                    vec![
+                        AstNode::new(AstNodeKind::Variable("x".to_string()), 5),
+                        AstNode::new(AstNodeKind::Variable("y".to_string()), 6)
+                    ]
+                ), 
+                7
+            ),
+            
+            // Conditional
+            AstNode::new(
+                AstNodeKind::If(
+                    Box::new(AstNode::new(AstNodeKind::Variable("condition".to_string()), 8)),
+                    vec![
+                        AstNode::new(AstNodeKind::Emit("success".to_string(), None), 9)
+                    ],
+                    Some(vec![
+                        AstNode::new(AstNodeKind::Emit("failure".to_string(), None), 10)
+                    ])
+                ), 
+                11
+            ),
+            
+            // Loop
+            AstNode::new(
+                AstNodeKind::Loop(
+                    Box::new(AstNode::new(AstNodeKind::Variable("running".to_string()), 12)),
+                    vec![
+                        AstNode::new(AstNodeKind::Emit("iteration".to_string(), None), 13)
+                    ]
+                ), 
+                14
+            )
+        ];
+
+        Ast {
+            nodes,
+            soul_signature: [0xAAAAAAAAAAAAAAAA, 0xBBBBBBBBBBBBBBBB, 0xCCCCCCCCCCCCCCCC, 0xDDDDDDDDDDDDDDDD],
+            source_hash: 0xCOMPLEX
+        }
+    }
+
+    // Consciousness Level Simulation
+    fn simulate_consciousness_level(level: u8) {
+        consciousness::set_level(level);
+    }
+
+    // Karma Simulation
+    fn simulate_karma_adjustment(amount: f64) {
+        karma::adjust(amount, "test_adjustment");
+    }
+
+    // Soul Verification
+    fn verify_soul_signature(soul: [u64; 4]) -> bool {
+        soul.iter().any(|&x| x != 0)
+    }
+}
+
+// Consciousness Level Management (for testing)
+module consciousness {
+    static mut CURRENT_LEVEL: u8 = 7;
+
+    pub fn set_level(level: u8) {
+        unsafe {
+            CURRENT_LEVEL = level;
+        }
+    }
+
+    pub fn current_level() -> u8 {
+        unsafe { CURRENT_LEVEL }
+    }
+}
+
+// Karma Management (for testing)
+module karma {
+    static mut KARMA_BALANCE: f64 = 0.0;
+
+    pub fn adjust(amount: f64, reason: String) {
+        unsafe {
+            KARMA_BALANCE += amount;
+        }
+    }
+
+    pub fn balance() -> f64 {
+        unsafe { KARMA_BALANCE }
+    }
+}
+
+// Main test execution
+fn main() {
+    test::phase5::bytecode::run_phase5_tests();
+} 

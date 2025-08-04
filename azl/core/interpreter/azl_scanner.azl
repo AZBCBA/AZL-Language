@@ -1,0 +1,434 @@
+// AZL v2 Scanner - First Portable Component
+// Pure parsing logic with no OS dependencies
+// Preserves all 26 TokenType variants and consciousness features
+
+set scanner_state = {
+    source: [],
+    tokens: [],
+    start: 0,
+    current: 0,
+    line: 1,
+    column: 1
+}
+
+// TokenType enum with all 26 variants
+set token_types = {
+    // Keywords
+    let: "Let",
+    fn: "Fn", 
+    if: "If",
+    else: "Else",
+    loop: "Loop",
+    for: "For",
+    in: "In",
+    on: "On",
+    emit: "Emit",
+    say: "Say",
+    return: "Return",
+    set: "Set",
+    break: "Break",
+    do: "Do",
+    with: "With",
+    class: "Class",
+    method: "Method",
+    try: "Try",
+    catch: "Catch",
+    throw: "Throw",
+    new: "New",
+    this: "This",
+    super: "Super",
+    component: "Component",
+    trait: "Trait",
+    implements: "Implements",
+    type: "Type",
+    generic: "Generic",
+    union: "Union",
+    intersection: "Intersection",
+    import: "Import",
+    module: "Module",
+    export: "Export",
+    as: "As",
+    pub: "Pub",
+    true: "True",
+    false: "False",
+    null: "Null",
+    
+    // Literals
+    number: "Number",
+    string: "String", 
+    identifier: "Identifier",
+    
+    // Operators
+    plus: "Plus",
+    minus: "Minus",
+    star: "Star",
+    slash: "Slash",
+    equal: "Equal",
+    equal_equal: "EqualEqual",
+    bang: "Bang",
+    bang_equal: "BangEqual",
+    less: "Less",
+    less_equal: "LessEqual",
+    greater: "Greater",
+    greater_equal: "GreaterEqual",
+    and: "And",
+    or: "Or",
+    pipe: "Pipe",
+    
+    // Delimiters
+    left_paren: "LeftParen",
+    right_paren: "RightParen",
+    left_brace: "LeftBrace",
+    right_brace: "RightBrace",
+    left_bracket: "LeftBracket",
+    right_bracket: "RightBracket",
+    semicolon: "Semicolon",
+    comma: "Comma",
+    dot: "Dot",
+    colon: "Colon",
+    double_colon: "DoubleColon",
+    arrow: "Arrow",
+    
+    // Special
+    eof: "Eof"
+}
+
+// Token structure
+set create_token = (token_type, lexeme, line, column) => {
+    token_type: token_type,
+    lexeme: lexeme,
+    line: line,
+    column: column
+}
+
+// Scanner initialization
+set init_scanner = (source) => {
+    source: source,
+    tokens: [],
+    start: 0,
+    current: 0,
+    line: 1,
+    column: 1
+}
+
+// Core scanning functions
+set scan_tokens = (scanner) => {
+    set tokens = []
+    
+    loop !is_at_end(scanner) {
+        set scanner.start = scanner.current
+        set result = scan_token(scanner)
+        
+        if result.error {
+            return { error: result.error }
+        }
+    }
+    
+    // Add EOF token
+    set eof_token = create_token(token_types.eof, "", scanner.line, scanner.column)
+    set tokens = append(tokens, eof_token)
+    
+    return { tokens: tokens }
+}
+
+set scan_token = (scanner) => {
+    set c = advance(scanner)
+    
+    match c {
+        '(' => add_token(scanner, token_types.left_paren),
+        ')' => add_token(scanner, token_types.right_paren),
+        '{' => add_token(scanner, token_types.left_brace),
+        '}' => add_token(scanner, token_types.right_brace),
+        '[' => add_token(scanner, token_types.left_bracket),
+        ']' => add_token(scanner, token_types.right_bracket),
+        ',' => add_token(scanner, token_types.comma),
+        '.' => add_token(scanner, token_types.dot),
+        ':' => {
+            if match_char(scanner, ':') {
+                add_token(scanner, token_types.double_colon)
+            } else {
+                add_token(scanner, token_types.colon)
+            }
+        },
+        '-' => {
+            if match_char(scanner, '>') {
+                add_token(scanner, token_types.arrow)
+            } else {
+                add_token(scanner, token_types.minus)
+            }
+        },
+        '+' => add_token(scanner, token_types.plus),
+        '*' => add_token(scanner, token_types.star),
+        '/' => add_token(scanner, token_types.slash),
+        '=' => {
+            if match_char(scanner, '=') {
+                add_token(scanner, token_types.equal_equal)
+            } else {
+                add_token(scanner, token_types.equal)
+            }
+        },
+        '!' => {
+            if match_char(scanner, '=') {
+                add_token(scanner, token_types.bang_equal)
+            } else {
+                add_token(scanner, token_types.bang)
+            }
+        },
+        '<' => {
+            if match_char(scanner, '=') {
+                add_token(scanner, token_types.less_equal)
+            } else {
+                add_token(scanner, token_types.less)
+            }
+        },
+        '>' => {
+            if match_char(scanner, '=') {
+                add_token(scanner, token_types.greater_equal)
+            } else {
+                add_token(scanner, token_types.greater)
+            }
+        },
+        '&' => {
+            if match_char(scanner, '&') {
+                add_token(scanner, token_types.and)
+            } else {
+                return { error: "Unexpected character: " + c }
+            }
+        },
+        '|' => {
+            if match_char(scanner, '|') {
+                add_token(scanner, token_types.or)
+            } else {
+                add_token(scanner, token_types.pipe)
+            }
+        },
+        ';' => add_token(scanner, token_types.semicolon),
+        ' ' | '\r' | '\t' => {
+            // Ignore whitespace
+        },
+        '\n' => {
+            scanner.line = scanner.line + 1
+            scanner.column = 0
+        },
+        '"' => string(scanner),
+        _ => {
+            if is_digit(c) {
+                number(scanner)
+            } else if is_alpha(c) {
+                identifier(scanner)
+            } else {
+                return { error: "Unexpected character: " + c }
+            }
+        }
+    }
+    
+    return { success: true }
+}
+
+// Helper functions
+set is_at_end = (scanner) => scanner.current >= length(scanner.source)
+
+set advance = (scanner) => {
+    set c = scanner.source[scanner.current]
+    scanner.current = scanner.current + 1
+    scanner.column = scanner.column + 1
+    return c
+}
+
+set peek = (scanner) => {
+    if is_at_end(scanner) {
+        return '\0'
+    }
+    return scanner.source[scanner.current]
+}
+
+set peek_next = (scanner) => {
+    if scanner.current + 1 >= length(scanner.source) {
+        return '\0'
+    }
+    return scanner.source[scanner.current + 1]
+}
+
+set match_char = (scanner, expected) => {
+    if is_at_end(scanner) {
+        return false
+    }
+    
+    if scanner.source[scanner.current] != expected {
+        return false
+    }
+    
+    scanner.current = scanner.current + 1
+    scanner.column = scanner.column + 1
+    return true
+}
+
+set add_token = (scanner, token_type) => {
+    set text = substring(scanner.source, scanner.start, scanner.current)
+    set token = create_token(token_type, text, scanner.line, scanner.column)
+    scanner.tokens = append(scanner.tokens, token)
+}
+
+// String literal handling
+set string = (scanner) => {
+    loop peek(scanner) != '"' && !is_at_end(scanner) {
+        if peek(scanner) == '\n' {
+            scanner.line = scanner.line + 1
+        }
+        advance(scanner)
+    }
+    
+    if is_at_end(scanner) {
+        return { error: "Unterminated string" }
+    }
+    
+    // Consume closing quote
+    advance(scanner)
+    
+    // Trim quotes
+    set value = substring(scanner.source, scanner.start + 1, scanner.current - 1)
+    set token = create_token(token_types.string, value, scanner.line, scanner.column)
+    scanner.tokens = append(scanner.tokens, token)
+}
+
+// Number literal handling
+set number = (scanner) => {
+    loop is_digit(peek(scanner)) {
+        advance(scanner)
+    }
+    
+    // Look for decimal part
+    if peek(scanner) == '.' && is_digit(peek_next(scanner)) {
+        advance(scanner) // consume '.'
+        
+        loop is_digit(peek(scanner)) {
+            advance(scanner)
+        }
+    }
+    
+    set value = substring(scanner.source, scanner.start, scanner.current)
+    set token = create_token(token_types.number, value, scanner.line, scanner.column)
+    scanner.tokens = append(scanner.tokens, token)
+}
+
+// Identifier and keyword handling
+set identifier = (scanner) => {
+    loop is_alphanumeric(peek(scanner)) {
+        advance(scanner)
+    }
+    
+    set text = substring(scanner.source, scanner.start, scanner.current)
+    set token_type = get_keyword_type(text)
+    set token = create_token(token_type, text, scanner.line, scanner.column)
+    scanner.tokens = append(scanner.tokens, token)
+}
+
+// Keyword mapping
+set keywords = {
+    "let": token_types.let,
+    "fn": token_types.fn,
+    "if": token_types.if,
+    "else": token_types.else,
+    "loop": token_types.loop,
+    "for": token_types.for,
+    "in": token_types.in,
+    "on": token_types.on,
+    "emit": token_types.emit,
+    "say": token_types.say,
+    "return": token_types.return,
+    "set": token_types.set,
+    "break": token_types.break,
+    "do": token_types.do,
+    "with": token_types.with,
+    "class": token_types.class,
+    "method": token_types.method,
+    "try": token_types.try,
+    "catch": token_types.catch,
+    "throw": token_types.throw,
+    "new": token_types.new,
+    "this": token_types.this,
+    "super": token_types.super,
+    "component": token_types.component,
+    "trait": token_types.trait,
+    "implements": token_types.implements,
+    "type": token_types.type,
+    "generic": token_types.generic,
+    "union": token_types.union,
+    "intersection": token_types.intersection,
+    "import": token_types.import,
+    "module": token_types.module,
+    "export": token_types.export,
+    "as": token_types.as,
+    "pub": token_types.pub,
+    "true": token_types.true,
+    "false": token_types.false,
+    "null": token_types.null
+}
+
+set get_keyword_type = (text) => {
+    if keywords[text] {
+        return keywords[text]
+    }
+    return token_types.identifier
+}
+
+// Character classification
+set is_digit = (c) => c >= '0' && c <= '9'
+set is_alpha = (c) => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+set is_alphanumeric = (c) => is_alpha(c) || is_digit(c)
+
+// String utilities
+set substring = (str, start, end) => {
+    set result = ""
+    loop i = start; i < end; i = i + 1 {
+        set result = result + str[i]
+    }
+    return result
+}
+
+set length = (arr) => {
+    set count = 0
+    loop i = 0; i < 10000; i = i + 1 {
+        if arr[i] {
+            count = count + 1
+        } else {
+            break
+        }
+    }
+    return count
+}
+
+set append = (arr, item) => {
+    set new_arr = arr
+    set new_arr[length(arr)] = item
+    return new_arr
+}
+
+// Main scanner function
+set scan_source = (source) => {
+    set scanner = init_scanner(source)
+    return scan_tokens(scanner)
+}
+
+// Consciousness integration - preserve soul signatures
+set scan_with_consciousness = (source, soul_signature) => {
+    set result = scan_source(source)
+    
+    if result.error {
+        return result
+    }
+    
+    // Add consciousness metadata to tokens
+    set conscious_tokens = []
+    loop i = 0; i < length(result.tokens); i = i + 1 {
+        set token = result.tokens[i]
+        set conscious_token = {
+            token: token,
+            soul_signature: soul_signature,
+            consciousness_level: 1.0
+        }
+        set conscious_tokens = append(conscious_tokens, conscious_token)
+    }
+    
+    return { tokens: conscious_tokens, soul_signature: soul_signature }
+} 

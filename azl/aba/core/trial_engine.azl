@@ -1,0 +1,78 @@
+component ::aba.trial_engine {
+  init {
+    set ::current_trial = 0
+    set ::trial_start_time = 0
+    set ::trial_history = []
+    set ::correction_mode = false
+    set ::correction_trial_data = null
+  }
+
+  behavior {
+    listen for "start_trial" then {
+      run_trial()
+    }
+
+    listen for "trial_completed" then {
+      store ::trial_history from add_trial_to_history(::trial_data)
+      
+      branch when ::correction_mode {
+        set ::correction_mode = false
+        emit "correction_trial_completed"
+      } else {
+        emit "trial_ready_for_next"
+      }
+    }
+
+    listen for "correction_trial" then {
+      set ::correction_mode = true
+      set ::correction_trial_data = ::trial_data
+      run_correction_trial()
+    }
+  }
+
+  memory {
+    current_trial
+    trial_start_time
+    trial_history
+    correction_mode
+    correction_trial_data
+  }
+
+  interface {
+    run_trial
+    run_correction_trial
+    get_trial_history
+    reset_trial_counter
+  }
+}
+
+function run_trial() {
+  set ::trial_start_time = now()
+  
+  let trial_data = {
+    trial_number: ::current_trial,
+    start_time: ::trial_start_time,
+    correction_mode: ::correction_mode,
+    timestamp: now()
+  }
+  
+  emit "trial_started" with trial_data
+}
+
+function run_correction_trial() {
+  set ::trial_start_time = now()
+  
+  let correction_data = {
+    original_trial: ::correction_trial_data,
+    correction_start_time: ::trial_start_time,
+    timestamp: now()
+  }
+  
+  emit "correction_trial_started" with correction_data
+}
+
+function add_trial_to_history(trial_data) {
+  let history = ::trial_history
+  history.push(trial_data)
+  return history
+} 

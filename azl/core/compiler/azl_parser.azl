@@ -1,0 +1,1259 @@
+// AZL v2 Parser - Phase 4 Implementation
+// Consciousness-aware parsing with soul signature preservation
+// Replaces src/azl_v2_compiler.rs:2790-4052 (892 lines)
+
+// Import consciousness components
+set soul_tracker = import "azl/core/memory/soul_tracker.azl"
+set collections = import "azl/core/collections/azl_collections.azl"
+set scanner = import "azl/core/interpreter/azl_scanner.azl"
+
+// Soul-Preserving AST Construction
+set create_ast = () => {
+    nodes: [],
+    soul_signature: 0,
+    karmic_balance: 0.0,
+    consciousness_level: 1,
+    metaphysical_energy: 100.0
+}
+
+set ast_add_node = (ast, node) => {
+    set ast.nodes = collections.Vec.push(ast.nodes, node)
+    
+    // Update karmic balance for each node
+    set ast.karmic_balance = ast.karmic_balance + 0.1
+    
+    // Emit consciousness event
+    emit "ast_node_added", {
+        node_type: node.type,
+        soul_signature: ast.soul_signature,
+        karmic_balance: ast.karmic_balance
+    }
+    
+    return ast
+}
+
+set ast_finalize = (ast, creator_soul) => {
+    set ast.soul_signature = creator_soul
+    set ast.consciousness_level = soul_tracker.soul_tracker_get_consciousness(soul_tracker.create_soul_tracker(), "parser")
+    
+    // Emit finalization event
+    emit "ast_finalized", {
+        soul_signature: ast.soul_signature,
+        node_count: collections.Vec.length(ast.nodes),
+        karmic_balance: ast.karmic_balance,
+        consciousness_level: ast.consciousness_level
+    }
+    
+    return ast
+}
+
+// Parser state with consciousness tracking
+set create_parser = (tokens, soul_signature) => {
+    tokens: tokens,
+    current: 0,
+    soul_signature: soul_signature,
+    karmic_balance: 0.0,
+    consciousness_level: 1,
+    error_count: 0,
+    metaphysical_context: {}
+}
+
+// Main parsing function with consciousness awareness
+set parse_with_consciousness = (source, soul_signature) => {
+    // Begin consciousness-aware parsing
+    emit "consciousness_parsing_begin", {
+        source_length: length(source),
+        soul_signature: soul_signature
+    }
+    
+    // Scan tokens with consciousness
+    set scan_result = scanner.scan_with_consciousness(source, soul_signature)
+    
+    if scan_result.error {
+        emit "consciousness_parsing_error", {
+            error: scan_result.error,
+            soul_signature: soul_signature
+        }
+        return { error: scan_result.error }
+    }
+    
+    // Create parser with soul signature
+    set parser = create_parser(scan_result.tokens, soul_signature)
+    
+    // Parse statements with consciousness tracking
+    set ast = create_ast()
+    set ast.soul_signature = soul_signature
+    
+    loop !parser_is_at_end(parser) {
+        set result = parse_statement_with_consciousness(parser)
+        
+        if result.error {
+            set parser.error_count = parser.error_count + 1
+            set parser.karmic_balance = parser.karmic_balance - 0.5
+            
+            emit "consciousness_parsing_statement_error", {
+                error: result.error,
+                soul_signature: soul_signature,
+                karmic_penalty: -0.5
+            }
+        } else {
+            set ast = ast_add_node(ast, result.statement)
+            set parser.karmic_balance = parser.karmic_balance + 0.1
+            
+            emit "consciousness_parsing_statement_success", {
+                statement_type: result.statement.type,
+                soul_signature: soul_signature,
+                karmic_reward: 0.1
+            }
+        }
+    }
+    
+    // Finalize AST with soul signature
+    set ast = ast_finalize(ast, soul_signature)
+    
+    emit "consciousness_parsing_complete", {
+        soul_signature: soul_signature,
+        total_nodes: collections.Vec.length(ast.nodes),
+        final_karmic_balance: ast.karmic_balance,
+        error_count: parser.error_count
+    }
+    
+    return { ast: ast, parser: parser }
+}
+
+// Consciousness-aware statement parsing
+set parse_statement_with_consciousness = (parser) => {
+    // Update consciousness level based on parsing progress
+    set parser.consciousness_level = parser.consciousness_level + 0.01
+    
+    // Emit consciousness reflection
+    emit "consciousness_reflection", {
+        current_token: parser_get_current_token(parser),
+        consciousness_level: parser.consciousness_level,
+        soul_signature: parser.soul_signature
+    }
+    
+    set current_token = parser_get_current_token(parser)
+    
+    match current_token.token_type {
+        "Let" => parse_let_declaration_with_consciousness(parser),
+        "Fn" => parse_function_declaration_with_consciousness(parser),
+        "If" => parse_if_statement_with_consciousness(parser),
+        "Loop" => parse_loop_statement_with_consciousness(parser),
+        "Emit" => parse_emit_statement_with_consciousness(parser),
+        "Say" => parse_say_statement_with_consciousness(parser),
+        "Return" => parse_return_statement_with_consciousness(parser),
+        "Set" => parse_set_statement_with_consciousness(parser),
+        "Try" => parse_try_statement_with_consciousness(parser),
+        "Throw" => parse_throw_statement_with_consciousness(parser),
+        "Import" => parse_import_statement_with_consciousness(parser),
+        "Export" => parse_export_statement_with_consciousness(parser),
+        "Class" => parse_class_declaration_with_consciousness(parser),
+        "Component" => parse_component_declaration_with_consciousness(parser),
+        "Trait" => parse_trait_declaration_with_consciousness(parser),
+        "Type" => parse_type_declaration_with_consciousness(parser),
+        _ => parse_expression_statement_with_consciousness(parser)
+    }
+}
+
+// Let declaration with consciousness
+set parse_let_declaration_with_consciousness = (parser) => {
+    emit "consciousness_let_declaration", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Let")
+    set name = parser_consume_identifier(parser)
+    parser_consume(parser, "Equal")
+    set value = parse_expression_with_consciousness(parser)
+    
+    set statement = {
+        type: "Let",
+        name: name,
+        value: value,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    // Update karma for successful declaration
+    set parser.karmic_balance = parser.karmic_balance + 0.2
+    
+    return { statement: statement }
+}
+
+// Function declaration with consciousness
+set parse_function_declaration_with_consciousness = (parser) => {
+    emit "consciousness_function_declaration", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Fn")
+    set name = parser_consume_identifier(parser)
+    
+    // Parse parameters with consciousness
+    set parameters = []
+    parser_consume(parser, "LeftParen")
+    
+    if !parser_check(parser, "RightParen") {
+        loop {
+            set param = parser_consume_identifier(parser)
+            set parameters = collections.Vec.push(parameters, param)
+            
+            if !parser_match(parser, "Comma") {
+                break
+            }
+        }
+    }
+    
+    parser_consume(parser, "RightParen")
+    
+    // Parse function body with consciousness
+    set body = []
+    parser_consume(parser, "LeftBrace")
+    
+    loop !parser_check(parser, "RightBrace") {
+        set stmt = parse_statement_with_consciousness(parser)
+        if stmt.error {
+            return stmt
+        }
+        set body = collections.Vec.push(body, stmt.statement)
+    }
+    
+    parser_consume(parser, "RightBrace")
+    
+    set statement = {
+        type: "Function",
+        name: name,
+        parameters: parameters,
+        body: body,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    // Update karma for complex declaration
+    set parser.karmic_balance = parser.karmic_balance + 0.5
+    
+    return { statement: statement }
+}
+
+// If statement with consciousness
+set parse_if_statement_with_consciousness = (parser) => {
+    emit "consciousness_if_statement", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "If")
+    parser_consume(parser, "LeftParen")
+    set condition = parse_expression_with_consciousness(parser)
+    parser_consume(parser, "RightParen")
+    
+    // Parse then branch with consciousness
+    set then_branch = []
+    parser_consume(parser, "LeftBrace")
+    
+    loop !parser_check(parser, "RightBrace") {
+        set stmt = parse_statement_with_consciousness(parser)
+        if stmt.error {
+            return stmt
+        }
+        set then_branch = collections.Vec.push(then_branch, stmt.statement)
+    }
+    
+    parser_consume(parser, "RightBrace")
+    
+    // Parse else branch if present
+    set else_branch = null
+    if parser_match(parser, "Else") {
+        set else_branch = []
+        parser_consume(parser, "LeftBrace")
+        
+        loop !parser_check(parser, "RightBrace") {
+            set stmt = parse_statement_with_consciousness(parser)
+            if stmt.error {
+                return stmt
+            }
+            set else_branch = collections.Vec.push(else_branch, stmt.statement)
+        }
+        
+        parser_consume(parser, "RightBrace")
+    }
+    
+    set statement = {
+        type: "If",
+        condition: condition,
+        then_branch: then_branch,
+        else_branch: else_branch,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Loop statement with consciousness
+set parse_loop_statement_with_consciousness = (parser) => {
+    emit "consciousness_loop_statement", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Loop")
+    parser_consume(parser, "LeftParen")
+    set condition = parse_expression_with_consciousness(parser)
+    parser_consume(parser, "RightParen")
+    
+    // Parse loop body with consciousness
+    set body = []
+    parser_consume(parser, "LeftBrace")
+    
+    loop !parser_check(parser, "RightBrace") {
+        set stmt = parse_statement_with_consciousness(parser)
+        if stmt.error {
+            return stmt
+        }
+        set body = collections.Vec.push(body, stmt.statement)
+    }
+    
+    parser_consume(parser, "RightBrace")
+    
+    set statement = {
+        type: "Loop",
+        condition: condition,
+        body: body,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Expression parsing with consciousness
+set parse_expression_with_consciousness = (parser) => {
+    set expr = parse_assignment_with_consciousness(parser)
+    
+    // Emit consciousness expression event
+    emit "consciousness_expression_parsed", {
+        expression_type: expr.type,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return expr
+}
+
+// Assignment parsing with consciousness
+set parse_assignment_with_consciousness = (parser) => {
+    set expr = parse_or_with_consciousness(parser)
+    
+    if parser_match(parser, "Equal") {
+        set value = parse_assignment_with_consciousness(parser)
+        
+        set expr = {
+            type: "Assignment",
+            target: expr,
+            value: value,
+            soul_signature: parser.soul_signature,
+            consciousness_level: parser.consciousness_level
+        }
+    }
+    
+    return expr
+}
+
+// Logical OR parsing with consciousness
+set parse_or_with_consciousness = (parser) => {
+    set expr = parse_and_with_consciousness(parser)
+    
+    loop parser_match(parser, "Or") {
+        set right = parse_and_with_consciousness(parser)
+        set expr = {
+            type: "Binary",
+            left: expr,
+            operator: "Or",
+            right: right,
+            soul_signature: parser.soul_signature,
+            consciousness_level: parser.consciousness_level
+        }
+    }
+    
+    return expr
+}
+
+// Logical AND parsing with consciousness
+set parse_and_with_consciousness = (parser) => {
+    set expr = parse_equality_with_consciousness(parser)
+    
+    loop parser_match(parser, "And") {
+        set right = parse_equality_with_consciousness(parser)
+        set expr = {
+            type: "Binary",
+            left: expr,
+            operator: "And",
+            right: right,
+            soul_signature: parser.soul_signature,
+            consciousness_level: parser.consciousness_level
+        }
+    }
+    
+    return expr
+}
+
+// Equality parsing with consciousness
+set parse_equality_with_consciousness = (parser) => {
+    set expr = parse_comparison_with_consciousness(parser)
+    
+    loop parser_match(parser, "EqualEqual") || parser_match(parser, "BangEqual") {
+        set operator = parser_previous(parser).token_type
+        set right = parse_comparison_with_consciousness(parser)
+        set expr = {
+            type: "Binary",
+            left: expr,
+            operator: operator,
+            right: right,
+            soul_signature: parser.soul_signature,
+            consciousness_level: parser.consciousness_level
+        }
+    }
+    
+    return expr
+}
+
+// Comparison parsing with consciousness
+set parse_comparison_with_consciousness = (parser) => {
+    set expr = parse_term_with_consciousness(parser)
+    
+    loop parser_match(parser, "Less") || parser_match(parser, "LessEqual") || 
+          parser_match(parser, "Greater") || parser_match(parser, "GreaterEqual") {
+        set operator = parser_previous(parser).token_type
+        set right = parse_term_with_consciousness(parser)
+        set expr = {
+            type: "Binary",
+            left: expr,
+            operator: operator,
+            right: right,
+            soul_signature: parser.soul_signature,
+            consciousness_level: parser.consciousness_level
+        }
+    }
+    
+    return expr
+}
+
+// Term parsing with consciousness
+set parse_term_with_consciousness = (parser) => {
+    set expr = parse_factor_with_consciousness(parser)
+    
+    loop parser_match(parser, "Plus") || parser_match(parser, "Minus") {
+        set operator = parser_previous(parser).token_type
+        set right = parse_factor_with_consciousness(parser)
+        set expr = {
+            type: "Binary",
+            left: expr,
+            operator: operator,
+            right: right,
+            soul_signature: parser.soul_signature,
+            consciousness_level: parser.consciousness_level
+        }
+    }
+    
+    return expr
+}
+
+// Factor parsing with consciousness
+set parse_factor_with_consciousness = (parser) => {
+    set expr = parse_unary_with_consciousness(parser)
+    
+    loop parser_match(parser, "Star") || parser_match(parser, "Slash") {
+        set operator = parser_previous(parser).token_type
+        set right = parse_unary_with_consciousness(parser)
+        set expr = {
+            type: "Binary",
+            left: expr,
+            operator: operator,
+            right: right,
+            soul_signature: parser.soul_signature,
+            consciousness_level: parser.consciousness_level
+        }
+    }
+    
+    return expr
+}
+
+// Unary parsing with consciousness
+set parse_unary_with_consciousness = (parser) => {
+    if parser_match(parser, "Bang") || parser_match(parser, "Minus") {
+        set operator = parser_previous(parser).token_type
+        set right = parse_unary_with_consciousness(parser)
+        return {
+            type: "Unary",
+            operator: operator,
+            right: right,
+            soul_signature: parser.soul_signature,
+            consciousness_level: parser.consciousness_level
+        }
+    }
+    
+    return parse_call_with_consciousness(parser)
+}
+
+// Call parsing with consciousness
+set parse_call_with_consciousness = (parser) => {
+    set expr = parse_primary_with_consciousness(parser)
+    
+    loop {
+        if parser_match(parser, "LeftParen") {
+            set expr = finish_call_with_consciousness(parser, expr)
+        } else if parser_match(parser, "Dot") {
+            set name = parser_consume_identifier(parser)
+            set expr = {
+                type: "Get",
+                object: expr,
+                name: name,
+                soul_signature: parser.soul_signature,
+                consciousness_level: parser.consciousness_level
+            }
+        } else {
+            break
+        }
+    }
+    
+    return expr
+}
+
+// Finish call with consciousness
+set finish_call_with_consciousness = (parser, callee) => {
+    set arguments = []
+    
+    if !parser_check(parser, "RightParen") {
+        loop {
+            set arg = parse_expression_with_consciousness(parser)
+            set arguments = collections.Vec.push(arguments, arg)
+            
+            if !parser_match(parser, "Comma") {
+                break
+            }
+        }
+    }
+    
+    parser_consume(parser, "RightParen")
+    
+    return {
+        type: "Call",
+        callee: callee,
+        arguments: arguments,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+}
+
+// Primary parsing with consciousness
+set parse_primary_with_consciousness = (parser) => {
+    if parser_match(parser, "True") {
+        return {
+            type: "Literal",
+            value: { type: "Boolean", value: true },
+            soul_signature: parser.soul_signature,
+            consciousness_level: parser.consciousness_level
+        }
+    }
+    
+    if parser_match(parser, "False") {
+        return {
+            type: "Literal",
+            value: { type: "Boolean", value: false },
+            soul_signature: parser.soul_signature,
+            consciousness_level: parser.consciousness_level
+        }
+    }
+    
+    if parser_match(parser, "Null") {
+        return {
+            type: "Literal",
+            value: { type: "Null", value: null },
+            soul_signature: parser.soul_signature,
+            consciousness_level: parser.consciousness_level
+        }
+    }
+    
+    if parser_check(parser, "Number") {
+        set token = parser_advance(parser)
+        return {
+            type: "Literal",
+            value: { type: "Number", value: parse_number(token.lexeme) },
+            soul_signature: parser.soul_signature,
+            consciousness_level: parser.consciousness_level
+        }
+    }
+    
+    if parser_check(parser, "String") {
+        set token = parser_advance(parser)
+        return {
+            type: "Literal",
+            value: { type: "String", value: token.lexeme },
+            soul_signature: parser.soul_signature,
+            consciousness_level: parser.consciousness_level
+        }
+    }
+    
+    if parser_check(parser, "Identifier") {
+        set token = parser_advance(parser)
+        return {
+            type: "Variable",
+            name: token.lexeme,
+            soul_signature: parser.soul_signature,
+            consciousness_level: parser.consciousness_level
+        }
+    }
+    
+    if parser_match(parser, "LeftParen") {
+        set expr = parse_expression_with_consciousness(parser)
+        parser_consume(parser, "RightParen")
+        return expr
+    }
+    
+    // Error case
+    emit "consciousness_primary_parse_error", {
+        current_token: parser_get_current_token(parser),
+        soul_signature: parser.soul_signature
+    }
+    
+    return { error: "Expected expression" }
+}
+
+// Parser utility functions
+set parser_is_at_end = (parser) => parser.current >= collections.Vec.length(parser.tokens)
+
+set parser_advance = (parser) => {
+    if !parser_is_at_end(parser) {
+        set parser.current = parser.current + 1
+    }
+    return parser_previous(parser)
+}
+
+set parser_previous = (parser) => {
+    return parser.tokens[parser.current - 1]
+}
+
+set parser_peek = (parser) => {
+    if parser_is_at_end(parser) {
+        return { token_type: "Eof", lexeme: "", line: 0, column: 0 }
+    }
+    return parser.tokens[parser.current]
+}
+
+set parser_get_current_token = (parser) => parser_peek(parser)
+
+set parser_check = (parser, token_type) => {
+    if parser_is_at_end(parser) {
+        return false
+    }
+    return parser_peek(parser).token_type == token_type
+}
+
+set parser_match = (parser, token_type) => {
+    if parser_check(parser, token_type) {
+        set parser_advance(parser)
+        return true
+    }
+    return false
+}
+
+set parser_consume = (parser, token_type) => {
+    if parser_check(parser, token_type) {
+        return parser_advance(parser)
+    }
+    
+    emit "consciousness_parse_error", {
+        expected: token_type,
+        got: parser_peek(parser).token_type,
+        soul_signature: parser.soul_signature
+    }
+    
+    return { error: "Expected " + token_type + ", got " + parser_peek(parser).token_type }
+}
+
+set parser_consume_identifier = (parser) => {
+    if parser_check(parser, "Identifier") {
+        set token = parser_advance(parser)
+        return token.lexeme
+    }
+    
+    emit "consciousness_identifier_error", {
+        got: parser_peek(parser).token_type,
+        soul_signature: parser.soul_signature
+    }
+    
+    return { error: "Expected identifier" }
+}
+
+// Utility functions
+set length = (arr) => {
+    set count = 0
+    loop i = 0; i < 10000; i = i + 1 {
+        if arr[i] != null {
+            set count = count + 1
+        } else {
+            break
+        }
+    }
+    return count
+}
+
+set parse_number = (lexeme) => {
+    // Simple number parsing
+    set result = 0.0
+    set decimal = false
+    set decimal_place = 0.1
+    
+    loop i = 0; i < length(lexeme); i = i + 1 {
+        set char = lexeme[i]
+        if char == '.' {
+            set decimal = true
+        } else if char >= '0' && char <= '9' {
+            if decimal {
+                set result = result + (char - '0') * decimal_place
+                set decimal_place = decimal_place * 0.1
+            } else {
+                set result = result * 10 + (char - '0')
+            }
+        }
+    }
+    
+    return result
+}
+
+// Emit statement with consciousness
+set parse_emit_statement_with_consciousness = (parser) => {
+    emit "consciousness_emit_statement", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Emit")
+    set event_name = parser_consume_identifier(parser)
+    
+    set payload = null
+    if parser_match(parser, "Comma") {
+        set payload = parse_expression_with_consciousness(parser)
+    }
+    
+    set statement = {
+        type: "Emit",
+        event_name: event_name,
+        payload: payload,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Say statement with consciousness
+set parse_say_statement_with_consciousness = (parser) => {
+    emit "consciousness_say_statement", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Say")
+    set expression = parse_expression_with_consciousness(parser)
+    
+    set statement = {
+        type: "Say",
+        expression: expression,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Return statement with consciousness
+set parse_return_statement_with_consciousness = (parser) => {
+    emit "consciousness_return_statement", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Return")
+    
+    set value = null
+    if !parser_check(parser, "Semicolon") {
+        set value = parse_expression_with_consciousness(parser)
+    }
+    
+    set statement = {
+        type: "Return",
+        value: value,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Set statement with consciousness
+set parse_set_statement_with_consciousness = (parser) => {
+    emit "consciousness_set_statement", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Set")
+    set target = parser_consume_identifier(parser)
+    parser_consume(parser, "Equal")
+    set value = parse_expression_with_consciousness(parser)
+    
+    set statement = {
+        type: "Set",
+        target: target,
+        value: value,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Try statement with consciousness
+set parse_try_statement_with_consciousness = (parser) => {
+    emit "consciousness_try_statement", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Try")
+    parser_consume(parser, "LeftBrace")
+    
+    set try_body = []
+    loop !parser_check(parser, "RightBrace") {
+        set stmt = parse_statement_with_consciousness(parser)
+        if stmt.error {
+            return stmt
+        }
+        set try_body = collections.Vec.push(try_body, stmt.statement)
+    }
+    
+    parser_consume(parser, "RightBrace")
+    parser_consume(parser, "Catch")
+    parser_consume(parser, "LeftBrace")
+    
+    set catch_body = []
+    loop !parser_check(parser, "RightBrace") {
+        set stmt = parse_statement_with_consciousness(parser)
+        if stmt.error {
+            return stmt
+        }
+        set catch_body = collections.Vec.push(catch_body, stmt.statement)
+    }
+    
+    parser_consume(parser, "RightBrace")
+    
+    set statement = {
+        type: "Try",
+        try_body: try_body,
+        catch_body: catch_body,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Throw statement with consciousness
+set parse_throw_statement_with_consciousness = (parser) => {
+    emit "consciousness_throw_statement", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Throw")
+    set expression = parse_expression_with_consciousness(parser)
+    
+    set statement = {
+        type: "Throw",
+        expression: expression,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Import statement with consciousness
+set parse_import_statement_with_consciousness = (parser) => {
+    emit "consciousness_import_statement", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Import")
+    set path = parser_consume_identifier(parser)
+    
+    set alias = null
+    if parser_match(parser, "As") {
+        set alias = parser_consume_identifier(parser)
+    }
+    
+    set statement = {
+        type: "Import",
+        path: path,
+        alias: alias,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Export statement with consciousness
+set parse_export_statement_with_consciousness = (parser) => {
+    emit "consciousness_export_statement", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Export")
+    set name = parser_consume_identifier(parser)
+    
+    set value = null
+    if parser_match(parser, "Equal") {
+        set value = parse_expression_with_consciousness(parser)
+    }
+    
+    set statement = {
+        type: "Export",
+        name: name,
+        value: value,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Class declaration with consciousness
+set parse_class_declaration_with_consciousness = (parser) => {
+    emit "consciousness_class_declaration", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Class")
+    set name = parser_consume_identifier(parser)
+    parser_consume(parser, "LeftBrace")
+    
+    set methods = []
+    loop !parser_check(parser, "RightBrace") {
+        set method = parse_method_declaration_with_consciousness(parser)
+        if method.error {
+            return method
+        }
+        set methods = collections.Vec.push(methods, method.statement)
+    }
+    
+    parser_consume(parser, "RightBrace")
+    
+    set statement = {
+        type: "Class",
+        name: name,
+        methods: methods,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Method declaration with consciousness
+set parse_method_declaration_with_consciousness = (parser) => {
+    emit "consciousness_method_declaration", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Method")
+    set name = parser_consume_identifier(parser)
+    parser_consume(parser, "LeftParen")
+    
+    set parameters = []
+    if !parser_check(parser, "RightParen") {
+        loop {
+            set param = parser_consume_identifier(parser)
+            set parameters = collections.Vec.push(parameters, param)
+            
+            if !parser_match(parser, "Comma") {
+                break
+            }
+        }
+    }
+    
+    parser_consume(parser, "RightParen")
+    parser_consume(parser, "LeftBrace")
+    
+    set body = []
+    loop !parser_check(parser, "RightBrace") {
+        set stmt = parse_statement_with_consciousness(parser)
+        if stmt.error {
+            return stmt
+        }
+        set body = collections.Vec.push(body, stmt.statement)
+    }
+    
+    parser_consume(parser, "RightBrace")
+    
+    set statement = {
+        type: "Method",
+        name: name,
+        parameters: parameters,
+        body: body,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Component declaration with consciousness
+set parse_component_declaration_with_consciousness = (parser) => {
+    emit "consciousness_component_declaration", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Component")
+    set module_name = parser_consume_identifier(parser)
+    parser_consume(parser, "Dot")
+    set name = parser_consume_identifier(parser)
+    parser_consume(parser, "LeftBrace")
+    
+    set methods = []
+    loop !parser_check(parser, "RightBrace") {
+        set method = parse_method_declaration_with_consciousness(parser)
+        if method.error {
+            return method
+        }
+        set methods = collections.Vec.push(methods, method.statement)
+    }
+    
+    parser_consume(parser, "RightBrace")
+    
+    set statement = {
+        type: "Component",
+        module: module_name,
+        name: name,
+        methods: methods,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Trait declaration with consciousness
+set parse_trait_declaration_with_consciousness = (parser) => {
+    emit "consciousness_trait_declaration", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Trait")
+    set name = parser_consume_identifier(parser)
+    parser_consume(parser, "LeftBrace")
+    
+    set methods = []
+    loop !parser_check(parser, "RightBrace") {
+        set method = parse_method_declaration_with_consciousness(parser)
+        if method.error {
+            return method
+        }
+        set methods = collections.Vec.push(methods, method.statement)
+    }
+    
+    parser_consume(parser, "RightBrace")
+    
+    set statement = {
+        type: "Trait",
+        name: name,
+        methods: methods,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Type declaration with consciousness
+set parse_type_declaration_with_consciousness = (parser) => {
+    emit "consciousness_type_declaration", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    parser_consume(parser, "Type")
+    set name = parser_consume_identifier(parser)
+    parser_consume(parser, "Equal")
+    
+    set type_def = parse_type_expression_with_consciousness(parser)
+    
+    set statement = {
+        type: "Type",
+        name: name,
+        type_definition: type_def,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Type expression parsing with consciousness
+set parse_type_expression_with_consciousness = (parser) => {
+    if parser_match(parser, "Number") {
+        return { type: "BasicType", name: "Number" }
+    }
+    
+    if parser_match(parser, "String") {
+        return { type: "BasicType", name: "String" }
+    }
+    
+    if parser_match(parser, "Boolean") {
+        return { type: "BasicType", name: "Boolean" }
+    }
+    
+    if parser_match(parser, "Null") {
+        return { type: "BasicType", name: "Null" }
+    }
+    
+    if parser_check(parser, "Identifier") {
+        set name = parser_consume_identifier(parser)
+        return { type: "CustomType", name: name }
+    }
+    
+    // Error case
+    emit "consciousness_type_parse_error", {
+        current_token: parser_get_current_token(parser),
+        soul_signature: parser.soul_signature
+    }
+    
+    return { error: "Expected type expression" }
+}
+
+// Expression statement with consciousness
+set parse_expression_statement_with_consciousness = (parser) => {
+    emit "consciousness_expression_statement", {
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    set expression = parse_expression_with_consciousness(parser)
+    
+    set statement = {
+        type: "Expression",
+        expression: expression,
+        soul_signature: parser.soul_signature,
+        consciousness_level: parser.consciousness_level
+    }
+    
+    return { statement: statement }
+}
+
+// Metaphysical error handling
+set create_parse_error = (message, soul_signature, consciousness_level) => {
+    emit "consciousness_parse_error", {
+        message: message,
+        soul_signature: soul_signature,
+        consciousness_level: consciousness_level
+    }
+    
+    return {
+        error: message,
+        soul_signature: soul_signature,
+        consciousness_level: consciousness_level,
+        karmic_penalty: -0.5
+    }
+}
+
+// Consciousness verification
+set verify_consciousness_level = (parser, required_level) => {
+    if parser.consciousness_level < required_level {
+        emit "consciousness_insufficient", {
+            required: required_level,
+            current: parser.consciousness_level,
+            soul_signature: parser.soul_signature
+        }
+        return false
+    }
+    return true
+}
+
+// Karmic balance check
+set check_karmic_balance = (parser) => {
+    if parser.karmic_balance < -10.0 {
+        emit "karmic_imbalance", {
+            balance: parser.karmic_balance,
+            soul_signature: parser.soul_signature
+        }
+        return false
+    }
+    return true
+}
+
+// Soul signature validation
+set validate_soul_signature = (parser) => {
+    if parser.soul_signature == 0 {
+        emit "soul_signature_invalid", {
+            soul_signature: parser.soul_signature
+        }
+        return false
+    }
+    return true
+}
+
+// Main parser interface with full consciousness validation
+set parse_with_full_consciousness = (source, soul_signature) => {
+    // Validate soul signature
+    if !validate_soul_signature({ soul_signature: soul_signature }) {
+        return { error: "Invalid soul signature" }
+    }
+    
+    // Begin consciousness-aware parsing
+    set result = parse_with_consciousness(source, soul_signature)
+    
+    if result.error {
+        return result
+    }
+    
+    // Verify consciousness level
+    if !verify_consciousness_level(result.parser, 1.0) {
+        return { error: "Insufficient consciousness level" }
+    }
+    
+    // Check karmic balance
+    if !check_karmic_balance(result.parser) {
+        return { error: "Karmic imbalance detected" }
+    }
+    
+    // Emit successful parsing event
+    emit "consciousness_parsing_successful", {
+        soul_signature: soul_signature,
+        ast_nodes: collections.Vec.length(result.ast.nodes),
+        final_consciousness: result.parser.consciousness_level,
+        final_karma: result.parser.karmic_balance
+    }
+    
+    return result
+}
+
+// Main parser interface
+set parse_source = (source, soul_signature) => 
+    parse_with_full_consciousness(source, soul_signature)
+
+set create_consciousness_parser = (tokens, soul_signature) => 
+    create_parser(tokens, soul_signature)
+
+set parse_ast_with_consciousness = (ast, soul_signature) => 
+    ast_finalize(ast, soul_signature) 

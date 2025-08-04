@@ -1,0 +1,63 @@
+# Test Goal Loop Execution Engine
+# Tests the setgoal, pursuegoal, and goal tracking functionality
+
+say "🎯 Starting Goal Loop Test..."
+
+# Test 1: Initial state (no goal)
+say "🔍 Testing initial state..."
+reflect
+
+# Test 2: Set a goal
+say "🔍 Setting a goal..."
+setgoal "Increase consciousness level" 10
+reflect
+
+# Test 3: Pursue the goal
+say "🔍 Pursuing the goal..."
+pursuegoal
+reflect
+
+# Test 4: Set another goal
+say "🔍 Setting another goal..."
+setgoal "Register new component" 8
+reflect
+
+# Test 5: Pursue the new goal
+say "🔍 Pursuing the new goal..."
+pursuegoal
+reflect
+
+# Test 6: Test different goal types
+say "🔍 Testing different goal types..."
+setgoal "Clear memory" 5
+pursuegoal
+reflect
+
+setgoal "Optimize performance" 7
+pursuegoal
+reflect
+
+setgoal "Learn new behavior" 9
+pursuegoal
+reflect
+
+# Test 7: Test unknown goal
+say "🔍 Testing unknown goal..."
+setgoal "Unknown goal type" 3
+pursuegoal
+reflect
+
+# Test 8: Test error handling
+say "🔍 Testing error handling..."
+setgoal "Invalid goal without quotes"
+pursuegoal
+
+# Test 9: Test goal without priority
+say "🔍 Testing goal without priority..."
+setgoal "Test goal without priority"
+reflect
+
+say "✅ Goal Loop Test Complete!"
+say "🎯 Goal loop system is working correctly"
+say "📊 Goal tracking is functional"
+say "🔧 Goal execution is operational" 

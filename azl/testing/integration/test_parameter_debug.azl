@@ -1,0 +1,85 @@
+component ::test.parameter_debug {
+  init {
+    set ::test_name = "Parameter Debug Test"
+    set ::test_version = 1
+    set ::status = "initializing"
+    say "🔍 Starting Parameter Debug Test v1..."
+  }
+
+  on test.start {
+    say "🔍 Starting Parameter Debug Test..."
+    emit test.test_parameters
+  }
+
+  on test.test_parameters {
+    say "🧪 Testing parameter passing..."
+    
+    # Test 1: Single string parameter
+    say "📤 Test 1: Single string parameter"
+    emit test.single_string with "hello_world"
+    
+    # Test 2: Single number parameter
+    say "📤 Test 2: Single number parameter"
+    emit test.single_number with 42
+    
+    # Test 3: Multiple string parameters
+    say "📤 Test 3: Multiple string parameters"
+    emit test.multiple_strings with "first" "second" "third"
+    
+    # Test 4: Mixed parameters
+    say "📤 Test 4: Mixed parameters"
+    emit test.mixed_params with "text" 123 "more_text"
+    
+    # Test 5: Variable parameter
+    say "📤 Test 5: Variable parameter"
+    set ::test_var = "variable_value"
+    emit test.variable_param with ::test_var
+  }
+
+  on test.single_string {
+    say "✅ Received single string"
+    say "📝 Parameter: '$1'"
+    say "📊 Parameter type: string"
+    say "📏 Parameter length: $1.length"
+  }
+
+  on test.single_number {
+    say "✅ Received single number"
+    say "📝 Parameter: '$1'"
+    say "📊 Parameter type: number"
+  }
+
+  on test.multiple_strings {
+    say "✅ Received multiple strings"
+    say "📝 Param1: '$1'"
+    say "📝 Param2: '$2'"
+    say "📝 Param3: '$3'"
+    say "📊 Total params: $#"
+  }
+
+  on test.mixed_params {
+    say "✅ Received mixed parameters"
+    say "📝 Text1: '$1'"
+    say "📝 Number: '$2'"
+    say "📝 Text2: '$3'"
+    say "📊 Total params: $#"
+  }
+
+  on test.variable_param {
+    say "✅ Received variable parameter"
+    say "📝 Parameter: '$1'"
+    say "📊 Parameter type: variable"
+  }
+
+  behavior {
+    on system.start {
+      emit test.start
+    }
+  }
+
+  memory {
+    ::test_name = ""
+    ::test_version = 1
+    ::status = ""
+  }
+} 

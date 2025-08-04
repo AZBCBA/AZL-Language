@@ -1,0 +1,365 @@
+# AZME Reward Monitor
+# Hooks for reward/penalty logging
+
+component ::azme.reward_monitor {
+  init {
+    set ::reward_log = []
+    set ::penalty_log = []
+    set ::reward_patterns = {}
+    set ::penalty_patterns = {}
+    set ::reward_thresholds = {
+      high_reward: 10,
+      medium_reward: 5,
+      low_reward: 2,
+      high_penalty: 5,
+      medium_penalty: 2,
+      low_penalty: 1
+    }
+    set ::monitoring_active = true
+    set ::reward_count = 0
+    set ::penalty_count = 0
+    set ::pattern_detections = 0
+  }
+
+  behavior {
+    on azme.reward_incremented {
+      set ::reward_info = $1
+      set ::task = ::reward_info.task
+      set ::path = ::reward_info.path
+      set ::new_score = ::reward_info.new_score
+      
+      say "🎉 Reward Monitor: Logging reward increment"
+      say "📋 Task: " + ::task
+      say "🛤️ Path: " + ::path
+      say "📊 New Score: " + ::new_score
+      
+      # Log reward
+      set ::reward_entry = {
+        id: "reward_" + ::reward_count,
+        task: ::task,
+        path: ::path,
+        score: ::new_score,
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      set ::reward_log = ::reward_log.push(::reward_entry)
+      set ::reward_count = ::reward_count + 1
+      
+      # Analyze reward patterns
+      analyze_reward_pattern(::task, ::path, ::new_score)
+      
+      emit azme.reward_logged with {
+        reward_entry: ::reward_entry
+      }
+    }
+
+    on azme.penalty_incremented {
+      set ::penalty_info = $1
+      set ::task = ::penalty_info.task
+      set ::path = ::penalty_info.path
+      set ::new_score = ::penalty_info.new_score
+      
+      say "❌ Penalty Monitor: Logging penalty increment"
+      say "📋 Task: " + ::task
+      say "🛤️ Path: " + ::path
+      say "📊 New Score: " + ::new_score
+      
+      # Log penalty
+      set ::penalty_entry = {
+        id: "penalty_" + ::penalty_count,
+        task: ::task,
+        path: ::path,
+        score: ::new_score,
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      set ::penalty_log = ::penalty_log.push(::penalty_entry)
+      set ::penalty_count = ::penalty_count + 1
+      
+      # Analyze penalty patterns
+      analyze_penalty_pattern(::task, ::path, ::new_score)
+      
+      emit azme.penalty_logged with {
+        penalty_entry: ::penalty_entry
+      }
+    }
+
+    on analyze_reward_pattern {
+      set ::analysis_request = $1
+      set ::task = ::analysis_request.task
+      set ::path = ::analysis_request.path
+      set ::score = ::analysis_request.score
+      
+      say "🔍 Analyzing reward pattern for task: " + ::task
+      
+      # Track reward patterns
+      if not ::task in ::reward_patterns {
+        set ::reward_patterns[::task] = {}
+      }
+      
+      if not ::path in ::reward_patterns[::task] {
+        set ::reward_patterns[::task][::path] = {
+          total_rewards: 0,
+          max_score: 0,
+          avg_score: 0,
+          frequency: 0,
+          last_reward: null
+        }
+      }
+      
+      set ::pattern = ::reward_patterns[::task][::path]
+      set ::pattern.total_rewards = ::pattern.total_rewards + 1
+      set ::pattern.max_score = max(::pattern.max_score, ::score)
+      set ::pattern.avg_score = (::pattern.avg_score * (::pattern.total_rewards - 1) + ::score) / ::pattern.total_rewards
+      set ::pattern.last_reward = ::internal.now()
+      
+      # Check for high reward thresholds
+      if ::score >= ::reward_thresholds.high_reward {
+        emit azme.high_reward_detected with {
+          task: ::task,
+          path: ::path,
+          score: ::score,
+          pattern: ::pattern
+        }
+      }
+      
+      emit azme.reward_pattern_analyzed with {
+        task: ::task,
+        path: ::path,
+        pattern: ::pattern
+      }
+    }
+
+    on analyze_penalty_pattern {
+      set ::analysis_request = $1
+      set ::task = ::analysis_request.task
+      set ::path = ::analysis_request.path
+      set ::score = ::analysis_request.score
+      
+      say "🔍 Analyzing penalty pattern for task: " + ::task
+      
+      # Track penalty patterns
+      if not ::task in ::penalty_patterns {
+        set ::penalty_patterns[::task] = {}
+      }
+      
+      if not ::path in ::penalty_patterns[::task] {
+        set ::penalty_patterns[::task][::path] = {
+          total_penalties: 0,
+          max_score: 0,
+          avg_score: 0,
+          frequency: 0,
+          last_penalty: null
+        }
+      }
+      
+      set ::pattern = ::penalty_patterns[::task][::path]
+      set ::pattern.total_penalties = ::pattern.total_penalties + 1
+      set ::pattern.max_score = max(::pattern.max_score, ::score)
+      set ::pattern.avg_score = (::pattern.avg_score * (::pattern.total_penalties - 1) + ::score) / ::pattern.total_penalties
+      set ::pattern.last_penalty = ::internal.now()
+      
+      # Check for high penalty thresholds
+      if ::score >= ::penalty_thresholds.high_penalty {
+        emit azme.high_penalty_detected with {
+          task: ::task,
+          path: ::path,
+          score: ::score,
+          pattern: ::pattern
+        }
+      }
+      
+      emit azme.penalty_pattern_analyzed with {
+        task: ::task,
+        path: ::path,
+        pattern: ::pattern
+      }
+    }
+
+    on get_reward_summary {
+      set ::summary_request = $1
+      set ::task = ::summary_request.task or null
+      
+      say "📊 Generating reward summary"
+      
+      set ::summary = {
+        total_rewards: ::reward_count,
+        total_penalties: ::penalty_count,
+        reward_patterns_count: ::reward_patterns.keys().length,
+        penalty_patterns_count: ::penalty_patterns.keys().length,
+        high_rewards: 0,
+        high_penalties: 0,
+        quantum_enhanced: true
+      }
+      
+      # Count high rewards/penalties
+      loop for ::task_type in ::reward_patterns.keys() {
+        if ::task and ::task_type != ::task {
+          continue
+        }
+        
+        loop for ::path in ::reward_patterns[::task_type].keys() {
+          set ::pattern = ::reward_patterns[::task_type][::path]
+          if ::pattern.max_score >= ::reward_thresholds.high_reward {
+            set ::summary.high_rewards = ::summary.high_rewards + 1
+          }
+        }
+      }
+      
+      loop for ::task_type in ::penalty_patterns.keys() {
+        if ::task and ::task_type != ::task {
+          continue
+        }
+        
+        loop for ::path in ::penalty_patterns[::task_type].keys() {
+          set ::pattern = ::penalty_patterns[::task_type][::path]
+          if ::pattern.max_score >= ::penalty_thresholds.high_penalty {
+            set ::summary.high_penalties = ::summary.high_penalties + 1
+          }
+        }
+      }
+      
+      emit azme.reward_summary_generated with {
+        task: ::task,
+        summary: ::summary
+      }
+    }
+
+    on detect_learning_patterns {
+      set ::detection_request = $1
+      
+      say "🧠 Detecting learning patterns"
+      
+      set ::patterns = {
+        improving_paths: [],
+        declining_paths: [],
+        stable_paths: [],
+        quantum_enhanced: true
+      }
+      
+      # Analyze reward patterns for learning trends
+      loop for ::task in ::reward_patterns.keys() {
+        loop for ::path in ::reward_patterns[::task].keys() {
+          set ::reward_pattern = ::reward_patterns[::task][::path]
+          set ::penalty_pattern = ::penalty_patterns[::task][::path] or { total_penalties: 0, avg_score: 0 }
+          
+          set ::net_score = ::reward_pattern.avg_score - ::penalty_pattern.avg_score
+          set ::total_attempts = ::reward_pattern.total_rewards + ::penalty_pattern.total_penalties
+          
+          if ::total_attempts >= 3 {
+            set ::pattern_info = {
+              task: ::task,
+              path: ::path,
+              net_score: ::net_score,
+              total_attempts: ::total_attempts,
+              success_rate: ::reward_pattern.total_rewards / ::total_attempts
+            }
+            
+            if ::net_score > 5 {
+              set ::patterns.improving_paths = ::patterns.improving_paths.push(::pattern_info)
+            } else if ::net_score < -2 {
+              set ::patterns.declining_paths = ::patterns.declining_paths.push(::pattern_info)
+            } else {
+              set ::patterns.stable_paths = ::patterns.stable_paths.push(::pattern_info)
+            }
+          }
+        }
+      }
+      
+      set ::pattern_detections = ::pattern_detections + 1
+      
+      emit azme.learning_patterns_detected with {
+        patterns: ::patterns,
+        detection_count: ::pattern_detections
+      }
+    }
+
+    on set_reward_thresholds {
+      set ::threshold_request = $1
+      set ::new_thresholds = ::threshold_request.thresholds
+      
+      say "⚙️ Setting reward thresholds"
+      
+      # Update thresholds
+      loop for ::key in ::new_thresholds.keys() {
+        set ::reward_thresholds[::key] = ::new_thresholds[::key]
+      }
+      
+      emit azme.reward_thresholds_updated with {
+        thresholds: ::reward_thresholds
+      }
+    }
+
+    on get_reward_statistics {
+      set ::stats_request = $1
+      set ::task = ::stats_request.task or null
+      
+      say "📈 Getting reward statistics"
+      
+      set ::statistics = {
+        total_rewards: ::reward_count,
+        total_penalties: ::penalty_count,
+        reward_log_size: ::reward_log.length,
+        penalty_log_size: ::penalty_log.length,
+        pattern_detections: ::pattern_detections,
+        monitoring_active: ::monitoring_active,
+        quantum_enhanced: true
+      }
+      
+      # Add task-specific statistics
+      if ::task {
+        set ::task_stats = {
+          task: ::task,
+          reward_patterns: ::reward_patterns[::task] or {},
+          penalty_patterns: ::penalty_patterns[::task] or {},
+          total_paths: 0
+        }
+        
+        if ::task in ::reward_patterns {
+          set ::task_stats.total_paths = ::reward_patterns[::task].keys().length
+        }
+        
+        set ::statistics.task_specific = ::task_stats
+      }
+      
+      emit azme.reward_statistics_retrieved with {
+        task: ::task,
+        statistics: ::statistics
+      }
+    }
+
+    on toggle_monitoring {
+      set ::toggle_request = $1
+      set ::monitoring_active = not ::monitoring_active
+      
+      say "🔄 Toggling reward monitoring: " + ::monitoring_active
+      
+      emit azme.monitoring_toggled with {
+        monitoring_active: ::monitoring_active
+      }
+    }
+
+    # Reward monitor monitoring
+    on azme.monitor_reward_monitor {
+      set ::monitor_request = $1
+      
+      set ::monitor_metrics = {
+        total_rewards: ::reward_count,
+        total_penalties: ::penalty_count,
+        reward_log_size: ::reward_log.length,
+        penalty_log_size: ::penalty_log.length,
+        reward_patterns_count: ::reward_patterns.keys().length,
+        penalty_patterns_count: ::penalty_patterns.keys().length,
+        pattern_detections: ::pattern_detections,
+        monitoring_active: ::monitoring_active,
+        quantum_enhanced: true
+      }
+      
+      emit azme.reward_monitor_metrics with {
+        metrics: ::monitor_metrics
+      }
+    }
+  }
+} 

@@ -1,0 +1,28 @@
+module quantum {
+    import "math" as m;
+    
+    pub fn entangle(a, b) {
+        say "Entangling particles with values:";
+        say a;
+        say b;
+        
+        // Use math module
+        let angle = m::sin(m::PI / 4);
+        say "Quantum angle:";
+        say angle;
+        
+        return a + b;
+    }
+    
+    pub fn measure(state) {
+        say "Measuring quantum state:";
+        say state;
+        
+        // 50/50 probability
+        if state > 0.5 {
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+} 

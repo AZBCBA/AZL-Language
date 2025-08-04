@@ -1,0 +1,506 @@
+# AZL Meta-Language Orchestrator
+# Coordinates universal AST, parsers, transformations, and code generation
+
+component ::meta_language.orchestrator {
+  init {
+    set ::status = "initializing"
+    set ::orchestrator_version = "1.0"
+    set ::supported_languages = ["python", "javascript", "rust", "typescript", "lua", "aba"]
+    set ::active_parsers = {}
+    set ::transformation_pipeline = []
+    set ::code_generation_history = []
+    
+    # Link to all meta-language components
+    link ::meta_language.universal_ast
+    link ::meta_language.python_parser
+    link ::meta_language.transformation_engine
+    link ::meta_language.parser_registry
+    link ::meta_language.ast_event_bus
+    
+    # Link to AGI systems for semantic understanding
+    link ::semantic.understanding
+    link ::reasoning.cognitive
+    link ::dialogue.system
+    
+    # Parser registry handles all language parsers
+    # No need for local active_parsers - use parser registry instead
+    
+    # Initialize transformation pipeline
+    set ::transformation_pipeline = [
+      "parse_source",
+      "convert_to_universal_ast",
+      "analyze_patterns",
+      "apply_transformations",
+      "generate_code"
+    ]
+    
+    emit "meta_language.orchestrator.initialized" with {
+      status: ::status,
+      version: ::orchestrator_version,
+      supported_languages: ::supported_languages,
+      pipeline_steps: ::transformation_pipeline.length
+    }
+    
+    # Bind to parser registry and AST event bus
+    emit "parser_registry.bind_orchestrator" with { orchestrator: "::meta_language.orchestrator" }
+    emit "ast.event_bus.bind_orchestrator" with { orchestrator: "::meta_language.orchestrator" }
+    
+    set ::status = "ready"
+    say "🎭 Meta-Language Orchestrator initialized"
+    say "🌍 Supported languages: ::supported_languages.length"
+    say "⚙️ Pipeline steps: ::transformation_pipeline.length"
+    say "📚 Bound to parser registry and AST event bus"
+  }
+
+  behavior {
+    # Main entry point for code transformation
+    listen for "meta_language.transform_code" then {
+      set ::source_code = ::transform_data.source
+      set ::source_language = ::transform_data.language
+      set ::target_language = ::transform_data.target_language || ::source_language
+      set ::transformations = ::transform_data.transformations || []
+      set ::options = ::transform_data.options || {}
+      
+      set ::status = "processing"
+      
+      say "🎭 Starting code transformation..."
+      say "📝 Source language: ::source_language"
+      say "🎯 Target language: ::target_language"
+      say "🔧 Transformations: ::transformations.length"
+      
+      # Execute transformation pipeline
+      set ::result = ::execute_transformation_pipeline(::source_code, ::source_language, ::target_language, ::transformations, ::options)
+      
+      emit "meta_language.transform_complete" with {
+        source_code: ::source_code,
+        source_language: ::source_language,
+        target_language: ::target_language,
+        transformations: ::transformations,
+        result: ::result
+      }
+      
+      set ::status = "ready"
+      say "✅ Code transformation complete"
+    }
+    
+    # Parse source code from any supported language
+    listen for "meta_language.parse_source" then {
+      set ::source_code = ::parse_data.source
+      set ::language = ::parse_data.language
+      set ::file_path = ::parse_data.file_path || "unknown." + ::language
+      
+      say "🎭 Parsing source code..."
+      say "📝 Language: ::language"
+      say "📁 File: ::file_path"
+      
+      # Route to parser registry
+      emit "parser_registry.parse" with {
+        source: ::source_code,
+        language: ::language,
+        file_path: ::file_path,
+        options: ::parse_data.options || {}
+      }
+    }
+    
+    # Handle parser registry binding
+    listen for "parser_registry.orchestrator_bound" then {
+      say "📚 Successfully bound to parser registry"
+      say "📊 Available parsers: $1.available_parsers.length"
+    }
+    
+    # Handle AST event bus binding
+    listen for "ast.event_bus.orchestrator_bound" then {
+      say "🚌 Successfully bound to AST event bus"
+      say "📊 Event handlers: $1.event_handlers.length"
+    }
+    
+    # Handle parse completion
+    listen for "python.parse_complete" then {
+      set ::parse_result = ::parse_result
+      
+      say "✅ Parse complete for Python"
+      say "📊 AST nodes: ::parse_result.universal_ast.body.length"
+      
+      # Continue with transformation pipeline
+      emit "meta_language.ast_ready" with {
+        ast: ::parse_result.universal_ast,
+        source_language: "python",
+        original_source: ::parse_result.source
+      }
+    }
+    
+    listen for "javascript.parse_complete" then {
+      set ::parse_result = ::parse_result
+      
+      say "✅ Parse complete for JavaScript"
+      say "📊 AST nodes: ::parse_result.universal_ast.body.length"
+      
+      # Continue with transformation pipeline
+      emit "meta_language.ast_ready" with {
+        ast: ::parse_result.universal_ast,
+        source_language: "javascript",
+        original_source: ::parse_result.source
+      }
+    }
+    
+    listen for "rust.parse_complete" then {
+      set ::parse_result = ::parse_result
+      
+      say "✅ Parse complete for Rust"
+      say "📊 AST nodes: ::parse_result.universal_ast.body.length"
+      
+      # Continue with transformation pipeline
+      emit "meta_language.ast_ready" with {
+        ast: ::parse_result.universal_ast,
+        source_language: "rust",
+        original_source: ::parse_result.source
+      }
+    }
+    
+    # Handle AST ready for transformation
+    listen for "meta_language.ast_ready" then {
+      set ::ast_data = ::ast_ready_data.ast
+      set ::source_language = ::ast_ready_data.source_language
+      set ::original_source = ::ast_ready_data.original_source
+      
+      say "🎭 AST ready for transformation..."
+      
+      # Analyze AST for transformation opportunities
+      emit "transform.analyze" with {
+        ast: ::ast_data,
+        options: { add_logging: true, optimize_performance: true }
+      }
+    }
+    
+    # Handle transformation analysis complete
+    listen for "transform.analysis_complete" then {
+      set ::analysis_result = ::analysis_complete_data
+      set ::suggestions = ::analysis_result.suggestions
+      
+      say "✅ Transformation analysis complete"
+      say "💡 Suggestions: ::suggestions.length"
+      
+      # Apply suggested transformations
+      loop for ::suggestion in ::suggestions {
+        if ::suggestion.priority == "high" {
+          emit "transform.apply" with {
+            type: ::suggestion.type,
+            ast: ::analysis_result.ast,
+            pattern: ::suggestion.pattern
+          }
+        }
+      }
+      
+      # Continue with code generation
+      emit "meta_language.generate_code" with {
+        ast: ::analysis_result.ast,
+        target_language: "python",
+        options: { preserve_formatting: true }
+      }
+    }
+    
+    # Handle transformation complete
+    listen for "transform.complete" then {
+      set ::transform_result = ::transform_complete_data
+      
+      say "✅ Transformation applied: ::transform_result.transformation.type"
+      
+      # Continue with next transformation or code generation
+      emit "meta_language.ast_updated" with {
+        ast: ::transform_result.transformed,
+        transformation: ::transform_result.transformation
+      }
+    }
+    
+    # Handle code generation
+    listen for "meta_language.generate_code" then {
+      set ::generate_data = ::generate_data
+      set ::ast_data = ::generate_data.ast
+      set ::target_language = ::generate_data.target_language
+      set ::options = ::generate_data.options || {}
+      
+      say "🎭 Generating code for language: ::target_language"
+      
+      if ::target_language == "python" {
+        emit "python.generate_code" with {
+          ast: ::ast_data,
+          options: ::options
+        }
+      } else if ::target_language == "javascript" {
+        emit "javascript.generate_code" with {
+          ast: ::ast_data,
+          options: ::options
+        }
+      } else if ::target_language == "rust" {
+        emit "rust.generate_code" with {
+          ast: ::ast_data,
+          options: ::options
+        }
+      } else {
+        emit "meta_language.generate_error" with {
+          error: "No code generator available for language: " + ::target_language
+        }
+      }
+    }
+    
+    # Handle code generation complete
+    listen for "python.code_generated" then {
+      set ::generation_result = ::code_generated_data
+      
+      say "✅ Code generation complete for Python"
+      say "📝 Generated code length: ::generation_result.code.length"
+      
+      # Store generation history
+      set ::code_generation_history.push({
+        source_language: "python",
+        target_language: "python",
+        ast: ::generation_result.ast,
+        code: ::generation_result.code,
+        timestamp: ::time.engine.now().epoch
+      })
+      
+      emit "meta_language.generation_complete" with {
+        original_source: "",
+        generated_code: ::generation_result.code,
+        ast: ::generation_result.ast,
+        transformations_applied: []
+      }
+    }
+    
+    listen for "javascript.code_generated" then {
+      set ::generation_result = ::code_generated_data
+      
+      say "✅ Code generation complete for JavaScript"
+      say "📝 Generated code length: ::generation_result.code.length"
+      
+      # Store generation history
+      set ::code_generation_history.push({
+        source_language: "javascript",
+        target_language: "javascript",
+        ast: ::generation_result.ast,
+        code: ::generation_result.code,
+        timestamp: ::time.engine.now().epoch
+      })
+      
+      emit "meta_language.generation_complete" with {
+        original_source: "",
+        generated_code: ::generation_result.code,
+        ast: ::generation_result.ast,
+        transformations_applied: []
+      }
+    }
+    
+    listen for "rust.code_generated" then {
+      set ::generation_result = ::code_generated_data
+      
+      say "✅ Code generation complete for Rust"
+      say "📝 Generated code length: ::generation_result.code.length"
+      
+      # Store generation history
+      set ::code_generation_history.push({
+        source_language: "rust",
+        target_language: "rust",
+        ast: ::generation_result.ast,
+        code: ::generation_result.code,
+        timestamp: ::time.engine.now().epoch
+      })
+      
+      emit "meta_language.generation_complete" with {
+        original_source: "",
+        generated_code: ::generation_result.code,
+        ast: ::generation_result.ast,
+        transformations_applied: []
+      }
+    }
+    
+    # Interactive code transformation via dialogue
+    listen for "dialogue.process_input" then {
+      set ::user_input = ::input_data.text
+      
+      # Check if input is a code transformation request
+      if ::is_code_transformation_request(::user_input) {
+        set ::transformation_request = ::parse_transformation_request(::user_input)
+        
+        emit "meta_language.transform_code" with {
+          source: ::transformation_request.source,
+          language: ::transformation_request.language,
+          transformations: ::transformation_request.transformations,
+          options: ::transformation_request.options
+        }
+      }
+    }
+    
+    # Handle generation complete for dialogue response
+    listen for "meta_language.generation_complete" then {
+      set ::generation_result = ::generation_complete_data
+      
+      # Generate dialogue response
+      set ::response = "Code transformation complete!\n\nGenerated code:\n```" + ::generation_result.generated_code + "```"
+      
+      emit "dialogue.response" with {
+        response: ::response,
+        intent: { type: "code_transformation" },
+        confidence: 0.9
+      }
+    }
+    
+    # Learn from transformation results
+    listen for "meta_language.learn" then {
+      set ::learning_data = ::learning_data
+      set ::transformation_result = ::learning_data.result
+      
+      say "🧠 Learning from meta-language transformation..."
+      
+      # Store learning outcome
+      emit "memory.core.store_memory" with {
+        id: "meta_language.learning." + ::time.engine.now().epoch,
+        memory_type: "semantic",
+        content: {
+          transformation: ::transformation_result,
+          learning_timestamp: ::time.engine.now().epoch
+        },
+        importance: 0.9,
+        confidence: 0.8,
+        emotional_valence: 0.6,
+        metadata: {
+          source: "meta_language.orchestrator",
+          learning_type: "transformation_pattern",
+          timestamp: ::time.engine.now().epoch
+        }
+      }
+      
+      emit "meta_language.learning_complete" with {
+        result: ::transformation_result
+      }
+    }
+  }
+
+  # Helper functions
+  function ::execute_transformation_pipeline(source_code, source_language, target_language, transformations, options) {
+    set ::pipeline_result = {
+      source_code: ::source_code,
+      source_language: ::source_language,
+      target_language: ::target_language,
+      transformations: ::transformations,
+      result_ast: null,
+      generated_code: null,
+      errors: [],
+      warnings: []
+    }
+    
+    # Step 1: Parse source code
+    emit "meta_language.parse_source" with {
+      source: ::source_code,
+      language: ::source_language,
+      file_path: "input." + ::source_language
+    }
+    
+    # Step 2: Convert to universal AST (handled by parser)
+    # Step 3: Analyze patterns (handled by transformation engine)
+    # Step 4: Apply transformations (handled by transformation engine)
+    # Step 5: Generate code (handled by language-specific generator)
+    
+    return ::pipeline_result
+  }
+  
+  function ::is_code_transformation_request(input) {
+    set ::transformation_keywords = [
+      "transform", "refactor", "optimize", "convert", "parse", "generate"
+    ]
+    
+    set ::language_keywords = [
+      "python", "javascript", "rust", "typescript", "lua", "aba"
+    ]
+    
+    set ::input_lower = ::input.toLowerCase()
+    
+    # Check for transformation keywords
+    loop for ::keyword in ::transformation_keywords {
+      if ::input_lower.contains(::keyword) {
+        return true
+      }
+    }
+    
+    # Check for language keywords
+    loop for ::language in ::language_keywords {
+      if ::input_lower.contains(::language) {
+        return true
+      }
+    }
+    
+    return false
+  }
+  
+  function ::parse_transformation_request(input) {
+    set ::request = {
+      source: "",
+      language: "python",
+      transformations: [],
+      options: {}
+    }
+    
+    # Simple parsing logic - in practice, this would use NLP
+    if ::input.contains("python") {
+      set ::request.language = "python"
+    } else if ::input.contains("javascript") {
+      set ::request.language = "javascript"
+    }
+    
+    if ::input.contains("optimize") {
+      set ::request.transformations.push("optimize_performance")
+    }
+    
+    if ::input.contains("refactor") {
+      set ::request.transformations.push("extract_function")
+    }
+    
+    if ::input.contains("add logging") {
+      set ::request.options.add_logging = true
+    }
+    
+    return ::request
+  }
+  
+  function ::add_language_parser(language, parser_component) {
+    set ::active_parsers[::language] = ::parser_component
+    
+    say "🔧 Added parser for language: ::language"
+    say "📊 Active parsers: ::active_parsers.length"
+  }
+  
+  function ::remove_language_parser(language) {
+    set ::active_parsers[::language] = null
+    
+    say "🔧 Removed parser for language: ::language"
+    say "📊 Active parsers: ::active_parsers.length"
+  }
+  
+  function ::get_supported_languages() {
+    set ::supported = []
+    
+    loop for ::language in ::supported_languages {
+      if ::active_parsers[::language] {
+        set ::supported.push(::language)
+      }
+    }
+    
+    return ::supported
+  }
+  
+  function ::get_transformation_history() {
+    return ::code_generation_history
+  }
+  
+  function ::validate_language_support(language) {
+    return ::active_parsers[::language] != null
+  }
+
+  memory {
+    ::status = ""
+    ::orchestrator_version = ""
+    ::supported_languages = []
+    ::active_parsers = {}
+    ::transformation_pipeline = []
+    ::code_generation_history = []
+  }
+} 

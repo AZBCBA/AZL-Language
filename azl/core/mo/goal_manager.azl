@@ -1,0 +1,276 @@
+// Goal Creator via EO - MO System Component
+// Creates goals based on EO states to drive behavior
+
+component ::goal.manager {
+  init {
+    set ::goals = []
+    set ::active_goal = null
+    set ::goal_history = []
+    set ::max_concurrent_goals = 3
+    set ::goal_timeout = 60
+    set ::last_goal_creation = 0
+    
+    emit "goal.manager.initialized" with { status: "ready" }
+  }
+
+  behavior {
+    // Listen for MO state updates and create goals based on EO states
+    listen for "mo.state.updated" then {
+      set ::current_state = ::mo.state.updated_data
+      set ::current_time = now()
+      
+      // Check if we can create new goals
+      branch when ::goals.length < ::max_concurrent_goals {
+        create_eo_goals(::current_state)
+      }
+    }
+
+    // Handle interaction EO - create engagement goal
+    listen for "mo.state.eo" then {
+      set ::eo_data = ::mo.state.eo_data
+      
+      branch when ::eo_data.type = "interaction" {
+        create_goal({
+          name: "EngageUser",
+          priority: 0.9,
+          condition: "user_response",
+          timeout: 60,
+          type: "interaction",
+          urgency: "high",
+          timestamp: now()
+        })
+      }
+    }
+
+    // Handle attention EO - create attention goal
+    listen for "mo.state.eo" then {
+      set ::eo_data = ::mo.state.eo_data
+      
+      branch when ::eo_data.type = "attention" {
+        create_goal({
+          name: "GainAttention",
+          priority: 0.8,
+          condition: "eye_contact",
+          timeout: 45,
+          type: "attention",
+          urgency: "medium",
+          timestamp: now()
+        })
+      }
+    }
+
+    // Handle praise EO - create praise goal
+    listen for "mo.state.eo" then {
+      set ::eo_data = ::mo.state.eo_data
+      
+      branch when ::eo_data.type = "praise" {
+        create_goal({
+          name: "ProvidePraise",
+          priority: 0.7,
+          condition: "praise_given",
+          timeout: 30,
+          type: "praise",
+          urgency: "medium",
+          timestamp: now()
+        })
+      }
+    }
+
+    // Handle hunger EO - create food goal
+    listen for "mo.state.eo" then {
+      set ::eo_data = ::mo.state.eo_data
+      
+      branch when ::eo_data.type = "hunger" {
+        create_goal({
+          name: "RequestFood",
+          priority: 0.95,
+          condition: "food_provided",
+          timeout: 120,
+          type: "hunger",
+          urgency: "critical",
+          timestamp: now()
+        })
+      }
+    }
+
+    // Handle goal completion
+    listen for "goal.completed" then {
+      set ::completion_data = ::goal.completed_data
+      
+      // Find and remove completed goal
+      loop for ::i from 0 to ::goals.length - 1 {
+        branch when ::goals[::i].name = ::completion_data.goal_name {
+          set ::completed_goal = ::goals[::i]
+          store ::goal_history from ::goal_history.push({
+            goal: ::completed_goal,
+            completion_time: now(),
+            success: true
+          })
+          
+          // Remove from active goals
+          set ::goals = ::goals.slice(0, ::i).concat(::goals.slice(::i + 1))
+          emit "goal.removed" with { goal_name: ::completion_data.goal_name }
+        }
+      }
+      
+      // Update active goal
+      branch when ::goals.length > 0 {
+        set ::active_goal = ::goals[0]
+        emit "goal.active" with ::active_goal
+      } else {
+        set ::active_goal = null
+        emit "goal.none_active"
+      }
+    }
+
+    // Handle goal timeout
+    listen for "goal.timeout" then {
+      set ::timeout_data = ::goal.timeout_data
+      
+      // Find and remove timed out goal
+      loop for ::i from 0 to ::goals.length - 1 {
+        branch when ::goals[::i].name = ::timeout_data.goal_name {
+          set ::timed_out_goal = ::goals[::i]
+          store ::goal_history from ::goal_history.push({
+            goal: ::timed_out_goal,
+            completion_time: now(),
+            success: false,
+            reason: "timeout"
+          })
+          
+          // Remove from active goals
+          set ::goals = ::goals.slice(0, ::i).concat(::goals.slice(::i + 1))
+          emit "goal.removed" with { goal_name: ::timeout_data.goal_name }
+        }
+      }
+      
+      // Update active goal
+      branch when ::goals.length > 0 {
+        set ::active_goal = ::goals[0]
+        emit "goal.active" with ::active_goal
+      } else {
+        set ::active_goal = null
+        emit "goal.none_active"
+      }
+    }
+
+    // Handle goal cancellation
+    listen for "goal.cancel" then {
+      set ::cancel_data = ::goal.cancel_data
+      
+      // Find and remove cancelled goal
+      loop for ::i from 0 to ::goals.length - 1 {
+        branch when ::goals[::i].name = ::cancel_data.goal_name {
+          set ::cancelled_goal = ::goals[::i]
+          store ::goal_history from ::goal_history.push({
+            goal: ::cancelled_goal,
+            completion_time: now(),
+            success: false,
+            reason: "cancelled"
+          })
+          
+          // Remove from active goals
+          set ::goals = ::goals.slice(0, ::i).concat(::goals.slice(::i + 1))
+          emit "goal.removed" with { goal_name: ::cancel_data.goal_name }
+        }
+      }
+      
+      // Update active goal
+      branch when ::goals.length > 0 {
+        set ::active_goal = ::goals[0]
+        emit "goal.active" with ::active_goal
+      } else {
+        set ::active_goal = null
+        emit "goal.none_active"
+      }
+    }
+
+    // Monitor goal timeouts
+    loop every 5 seconds {
+      set ::current_time = now()
+      
+      loop for ::i from 0 to ::goals.length - 1 {
+        set ::goal = ::goals[::i]
+        set ::elapsed_time = ::current_time - ::goal.timestamp
+        
+        branch when ::elapsed_time > ::goal.timeout {
+          emit "goal.timeout" with { goal_name: ::goal.name }
+        }
+      }
+    }
+  }
+
+  memory {
+    goals
+    active_goal
+    goal_history
+    max_concurrent_goals
+    goal_timeout
+    last_goal_creation
+  }
+
+  interface {
+    get_active_goals
+    get_active_goal
+    get_goal_history
+    create_custom_goal
+    cancel_goal
+    set_max_goals
+  }
+}
+
+// Create goals based on EO states
+function create_eo_goals(current_state) {
+  set ::eo_count = 0
+  set ::goals_created = 0
+  
+  // Count EO states
+  loop for ::state_type in Object.keys(::current_state) {
+    branch when ::current_state[::state_type] = "EO" {
+      set ::eo_count = ::eo_count + 1
+    }
+  }
+  
+  // Create goals based on EO count
+  branch when ::eo_count >= 2 {
+    create_goal({
+      name: "UrgentAction",
+      priority: 0.95,
+      condition: "multiple_eo_resolved",
+      timeout: 90,
+      type: "urgent",
+      urgency: "critical",
+      eo_count: ::eo_count,
+      timestamp: now()
+    })
+    set ::goals_created = ::goals_created + 1
+  } else branch when ::eo_count = 1 {
+    create_goal({
+      name: "ModerateAction",
+      priority: 0.8,
+      condition: "single_eo_resolved",
+      timeout: 60,
+      type: "moderate",
+      urgency: "medium",
+      timestamp: now()
+    })
+    set ::goals_created = ::goals_created + 1
+  }
+  
+  emit "goals.created" with { count: ::goals_created, eo_count: ::eo_count }
+}
+
+// Create a new goal
+function create_goal(goal_data) {
+  // Add goal to list
+  store ::goals from ::goals.push(goal_data)
+  
+  // Set as active goal if none is active
+  branch when ::active_goal = null {
+    set ::active_goal = goal_data
+    emit "goal.active" with ::active_goal
+  }
+  
+  set ::last_goal_creation = now()
+  emit "goal.created" with goal_data
+} 

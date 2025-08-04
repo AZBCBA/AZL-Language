@@ -1,0 +1,362 @@
+# AZME Vision Processor
+# Core visual processing engine
+
+component ::azme.vision_processor {
+  init {
+    # Core state variables
+    set ::visual_input_buffer = null
+    set ::detected_objects = []
+    set ::detected_text = []
+    set ::visual_context = ""
+    set ::visual_to_memory_map = {}
+    set ::image_reward_trace = []
+    set ::vision_models = {
+      object_detection: "yolo_v5",
+      text_extraction: "tesseract",
+      scene_understanding: "clip",
+      face_recognition: "face_recognition"
+    }
+    set ::vision_settings = {
+      confidence_threshold: 0.7,
+      max_objects: 20,
+      max_text_blocks: 10,
+      image_quality_threshold: 0.5,
+      processing_timeout: 30
+    }
+    set ::processing_count = 0
+    set ::successful_detections = 0
+    set ::failed_detections = 0
+  }
+
+  behavior {
+    on process_image {
+      set ::image_request = $1
+      set ::image_path = ::image_request.path
+      set ::image_source = ::image_request.source or "file"
+      
+      say "👁️ Vision Processor: Processing image"
+      say "📁 Path: " + ::image_path
+      say "📡 Source: " + ::image_source
+      
+      # Update visual input buffer
+      set ::visual_input_buffer = ::image_path
+      
+      # Process image through pipeline
+      set ::objects = detect_objects(::image_path)
+      set ::text = extract_text(::image_path)
+      set ::summary = summarize_visual(::objects, ::text)
+      
+      # Update state variables
+      set ::detected_objects = ::objects
+      set ::detected_text = ::text
+      set ::visual_context = ::summary
+      
+      set ::processing_count = ::processing_count + 1
+      
+      if ::objects.length > 0 or ::text.length > 0 {
+        set ::successful_detections = ::successful_detections + 1
+        
+        # Create visual memory entry
+        set ::visual_entry = {
+          id: "vision_" + ::processing_count,
+          image_path: ::image_path,
+          objects: ::objects,
+          text: ::text,
+          summary: ::summary,
+          timestamp: ::internal.now(),
+          source: ::image_source,
+          quantum_enhanced: true
+        }
+        
+        # Link to memory
+        link_visual_to_memory(::visual_entry)
+        
+        emit azme.vision_processed with {
+          image_path: ::image_path,
+          objects: ::objects,
+          text: ::text,
+          summary: ::summary,
+          visual_entry: ::visual_entry
+        }
+      } else {
+        set ::failed_detections = ::failed_detections + 1
+        
+        emit azme.vision_processing_failed with {
+          image_path: ::image_path,
+          reason: "no_objects_or_text_detected"
+        }
+      }
+    }
+
+    on detect_objects {
+      set ::detection_request = $1
+      set ::image_path = ::detection_request.path
+      
+      say "🔍 Detecting objects in image: " + ::image_path
+      
+      # Simulate YOLO object detection
+      set ::detection_result = {
+        success: true,
+        objects: [
+          {
+            label: "person",
+            confidence: 0.95,
+            bbox: [100, 150, 200, 400],
+            class_id: 0
+          },
+          {
+            label: "laptop",
+            confidence: 0.87,
+            bbox: [300, 200, 450, 300],
+            class_id: 63
+          },
+          {
+            label: "chair",
+            confidence: 0.82,
+            bbox: [250, 350, 350, 450],
+            class_id: 56
+          }
+        ],
+        processing_time: ::internal.random() * 2 + 0.5,
+        model_used: ::vision_models.object_detection,
+        quantum_enhanced: true
+      }
+      
+      # Filter by confidence threshold
+      set ::filtered_objects = []
+      loop for ::obj in ::detection_result.objects {
+        if ::obj.confidence >= ::vision_settings.confidence_threshold {
+          set ::filtered_objects = ::filtered_objects.push(::obj)
+        }
+      }
+      
+      # Limit to max objects
+      if ::filtered_objects.length > ::vision_settings.max_objects {
+        set ::filtered_objects = ::filtered_objects.slice(0, ::vision_settings.max_objects)
+      }
+      
+      emit azme.objects_detected with {
+        image_path: ::image_path,
+        objects: ::filtered_objects,
+        result: ::detection_result
+      }
+    }
+
+    on extract_text {
+      set ::extraction_request = $1
+      set ::image_path = ::extraction_request.path
+      
+      say "🔤 Extracting text from image: " + ::image_path
+      
+      # Simulate OCR text extraction
+      set ::ocr_result = {
+        success: true,
+        text_blocks: [
+          {
+            text: "AZME System Status",
+            confidence: 0.98,
+            bbox: [50, 50, 300, 80],
+            language: "en"
+          },
+          {
+            text: "All systems operational",
+            confidence: 0.92,
+            bbox: [50, 100, 350, 130],
+            language: "en"
+          },
+          {
+            text: "Memory: 85%",
+            confidence: 0.89,
+            bbox: [50, 150, 200, 180],
+            language: "en"
+          }
+        ],
+        processing_time: ::internal.random() * 1.5 + 0.3,
+        model_used: ::vision_models.text_extraction,
+        quantum_enhanced: true
+      }
+      
+      # Filter by confidence and limit text blocks
+      set ::filtered_text = []
+      loop for ::block in ::ocr_result.text_blocks {
+        if ::block.confidence >= ::vision_settings.confidence_threshold {
+          set ::filtered_text = ::filtered_text.push(::block)
+        }
+      }
+      
+      if ::filtered_text.length > ::vision_settings.max_text_blocks {
+        set ::filtered_text = ::filtered_text.slice(0, ::vision_settings.max_text_blocks)
+      }
+      
+      emit azme.text_extracted with {
+        image_path: ::image_path,
+        text_blocks: ::filtered_text,
+        result: ::ocr_result
+      }
+    }
+
+    on summarize_visual {
+      set ::summary_request = $1
+      set ::objects = ::summary_request.objects
+      set ::text = ::summary_request.text
+      
+      say "📝 Generating visual summary"
+      
+      set ::object_labels = []
+      loop for ::obj in ::objects {
+        set ::object_labels = ::object_labels.push(::obj.label)
+      }
+      
+      set ::text_content = []
+      loop for ::block in ::text {
+        set ::text_content = ::text_content.push(::block.text)
+      }
+      
+      set ::summary = {
+        scene_description: "Scene contains " + ::object_labels.join(", "),
+        detected_objects: ::object_labels,
+        extracted_text: ::text_content,
+        object_count: ::objects.length,
+        text_block_count: ::text.length,
+        has_people: "person" in ::object_labels,
+        has_text: ::text.length > 0,
+        urgency_level: calculate_urgency(::text_content),
+        quantum_enhanced: true
+      }
+      
+      emit azme.visual_summary_generated with {
+        summary: ::summary
+      }
+    }
+
+    on calculate_urgency {
+      set ::urgency_request = $1
+      set ::text_content = ::urgency_request.text_content
+      
+      say "🚨 Calculating urgency from visual content"
+      
+      set ::urgency_keywords = [
+        "alert", "urgent", "error", "failure", "critical", "warning",
+        "emergency", "stop", "danger", "system down", "fatal"
+      ]
+      
+      set ::urgency_score = 0
+      set ::detected_keywords = []
+      
+      loop for ::text in ::text_content {
+        loop for ::keyword in ::urgency_keywords {
+          if ::text.contains(::keyword) {
+            set ::urgency_score = ::urgency_score + 1
+            set ::detected_keywords = ::detected_keywords.push(::keyword)
+          }
+        }
+      }
+      
+      set ::urgency_level = "normal"
+      if ::urgency_score >= 3 {
+        set ::urgency_level = "critical"
+      } else if ::urgency_score >= 1 {
+        set ::urgency_level = "urgent"
+      }
+      
+      emit azme.urgency_calculated with {
+        urgency_score: ::urgency_score,
+        urgency_level: ::urgency_level,
+        detected_keywords: ::detected_keywords
+      }
+    }
+
+    on link_visual_to_memory {
+      set ::link_request = $1
+      set ::visual_entry = ::link_request.visual_entry
+      
+      say "🔗 Linking visual content to memory"
+      
+      # Create memory link
+      set ::memory_link = {
+        visual_id: ::visual_entry.id,
+        memory_type: "visual_perception",
+        linked_at: ::internal.now(),
+        summary: ::visual_entry.summary,
+        objects: ::visual_entry.objects,
+        text: ::visual_entry.text,
+        quantum_enhanced: true
+      }
+      
+      # Add to visual-to-memory map
+      set ::visual_to_memory_map[::visual_entry.id] = ::memory_link
+      
+      # Check for goal-relevant content
+      if ::visual_entry.summary.urgency_level != "normal" {
+        emit azme.visual_goal_triggered with {
+          visual_entry: ::visual_entry,
+          urgency_level: ::visual_entry.summary.urgency_level,
+          memory_link: ::memory_link
+        }
+      }
+      
+      emit azme.visual_memory_linked with {
+        visual_entry: ::visual_entry,
+        memory_link: ::memory_link
+      }
+    }
+
+    on update_vision_settings {
+      set ::settings_request = $1
+      set ::new_settings = ::settings_request.settings
+      
+      say "⚙️ Updating vision settings"
+      
+      # Update settings
+      loop for ::key in ::new_settings.keys() {
+        set ::vision_settings[::key] = ::new_settings[::key]
+      }
+      
+      emit azme.vision_settings_updated with {
+        settings: ::vision_settings
+      }
+    }
+
+    on get_visual_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Getting visual processing statistics"
+      
+      set ::vision_stats = {
+        total_processing_count: ::processing_count,
+        successful_detections: ::successful_detections,
+        failed_detections: ::failed_detections,
+        success_rate: ::successful_detections / ::processing_count,
+        visual_memory_links: ::visual_to_memory_map.keys().length,
+        image_reward_trace_size: ::image_reward_trace.length,
+        current_visual_context: ::visual_context,
+        quantum_enhanced: true
+      }
+      
+      emit azme.vision_statistics_retrieved with {
+        statistics: ::vision_stats
+      }
+    }
+
+    # Vision processor monitoring
+    on azme.monitor_vision_processor {
+      set ::monitor_request = $1
+      
+      set ::processor_metrics = {
+        total_processing_count: ::processing_count,
+        successful_detections: ::successful_detections,
+        failed_detections: ::failed_detections,
+        visual_input_buffer: ::visual_input_buffer,
+        detected_objects_count: ::detected_objects.length,
+        detected_text_count: ::detected_text.length,
+        visual_memory_links_count: ::visual_to_memory_map.keys().length,
+        image_reward_trace_size: ::image_reward_trace.length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.vision_processor_metrics with {
+        metrics: ::processor_metrics
+      }
+    }
+  }
+} 

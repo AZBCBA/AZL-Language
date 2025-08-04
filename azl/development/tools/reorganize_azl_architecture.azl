@@ -1,0 +1,288 @@
+# AZL ARCHITECTURE REORGANIZATION SCRIPT
+# This script will reorganize all loose components into proper structure
+
+component ::architect.reorganizer {
+  init {
+    set ::status = "initializing"
+    set ::reorganization_plan = {
+      runtime_layer: [
+        "azl/runtime/bootstrap/azl_runner.azl",
+        "azl/runtime/memory/lha3_memory_system.azl", 
+        "azl/runtime/parser/azl_parser.azl",
+        "azl/runtime/executor/command_executor.azl",
+        "azl/runtime/interpreter/azl_interpreter.azl"
+      ],
+      core_systems_layer: [
+        "azl/core/language/syntax.azl",
+        "azl/core/execution/command_processor.azl",
+        "azl/core/memory/memory_system.azl",
+        "azl/core/events/event_system.azl"
+      ],
+      quantum_layer: [
+        "azl/quantum/processor/quantum_processor.azl",
+        "azl/quantum/memory/quantum_memory.azl",
+        "azl/quantum/mathematics/quantum_math.azl",
+        "azl/quantum/neural/quantum_neural.azl",
+        "azl/quantum/consciousness/quantum_consciousness.azl",
+        "azl/quantum/optimizer/quantum_optimizer.azl"
+      ],
+      agi_layer: [
+        "azl/agi/core/agi_core.azl",
+        "azl/agi/cognitive/cognitive_engine.azl",
+        "azl/agi/planning/planner.azl",
+        "azl/agi/adaptation/adaptive_system.azl"
+      ],
+      neural_layer: [
+        "azl/neural/core/neural_core.azl",
+        "azl/neural/learning/learning_engine.azl",
+        "azl/neural/attention/attention_mechanism.azl",
+        "azl/neural/adaptation/neural_adaptation.azl"
+      ],
+      consciousness_layer: [
+        "azl/consciousness/core/consciousness_core.azl",
+        "azl/consciousness/experience/experience_processor.azl",
+        "azl/consciousness/integration/consciousness_integration.azl",
+        "azl/consciousness/evolution/consciousness_evolution.azl"
+      ],
+      aba_layer: [
+        "azl/aba/core/aba_core.azl",
+        "azl/aba/analysis/behavior_analysis.azl",
+        "azl/aba/intervention/intervention_engine.azl",
+        "azl/aba/data/data_collector.azl"
+      ],
+      agents_layer: [
+        "azl/agents/core/agent_core.azl",
+        "azl/agents/specialized/learning_agent.azl",
+        "azl/agents/coordination/agent_coordinator.azl"
+      ],
+      integrations_layer: [
+        "azl/integrations/external/api_connector.azl",
+        "azl/integrations/protocols/communication_protocol.azl",
+        "azl/integrations/bridges/language_bridge.azl"
+      ],
+      development_layer: [
+        "azl/development/tools/debugger.azl",
+        "azl/development/testing/test_framework.azl",
+        "azl/development/documentation/doc_generator.azl"
+      ]
+    }
+    
+    say "🏗️ AZL Architecture Reorganizer initialized"
+    emit architect.ready with "ready"
+  }
+
+  on reorganize_architecture {
+    say "🏗️ Starting AZL architecture reorganization..."
+    
+    # Phase 1: Create directory structure
+    emit create_directory_structure
+    
+    # Phase 2: Move existing components
+    emit move_existing_components
+    
+    # Phase 3: Create missing components
+    emit create_missing_components
+    
+    # Phase 4: Update references
+    emit update_component_references
+    
+    # Phase 5: Validate architecture
+    emit validate_architecture
+  }
+
+  on create_directory_structure {
+    say "📁 Creating directory structure..."
+    
+    # Runtime Layer
+    emit create_directory with "azl/runtime/bootstrap"
+    emit create_directory with "azl/runtime/memory"
+    emit create_directory with "azl/runtime/parser"
+    emit create_directory with "azl/runtime/executor"
+    emit create_directory with "azl/runtime/interpreter"
+    
+    # Core Systems Layer
+    emit create_directory with "azl/core/language"
+    emit create_directory with "azl/core/execution"
+    emit create_directory with "azl/core/memory"
+    emit create_directory with "azl/core/events"
+    
+    # Quantum Layer
+    emit create_directory with "azl/quantum/processor"
+    emit create_directory with "azl/quantum/memory"
+    emit create_directory with "azl/quantum/mathematics"
+    emit create_directory with "azl/quantum/neural"
+    emit create_directory with "azl/quantum/consciousness"
+    emit create_directory with "azl/quantum/optimizer"
+    
+    # AGI Layer
+    emit create_directory with "azl/agi/core"
+    emit create_directory with "azl/agi/cognitive"
+    emit create_directory with "azl/agi/planning"
+    emit create_directory with "azl/agi/adaptation"
+    
+    # Neural Layer
+    emit create_directory with "azl/neural/core"
+    emit create_directory with "azl/neural/learning"
+    emit create_directory with "azl/neural/attention"
+    emit create_directory with "azl/neural/adaptation"
+    
+    # Consciousness Layer
+    emit create_directory with "azl/consciousness/core"
+    emit create_directory with "azl/consciousness/experience"
+    emit create_directory with "azl/consciousness/integration"
+    emit create_directory with "azl/consciousness/evolution"
+    
+    # ABA Layer
+    emit create_directory with "azl/aba/core"
+    emit create_directory with "azl/aba/analysis"
+    emit create_directory with "azl/aba/intervention"
+    emit create_directory with "azl/aba/data"
+    
+    # Agents Layer
+    emit create_directory with "azl/agents/core"
+    emit create_directory with "azl/agents/specialized"
+    emit create_directory with "azl/agents/coordination"
+    
+    # Integrations Layer
+    emit create_directory with "azl/integrations/external"
+    emit create_directory with "azl/integrations/protocols"
+    emit create_directory with "azl/integrations/bridges"
+    
+    # Development Layer
+    emit create_directory with "azl/development/tools"
+    emit create_directory with "azl/development/testing"
+    emit create_directory with "azl/development/documentation"
+    
+    emit directory_structure.created
+  }
+
+  on move_existing_components {
+    say "📦 Moving existing components to proper locations..."
+    
+    # Move existing components to their proper places
+    emit move_component with "azl/core/memory/lha3_memory_system.azl" "azl/runtime/memory/lha3_memory_system.azl"
+    emit move_component with "azl/core/neural/neural_system.azl" "azl/neural/core/neural_core.azl"
+    emit move_component with "azl/quantum/consciousness/unified_consciousness.azl" "azl/consciousness/core/consciousness_core.azl"
+    emit move_component with "azl/core/agi/azme_goal_planning.azl" "azme/planning/goal_system.azl"
+    emit move_component with "azl/core/agi/azme_cognitive_reasoning.azl" "azme/cognitive/cognitive_engine.azl"
+    emit move_component with "azl/core/agi/azme_learning.azl" "azme/learning/learning_system.azl"
+    emit move_component with "azl/core/agi/azme_semantic_understanding.azl" "azme/cognitive/semantic_engine.azl"
+    emit move_component with "azl/agents/autonomous_brain.azl" "azme/core/autonomous_brain.azl"
+    emit move_component with "azl/core/aba/aba_analytics.azl" "azl/aba/core/aba_core.azl"
+    emit move_component with "azl/core/aba/behavior_repair_engine.azl" "azl/aba/intervention/intervention_engine.azl"
+    emit move_component with "azl/core/aba/discrete_trial_training.azl" "azl/aba/core/trial_engine.azl"
+    emit move_component with "azl/core/aba/function_identifier.azl" "azl/aba/analysis/function_identifier.azl"
+    emit move_component with "azl/core/aba/language_shaper.azl" "azl/aba/intervention/language_shaper.azl"
+    emit move_component with "azl/core/aba/prompt_manager.azl" "azl/aba/intervention/prompt_manager.azl"
+    emit move_component with "azl/core/aba/reinforcement_schedule.azl" "azl/aba/core/reinforcement_system.azl"
+    emit move_component with "azl/core/aba/result_logger.azl" "azl/aba/data/result_logger.azl"
+    emit move_component with "azl/core/aba/trial_engine.azl" "azl/aba/core/trial_engine.azl"
+    emit move_component with "azl/quantum/processor/engine.azl" "azl/quantum/processor/quantum_processor.azl"
+    emit move_component with "azl/quantum/processor/lha3_quantum_engine.azl" "azl/quantum/memory/lha3_quantum_engine.azl"
+    emit move_component with "azl/quantum/optimizer/quantum_optimizer.azl" "azl/quantum/optimizer/quantum_optimizer.azl"
+    emit move_component with "azl/quantum/neural/quantum_neural_network.azl" "azl/quantum/neural/quantum_neural.azl"
+    emit move_component with "azl/quantum/consciousness/quantum_consciousness_bridge.azl" "azl/quantum/consciousness/quantum_consciousness.azl"
+    emit move_component with "azl/quantum/mathematics/advanced_topology.azl" "azl/quantum/mathematics/quantum_math.azl"
+    emit move_component with "azl/quantum/mathematics/algebraic_structures.azl" "azl/quantum/mathematics/quantum_algebra.azl"
+    emit move_component with "azl/quantum/mathematics/category_theory.azl" "azl/quantum/mathematics/quantum_category.azl"
+    emit move_component with "azl/quantum/mathematics/chaos_theory.azl" "azl/quantum/mathematics/quantum_chaos.azl"
+    emit move_component with "azl/quantum/mathematics/geometric_structures.azl" "azl/quantum/mathematics/quantum_geometry.azl"
+    emit move_component with "azl/quantum/mathematics/integrator.azl" "azl/quantum/mathematics/quantum_integrator.azl"
+    emit move_component with "azl/quantum/mathematics/topological_intelligence.azl" "azl/quantum/mathematics/quantum_topology.azl"
+    
+    emit components.moved
+  }
+
+  on create_missing_components {
+    say "🔧 Creating missing components..."
+    
+    # Create core missing components
+    emit create_component with "azl/runtime/bootstrap/azl_runner.azl" "runtime_bootstrap"
+    emit create_component with "azl/runtime/parser/azl_parser.azl" "runtime_parser"
+    emit create_component with "azl/runtime/executor/command_executor.azl" "runtime_executor"
+    emit create_component with "azl/core/language/syntax.azl" "core_syntax"
+    emit create_component with "azl/core/execution/command_processor.azl" "core_command_processor"
+    emit create_component with "azl/core/memory/memory_system.azl" "core_memory_system"
+    emit create_component with "azl/core/events/event_system.azl" "core_event_system"
+    emit create_component with "azme/core/agi_core.azl" "azme_core"
+    emit create_component with "azme/cognitive/cognitive_engine.azl" "azme_cognitive_engine"
+    emit create_component with "azme/planning/goal_system.azl" "azme_planner"
+    emit create_component with "azme/adaptation/adaptive_system.azl" "azme_adaptive_system"
+    emit create_component with "azl/neural/core/neural_core.azl" "neural_core"
+    emit create_component with "azl/neural/learning/learning_engine.azl" "neural_learning_engine"
+    emit create_component with "azl/neural/attention/attention_mechanism.azl" "neural_attention"
+    emit create_component with "azl/neural/adaptation/neural_adaptation.azl" "neural_adaptation"
+    emit create_component with "azl/consciousness/core/consciousness_core.azl" "consciousness_core"
+    emit create_component with "azl/consciousness/experience/experience_processor.azl" "consciousness_experience"
+    emit create_component with "azl/consciousness/integration/consciousness_integration.azl" "consciousness_integration"
+    emit create_component with "azl/consciousness/evolution/consciousness_evolution.azl" "consciousness_evolution"
+    emit create_component with "azl/aba/core/aba_core.azl" "aba_core"
+    emit create_component with "azl/aba/analysis/behavior_analysis.azl" "aba_behavior_analysis"
+    emit create_component with "azl/aba/intervention/intervention_engine.azl" "aba_intervention_engine"
+    emit create_component with "azl/aba/data/data_collector.azl" "aba_data_collector"
+    emit create_component with "azme/agents/core/agent_core.azl" "azme_agents_core"
+    emit create_component with "azme/agents/specialized/learning_agent.azl" "azme_agents_learning_agent"
+    emit create_component with "azme/agents/coordination/agent_coordinator.azl" "azme_agents_coordinator"
+    emit create_component with "azl/integrations/external/api_connector.azl" "integrations_api_connector"
+    emit create_component with "azl/integrations/protocols/communication_protocol.azl" "integrations_communication"
+    emit create_component with "azl/integrations/bridges/language_bridge.azl" "integrations_language_bridge"
+    emit create_component with "azl/development/tools/debugger.azl" "development_debugger"
+    emit create_component with "azl/development/testing/test_framework.azl" "development_test_framework"
+    emit create_component with "azl/development/documentation/doc_generator.azl" "development_doc_generator"
+    
+    emit missing_components.created
+  }
+
+  on update_component_references {
+    say "🔗 Updating component references..."
+    
+    # Update all component references to use new architecture
+    emit update_references with "all_components"
+    
+    emit references.updated
+  }
+
+  on validate_architecture {
+    say "✅ Validating new architecture..."
+    
+    # Check that all components are in proper locations
+    emit validate_component_locations
+    
+    # Check that all references are correct
+    emit validate_component_references
+    
+    # Check that all dependencies are satisfied
+    emit validate_dependencies
+    
+    emit architecture.validated
+  }
+
+  on architecture.validated {
+    set ::status = $1
+    say "🎉 AZL Architecture reorganization completed: ::status"
+    say "🏗️ Clean, organized structure achieved!"
+    say "🚀 Ready for true self-hosting implementation!"
+  }
+
+  memory {
+    ::status = "ready"
+    ::reorganization_plan = {}
+  }
+}
+
+# Bootstrap the reorganization
+component ::architect.bootstrap {
+  init {
+    set ::status = "ready"
+    say "🏗️ Architecture Bootstrap initialized"
+  }
+
+  on system.start {
+    say "🏗️ Starting AZL Architecture Reorganization..."
+    emit architect.reorganizer.reorganize_architecture
+  }
+
+  memory {
+    ::status = "ready"
+  }
+} 

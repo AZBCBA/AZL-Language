@@ -1,0 +1,346 @@
+# AZME Tool Execution Log
+# Record of past tool invocations
+
+component ::azme.tool_execution_log {
+  init {
+    set ::execution_history = []
+    set ::performance_metrics = {}
+    set ::failure_patterns = {}
+    set ::tool_usage_stats = {}
+    set ::log_count = 0
+    set ::successful_logs = 0
+    set ::failed_logs = 0
+  }
+
+  behavior {
+    on azme.plugin_executed {
+      set ::execution_info = $1
+      set ::plugin = ::execution_info.plugin
+      set ::output = ::execution_info.output
+      set ::execution_entry = ::execution_info.execution_entry
+      
+      say "📝 Logging plugin execution: " + ::plugin
+      
+      # Create detailed log entry
+      set ::log_entry = {
+        id: "log_" + ::log_count,
+        plugin_id: ::plugin,
+        execution_id: ::execution_entry.id,
+        timestamp: ::execution_entry.timestamp,
+        success: ::execution_entry.success,
+        output: ::output,
+        execution_time: ::output.execution_time,
+        memory_usage: ::output.memory_usage,
+        args: ::execution_entry.args,
+        quantum_enhanced: true
+      }
+      
+      set ::execution_history = ::execution_history.push(::log_entry)
+      set ::log_count = ::log_count + 1
+      
+      if ::execution_entry.success {
+        set ::successful_logs = ::successful_logs + 1
+        update_performance_metrics(::plugin, ::output)
+      } else {
+        set ::failed_logs = ::failed_logs + 1
+        update_failure_patterns(::plugin, ::output)
+      }
+      
+      update_tool_usage_stats(::plugin)
+      
+      emit azme.execution_logged with {
+        log_entry: ::log_entry
+      }
+    }
+
+    on azme.plugin_blocked {
+      set ::blocked_info = $1
+      set ::plugin = ::blocked_info.plugin
+      set ::reason = ::blocked_info.reason
+      set ::blocked_entry = ::blocked_info.blocked_entry
+      
+      say "📝 Logging blocked plugin execution: " + ::plugin
+      
+      # Create blocked log entry
+      set ::log_entry = {
+        id: "log_" + ::log_count,
+        plugin_id: ::plugin,
+        execution_id: ::blocked_entry.id,
+        timestamp: ::blocked_entry.timestamp,
+        success: false,
+        blocked: true,
+        reason: ::reason,
+        args: ::blocked_entry.args,
+        quantum_enhanced: true
+      }
+      
+      set ::execution_history = ::execution_history.push(::log_entry)
+      set ::log_count = ::log_count + 1
+      set ::failed_logs = ::failed_logs + 1
+      
+      update_failure_patterns(::plugin, { error: "blocked", reason: ::reason })
+      update_tool_usage_stats(::plugin)
+      
+      emit azme.blocked_execution_logged with {
+        log_entry: ::log_entry
+      }
+    }
+
+    on update_performance_metrics {
+      set ::update_request = $1
+      set ::plugin_id = ::update_request.plugin_id
+      set ::output = ::update_request.output
+      
+      say "📊 Updating performance metrics for: " + ::plugin_id
+      
+      if not ::plugin_id in ::performance_metrics {
+        set ::performance_metrics[::plugin_id] = {
+          total_executions: 0,
+          successful_executions: 0,
+          failed_executions: 0,
+          total_execution_time: 0,
+          average_execution_time: 0,
+          total_memory_usage: 0,
+          average_memory_usage: 0,
+          last_executed: null,
+          success_rate: 0
+        }
+      }
+      
+      set ::metrics = ::performance_metrics[::plugin_id]
+      set ::metrics.total_executions = ::metrics.total_executions + 1
+      set ::metrics.successful_executions = ::metrics.successful_executions + 1
+      set ::metrics.total_execution_time = ::metrics.total_execution_time + ::output.execution_time
+      set ::metrics.total_memory_usage = ::metrics.total_memory_usage + ::output.memory_usage
+      set ::metrics.last_executed = ::internal.now()
+      
+      # Calculate averages
+      set ::metrics.average_execution_time = ::metrics.total_execution_time / ::metrics.total_executions
+      set ::metrics.average_memory_usage = ::metrics.total_memory_usage / ::metrics.total_executions
+      set ::metrics.success_rate = ::metrics.successful_executions / ::metrics.total_executions
+      
+      emit azme.performance_metrics_updated with {
+        plugin_id: ::plugin_id,
+        metrics: ::metrics
+      }
+    }
+
+    on update_failure_patterns {
+      set ::update_request = $1
+      set ::plugin_id = ::update_request.plugin_id
+      set ::output = ::update_request.output
+      
+      say "❌ Updating failure patterns for: " + ::plugin_id
+      
+      if not ::plugin_id in ::failure_patterns {
+        set ::failure_patterns[::plugin_id] = {
+          total_failures: 0,
+          failure_reasons: {},
+          last_failure: null,
+          failure_rate: 0
+        }
+      }
+      
+      set ::patterns = ::failure_patterns[::plugin_id]
+      set ::patterns.total_failures = ::patterns.total_failures + 1
+      set ::patterns.last_failure = ::internal.now()
+      
+      # Track failure reasons
+      set ::reason = ::output.error or "unknown"
+      if not ::reason in ::patterns.failure_reasons {
+        set ::patterns.failure_reasons[::reason] = 0
+      }
+      set ::patterns.failure_reasons[::reason] = ::patterns.failure_reasons[::reason] + 1
+      
+      # Calculate failure rate from performance metrics
+      if ::plugin_id in ::performance_metrics {
+        set ::total_executions = ::performance_metrics[::plugin_id].total_executions
+        set ::patterns.failure_rate = ::patterns.total_failures / ::total_executions
+      }
+      
+      emit azme.failure_patterns_updated with {
+        plugin_id: ::plugin_id,
+        patterns: ::patterns
+      }
+    }
+
+    on update_tool_usage_stats {
+      set ::update_request = $1
+      set ::plugin_id = ::update_request.plugin_id
+      
+      say "📈 Updating tool usage stats for: " + ::plugin_id
+      
+      if not ::plugin_id in ::tool_usage_stats {
+        set ::tool_usage_stats[::plugin_id] = {
+          usage_count: 0,
+          first_used: null,
+          last_used: null,
+          usage_frequency: 0
+        }
+      }
+      
+      set ::stats = ::tool_usage_stats[::plugin_id]
+      set ::stats.usage_count = ::stats.usage_count + 1
+      
+      if not ::stats.first_used {
+        set ::stats.first_used = ::internal.now()
+      }
+      set ::stats.last_used = ::internal.now()
+      
+      # Calculate usage frequency (uses per day)
+      if ::stats.first_used {
+        set ::days_since_first = (::stats.last_used - ::stats.first_used) / 86400
+        if ::days_since_first > 0 {
+          set ::stats.usage_frequency = ::stats.usage_count / ::days_since_first
+        }
+      }
+      
+      emit azme.tool_usage_stats_updated with {
+        plugin_id: ::plugin_id,
+        stats: ::stats
+      }
+    }
+
+    on get_execution_history {
+      set ::history_request = $1
+      set ::plugin_id = ::history_request.plugin_id or null
+      set ::limit = ::history_request.limit or 100
+      
+      say "📋 Getting execution history"
+      
+      set ::filtered_history = []
+      
+      if ::plugin_id {
+        # Filter by plugin ID
+        loop for ::entry in ::execution_history {
+          if ::entry.plugin_id == ::plugin_id {
+            set ::filtered_history = ::filtered_history.push(::entry)
+          }
+        }
+      } else {
+        # Return all history
+        set ::filtered_history = ::execution_history
+      }
+      
+      # Apply limit
+      if ::filtered_history.length > ::limit {
+        set ::filtered_history = ::filtered_history.slice(-::limit)
+      }
+      
+      emit azme.execution_history_retrieved with {
+        plugin_id: ::plugin_id,
+        history: ::filtered_history,
+        total_entries: ::filtered_history.length
+      }
+    }
+
+    on get_performance_report {
+      set ::report_request = $1
+      set ::plugin_id = ::report_request.plugin_id or null
+      
+      say "📊 Generating performance report"
+      
+      if ::plugin_id {
+        # Single plugin report
+        set ::report = {
+          plugin_id: ::plugin_id,
+          performance: ::performance_metrics[::plugin_id] or {},
+          failures: ::failure_patterns[::plugin_id] or {},
+          usage: ::tool_usage_stats[::plugin_id] or {},
+          quantum_enhanced: true
+        }
+      } else {
+        # Overall system report
+        set ::report = {
+          total_plugins: ::performance_metrics.keys().length,
+          total_executions: 0,
+          total_successful: 0,
+          total_failed: 0,
+          average_success_rate: 0,
+          top_performing_plugins: [],
+          most_used_plugins: [],
+          quantum_enhanced: true
+        }
+        
+        # Calculate overall statistics
+        loop for ::plugin_id in ::performance_metrics.keys() {
+          set ::metrics = ::performance_metrics[::plugin_id]
+          set ::report.total_executions = ::report.total_executions + ::metrics.total_executions
+          set ::report.total_successful = ::report.total_successful + ::metrics.successful_executions
+          set ::report.total_failed = ::report.total_failed + ::metrics.failed_executions
+        }
+        
+        if ::report.total_executions > 0 {
+          set ::report.average_success_rate = ::report.total_successful / ::report.total_executions
+        }
+      }
+      
+      emit azme.performance_report_generated with {
+        report: ::report
+      }
+    }
+
+    on analyze_failure_patterns {
+      set ::analysis_request = $1
+      set ::plugin_id = ::analysis_request.plugin_id or null
+      
+      say "🔍 Analyzing failure patterns"
+      
+      set ::analysis = {
+        common_failures: [],
+        failure_trends: {},
+        recommendations: [],
+        quantum_enhanced: true
+      }
+      
+      if ::plugin_id and ::plugin_id in ::failure_patterns {
+        set ::patterns = ::failure_patterns[::plugin_id]
+        
+        # Find most common failure reasons
+        loop for ::reason in ::patterns.failure_reasons.keys() {
+          set ::count = ::patterns.failure_reasons[::reason]
+          set ::analysis.common_failures = ::analysis.common_failures.push({
+            reason: ::reason,
+            count: ::count
+          })
+        }
+        
+        # Sort by count
+        set ::analysis.common_failures = ::analysis.common_failures.sort_by("count", "desc")
+        
+        # Generate recommendations
+        if ::patterns.failure_rate > 0.5 {
+          set ::analysis.recommendations = ::analysis.recommendations.push("Consider replacing this plugin due to high failure rate")
+        }
+        if ::patterns.total_failures > 10 {
+          set ::analysis.recommendations = ::analysis.recommendations.push("Investigate root cause of repeated failures")
+        }
+      }
+      
+      emit azme.failure_analysis_complete with {
+        plugin_id: ::plugin_id,
+        analysis: ::analysis
+      }
+    }
+
+    # Tool execution log monitoring
+    on azme.monitor_tool_execution_log {
+      set ::monitor_request = $1
+      
+      set ::log_metrics = {
+        total_logs: ::log_count,
+        successful_logs: ::successful_logs,
+        failed_logs: ::failed_logs,
+        execution_history_size: ::execution_history.length,
+        performance_metrics_count: ::performance_metrics.keys().length,
+        failure_patterns_count: ::failure_patterns.keys().length,
+        tool_usage_stats_count: ::tool_usage_stats.keys().length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.tool_execution_log_metrics with {
+        metrics: ::log_metrics
+      }
+    }
+  }
+} 

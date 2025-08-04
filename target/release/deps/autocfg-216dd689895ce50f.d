@@ -1,0 +1,10 @@
+/home/abdulrahman-alzalameh/azl-language/target/release/deps/libautocfg-216dd689895ce50f.rmeta: /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/lib.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/error.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/rustc.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/version.rs
+
+/home/abdulrahman-alzalameh/azl-language/target/release/deps/libautocfg-216dd689895ce50f.rlib: /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/lib.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/error.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/rustc.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/version.rs
+
+/home/abdulrahman-alzalameh/azl-language/target/release/deps/autocfg-216dd689895ce50f.d: /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/lib.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/error.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/rustc.rs /mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/version.rs
+
+/mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/lib.rs:
+/mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/error.rs:
+/mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/rustc.rs:
+/mnt/ssd4t/abdulrahman-alzalameh/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.0/src/version.rs:

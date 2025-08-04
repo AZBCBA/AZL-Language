@@ -1,0 +1,24 @@
+// Simple test to isolate stack underflow in map function
+fn double(n) {
+    return n * 2;
+}
+
+fn map(array, transform) {
+    let result = [];
+    let length = array.length(array);
+    let i = 0;
+    
+    while (i < length) {
+        let element = array[i];
+        let transformed = transform(element);
+        result = array.push(result, transformed);
+        i = i + 1;
+    }
+    
+    return result;
+}
+
+let numbers = [1, 2];
+say "Testing simple map:";
+let doubled = map(numbers, double);
+say doubled; 

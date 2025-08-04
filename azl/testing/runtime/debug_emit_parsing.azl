@@ -1,0 +1,10 @@
+component ::debug.emit {
+  init {
+    say "🔍 Debug emit parsing"
+  }
+
+  on start {
+    say "🔍 Testing emit parsing..."
+    emit debug.test with "hello" 42 "world"
+  }
+} 

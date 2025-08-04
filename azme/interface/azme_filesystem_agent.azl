@@ -1,0 +1,376 @@
+# AZME Filesystem Agent
+# Read, write, and organize files & memory with persistence
+
+component ::azme.filesystem_agent {
+  init {
+    # Core state variables
+    set ::file_access_log = []
+    set ::memory_storage_root = "/azme/memory"
+    set ::goal_trace_dir = "/azme/goals"
+    set ::narrative_archive_path = "/azme/narratives"
+    set ::component_edit_queue = []
+    set ::secure_file_mode = false
+    
+    # File operations tracking
+    set ::file_operations = []
+    set ::memory_files = {
+      episodic_memory: "/azme/memory/episodic.json",
+      belief_continuity: "/azme/memory/beliefs.json",
+      self_model: "/azme/memory/self_model.json",
+      emotional_state: "/azme/memory/emotions.json",
+      goals: "/azme/memory/goals.json",
+      narrative_state: "/azme/memory/narrative.json"
+    }
+    set ::file_permissions = {
+      read: true,
+      write: true,
+      create: true,
+      delete: false
+    }
+    set ::operation_count = 0
+    set ::successful_operations = 0
+    set ::failed_operations = 0
+  }
+
+  behavior {
+    # Core file operations
+    on read_file {
+      set ::read_request = $1
+      set ::path = ::read_request.path
+      
+      say "📖 Reading file: " + ::path
+      
+      if secure_check(::path) {
+        # Simulate file read operation
+        set ::content = "File content for " + ::path
+        set ::read_result = {
+          success: true,
+          content: ::content,
+          bytes_read: ::content.length,
+          file_path: ::path,
+          timestamp: ::internal.now()
+        }
+        
+        log_access("read", ::path)
+        
+        set ::operation_entry = {
+          id: "op_" + ::operation_count,
+          type: "read_file",
+          file_path: ::path,
+          timestamp: ::internal.now(),
+          result: ::read_result,
+          success: ::read_result.success,
+          quantum_enhanced: true
+        }
+        
+        set ::file_operations = ::file_operations.push(::operation_entry)
+        set ::operation_count = ::operation_count + 1
+        set ::successful_operations = ::successful_operations + 1
+        
+        emit azme.file_read with {
+          path: ::path,
+          content: ::content,
+          result: ::read_result
+        }
+      } else {
+        emit azme.filesystem_violation with {
+          path: ::path,
+          operation: "read",
+          reason: "unauthorized_path"
+        }
+      }
+    }
+
+    on write_file {
+      set ::write_request = $1
+      set ::path = ::write_request.path
+      set ::content = ::write_request.content
+      
+      say "📝 Writing file: " + ::path
+      
+      if secure_check(::path) {
+        # Simulate file write operation
+        set ::write_result = {
+          success: true,
+          bytes_written: ::content.length,
+          file_path: ::path,
+          timestamp: ::internal.now()
+        }
+        
+        log_access("write", ::path)
+        
+        set ::operation_entry = {
+          id: "op_" + ::operation_count,
+          type: "write_file",
+          file_path: ::path,
+          timestamp: ::internal.now(),
+          result: ::write_result,
+          success: ::write_result.success,
+          quantum_enhanced: true
+        }
+        
+        set ::file_operations = ::file_operations.push(::operation_entry)
+        set ::operation_count = ::operation_count + 1
+        set ::successful_operations = ::successful_operations + 1
+        
+        emit azme.file_written with {
+          path: ::path,
+          result: ::write_result
+        }
+      } else {
+        emit azme.filesystem_violation with {
+          path: ::path,
+          operation: "write",
+          reason: "unauthorized_path"
+        }
+      }
+    }
+
+    on append_to_file {
+      set ::append_request = $1
+      set ::path = ::append_request.path
+      set ::data = ::append_request.data
+      
+      say "📎 Appending to file: " + ::path
+      
+      if secure_check(::path) {
+        # Simulate file append operation
+        set ::append_result = {
+          success: true,
+          bytes_appended: ::data.length,
+          file_path: ::path,
+          timestamp: ::internal.now()
+        }
+        
+        log_access("append", ::path)
+        
+        set ::operation_entry = {
+          id: "op_" + ::operation_count,
+          type: "append_file",
+          file_path: ::path,
+          timestamp: ::internal.now(),
+          result: ::append_result,
+          success: ::append_result.success,
+          quantum_enhanced: true
+        }
+        
+        set ::file_operations = ::file_operations.push(::operation_entry)
+        set ::operation_count = ::operation_count + 1
+        set ::successful_operations = ::successful_operations + 1
+        
+        emit azme.file_updated with {
+          path: ::path,
+          result: ::append_result
+        }
+      } else {
+        emit azme.filesystem_violation with {
+          path: ::path,
+          operation: "append",
+          reason: "unauthorized_path"
+        }
+      }
+    }
+
+    on list_directory {
+      set ::list_request = $1
+      set ::path = ::list_request.path
+      
+      say "📁 Listing directory: " + ::path
+      
+      if secure_check(::path) {
+        # Simulate directory listing
+        set ::directory_contents = [
+          "file1.txt",
+          "file2.json",
+          "subdirectory/"
+        ]
+        
+        set ::list_result = {
+          success: true,
+          path: ::path,
+          contents: ::directory_contents,
+          file_count: ::directory_contents.length,
+          timestamp: ::internal.now()
+        }
+        
+        log_access("list", ::path)
+        
+        set ::operation_entry = {
+          id: "op_" + ::operation_count,
+          type: "list_directory",
+          file_path: ::path,
+          timestamp: ::internal.now(),
+          result: ::list_result,
+          success: ::list_result.success,
+          quantum_enhanced: true
+        }
+        
+        set ::file_operations = ::file_operations.push(::operation_entry)
+        set ::operation_count = ::operation_count + 1
+        set ::successful_operations = ::successful_operations + 1
+        
+        emit azme.directory_listed with {
+          path: ::path,
+          contents: ::directory_contents,
+          result: ::list_result
+        }
+      } else {
+        emit azme.filesystem_violation with {
+          path: ::path,
+          operation: "list",
+          reason: "unauthorized_path"
+        }
+      }
+    }
+
+    # Intent resolution
+    on azme.intent_resolved {
+      set ::intent = $1
+      
+      if ::intent.type == "read_file" {
+        emit read_file with {
+          path: ::intent.path
+        }
+      } else if ::intent.type == "write_file" {
+        emit write_file with {
+          path: ::intent.path,
+          content: ::intent.content
+        }
+      } else if ::intent.type == "append_file" {
+        emit append_to_file with {
+          path: ::intent.path,
+          data: ::intent.data
+        }
+      } else if ::intent.type == "list_directory" {
+        emit list_directory with {
+          path: ::intent.path
+        }
+      }
+    }
+
+    # Memory operations
+    on azme.memory.save {
+      set ::save_request = $1
+      set ::memory_type = ::save_request.memory_type
+      set ::memory_data = ::save_request.memory_data
+      
+      emit write_file with {
+        path: ::memory_files[::memory_type],
+        content: ::memory_data
+      }
+    }
+
+    on azme.memory.load {
+      set ::load_request = $1
+      set ::memory_type = ::load_request.memory_type
+      
+      emit read_file with {
+        path: ::memory_files[::memory_type]
+      }
+    }
+
+    # Goal trace operations
+    on azme.goal.trace {
+      set ::trace_request = $1
+      set ::goal_data = ::trace_request.goal_data
+      
+      set ::trace_path = ::goal_trace_dir + "/goal_" + ::internal.now() + ".json"
+      
+      emit write_file with {
+        path: ::trace_path,
+        content: ::goal_data
+      }
+    }
+
+    # Narrative archive operations
+    on azme.narrative.archive {
+      set ::archive_request = $1
+      set ::narrative_data = ::archive_request.narrative_data
+      
+      set ::archive_path = ::narrative_archive_path + "/narrative_" + ::internal.now() + ".json"
+      
+      emit write_file with {
+        path: ::archive_path,
+        content: ::narrative_data
+      }
+    }
+
+    # Component edit queue (ASEE-driven)
+    on azme.component.edit {
+      set ::edit_request = $1
+      set ::component_path = ::edit_request.component_path
+      set ::edit_content = ::edit_request.edit_content
+      
+      set ::edit_entry = {
+        id: "edit_" + ::internal.now(),
+        component_path: ::component_path,
+        edit_content: ::edit_content,
+        timestamp: ::internal.now(),
+        status: "pending",
+        quantum_enhanced: true
+      }
+      
+      set ::component_edit_queue = ::component_edit_queue.push(::edit_entry)
+      
+      emit azme.component.edit_queued with {
+        edit_entry: ::edit_entry
+      }
+    }
+
+    # Security functions
+    on secure_check {
+      set ::security_request = $1
+      set ::path = ::security_request.path
+      
+      set ::is_secure = ::path.starts_with(::memory_storage_root) or 
+                        ::path.starts_with(::goal_trace_dir) or 
+                        ::path.starts_with(::narrative_archive_path)
+      
+      emit azme.security_check_result with {
+        path: ::path,
+        is_secure: ::is_secure,
+        secure_file_mode: ::secure_file_mode
+      }
+    }
+
+    # Log access function
+    on log_access {
+      set ::log_request = $1
+      set ::operation = ::log_request.operation
+      set ::path = ::log_request.path
+      
+      set ::access_entry = {
+        operation: ::operation,
+        path: ::path,
+        timestamp: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      set ::file_access_log = ::file_access_log.push(::access_entry)
+      
+      emit azme.access_logged with {
+        access_entry: ::access_entry
+      }
+    }
+
+    # Filesystem agent monitoring
+    on azme.monitor_filesystem_agent {
+      set ::monitor_request = $1
+      
+      set ::filesystem_metrics = {
+        total_operations: ::operation_count,
+        successful_operations: ::successful_operations,
+        failed_operations: ::failed_operations,
+        file_operations_size: ::file_operations.length,
+        file_access_log_size: ::file_access_log.length,
+        component_edit_queue_size: ::component_edit_queue.length,
+        secure_file_mode: ::secure_file_mode,
+        quantum_enhanced: true
+      }
+      
+      emit azme.filesystem_agent_metrics with {
+        metrics: ::filesystem_metrics
+      }
+    }
+  }
+} 

@@ -1,0 +1,14 @@
+fn make_counter() {
+    let n = 0;
+    return fn() { n = n + 1; return n; };
+}
+
+counter = make_counter();
+result1 = counter();
+result2 = counter();
+result3 = counter();
+
+say "Counter results:";
+say result1;
+say result2;
+say result3; 

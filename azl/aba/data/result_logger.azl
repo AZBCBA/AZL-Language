@@ -1,0 +1,240 @@
+component ::aba.result_logger {
+  init {
+    set ::trial_results = []
+    set ::session_summaries = []
+    set ::export_frequency = 10
+    set ::trials_since_last_export = 0
+  }
+
+  behavior {
+    listen for "trial_result" then {
+      store ::trial_results from add_trial_result(::trial_data)
+      increment ::trials_since_last_export
+      
+      branch when ::trials_since_last_export >= ::export_frequency {
+        export_session_summary()
+        set ::trials_since_last_export = 0
+      }
+    }
+
+    listen for "session_completed" then {
+      generate_final_session_report()
+    }
+
+    listen for "export_requested" then {
+      export_session_summary()
+    }
+  }
+
+  memory {
+    trial_results
+    session_summaries
+    export_frequency
+    trials_since_last_export
+  }
+
+  interface {
+    add_trial_result using ::trial_data
+    export_session_summary
+    generate_final_session_report
+    get_trial_results
+  }
+}
+
+function add_trial_result(trial_data) {
+  let results = ::trial_results
+  results.push({
+    trial_number: trial_data.trial_number,
+    correct: trial_data.correct,
+    response_latency: trial_data.latency,
+    behavior_type: trial_data.behavior_type,
+    prompt_level: trial_data.prompt_level,
+    timestamp: now()
+  })
+  return results
+}
+
+function export_session_summary() {
+  let summary = {
+    total_trials: ::trial_results.length,
+    correct_trials: count_correct_trials(),
+    accuracy: calculate_accuracy(),
+    average_latency: calculate_average_latency(),
+    behavior_type_breakdown: calculate_behavior_breakdown(),
+    export_timestamp: now()
+  }
+  
+  ::session_summaries.push(summary)
+  
+  emit "session_summary" with summary
+  log("Session Summary Exported:", summary)
+}
+
+function generate_final_session_report() {
+  let final_report = {
+    session_duration: now() - ::session_start,
+    total_trials: ::trial_results.length,
+    accuracy: calculate_accuracy(),
+    behavior_analysis: analyze_behavior_patterns(),
+    prompt_effectiveness: analyze_prompt_effectiveness(),
+    recommendations: generate_recommendations(),
+    timestamp: now()
+  }
+  
+  emit "final_session_report" with final_report
+}
+
+function count_correct_trials() {
+  let correct_count = 0
+  
+  loop for result in ::trial_results {
+    branch when result.correct {
+      increment correct_count
+    }
+  }
+  
+  return correct_count
+}
+
+function calculate_accuracy() {
+  let total = ::trial_results.length
+  let correct = count_correct_trials()
+  
+  branch when total > 0 {
+    return correct / total
+  } else {
+    return 0.0
+  }
+}
+
+function calculate_average_latency() {
+  let total_latency = 0.0
+  let count = 0
+  
+  loop for result in ::trial_results {
+    total_latency = total_latency + result.response_latency
+    increment count
+  }
+  
+  branch when count > 0 {
+    return total_latency / count
+  } else {
+    return 0.0
+  }
+}
+
+function calculate_behavior_breakdown() {
+  let breakdown = {
+    mand: 0,
+    tact: 0,
+    intraverbal: 0,
+    echoic: 0
+  }
+  
+  loop for result in ::trial_results {
+    branch when result.behavior_type == "mand" {
+      increment breakdown.mand
+    } else branch when result.behavior_type == "tact" {
+      increment breakdown.tact
+    } else branch when result.behavior_type == "intraverbal" {
+      increment breakdown.intraverbal
+    } else branch when result.behavior_type == "echoic" {
+      increment breakdown.echoic
+    }
+  }
+  
+  return breakdown
+}
+
+function analyze_behavior_patterns() {
+  let analysis = {
+    most_difficult_behavior: null,
+    easiest_behavior: null,
+    behavior_accuracy: {}
+  }
+  
+  let behavior_types = ["mand", "tact", "intraverbal", "echoic"]
+  
+  loop for behavior in behavior_types {
+    let accuracy = calculate_behavior_accuracy(behavior)
+    set analysis.behavior_accuracy[behavior] = accuracy
+    
+    branch when analysis.most_difficult_behavior == null or accuracy < analysis.behavior_accuracy[analysis.most_difficult_behavior] {
+      set analysis.most_difficult_behavior = behavior
+    }
+    
+    branch when analysis.easiest_behavior == null or accuracy > analysis.behavior_accuracy[analysis.easiest_behavior] {
+      set analysis.easiest_behavior = behavior
+    }
+  }
+  
+  return analysis
+}
+
+function calculate_behavior_accuracy(behavior_type) {
+  let total = 0
+  let correct = 0
+  
+  loop for result in ::trial_results {
+    branch when result.behavior_type == behavior_type {
+      increment total
+      branch when result.correct {
+        increment correct
+      }
+    }
+  }
+  
+  branch when total > 0 {
+    return correct / total
+  } else {
+    return 0.0
+  }
+}
+
+function analyze_prompt_effectiveness() {
+  let effectiveness = {}
+  
+  loop for result in ::trial_results {
+    let level = result.prompt_level
+    branch when effectiveness[level] == null {
+      set effectiveness[level] = {
+        trials: 0,
+        successes: 0,
+        accuracy: 0.0
+      }
+    }
+    
+    increment effectiveness[level].trials
+    branch when result.correct {
+      increment effectiveness[level].successes
+    }
+  }
+  
+  // Calculate accuracy for each prompt level
+  loop for level in effectiveness {
+    let level_data = effectiveness[level]
+    set level_data.accuracy = level_data.successes / level_data.trials
+  }
+  
+  return effectiveness
+}
+
+function generate_recommendations() {
+  let recommendations = []
+  let accuracy = calculate_accuracy()
+  
+  branch when accuracy < 0.5 {
+    recommendations.push("Increase prompt levels for struggling skills")
+    recommendations.push("Focus on error correction procedures")
+  } else branch when accuracy > 0.8 {
+    recommendations.push("Consider reducing prompt levels")
+    recommendations.push("Introduce more complex tasks")
+  }
+  
+  let behavior_analysis = analyze_behavior_patterns()
+  branch when behavior_analysis.most_difficult_behavior {
+    recommendations.push("Focus training on " + behavior_analysis.most_difficult_behavior + " skills")
+  }
+  
+  return recommendations
+} 

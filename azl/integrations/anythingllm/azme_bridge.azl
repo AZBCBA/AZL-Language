@@ -1,0 +1,160 @@
+// AZME Bridge for AnythingLLM Integration
+// This script provides AZME-style functionality as an API that AnythingLLM can use.
+// It bridges the gap between AZME's advanced capabilities and AnythingLLM's interface.
+
+// Bridge between AZME capabilities and AnythingLLM
+class AZMEBridge {
+    constructor() {
+        this.ollama_endpoint = "http://localhost:11434"
+        this.azme_workspace = "/mnt/ssd4t/azme-workspace"
+        this.available_models = this._get_ollama_models()
+    }
+    
+    // Get available Ollama models
+    _get_ollama_models() {
+        try {
+            let response = http_get(this.ollama_endpoint + "/api/tags")
+            if (response.status == 200) {
+                let data = json_parse(response.body)
+                let models = []
+                for (let model in data.models) {
+                    models.push(model.name)
+                }
+                return models
+            }
+            return []
+        } catch (error) {
+            return []
+        }
+    }
+    
+    // Perform AZME-style analysis using local models
+    azme_style_analysis(prompt, model = "llama3:latest") {
+        // AZME-style prompt enhancement
+        let enhanced_prompt = this._enhance_prompt(prompt)
+        
+        // Use Ollama for inference
+        try {
+            let request_data = {
+                "model": model,
+                "prompt": enhanced_prompt,
+                "stream": false,
+                "options": {
+                    "temperature": 0.1,
+                    "top_p": 0.9,
+                    "max_tokens": 2048
+                }
+            }
+            
+            let response = http_post(this.ollama_endpoint + "/api/generate", json_stringify(request_data))
+            
+            if (response.status == 200) {
+                let result = json_parse(response.body)
+                return {
+                    "status": "success",
+                    "response": result.response || "",
+                    "model": model,
+                    "analysis_type": "azme_enhanced",
+                    "prompt_enhanced": true
+                }
+            } else {
+                return {"status": "error", "message": "Ollama request failed"}
+            }
+        } catch (error) {
+            return {"status": "error", "message": error.toString()}
+        }
+    }
+    
+    // Enhance prompt with AZME-style analysis framework
+    _enhance_prompt(prompt) {
+        let enhanced = "AZME Analysis Framework\n\nTASK: " + prompt + "\n\nPlease provide a comprehensive analysis following AZME principles:\n\n1. **SYSTEM ANALYSIS**: Identify key components and their relationships\n2. **PERFORMANCE EVALUATION**: Assess efficiency and optimization opportunities  \n3. **SECURITY CONSIDERATIONS**: Identify potential vulnerabilities and improvements\n4. **SCALABILITY ASSESSMENT**: Evaluate growth potential and bottlenecks\n5. **BEST PRACTICES**: Recommend industry standards and improvements\n6. **ALTERNATIVE APPROACHES**: Suggest different methodologies or solutions\n7. **IMPLEMENTATION ROADMAP**: Provide step-by-step execution plan\n\nPlease structure your response with clear sections and actionable insights.\n"
+        return enhanced
+    }
+    
+    // Get AZME bridge capabilities
+    get_capabilities() {
+        return {
+            "name": "AZME Bridge",
+            "version": "1.0.0",
+            "capabilities": [
+                "system_analysis",
+                "performance_evaluation", 
+                "security_assessment",
+                "scalability_analysis",
+                "best_practices_recommendation",
+                "alternative_approaches",
+                "implementation_roadmap"
+            ],
+            "available_models": this.available_models,
+            "endpoint": "http://localhost:5000"
+        }
+    }
+}
+
+// Global bridge instance
+let bridge = new AZMEBridge()
+
+// Health check endpoint
+function health() {
+    return {
+        "status": "healthy",
+        "service": "AZME Bridge",
+        "ollama_connected": bridge.available_models.length > 0,
+        "available_models": bridge.available_models
+    }
+}
+
+// Generate AZME-style analysis
+function generate(data) {
+    let prompt = data.prompt || ""
+    let model = data.model || "llama3:latest"
+    
+    if (!prompt) {
+        return {"error": "No prompt provided"}
+    }
+    
+    return bridge.azme_style_analysis(prompt, model)
+}
+
+// Get bridge capabilities
+function capabilities() {
+    return bridge.get_capabilities()
+}
+
+// Get available models
+function models() {
+    return {
+        "models": bridge.available_models,
+        "default": "llama3:latest"
+    }
+}
+
+// HTTP server routes
+let routes = {
+    "/health": {
+        "GET": health
+    },
+    "/generate": {
+        "POST": generate
+    },
+    "/capabilities": {
+        "GET": capabilities
+    },
+    "/models": {
+        "GET": models
+    }
+}
+
+// Start HTTP server
+function start_server(port = 5000) {
+    print("🚀 Starting AZME Bridge for AnythingLLM...")
+    print("📊 Available models: " + bridge.available_models)
+    print("🌐 API will be available at: http://localhost:" + port)
+    print("🔗 Health check: http://localhost:" + port + "/health")
+    
+    // Start HTTP server with routes
+    start_http_server(port, routes)
+}
+
+// Main execution
+start_server(5000) 

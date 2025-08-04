@@ -1,0 +1,362 @@
+# AZL AST Event Bus
+# Central event-driven system for AST generation, transformation, and coordination
+
+component ::meta_language.ast_event_bus {
+  init {
+    set ::status = "initializing"
+    set ::bus_version = "1.0"
+    set ::event_handlers = {}
+    set ::event_history = []
+    set ::active_transformations = []
+    set ::ast_pipeline = []
+    
+    # Link to core components
+    link ::meta_language.universal_ast
+    link ::meta_language.transformation_engine
+    link ::meta_language.parser_registry
+    
+    # Initialize event handlers
+    set ::event_handlers = {
+      "ast.generated": ["transform.analyze", "semantic.understanding.insight.ready"],
+      "ast.transformed": ["meta_language.generate_code", "ast.event_bus.ast.ready"],
+      "ast.error": ["parser_registry.handle_error", "meta_language.handle_error"],
+      "intent.extracted": ["transform.apply", "reasoning.cognitive.insight.meaningful"],
+      "transformation.complete": ["ast.event_bus.ast.transformed", "meta_language.learn"]
+    }
+    
+    # Initialize AST pipeline stages
+    set ::ast_pipeline = [
+      "parse_source",
+      "generate_universal_ast", 
+      "extract_semantic_intent",
+      "apply_transformations",
+      "validate_ast",
+      "generate_code"
+    ]
+    
+    emit "ast.event_bus.initialized" with {
+      status: ::status,
+      version: ::bus_version,
+      event_handlers: ::event_handlers.length,
+      pipeline_stages: ::ast_pipeline.length
+    }
+    
+    set ::status = "ready"
+    say "🚌 AST Event Bus initialized"
+    say "📊 Event handlers: ::event_handlers.length"
+    say "⚙️ Pipeline stages: ::ast_pipeline.length"
+  }
+
+  behavior {
+    # Handle AST generation events
+    listen for "ast.event_bus.ast.generated" then {
+      set ::ast_data = ::ast_generated_data
+      
+      say "🚌 AST generated for language: ::ast_data.language"
+      say "📁 File: ::ast_data.file_path"
+      say "📊 AST nodes: ::ast_data.ast.body.length"
+      
+      # Record event
+      set ::event_history.push({
+        event: "ast.generated",
+        language: ::ast_data.language,
+        file_path: ::ast_data.file_path,
+        timestamp: ::time.engine.now().epoch
+      })
+      
+      # Route to transformation analysis
+      emit "transform.analyze" with {
+        ast: ::ast_data.ast,
+        language: ::ast_data.language,
+        file_path: ::ast_data.file_path,
+        options: { add_logging: true, optimize_performance: true }
+      }
+      
+      # Route to semantic understanding
+      emit "semantic.understanding.insight.ready" with {
+        text: "AST generated for " + ::ast_data.language + " file: " + ::ast_data.file_path
+      }
+    }
+    
+    # Handle AST transformation events
+    listen for "ast.event_bus.ast.transformed" then {
+      set ::transform_data = ::ast_transformed_data
+      
+      say "🚌 AST transformation complete"
+      say "🔧 Transformation type: ::transform_data.transformation.type"
+      
+      # Record event
+      set ::event_history.push({
+        event: "ast.transformed",
+        transformation: ::transform_data.transformation.type,
+        timestamp: ::time.engine.now().epoch
+      })
+      
+      # Route to code generation
+      emit "meta_language.generate_code" with {
+        ast: ::transform_data.transformed,
+        target_language: ::transform_data.language,
+        options: { preserve_formatting: true }
+      }
+      
+      # Route to learning system
+      emit "meta_language.learn" with {
+        result: ::transform_data
+      }
+    }
+    
+    # Handle AST error events
+    listen for "ast.event_bus.ast.error" then {
+      set ::error_data = ::ast_error_data
+      
+      say "❌ AST error occurred"
+      say "📝 Language: ::error_data.language"
+      say "📝 Error: ::error_data.error"
+      
+      # Record error event
+      set ::event_history.push({
+        event: "ast.error",
+        language: ::error_data.language,
+        error: ::error_data.error,
+        timestamp: ::time.engine.now().epoch
+      })
+      
+      # Route to error handling
+      emit "meta_language.handle_error" with {
+        error: ::error_data.error,
+        language: ::error_data.language,
+        file_path: ::error_data.file_path
+      }
+    }
+    
+    # Handle intent extraction events
+    listen for "ast.event_bus.intent.extracted" then {
+      set ::intent_data = ::intent_extracted_data
+      
+      say "🧠 Semantic intent extracted"
+      say "📊 Intent type: ::intent_data.intent.type"
+      say "💡 Intent value: ::intent_data.intent.value"
+      
+      # Record intent event
+      set ::event_history.push({
+        event: "intent.extracted",
+        intent_type: ::intent_data.intent.type,
+        timestamp: ::time.engine.now().epoch
+      })
+      
+      # Route to transformation engine
+      emit "transform.apply" with {
+        type: ::intent_data.intent.type,
+        ast: ::intent_data.ast,
+        intent: ::intent_data.intent
+      }
+      
+      # Route to cognitive reasoning
+      emit "reasoning.cognitive.insight.meaningful" with {
+        semantic_data: ::intent_data
+      }
+    }
+    
+    # Handle transformation completion events
+    listen for "ast.event_bus.transformation.complete" then {
+      set ::complete_data = ::transformation_complete_data
+      
+      say "✅ Transformation completed successfully"
+      say "🔧 Type: ::complete_data.transformation.type"
+      
+      # Record completion event
+      set ::event_history.push({
+        event: "transformation.complete",
+        transformation_type: ::complete_data.transformation.type,
+        timestamp: ::time.engine.now().epoch
+      })
+      
+      # Route to AST ready event
+      emit "ast.event_bus.ast.ready" with {
+        ast: ::complete_data.transformed,
+        transformation: ::complete_data.transformation
+      }
+      
+      # Route to learning system
+      emit "meta_language.learn" with {
+        result: ::complete_data
+      }
+    }
+    
+    # Handle AST ready events (ready for code generation)
+    listen for "ast.event_bus.ast.ready" then {
+      set ::ready_data = ::ast_ready_data
+      
+      say "🚌 AST ready for code generation"
+      say "📊 AST nodes: ::ready_data.ast.body.length"
+      
+      # Record ready event
+      set ::event_history.push({
+        event: "ast.ready",
+        ast_nodes: ::ready_data.ast.body.length,
+        timestamp: ::time.engine.now().epoch
+      })
+      
+      # Route to code generation
+      emit "meta_language.generate_code" with {
+        ast: ::ready_data.ast,
+        target_language: "python", # Default for now
+        options: { preserve_formatting: true }
+      }
+    }
+    
+    # Handle pipeline stage completion
+    listen for "ast.event_bus.pipeline.stage_complete" then {
+      set ::stage_data = ::pipeline_stage_data
+      
+      say "🚌 Pipeline stage complete: ::stage_data.stage"
+      say "📊 Progress: ::stage_data.stage_index / ::ast_pipeline.length"
+      
+      # Record pipeline event
+      set ::event_history.push({
+        event: "pipeline.stage_complete",
+        stage: ::stage_data.stage,
+        stage_index: ::stage_data.stage_index,
+        timestamp: ::time.engine.now().epoch
+      })
+      
+      # Route to next pipeline stage
+      if ::stage_data.stage_index < ::ast_pipeline.length {
+        set ::next_stage = ::ast_pipeline[::stage_data.stage_index]
+        emit "ast.event_bus.pipeline." + ::next_stage with {
+          data: ::stage_data.data,
+          stage_index: ::stage_data.stage_index + 1
+        }
+      } else {
+        # Pipeline complete
+        emit "ast.event_bus.pipeline.complete" with {
+          result: ::stage_data.data
+        }
+      }
+    }
+    
+    # Handle pipeline completion
+    listen for "ast.event_bus.pipeline.complete" then {
+      set ::pipeline_result = ::pipeline_complete_data
+      
+      say "🎉 AST Pipeline complete!"
+      say "📊 Final result: ::pipeline_result.result"
+      
+      # Record pipeline completion
+      set ::event_history.push({
+        event: "pipeline.complete",
+        timestamp: ::time.engine.now().epoch
+      })
+      
+      # Route to final destination
+      emit "meta_language.transform_complete" with {
+        result: ::pipeline_result.result
+      }
+    }
+    
+    # Get event bus statistics
+    listen for "ast.event_bus.get_statistics" then {
+      set ::stats = {
+        total_events: ::event_history.length,
+        active_transformations: ::active_transformations.length,
+        pipeline_stages: ::ast_pipeline.length,
+        event_handlers: ::event_handlers.length,
+        recent_events: ::event_history.slice(-10) # Last 10 events
+      }
+      
+      emit "ast.event_bus.statistics" with { statistics: ::stats }
+    }
+    
+    # Clear event history
+    listen for "ast.event_bus.clear_history" then {
+      set ::event_history = []
+      
+      say "🗑️ AST Event Bus history cleared"
+      
+      emit "ast.event_bus.history_cleared" with {
+        cleared_events: 0
+      }
+    }
+    
+    # Register new event handler
+    listen for "ast.event_bus.register_handler" then {
+      set ::event_type = ::handler_data.event_type
+      set ::handlers = ::handler_data.handlers
+      
+      if ::event_handlers[::event_type] {
+        set ::event_handlers[::event_type] = ::event_handlers[::event_type].push(::handlers)
+      } else {
+        set ::event_handlers[::event_type] = ::handlers
+      }
+      
+      say "📝 Registered handler for event: ::event_type"
+      
+      emit "ast.event_bus.handler_registered" with {
+        event_type: ::event_type,
+        handlers: ::handlers
+      }
+    }
+    
+    # Handle orchestrator binding
+    listen for "ast.event_bus.bind_orchestrator" then {
+      set ::orchestrator = ::bind_data.orchestrator
+      
+      say "🚌 Binding orchestrator: ::orchestrator"
+      
+      emit "ast.event_bus.orchestrator_bound" with {
+        orchestrator: ::orchestrator,
+        event_handlers: ::event_handlers.length,
+        pipeline_stages: ::ast_pipeline.length
+      }
+      
+      say "✅ Orchestrator bound to AST event bus"
+    }
+  }
+
+  # Helper functions
+  function ::route_event(event_type, data) {
+    if ::event_handlers[::event_type] {
+      loop for ::handler in ::event_handlers[::event_type] {
+        emit ::handler with ::data
+      }
+    }
+  }
+  
+  function ::get_event_history() {
+    return ::event_history
+  }
+  
+  function ::get_active_transformations() {
+    return ::active_transformations
+  }
+  
+  function ::add_active_transformation(transformation) {
+    set ::active_transformations.push(::transformation)
+  }
+  
+  function ::remove_active_transformation(transformation_id) {
+    loop for ::i in range(0, ::active_transformations.length) {
+      if ::active_transformations[::i].id == ::transformation_id {
+        set ::active_transformations.splice(::i, 1)
+        break
+      }
+    }
+  }
+  
+  function ::get_pipeline_stages() {
+    return ::ast_pipeline
+  }
+  
+  function ::add_pipeline_stage(stage) {
+    set ::ast_pipeline.push(::stage)
+  }
+
+  memory {
+    ::status = ""
+    ::bus_version = ""
+    ::event_handlers = {}
+    ::event_history = []
+    ::active_transformations = []
+    ::ast_pipeline = []
+  }
+} 

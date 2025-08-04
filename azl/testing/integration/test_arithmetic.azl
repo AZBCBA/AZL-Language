@@ -1,0 +1,167 @@
+component ::test.arithmetic {
+  init {
+    set ::a = 5
+    set ::b = 3
+    set ::c = 2
+    set ::result = 0
+    
+    emit "test.arithmetic.initialized" with { a: ::a, b: ::b, c: ::c }
+  }
+
+  behavior {
+    // Test basic arithmetic
+    listen for "test_basic_math" then {
+      say "🧮 Testing Basic Arithmetic..."
+      
+      // Test addition
+      set ::result = ::a + ::b
+      say "Addition: ::a + ::b = ::result"
+      
+      // Test multiplication
+      set ::result = ::a * ::b
+      say "Multiplication: ::a * ::b = ::result"
+      
+      // Test complex expression
+      set ::result = ::a + ::b * ::c
+      say "Complex: ::a + ::b * ::c = ::result"
+      
+      // Test division
+      set ::result = ::a / ::b
+      say "Division: ::a / ::b = ::result"
+      
+      // Test subtraction
+      set ::result = ::a - ::b
+      say "Subtraction: ::a - ::b = ::result"
+      
+      emit "basic_math.complete" with ::result
+    }
+
+    // Test variable substitution
+    listen for "test_variable_substitution" then {
+      say "🔄 Testing Variable Substitution..."
+      
+      set ::x = 10
+      set ::y = 5
+      set ::z = 2
+      
+      // Complex expression with variables
+      set ::result = ::x + ::y * ::z - 3
+      say "Expression: ::x + ::y * ::z - 3 = ::result"
+      
+      // Test with parentheses (if supported)
+      set ::result = (::x + ::y) * ::z
+      say "Parentheses: (::x + ::y) * ::z = ::result"
+      
+      emit "variable_substitution.complete" with ::result
+    }
+
+    // Test error handling
+    listen for "test_error_handling" then {
+      say "⚠️ Testing Error Handling..."
+      
+      // Test division by zero
+      set ::zero = 0
+      set ::result = ::a / ::zero
+      say "Division by zero: ::a / ::zero = ::result"
+      
+      // Test invalid expression
+      set ::result = ::a + "invalid"
+      say "Invalid expression: ::a + 'invalid' = ::result"
+      
+      emit "error_handling.complete" with ::result
+    }
+
+    // Test mathematical functions
+    listen for "test_math_functions" then {
+      say "📊 Testing Math Functions..."
+      
+      // Test absolute value
+      set ::negative = -5
+      set ::result = ::math.abs(::negative)
+      say "Absolute value: |::negative| = ::result"
+      
+      // Test floor function
+      set ::decimal = 3.7
+      set ::result = ::math.floor(::decimal)
+      say "Floor: floor(::decimal) = ::result"
+      
+      // Test random number
+      set ::result = ::math.random()
+      say "Random: ::result"
+      
+      emit "math_functions.complete" with ::result
+    }
+  }
+
+  memory {
+    a
+    b
+    c
+    result
+  }
+
+  interface {
+    test_basic_math
+    test_variable_substitution
+    test_error_handling
+    test_math_functions
+  }
+}
+
+// Math functions component
+component ::math.functions {
+  init {
+    set ::status = "ready"
+    emit "math.functions.initialized"
+  }
+
+  behavior {
+    // Absolute value function
+    listen for "math.abs" then {
+      set ::value = ::function_data.value
+      branch when ::value < 0 {
+        return -::value
+      } else {
+        return ::value
+      }
+    }
+
+    // Floor function
+    listen for "math.floor" then {
+      set ::value = ::function_data.value
+      return ::parse_int(::value)
+    }
+
+    // Random number generator
+    listen for "math.random" then {
+      // Simple random number between 0 and 1
+      set ::seed = ::now()
+      set ::random = ::seed % 1000 / 1000
+      return ::random
+    }
+
+    // Square root function
+    listen for "math.sqrt" then {
+      set ::value = ::function_data.value
+      set ::guess = ::value / 2
+      
+      // Newton's method for square root
+      loop for ::i from 1 to 10 {
+        set ::guess = ::guess - (::guess * ::guess - ::value) / (2 * ::guess)
+      }
+      
+      return ::guess
+    }
+  }
+
+  memory {
+    status
+  }
+
+  interface {
+    math.abs
+    math.floor
+    math.random
+    math.sqrt
+  }
+} 

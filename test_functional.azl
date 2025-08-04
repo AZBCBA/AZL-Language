@@ -1,0 +1,47 @@
+// Higher-Order Functions Test
+say "=== AZL Higher-Order Functions Test ===";
+
+// Test data
+let numbers = [1, 2, 3, 4, 5];
+let strings = ["hello", "world", "azl"];
+
+say "Test data:";
+say numbers;
+say strings;
+
+// Test basic function calls
+fn add_one(x) {
+    return x + 1;
+}
+
+fn double(x) {
+    return x * 2;
+}
+
+fn is_even(x) {
+    // Use division to check if even (x / 2 * 2 == x)
+    return (x / 2) * 2 == x;
+}
+
+fn to_upper(s) {
+    return "UPPER_" + s;
+}
+
+say "Testing basic functions:";
+say "add_one(5):";
+say add_one(5);
+say "double(3):";
+say double(3);
+say "is_even(4):";
+say is_even(4);
+say "is_even(3):";
+say is_even(3);
+say "to_upper('test'):";
+say to_upper("test");
+
+// Test function passing (this should work with our current closures!)
+let test_func = add_one;
+say "Function as variable:";
+say test_func(10);
+
+say "=== Functional Programming Test Complete ==="; 

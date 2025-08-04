@@ -1,0 +1,20 @@
+say "🎉 SIMPLE CONTROL FLOW TEST 🎉";
+
+let x = 10;
+let y = 5;
+
+say "Testing basic if statement:";
+if x > y {
+    say "✅ x > y is true";
+} else {
+    say "❌ x > y is false";
+}
+
+say "Testing if-else statement:";
+if x < y {
+    say "❌ x < y is true";
+} else {
+    say "✅ x < y is false";
+}
+
+say "🎉 TEST COMPLETE! 🎉"; 

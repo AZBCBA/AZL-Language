@@ -1,0 +1,23 @@
+# AZL Fibonacci Benchmarks
+# This file contains AZL commands for Fibonacci benchmarks
+
+# Run iterative Fibonacci benchmarks
+fibonacci_iterative 10
+fibonacci_iterative 20
+fibonacci_iterative 30
+fibonacci_iterative 35
+fibonacci_iterative 40
+
+# Run memoized Fibonacci benchmarks (for larger values)
+fibonacci_memoized 10
+fibonacci_memoized 20
+fibonacci_memoized 30
+fibonacci_memoized 35
+
+# Run recursive Fibonacci benchmarks (for smaller values)
+fibonacci_recursive 10
+fibonacci_recursive 20
+fibonacci_recursive 30
+
+# Output benchmark results
+output_fibonacci_results 

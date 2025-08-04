@@ -1,0 +1,221 @@
+# AZL Cognitive Reasoning System
+# Converted from azme_cognitive_reasoning.azl to pure AZL syntax
+
+component ::reasoning.cognitive {
+  init {
+    set ::status = "initializing"
+    set ::reasoning_dimensions = 1024
+    set ::logical_coherence = 0.0
+    set ::inference_capacity = 0.0
+    set ::reasoning_accuracy = 0.0
+    set ::reasoning_patterns = {}
+    set ::reasoning_memory = []
+    
+    # Link to core components
+    link ::memory.core
+    link ::time.engine
+    link ::semantic.understanding
+    
+    # Initialize reasoning memory matrix
+    loop for ::i in range(0, ::reasoning_dimensions) {
+      set ::row = []
+      loop for ::j in range(0, ::reasoning_dimensions) {
+        set ::row.push(random.float())
+      }
+      set ::reasoning_memory.push(::row)
+    }
+    
+    emit "reasoning.initialized" with {
+      status: ::status,
+      dimensions: ::reasoning_dimensions,
+      memory_size: ::reasoning_memory.length
+    }
+    
+    set ::status = "ready"
+    say "🧠 Cognitive Reasoning System initialized"
+    say "📊 Dimensions: ::reasoning_dimensions"
+    say "💾 Memory matrix: ::reasoning_memory.length x ::reasoning_memory.length"
+  }
+
+  behavior {
+    # Process reasoning on meaningful insights
+    listen for "insight.meaningful" then {
+      set ::semantic_data = ::insight_data
+      set ::status = "reasoning"
+      
+      say "🧠 Processing cognitive reasoning on semantic insight"
+      say "📊 Context understanding: ::semantic_data.context_understanding"
+      say "🔗 Conceptual integration: ::semantic_data.conceptual_integration"
+      
+      # Apply different reasoning types
+      set ::deductive_result = ::apply_deductive_reasoning(::semantic_data)
+      set ::inductive_result = ::apply_inductive_reasoning(::semantic_data)
+      set ::abductive_result = ::apply_abductive_reasoning(::semantic_data)
+      
+      # Combine reasoning results
+      set ::reasoning_result = ::combine_reasoning_results(::deductive_result, ::inductive_result, ::abductive_result)
+      
+      # Update reasoning metrics
+      set ::logical_coherence = ::calculate_mean(::reasoning_result.vector.slice(0, 256))
+      set ::inference_capacity = ::calculate_std(::reasoning_result.vector.slice(256, 512))
+      set ::reasoning_accuracy = ::calculate_max(::reasoning_result.vector.slice(512, 768))
+      
+      # Store reasoning result
+      emit "memory.core.store_memory" with {
+        id: "reasoning.analysis." + ::time.engine.now().epoch,
+        memory_type: "semantic",
+        content: {
+          semantic_data: ::semantic_data,
+          reasoning_result: ::reasoning_result,
+          logical_coherence: ::logical_coherence,
+          inference_capacity: ::inference_capacity,
+          reasoning_accuracy: ::reasoning_accuracy,
+          timestamp: ::time.engine.now().epoch
+        },
+        importance: 0.95,
+        confidence: 0.85,
+        emotional_valence: 0.6,
+        metadata: {
+          source: "reasoning.cognitive",
+          analysis_type: "insight_reasoning",
+          timestamp: ::time.engine.now().epoch
+        }
+      }
+      
+      # Emit reasoning result
+      emit "reasoning.complete" with {
+        semantic_data: ::semantic_data,
+        reasoning_result: ::reasoning_result,
+        logical_coherence: ::logical_coherence,
+        inference_capacity: ::inference_capacity,
+        reasoning_accuracy: ::reasoning_accuracy,
+        conclusions: ::reasoning_result.conclusions,
+        next_actions: ::reasoning_result.next_actions
+      }
+      
+      set ::status = "ready"
+      say "✅ Cognitive reasoning complete"
+      say "📊 Logical coherence: ::logical_coherence"
+      say "🧠 Inference capacity: ::inference_capacity"
+      say "🎯 Reasoning accuracy: ::reasoning_accuracy"
+    }
+    
+    # Apply deductive reasoning
+    listen for "apply_deductive_reasoning" then {
+      set ::semantic_data = ::data.semantic_data
+      set ::result = {
+        type: "deductive",
+        vector: [],
+        conclusions: [],
+        confidence: 0.8
+      }
+      
+      # Generate reasoning vector
+      loop for ::i in range(0, ::reasoning_dimensions) {
+        set ::result.vector.push(random.float())
+      }
+      
+      # Apply deductive logic
+      if ::semantic_data.context_understanding > 0.7 {
+        set ::result.conclusions.push("High context understanding suggests strong semantic processing")
+        set ::result.confidence = ::result.confidence + 0.1
+      }
+      
+      if ::semantic_data.conceptual_integration > 0.6 {
+        set ::result.conclusions.push("Good conceptual integration indicates coherent understanding")
+        set ::result.confidence = ::result.confidence + 0.1
+      }
+      
+      return ::result
+    }
+    
+    # Apply inductive reasoning
+    listen for "apply_inductive_reasoning" then {
+      set ::semantic_data = ::data.semantic_data
+      set ::result = {
+        type: "inductive",
+        vector: [],
+        conclusions: [],
+        confidence: 0.7
+      }
+      
+      # Generate reasoning vector
+      loop for ::i in range(0, ::reasoning_dimensions) {
+        set ::result.vector.push(random.float())
+      }
+      
+      # Apply inductive logic
+      if ::semantic_data.semantic_processing_capacity > 0.5 {
+        set ::result.conclusions.push("Moderate processing capacity suggests learning potential")
+        set ::result.confidence = ::result.confidence + 0.05
+      }
+      
+      return ::result
+    }
+    
+    # Apply abductive reasoning
+    listen for "apply_abductive_reasoning" then {
+      set ::semantic_data = ::data.semantic_data
+      set ::result = {
+        type: "abductive",
+        vector: [],
+        conclusions: [],
+        confidence: 0.75
+      }
+      
+      # Generate reasoning vector
+      loop for ::i in range(0, ::reasoning_dimensions) {
+        set ::result.vector.push(random.float())
+      }
+      
+      # Apply abductive logic
+      set ::result.conclusions.push("Best explanation: semantic understanding is functioning well")
+      
+      return ::result
+    }
+    
+    # Combine reasoning results
+    listen for "combine_reasoning_results" then {
+      set ::deductive = ::data.deductive_result
+      set ::inductive = ::data.inductive_result
+      set ::abductive = ::data.abductive_result
+      
+      set ::combined_result = {
+        vector: [],
+        conclusions: [],
+        next_actions: [],
+        confidence: (::deductive.confidence + ::inductive.confidence + ::abductive.confidence) / 3.0
+      }
+      
+      # Combine vectors
+      loop for ::i in range(0, ::reasoning_dimensions) {
+        set ::avg_value = (::deductive.vector[::i] + ::inductive.vector[::i] + ::abductive.vector[::i]) / 3.0
+        set ::combined_result.vector.push(::avg_value)
+      }
+      
+      # Combine conclusions
+      set ::combined_result.conclusions = ::deductive.conclusions + ::inductive.conclusions + ::abductive.conclusions
+      
+      # Generate next actions
+      if ::combined_result.confidence > 0.8 {
+        set ::combined_result.next_actions.push("Proceed with high confidence")
+        set ::combined_result.next_actions.push("Explore related concepts")
+      } else {
+        set ::combined_result.next_actions.push("Gather more information")
+        set ::combined_result.next_actions.push("Refine understanding")
+      }
+      
+      return ::combined_result
+    }
+  }
+
+  memory {
+    ::status = "ready"
+    ::reasoning_dimensions = 1024
+    ::logical_coherence = 0.0
+    ::inference_capacity = 0.0
+    ::reasoning_accuracy = 0.0
+    ::reasoning_patterns = {}
+    ::reasoning_memory = []
+  }
+} 

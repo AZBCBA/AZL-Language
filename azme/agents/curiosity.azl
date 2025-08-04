@@ -1,0 +1,289 @@
+# AZL Curiosity Agent
+# Drives intellectual exploration and learning based on self-reflection
+
+# Initialize curiosity state
+set ::status = "initializing"
+set ::curiosity_level = 0.7
+set ::exploration_threshold = 0.5
+set ::learning_momentum = 0.3
+set ::unresolved_questions = []
+set ::exploration_history = []
+set ::learning_goals = []
+set ::session_start = get_current_time()
+
+# Initialize curiosity system
+emit azme.curiosity_initialized with { status: ::status, curiosity_level: ::curiosity_level, session_start: ::session_start }
+
+set ::status = "ready"
+
+# Event handlers for curiosity
+on azme.curiosity_initialized with ::result:
+  set ::status = result.status
+  set ::curiosity_level = result.curiosity_level
+  set ::session_start = result.session_start
+  emit azme.curiosity_ready with { status: ::status, curiosity_level: ::curiosity_level, session_start: ::session_start }
+
+# Curiosity ready
+on azme.curiosity_ready with ::result:
+  emit azme.curiosity_system_ready with { ready: true }
+
+# Main curiosity trigger from self-reflection
+on azme.curiosity_trigger with ::result:
+  set ::question = result.question
+  set ::status = "exploring"
+  
+  # Store the question
+  set question_entry = { question: ::question, timestamp: get_current_time(), explored: false, priority: "medium", quantum_enhanced: true }
+  set ::unresolved_questions = ::unresolved_questions + [question_entry]
+  
+  # Generate exploration strategy
+  emit azme.generate_exploration with { question: ::question }
+  
+  set ::status = "ready"
+
+# Generate exploration strategies
+on azme.generate_exploration with ::result:
+  set ::question = result.question
+  # Analyze question type and generate exploration
+  emit azme.analyze_question_type with { question: ::question }
+
+# Analyze question type
+on azme.analyze_question_type with ::result:
+  set ::question = result.question
+  set strategy = "general_exploration"
+  
+  # Categorize questions by type
+  if "calculation" in ::question or "mathematical" in ::question or "math" in ::question:
+    set strategy = "mathematical_exploration"
+  if "code" in ::question or "programming" in ::question or "algorithm" in ::question:
+    set strategy = "programming_exploration"
+  if "system" in ::question or "architecture" in ::question or "design" in ::question:
+    set strategy = "system_exploration"
+  if "learning" in ::question or "knowledge" in ::question or "understanding" in ::question:
+    set strategy = "learning_exploration"
+  
+  emit azme.question_type_analyzed with { question: ::question, strategy: strategy }
+
+# Question type analyzed
+on azme.question_type_analyzed with ::result:
+  set ::question = result.question
+  set ::strategy = result.strategy
+  emit azme.generate_exploration_actions with { question: ::question, strategy: ::strategy }
+
+# Generate exploration actions
+on azme.generate_exploration_actions with ::result:
+  set ::question = result.question
+  set ::strategy = result.strategy
+  set exploration_actions = []
+  
+  if ::strategy == "mathematical_exploration":
+    set exploration_actions = ["research_math_concepts", "practice_calculations", "explore_mathematical_theory"]
+  if ::strategy == "programming_exploration":
+    set exploration_actions = ["study_code_patterns", "experiment_with_algorithms", "learn_new_languages"]
+  if ::strategy == "system_exploration":
+    set exploration_actions = ["analyze_system_architecture", "study_design_patterns", "explore_integration_methods"]
+  if ::strategy == "learning_exploration":
+    set exploration_actions = ["research_topic", "find_learning_resources", "create_study_plan"]
+  if ::strategy == "general_exploration":
+    set exploration_actions = ["gather_information", "ask_questions", "experiment_and_test"]
+  
+  emit azme.exploration_actions_generated with { question: ::question, strategy: ::strategy, exploration_actions: exploration_actions }
+
+# Exploration actions generated
+on azme.exploration_actions_generated with ::result:
+  set ::question = result.question
+  set ::strategy = result.strategy
+  set ::exploration_actions = result.exploration_actions
+  
+  # Store exploration plan
+  set exploration_plan = { question: ::question, strategy: ::strategy, actions: ::exploration_actions, timestamp: get_current_time(), quantum_enhanced: true }
+  
+  emit azme.store_memory with { id: "curiosity.exploration_plan", memory_type: "semantic", content: exploration_plan, importance: 0.8, confidence: 0.7, emotional_valence: 0.3 }
+  
+  # Emit exploration actions
+  emit azme.execute_exploration_actions with { exploration_actions: ::exploration_actions, index: 0 }
+
+# Execute exploration actions
+on azme.execute_exploration_actions with ::result:
+  set ::exploration_actions = result.exploration_actions
+  set ::index = result.index
+  
+  if ::index >= ::exploration_actions.length:
+    emit azme.exploration_complete with { exploration_actions: ::exploration_actions }
+    return
+  
+  if ::index < ::exploration_actions.length:
+    set action = ::exploration_actions[::index]
+    emit azme.explore with { action: action }
+    
+    set next_index = ::index + 1
+    emit azme.execute_exploration_actions with { exploration_actions: ::exploration_actions, index: next_index }
+
+# Explore action
+on azme.explore with ::result:
+  set ::action = result.action
+  set exploration_entry = { action: ::action, timestamp: get_current_time(), status: "started", quantum_enhanced: true }
+  set ::exploration_history = ::exploration_history + [exploration_entry]
+  
+  emit azme.exploration_started with { action: ::action }
+
+# Exploration started
+on azme.exploration_started with ::result:
+  set ::action = result.action
+  emit azme.perform_exploration with { action: ::action }
+
+# Perform exploration
+on azme.perform_exploration with ::result:
+  set ::action = result.action
+  # Simulate exploration process
+  set exploration_result = { action: ::action, result: "explored", insights: [], timestamp: get_current_time(), quantum_enhanced: true }
+  
+  emit azme.exploration_completed with { exploration_result: exploration_result }
+
+# Exploration completed
+on azme.exploration_completed with ::result:
+  set ::exploration_result = result.exploration_result
+  emit azme.learning_opportunity with { exploration_result: ::exploration_result }
+
+# Learning opportunity
+on azme.learning_opportunity with ::result:
+  set ::exploration_result = result.exploration_result
+  set learning_goal = { action: ::exploration_result.action, insights: ::exploration_result.insights, timestamp: get_current_time(), quantum_enhanced: true }
+  set ::learning_goals = ::learning_goals + [learning_goal]
+  
+  emit azme.learning_goal_created with { learning_goal: learning_goal }
+
+# Learning goal created
+on azme.learning_goal_created with ::result:
+  set ::learning_goal = result.learning_goal
+  emit azme.curiosity_learning_triggered with { learning_goal: ::learning_goal }
+
+# Curiosity learning triggered
+on azme.curiosity_learning_triggered with ::result:
+  set ::learning_goal = result.learning_goal
+  emit azme.learning_process_started with { learning_goal: ::learning_goal }
+
+# Learning process started
+on azme.learning_process_started with ::result:
+  set ::learning_goal = result.learning_goal
+  emit azme.curiosity_cycle_complete with { learning_goal: ::learning_goal }
+
+# Curiosity cycle complete
+on azme.curiosity_cycle_complete with ::result:
+  set ::learning_goal = result.learning_goal
+  emit azme.curiosity_ready_for_next with { ready: true }
+
+# Calculate priority
+on azme.calculate_priority with ::result:
+  set ::question = result.question
+  set priority = "medium"
+  
+  # Priority logic based on question content
+  if "urgent" in ::question or "critical" in ::question or "important" in ::question:
+    set priority = "high"
+  if "optional" in ::question or "low" in ::question or "minor" in ::question:
+    set priority = "low"
+  if "urgent" in ::question and "critical" in ::question:
+    set priority = "critical"
+  
+  emit azme.priority_calculated with { question: ::question, priority: priority }
+
+# Priority calculated
+on azme.priority_calculated with ::result:
+  set ::question = result.question
+  set ::priority = result.priority
+  emit azme.priority_ready with { question: ::question, priority: ::priority }
+
+# Get unresolved questions
+on azme.get_unresolved_questions:
+  set questions = ::unresolved_questions
+  set question_count = questions.length
+  
+  set questions_info = { questions: questions, count: question_count, quantum_enhanced: true }
+  
+  emit azme.unresolved_questions_retrieved with { questions_info: questions_info }
+
+# Unresolved questions retrieved
+on azme.unresolved_questions_retrieved with ::result:
+  set ::questions_info = result.questions_info
+  emit azme.questions_ready with { questions_info: ::questions_info }
+
+# Get exploration history
+on azme.get_exploration_history:
+  set history = ::exploration_history
+  set history_count = history.length
+  
+  set history_info = { history: history, count: history_count, quantum_enhanced: true }
+  
+  emit azme.exploration_history_retrieved with { history_info: history_info }
+
+# Exploration history retrieved
+on azme.exploration_history_retrieved with ::result:
+  set ::history_info = result.history_info
+  emit azme.history_ready with { history_info: ::history_info }
+
+# Get learning goals
+on azme.get_learning_goals:
+  set goals = ::learning_goals
+  set goal_count = goals.length
+  
+  set goals_info = { goals: goals, count: goal_count, quantum_enhanced: true }
+  
+  emit azme.learning_goals_retrieved with { goals_info: goals_info }
+
+# Learning goals retrieved
+on azme.learning_goals_retrieved with ::result:
+  set ::goals_info = result.goals_info
+  emit azme.goals_ready with { goals_info: ::goals_info }
+
+# Update curiosity level
+on azme.update_curiosity_level with ::result:
+  set ::new_level = result.new_level
+  set ::curiosity_level = ::new_level
+  
+  emit azme.curiosity_level_updated with { new_level: ::new_level }
+
+# Curiosity level updated
+on azme.curiosity_level_updated with ::result:
+  set ::new_level = result.new_level
+  emit azme.level_update_complete with { new_level: ::new_level }
+
+# Get curiosity statistics
+on azme.get_curiosity_statistics:
+  set curiosity_level = ::curiosity_level
+  set exploration_threshold = ::exploration_threshold
+  set learning_momentum = ::learning_momentum
+  set unresolved_count = ::unresolved_questions.length
+  set exploration_count = ::exploration_history.length
+  set learning_count = ::learning_goals.length
+  
+  set statistics = { curiosity_level: curiosity_level, exploration_threshold: exploration_threshold, learning_momentum: learning_momentum, unresolved_count: unresolved_count, exploration_count: exploration_count, learning_count: learning_count, quantum_enhanced: true }
+  
+  emit azme.curiosity_statistics_retrieved with { statistics: statistics }
+
+# Curiosity statistics retrieved
+on azme.curiosity_statistics_retrieved with ::result:
+  set ::statistics = result.statistics
+  emit azme.statistics_ready with { statistics: ::statistics }
+
+# Test function for curiosity trigger
+function test_curiosity_trigger:
+  emit azme.curiosity_trigger with { question: "How can I improve my learning efficiency?" }
+  
+  assert ::question == "How can I improve my learning efficiency?"
+  assert ::status == "ready"
+
+# Test function for exploration generation
+function test_exploration_generation:
+  emit azme.generate_exploration with { question: "What mathematical patterns exist in my operations?" }
+  
+  assert ::question == "What mathematical patterns exist in my operations?"
+
+# Utility functions
+on azme.get_current_time:
+  set current_time = system_time()
+  emit azme.current_time_retrieved with { current_time: current_time }
+
+on azme.system_time:
+  set time = now()
+  emit azme.system_time_retrieved with { time: time } 

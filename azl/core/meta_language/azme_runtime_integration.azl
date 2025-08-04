@@ -1,0 +1,350 @@
+# AZME Runtime Integration for Meta-Language System
+# Registers meta-language components into AZME's ComponentRegistry and CognitiveLoop
+
+component ::meta_language.azme_integration {
+  init {
+    set ::status = "initializing"
+    set ::integration_version = "1.0"
+    set ::registered_components = []
+    set ::cognitive_hooks = []
+    set ::transformation_trials = []
+    
+    # Link to all meta-language components
+    link ::meta_language.orchestrator
+    link ::meta_language.parser_registry
+    link ::meta_language.ast_event_bus
+    link ::meta_language.universal_ast
+    link ::meta_language.transformation_engine
+    
+    # Link to AZME core systems
+    link ::agent.autonomous_brain
+    link ::semantic.understanding
+    link ::reasoning.cognitive
+    link ::dialogue.system
+    
+    # Register components into AZME ComponentRegistry
+    set ::registered_components = [
+      "::meta_language.orchestrator",
+      "::meta_language.parser_registry", 
+      "::meta_language.ast_event_bus",
+      "::meta_language.universal_ast",
+      "::meta_language.transformation_engine",
+      "::meta_language.python_parser",
+      "::meta_language.javascript_parser",
+      "::meta_language.rust_parser"
+    ]
+    
+    # Initialize cognitive hooks
+    set ::cognitive_hooks = [
+      "semantic.understanding.insight.ready",
+      "reasoning.cognitive.insight.meaningful",
+      "dialogue.system.process_input",
+      "agent.autonomous_brain.user.input"
+    ]
+    
+    emit "azme.component_registry.register_components" with {
+      components: ::registered_components,
+      category: "meta_language",
+      priority: "high"
+    }
+    
+    emit "azme.cognitive_loop.register_hooks" with {
+      hooks: ::cognitive_hooks,
+      source: "meta_language",
+      priority: "high"
+    }
+    
+    emit "meta_language.azme_integration.initialized" with {
+      status: ::status,
+      version: ::integration_version,
+      registered_components: ::registered_components.length,
+      cognitive_hooks: ::cognitive_hooks.length
+    }
+    
+    set ::status = "ready"
+    say "🔗 AZME Runtime Integration initialized"
+    say "📊 Registered components: ::registered_components.length"
+    say "🧠 Cognitive hooks: ::cognitive_hooks.length"
+  }
+
+  behavior {
+    # Handle semantic understanding integration
+    listen for "semantic.understanding.insight.ready" then {
+      set ::insight_data = ::insight_ready_data
+      
+      say "🧠 Semantic insight ready for meta-language processing"
+      say "📝 Insight: ::insight_data.text"
+      
+      # Check if insight contains code transformation request
+      if ::is_code_transformation_request(::insight_data.text) {
+        set ::transformation_request = ::parse_transformation_request(::insight_data.text)
+        
+        emit "meta_language.transform_code" with {
+          source: ::transformation_request.source,
+          language: ::transformation_request.language,
+          target_language: ::transformation_request.target_language,
+          transformations: ::transformation_request.transformations,
+          options: ::transformation_request.options
+        }
+        
+        # Record transformation trial
+        set ::transformation_trials.push({
+          type: "semantic_triggered",
+          insight: ::insight_data.text,
+          request: ::transformation_request,
+          timestamp: ::time.engine.now().epoch
+        })
+      }
+    }
+    
+    # Handle cognitive reasoning integration
+    listen for "reasoning.cognitive.insight.meaningful" then {
+      set ::reasoning_data = ::insight_meaningful_data
+      
+      say "🧠 Cognitive reasoning complete for meta-language"
+      say "📊 Logical coherence: ::reasoning_data.logical_coherence"
+      say "💡 Conclusions: ::reasoning_data.conclusions"
+      
+      # Apply reasoning conclusions to transformation decisions
+      if ::reasoning_data.conclusions {
+        set ::transformation_decisions = ::apply_reasoning_to_transformations(::reasoning_data.conclusions)
+        
+        emit "meta_language.apply_reasoning" with {
+          reasoning: ::reasoning_data,
+          decisions: ::transformation_decisions
+        }
+      }
+    }
+    
+    # Handle dialogue system integration
+    listen for "dialogue.system.process_input" then {
+      set ::dialogue_input = ::process_input_data
+      
+      say "💬 Dialogue input received for meta-language"
+      say "📝 Input: ::dialogue_input.text"
+      
+      # Check if dialogue contains code transformation request
+      if ::is_code_transformation_request(::dialogue_input.text) {
+        set ::transformation_request = ::parse_transformation_request(::dialogue_input.text)
+        
+        emit "meta_language.transform_code" with {
+          source: ::transformation_request.source,
+          language: ::transformation_request.language,
+          target_language: ::transformation_request.target_language,
+          transformations: ::transformation_request.transformations,
+          options: ::transformation_request.options
+        }
+        
+        # Record transformation trial
+        set ::transformation_trials.push({
+          type: "dialogue_triggered",
+          input: ::dialogue_input.text,
+          request: ::transformation_request,
+          timestamp: ::time.engine.now().epoch
+        })
+      }
+    }
+    
+    # Handle autonomous brain integration
+    listen for "agent.autonomous_brain.user.input" then {
+      set ::brain_input = ::user_input_data
+      
+      say "🧠 Autonomous brain input for meta-language"
+      say "📝 Input: ::brain_input.text"
+      
+      # Check if brain input contains code transformation request
+      if ::is_code_transformation_request(::brain_input.text) {
+        set ::transformation_request = ::parse_transformation_request(::brain_input.text)
+        
+        emit "meta_language.transform_code" with {
+          source: ::transformation_request.source,
+          language: ::transformation_request.language,
+          target_language: ::transformation_request.target_language,
+          transformations: ::transformation_request.transformations,
+          options: ::transformation_request.options
+        }
+        
+        # Record transformation trial
+        set ::transformation_trials.push({
+          type: "brain_triggered",
+          input: ::brain_input.text,
+          request: ::transformation_request,
+          timestamp: ::time.engine.now().epoch
+        })
+      }
+    }
+    
+    # Handle transformation completion
+    listen for "meta_language.transform_complete" then {
+      set ::transform_result = ::transform_complete_data
+      
+      say "✅ Meta-language transformation complete"
+      say "📊 Result: ::transform_result.result"
+      
+      # Send result back to cognitive systems
+      emit "azme.cognitive_loop.transformation_result" with {
+        result: ::transform_result,
+        source: "meta_language",
+        timestamp: ::time.engine.now().epoch
+      }
+      
+      # Update dialogue system with result
+      emit "dialogue.system.response" with {
+        response: "Code transformation completed successfully!",
+        intent: { type: "transformation_complete" },
+        confidence: 0.9
+      }
+    }
+    
+    # Handle transformation errors
+    listen for "meta_language.transform_error" then {
+      set ::error_data = ::transform_error_data
+      
+      say "❌ Meta-language transformation error"
+      say "📝 Error: ::error_data.error"
+      
+      # Send error to cognitive systems for learning
+      emit "azme.cognitive_loop.transformation_error" with {
+        error: ::error_data,
+        source: "meta_language",
+        timestamp: ::time.engine.now().epoch
+      }
+      
+      # Update dialogue system with error
+      emit "dialogue.system.response" with {
+        response: "Code transformation failed: " + ::error_data.error,
+        intent: { type: "transformation_error" },
+        confidence: 0.8
+      }
+    }
+    
+    # Handle component registry confirmation
+    listen for "azme.component_registry.components_registered" then {
+      say "✅ Meta-language components registered in AZME ComponentRegistry"
+      say "📊 Registered: $1.components.length components"
+    }
+    
+    # Handle cognitive loop confirmation
+    listen for "azme.cognitive_loop.hooks_registered" then {
+      say "✅ Meta-language hooks registered in AZME CognitiveLoop"
+      say "📊 Registered: $1.hooks.length hooks"
+    }
+    
+    # Get integration statistics
+    listen for "azme_integration.get_statistics" then {
+      set ::stats = {
+        registered_components: ::registered_components.length,
+        cognitive_hooks: ::cognitive_hooks.length,
+        transformation_trials: ::transformation_trials.length,
+        recent_trials: ::transformation_trials.slice(-10)
+      }
+      
+      emit "azme_integration.statistics" with { statistics: ::stats }
+    }
+  }
+
+  # Helper functions
+  function ::is_code_transformation_request(text) {
+    set ::transformation_keywords = [
+      "transform", "refactor", "optimize", "convert", "parse", "generate",
+      "code", "function", "class", "variable", "rename", "extract"
+    ]
+    
+    set ::language_keywords = [
+      "python", "javascript", "rust", "typescript", "lua", "aba"
+    ]
+    
+    set ::text_lower = ::text.toLowerCase()
+    
+    # Check for transformation keywords
+    loop for ::keyword in ::transformation_keywords {
+      if ::text_lower.contains(::keyword) {
+        return true
+      }
+    }
+    
+    # Check for language keywords
+    loop for ::language in ::language_keywords {
+      if ::text_lower.contains(::language) {
+        return true
+      }
+    }
+    
+    return false
+  }
+  
+  function ::parse_transformation_request(text) {
+    set ::request = {
+      source: "",
+      language: "python",
+      target_language: "python",
+      transformations: [],
+      options: {}
+    }
+    
+    # Simple parsing logic - in practice, this would use NLP
+    if ::text.contains("python") {
+      set ::request.language = "python"
+    } else if ::text.contains("javascript") {
+      set ::request.language = "javascript"
+    } else if ::text.contains("rust") {
+      set ::request.language = "rust"
+    }
+    
+    if ::text.contains("optimize") {
+      set ::request.transformations.push("optimize_performance")
+    }
+    
+    if ::text.contains("refactor") {
+      set ::request.transformations.push("extract_function")
+    }
+    
+    if ::text.contains("add logging") {
+      set ::request.options.add_logging = true
+    }
+    
+    return ::request
+  }
+  
+  function ::apply_reasoning_to_transformations(conclusions) {
+    set ::decisions = []
+    
+    loop for ::conclusion in ::conclusions {
+      if ::conclusion.type == "optimization_opportunity" {
+        set ::decisions.push({
+          type: "optimize_performance",
+          target: ::conclusion.target,
+          confidence: ::conclusion.confidence
+        })
+      } else if ::conclusion.type == "refactoring_opportunity" {
+        set ::decisions.push({
+          type: "extract_function",
+          target: ::conclusion.target,
+          confidence: ::conclusion.confidence
+        })
+      }
+    }
+    
+    return ::decisions
+  }
+  
+  function ::get_transformation_trials() {
+    return ::transformation_trials
+  }
+  
+  function ::get_registered_components() {
+    return ::registered_components
+  }
+  
+  function ::get_cognitive_hooks() {
+    return ::cognitive_hooks
+  }
+
+  memory {
+    ::status = ""
+    ::integration_version = ""
+    ::registered_components = []
+    ::cognitive_hooks = []
+    ::transformation_trials = []
+  }
+} 

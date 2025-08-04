@@ -1,0 +1,45 @@
+// Simple JIT Compilation Test
+// Demonstrating native code generation for hot code paths
+
+// Performance profiling
+profiler.start("jit_simple_test")
+
+// Test hot arithmetic operations that will be JIT compiled
+let a = 10
+let b = 20
+let c = a + b
+let d = c * 2
+let e = d - 5
+
+// Measure performance
+profiler.measure("hot_arithmetic_execution")
+
+// Test JIT compilation of quantum operations
+let quantum_superposition = quantum.superposition(0.707, 0.707)
+let quantum_measurement = quantum.measure(quantum_superposition)
+write_file("jit_quantum_test.log", stringify(quantum_measurement))
+
+// Test JIT compilation of neural operations
+let neural_layer = neural.layer(10, 5)
+let neural_forward = neural.forward(neural_layer, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+write_file("jit_neural_test.log", stringify(neural_forward))
+
+// Test consciousness operations
+let consciousness_aware = consciousness.aware("JIT compilation test")
+let consciousness_reflect = consciousness.reflect("performance optimization", 0.95)
+write_file("jit_consciousness_test.log", stringify(consciousness_reflect))
+
+// Test memory operations
+let memory_store = memory.lha3.store("jit_test_key", "jit_test_value")
+let memory_retrieve = memory.lha3.retrieve("jit_test_key")
+write_file("jit_memory_test.log", stringify(memory_retrieve))
+
+// Test autonomous operations
+let autonomous_plan = autonomous.plan("optimize JIT compilation", "minimize compilation time")
+write_file("jit_autonomous_test.log", stringify(autonomous_plan))
+
+// End profiling
+profiler.end("jit_simple_test")
+
+// Write final results
+write_file("jit_simple_test.log", "JIT compilation test completed successfully!") 

@@ -1,0 +1,383 @@
+# AZME Model Registry
+# Model metadata, status, loading logic
+
+component ::azme.model_registry {
+  init {
+    set ::available_models = {
+      deepseek: {
+        path: "/models/deepseek-7b",
+        runtime_options: {
+          quant: "int8",
+          device: "gpu"
+        },
+        requires: {
+          gpu_memory: 12,
+          ram: 4
+        },
+        metadata: {
+          name: "DeepSeek 7B",
+          version: "1.0",
+          description: "Code generation and creative writing model",
+          author: "DeepSeek",
+          license: "Apache 2.0",
+          model_size: "7B",
+          quantization: "int8"
+        },
+        status: "unloaded",
+        loaded_at: null,
+        last_used: null,
+        performance_history: []
+      },
+      mistral: {
+        path: "/models/mistral-7b",
+        runtime_options: {
+          threads: 8,
+          device: "cpu"
+        },
+        requires: {
+          ram: 6
+        },
+        metadata: {
+          name: "Mistral 7B",
+          version: "1.0",
+          description: "Logic reasoning and mathematical model",
+          author: "Mistral AI",
+          license: "Apache 2.0",
+          model_size: "7B",
+          quantization: "fp16"
+        },
+        status: "unloaded",
+        loaded_at: null,
+        last_used: null,
+        performance_history: []
+      },
+      azme_lang: {
+        path: "/azme/core/lang_runtime.azl",
+        runtime_options: {
+          safe_mode: true
+        },
+        requires: {
+          ram: 2
+        },
+        metadata: {
+          name: "AZME Language Runtime",
+          version: "1.0",
+          description: "Native AZME language processing engine",
+          author: "AZME",
+          license: "Proprietary",
+          model_size: "native",
+          quantization: "none"
+        },
+        status: "loaded",
+        loaded_at: ::internal.now(),
+        last_used: ::internal.now(),
+        performance_history: []
+      }
+    }
+    set ::model_registry_count = 0
+    set ::successful_registrations = 0
+    set ::failed_registrations = 0
+  }
+
+  behavior {
+    on get_model_config {
+      set ::config_request = $1
+      set ::model_id = ::config_request.model_id
+      
+      say "📋 Getting model configuration for: " + ::model_id
+      
+      if ::model_id in ::available_models {
+        set ::config = ::available_models[::model_id]
+        
+        emit azme.model_config_retrieved with {
+          model_id: ::model_id,
+          config: ::config
+        }
+      } else {
+        emit azme.model_config_not_found with {
+          model_id: ::model_id
+        }
+      }
+    }
+
+    on register_model {
+      set ::registration_request = $1
+      set ::model_id = ::registration_request.model_id
+      set ::model_config = ::registration_request.model_config
+      
+      say "📝 Registering model: " + ::model_id
+      
+      if ::model_id in ::available_models {
+        set ::registration_result = {
+          model_id: ::model_id,
+          success: false,
+          reason: "model_already_exists",
+          quantum_enhanced: true
+        }
+        set ::failed_registrations = ::failed_registrations + 1
+      } else {
+        # Add model to registry
+        set ::available_models[::model_id] = ::model_config
+        
+        set ::registration_result = {
+          model_id: ::model_id,
+          success: true,
+          reason: "model_registered",
+          quantum_enhanced: true
+        }
+        set ::successful_registrations = ::successful_registrations + 1
+      }
+      
+      set ::model_registry_count = ::model_registry_count + 1
+      
+      emit azme.model_registered with {
+        model_id: ::model_id,
+        result: ::registration_result
+      }
+    }
+
+    on unregister_model {
+      set ::unregistration_request = $1
+      set ::model_id = ::unregistration_request.model_id
+      
+      say "🗑️ Unregistering model: " + ::model_id
+      
+      if ::model_id == "azme_lang" {
+        set ::unregistration_result = {
+          model_id: ::model_id,
+          success: false,
+          reason: "cannot_unregister_core_model",
+          quantum_enhanced: true
+        }
+      } else if ::model_id in ::available_models {
+        # Remove model from registry
+        set ::removed_config = ::available_models[::model_id]
+        set ::available_models = ::available_models.remove(::model_id)
+        
+        set ::unregistration_result = {
+          model_id: ::model_id,
+          success: true,
+          reason: "model_unregistered",
+          removed_config: ::removed_config,
+          quantum_enhanced: true
+        }
+      } else {
+        set ::unregistration_result = {
+          model_id: ::model_id,
+          success: false,
+          reason: "model_not_found",
+          quantum_enhanced: true
+        }
+      }
+      
+      emit azme.model_unregistered with {
+        model_id: ::model_id,
+        result: ::unregistration_result
+      }
+    }
+
+    on update_model_status {
+      set ::status_request = $1
+      set ::model_id = ::status_request.model_id
+      set ::new_status = ::status_request.status
+      set ::timestamp = ::status_request.timestamp or ::internal.now()
+      
+      say "📊 Updating model status: " + ::model_id + " -> " + ::new_status
+      
+      if ::model_id in ::available_models {
+        set ::available_models[::model_id].status = ::new_status
+        set ::available_models[::model_id].last_used = ::timestamp
+        
+        if ::new_status == "loaded" {
+          set ::available_models[::model_id].loaded_at = ::timestamp
+        }
+        
+        set ::status_result = {
+          model_id: ::model_id,
+          status: ::new_status,
+          timestamp: ::timestamp,
+          success: true,
+          quantum_enhanced: true
+        }
+        
+        emit azme.model_status_updated with {
+          model_id: ::model_id,
+          result: ::status_result
+        }
+      } else {
+        emit azme.model_status_update_failed with {
+          model_id: ::model_id,
+          reason: "model_not_found"
+        }
+      }
+    }
+
+    on record_model_performance {
+      set ::performance_request = $1
+      set ::model_id = ::performance_request.model_id
+      set ::task_type = ::performance_request.task_type
+      set ::performance_score = ::performance_request.performance_score
+      set ::execution_time = ::performance_request.execution_time
+      
+      say "📈 Recording performance for " + ::model_id + " on " + ::task_type
+      
+      if ::model_id in ::available_models {
+        set ::performance_entry = {
+          task_type: ::task_type,
+          performance_score: ::performance_score,
+          execution_time: ::execution_time,
+          timestamp: ::internal.now(),
+          quantum_enhanced: true
+        }
+        
+        set ::available_models[::model_id].performance_history = 
+          ::available_models[::model_id].performance_history.push(::performance_entry)
+        
+        # Keep only last 100 performance entries
+        if ::available_models[::model_id].performance_history.length > 100 {
+          set ::available_models[::model_id].performance_history = 
+            ::available_models[::model_id].performance_history.slice(-100)
+        }
+        
+        emit azme.model_performance_recorded with {
+          model_id: ::model_id,
+          performance_entry: ::performance_entry
+        }
+      }
+    }
+
+    on get_model_performance {
+      set ::performance_request = $1
+      set ::model_id = ::performance_request.model_id
+      set ::task_type = ::performance_request.task_type
+      
+      say "📊 Getting performance for " + ::model_id + " on " + ::task_type
+      
+      set ::performance_data = {
+        model_id: ::model_id,
+        task_type: ::task_type,
+        average_score: 0,
+        total_executions: 0,
+        recent_performance: [],
+        quantum_enhanced: true
+      }
+      
+      if ::model_id in ::available_models {
+        set ::history = ::available_models[::model_id].performance_history
+        set ::task_history = []
+        
+        # Filter history for specific task type
+        loop for ::entry in ::history {
+          if ::entry.task_type == ::task_type {
+            set ::task_history = ::task_history.push(::entry)
+          }
+        }
+        
+        if ::task_history.length > 0 {
+          set ::total_score = 0
+          loop for ::entry in ::task_history {
+            set ::total_score = ::total_score + ::entry.performance_score
+          }
+          
+          set ::performance_data.average_score = ::total_score / ::task_history.length
+          set ::performance_data.total_executions = ::task_history.length
+          set ::performance_data.recent_performance = ::task_history.slice(-10)
+        }
+      }
+      
+      emit azme.model_performance_retrieved with {
+        performance_data: ::performance_data
+      }
+    }
+
+    on list_available_models {
+      set ::list_request = $1
+      
+      say "📋 Listing available models"
+      
+      set ::model_list = []
+      loop for ::model_id in ::available_models.keys() {
+        set ::model_info = ::available_models[::model_id]
+        set ::list_entry = {
+          model_id: ::model_id,
+          name: ::model_info.metadata.name,
+          status: ::model_info.status,
+          description: ::model_info.metadata.description,
+          model_size: ::model_info.metadata.model_size,
+          quantum_enhanced: true
+        }
+        set ::model_list = ::model_list.push(::list_entry)
+      }
+      
+      emit azme.available_models_listed with {
+        models: ::model_list,
+        total_count: ::model_list.length
+      }
+    }
+
+    on check_model_health {
+      set ::health_request = $1
+      set ::model_id = ::health_request.model_id
+      
+      say "🏥 Checking health for model: " + ::model_id
+      
+      set ::health_result = {
+        model_id: ::model_id,
+        healthy: true,
+        status: "unknown",
+        last_check: ::internal.now(),
+        quantum_enhanced: true
+      }
+      
+      if ::model_id in ::available_models {
+        set ::model_info = ::available_models[::model_id]
+        set ::health_result.status = ::model_info.status
+        
+        # Check if model is accessible
+        if ::model_info.status == "loaded" {
+          set ::health_result.healthy = true
+        } else if ::model_info.status == "unloaded" {
+          set ::health_result.healthy = true
+        } else {
+          set ::health_result.healthy = false
+        }
+      } else {
+        set ::health_result.healthy = false
+        set ::health_result.status = "not_found"
+      }
+      
+      emit azme.model_health_checked with {
+        model_id: ::model_id,
+        result: ::health_result
+      }
+    }
+
+    # Model registry monitoring
+    on azme.monitor_model_registry {
+      set ::monitor_request = $1
+      
+      set ::registry_metrics = {
+        total_models: ::available_models.keys().length,
+        successful_registrations: ::successful_registrations,
+        failed_registrations: ::failed_registrations,
+        loaded_models: 0,
+        unloaded_models: 0,
+        quantum_enhanced: true
+      }
+      
+      # Count loaded vs unloaded models
+      loop for ::model_id in ::available_models.keys() {
+        set ::model_info = ::available_models[::model_id]
+        if ::model_info.status == "loaded" {
+          set ::registry_metrics.loaded_models = ::registry_metrics.loaded_models + 1
+        } else {
+          set ::registry_metrics.unloaded_models = ::registry_metrics.unloaded_models + 1
+        }
+      }
+      
+      emit azme.model_registry_metrics with {
+        metrics: ::registry_metrics
+      }
+    }
+  }
+} 

@@ -1,0 +1,128 @@
+// Test AnythingLLM + AZME Integration
+
+// Test AnythingLLM workspace configuration
+function test_anythingllm_workspace() {
+    print("🧪 Testing AnythingLLM workspace...")
+    try {
+        let response = http_get("http://localhost:3001/api/workspaces/1")
+        if (response.status == 200) {
+            let workspace = json_parse(response.body)
+            print("✅ Workspace found: " + (workspace.name || "Unknown"))
+            print("   Chat Provider: " + (workspace.chatProvider || "None"))
+            print("   Chat Model: " + (workspace.chatModel || "None"))
+            return workspace
+        } else {
+            print("❌ Workspace error: " + response.status)
+            return null
+        }
+    } catch (error) {
+        print("❌ Workspace error: " + error)
+        return null
+    }
+}
+
+// Test direct AZME API
+function test_azme_direct() {
+    print("🧪 Testing direct AZME API...")
+    try {
+        let response = http_post(
+            "http://localhost:8000/generate",
+            json_stringify({"prompt": "Hello AZME, can you tell me about quantum computing?"}),
+            {"Content-Type": "application/json"}
+        )
+        if (response.status == 200) {
+            let result = json_parse(response.body)
+            print("✅ AZME API working: " + (result.response || "No response").substring(0, 100) + "...")
+            return true
+        } else {
+            print("❌ AZME API error: " + response.status)
+            return false
+        }
+    } catch (error) {
+        print("❌ AZME API error: " + error)
+        return false
+    }
+}
+
+// Test proxy server
+function test_proxy() {
+    print("🧪 Testing proxy server...")
+    try {
+        let response = http_post(
+            "http://localhost:8080/workspaces/1/chat",
+            json_stringify({"message": "Hello AZME, can you tell me about quantum computing?"}),
+            {"Content-Type": "application/json"}
+        )
+        if (response.status == 200) {
+            let result = json_parse(response.body)
+            print("✅ Proxy working: " + (result.textResponse || "No response").substring(0, 100) + "...")
+            return true
+        } else {
+            print("❌ Proxy error: " + response.status)
+            return false
+        }
+    } catch (error) {
+        print("❌ Proxy error: " + error)
+        return false
+    }
+}
+
+// Test AnythingLLM chat endpoint
+function test_anythingllm_chat() {
+    print("🧪 Testing AnythingLLM chat...")
+    try {
+        let response = http_post(
+            "http://localhost:3001/api/workspaces/azme-quantum-ai/chat",
+            json_stringify({"message": "Hello AZME, can you tell me about quantum computing?", "mode": "chat"}),
+            {"Content-Type": "application/json"}
+        )
+        if (response.status == 200) {
+            let result = json_parse(response.body)
+            print("✅ AnythingLLM chat working: " + (result.textResponse || "No response").substring(0, 100) + "...")
+            return true
+        } else {
+            print("❌ AnythingLLM chat error: " + response.status)
+            return false
+        }
+    } catch (error) {
+        print("❌ AnythingLLM chat error: " + error)
+        return false
+    }
+}
+
+// Main function
+function main() {
+    print("🚀 Testing AnythingLLM + AZME Integration...")
+    print("=" * 60)
+    
+    // Test all components
+    let workspace = test_anythingllm_workspace()
+    let azme_ok = test_azme_direct()
+    let proxy_ok = test_proxy()
+    let anythingllm_chat_ok = test_anythingllm_chat()
+    
+    print("\n" + "=" * 60)
+    print("📊 Integration Test Results:")
+    print("AnythingLLM Workspace: " + (workspace ? "✅ Working" : "❌ Failed"))
+    print("AZME API: " + (azme_ok ? "✅ Working" : "❌ Failed"))
+    print("Proxy Server: " + (proxy_ok ? "✅ Working" : "❌ Failed"))
+    print("AnythingLLM Chat: " + (anythingllm_chat_ok ? "✅ Working" : "❌ Failed"))
+    
+    if (workspace && azme_ok && proxy_ok) {
+        print("\n🎉 Core systems are working!")
+        print("🌐 You can access AnythingLLM at: http://localhost:3001")
+        print("💡 The AZME integration should be working now!")
+        
+        if (workspace) {
+            print("\n📋 Workspace Details:")
+            print("   Name: " + (workspace.name || "Unknown"))
+            print("   Provider: " + (workspace.chatProvider || "None"))
+            print("   Model: " + (workspace.chatModel || "None"))
+        }
+    } else {
+        print("\n⚠️ Some components are not working. Please check the errors above.")
+    }
+}
+
+// Execute main function
+main() 

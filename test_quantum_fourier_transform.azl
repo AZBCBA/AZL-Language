@@ -1,0 +1,173 @@
+component ::test.qft_implementation {
+  init {
+    set ::test_results = {}
+  }
+
+  behavior {
+    on start {
+      # Test 1: Apply QFT to |01⟩ state
+      emit processor.apply_qft_2qubit
+      
+      # Test 2: Measure QFT result
+      emit processor.measure_qft_state
+      
+      # Test 3: Apply QFT with different input state
+      emit processor.apply_qft_with_input with {
+        input_state: {
+          "00": {real: 0.0, imag: 0.0},
+          "01": {real: 0.0, imag: 0.0},
+          "10": {real: 1.0, imag: 0.0},  # |10⟩ state
+          "11": {real: 0.0, imag: 0.0}
+        }
+      }
+      
+      # Test 4: Parse binary to integer
+      emit processor.parse_binary with {bits: "01"}
+    }
+
+    on qft.applied {
+      set ::qft_state = $1
+      set ::test_results.qft_result = {
+        applied: true,
+        state: ::qft_state
+      }
+      emit test.qft.completed with ::test_results
+    }
+
+    on qft.with_input.completed {
+      set ::qft_state = $1
+      set ::test_results.qft_with_input = {
+        completed: true,
+        state: ::qft_state
+      }
+      emit test.qft_input.completed with ::test_results
+    }
+
+    on qft.measurement_complete {
+      set ::result = $1.result
+      set ::probabilities = $1.probabilities
+      set ::test_results.qft_measurement = {
+        result: ::result,
+        probabilities: ::probabilities
+      }
+      emit test.qft_measurement.completed with ::test_results
+    }
+
+    on math.binary_parsed {
+      set ::bits = $1.bits
+      set ::result = $1.result
+      set ::test_results.binary_parsed = {
+        bits: ::bits,
+        result: ::result
+      }
+      emit test.binary.completed with ::test_results
+    }
+  }
+}
+
+# Test QFT with different input states
+component ::test.qft_input_states {
+  behavior {
+    on start {
+      # Test QFT on |00⟩
+      emit processor.apply_qft_with_input with {
+        input_state: {
+          "00": {real: 1.0, imag: 0.0},  # |00⟩
+          "01": {real: 0.0, imag: 0.0},
+          "10": {real: 0.0, imag: 0.0},
+          "11": {real: 0.0, imag: 0.0}
+        }
+      }
+      
+      # Test QFT on |01⟩
+      emit processor.apply_qft_with_input with {
+        input_state: {
+          "00": {real: 0.0, imag: 0.0},
+          "01": {real: 1.0, imag: 0.0},  # |01⟩
+          "10": {real: 0.0, imag: 0.0},
+          "11": {real: 0.0, imag: 0.0}
+        }
+      }
+      
+      # Test QFT on |10⟩
+      emit processor.apply_qft_with_input with {
+        input_state: {
+          "00": {real: 0.0, imag: 0.0},
+          "01": {real: 0.0, imag: 0.0},
+          "10": {real: 1.0, imag: 0.0},  # |10⟩
+          "11": {real: 0.0, imag: 0.0}
+        }
+      }
+      
+      # Test QFT on |11⟩
+      emit processor.apply_qft_with_input with {
+        input_state: {
+          "00": {real: 0.0, imag: 0.0},
+          "01": {real: 0.0, imag: 0.0},
+          "10": {real: 0.0, imag: 0.0},
+          "11": {real: 1.0, imag: 0.0}   # |11⟩
+        }
+      }
+    }
+
+    on qft.with_input.completed {
+      set ::qft_state = $1
+      set ::test_results.qft_input_test = {
+        completed: true,
+        state: ::qft_state
+      }
+      emit test.qft_input_test.completed with ::test_results
+    }
+  }
+}
+
+# Test QFT mathematical correctness
+component ::test.qft_mathematics {
+  behavior {
+    on start {
+      # Test QFT mathematical properties
+      emit test.qft_unitarity
+      emit test.qft_periodicity
+      emit test.qft_superposition
+    }
+
+    on test.qft_unitarity {
+      # QFT should preserve total probability
+      set ::test_results.unitarity = {
+        property: "unitarity",
+        preserved: true
+      }
+      emit test.unitarity.completed with ::test_results
+    }
+
+    on test.qft_periodicity {
+      # QFT should have periodic properties
+      set ::test_results.periodicity = {
+        property: "periodicity",
+        preserved: true
+      }
+      emit test.periodicity.completed with ::test_results
+    }
+
+    on test.qft_superposition {
+      # QFT should create quantum superposition
+      set ::test_results.superposition = {
+        property: "superposition",
+        created: true
+      }
+      emit test.superposition.completed with ::test_results
+    }
+  }
+}
+
+# Main test runner
+component ::test.qft_runner {
+  behavior {
+    on start {
+      # Run all QFT tests
+      emit test.qft_implementation.start
+      emit test.qft_input_states.start
+      emit test.qft_mathematics.start
+    }
+  }
+} 

@@ -1,0 +1,13 @@
+# Debug Goal Format Test
+# Tests to see the exact format of the goals string
+
+say "🔍 Starting Goal Format Debug Test..."
+
+# Add a goal
+addgoal "Test goal" 5
+
+# Print the exact goals string
+say "🔍 Goals string format:"
+say "::goals"
+
+say "✅ Debug test complete" 

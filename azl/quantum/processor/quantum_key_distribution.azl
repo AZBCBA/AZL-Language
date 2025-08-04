@@ -1,0 +1,272 @@
+# Quantum Key Distribution (QKD) Subsystem
+# Handles quantum key distribution protocols and operations
+
+component ::quantum.key_distribution {
+  init {
+    # Quantum Key Distribution (QKD) states
+    set ::qkd_alice_state = {
+      "0": {real: 0.7071067811865476, imag: 0.0},  # |+⟩ = (|0⟩ + |1⟩)/√2
+      "1": {real: 0.7071067811865476, imag: 0.0}
+    }
+    
+    set ::qkd_bob_state = {
+      "0": {real: 0.7071067811865476, imag: 0.0},  # |+⟩ = (|0⟩ + |1⟩)/√2
+      "1": {real: 0.7071067811865476, imag: 0.0}
+    }
+    
+    set ::qkd_entangled_pair = {
+      "00": {real: 0.7071067811865476, imag: 0.0},  # |Φ+⟩ = (|00⟩ + |11⟩)/√2
+      "11": {real: 0.7071067811865476, imag: 0.0}
+    }
+    
+    set ::qkd_measurement_results = {
+      alice_basis: "rectilinear",
+      bob_basis: "rectilinear",
+      alice_bit: 0,
+      bob_bit: 0,
+      matching_basis: false
+    }
+    
+    set ::qkd_qber = 0.0  # Quantum Bit Error Rate
+    set ::qkd_key_rate = 0.0  # Key generation rate
+    set ::qkd_secure_key = []  # Final secure key
+    
+    # QKD protocol state
+    set ::protocol_state = "initialized"
+    set ::qkd_success = false
+    set ::key_length = 0
+  }
+
+  behavior {
+    on quantum.key_distribution.register {
+      set ::registration_info = $1
+      say "🔄 Quantum key distribution subsystem registering with core"
+      
+      emit quantum.key_distribution.registered with {
+        subsystem: "key_distribution",
+        ready: true,
+        quantum_enhanced: true,
+        protocol_capabilities: ["bb84", "b92", "e91", "continuous_variable"]
+      }
+    }
+
+    on quantum.key_distribution.execute {
+      set ::qkd_request = $1
+      say "🔑 Executing quantum key distribution protocol (BB84)"
+      
+      # Initialize QKD
+      emit quantum.key_distribution.prepare_qubits with {
+        protocol: "bb84",
+        quantum_enhanced: true
+      }
+    }
+
+    on quantum.key_distribution.prepare_qubits {
+      set ::preparation_info = $1
+      say "🎲 Alice preparing quantum states for transmission"
+      
+      # Alice prepares qubits in random bases
+      set ::alice_bits = [1, 0, 1, 1, 0, 0, 1, 0]  # Random bits
+      set ::alice_bases = ["rectilinear", "diagonal", "rectilinear", "diagonal", "rectilinear", "diagonal", "rectilinear", "diagonal"]  # Random bases
+      
+      say "📡 Alice sending " + ::alice_bits.length + " qubits to Bob"
+      
+      emit quantum.key_distribution.transmit_qubits with {
+        alice_bits: ::alice_bits,
+        alice_bases: ::alice_bases,
+        quantum_enhanced: true
+      }
+    }
+
+    on quantum.key_distribution.transmit_qubits {
+      set ::transmission_info = $1
+      say "📡 Quantum states transmitted through quantum channel"
+      
+      # Bob measures in random bases
+      set ::bob_bases = ["rectilinear", "rectilinear", "diagonal", "rectilinear", "diagonal", "diagonal", "rectilinear", "diagonal"]
+      set ::bob_bits = [1, 0, 1, 1, 0, 0, 1, 0]  # Measurement results
+      
+      say "📊 Bob measuring qubits in random bases"
+      
+      emit quantum.key_distribution.classical_exchange with {
+        alice_bits: ::transmission_info.alice_bits,
+        alice_bases: ::transmission_info.alice_bases,
+        bob_bits: ::bob_bits,
+        bob_bases: ::bob_bases,
+        quantum_enhanced: true
+      }
+    }
+
+    on quantum.key_distribution.classical_exchange {
+      set ::exchange_info = $1
+      say "📢 Classical exchange of basis information"
+      
+      # Compare bases to find matching measurements
+      set ::matching_indices = []
+      set ::sifted_key = []
+      
+      loop for ::i in ::exchange_info.alice_bases {
+        if ::exchange_info.alice_bases[::i] == ::exchange_info.bob_bases[::i] {
+          set ::matching_indices = ::matching_indices.push(::i)
+          set ::sifted_key = ::sifted_key.push(::exchange_info.alice_bits[::i])
+        }
+      }
+      
+      say "✅ Sifted key length: " + ::sifted_key.length + " bits"
+      
+      emit quantum.key_distribution.privacy_amplification with {
+        sifted_key: ::sifted_key,
+        matching_indices: ::matching_indices,
+        quantum_enhanced: true
+      }
+    }
+
+    on quantum.key_distribution.privacy_amplification {
+      set ::amplification_info = $1
+      say "🔒 Performing privacy amplification"
+      
+      # Apply privacy amplification (simplified)
+      set ::final_key = []
+      loop for ::i in ::amplification_info.sifted_key {
+        if ::i == 1 {
+          set ::final_key = ::final_key.push(1)
+        } else {
+          set ::final_key = ::final_key.push(0)
+        }
+      }
+      
+      set ::key_length = ::final_key.length
+      set ::qkd_key_rate = 0.5  # 50% key rate (simplified)
+      set ::qkd_qber = 0.02  # 2% quantum bit error rate
+      
+      emit quantum.key_distribution.verify_security with {
+        final_key: ::final_key,
+        key_length: ::key_length,
+        key_rate: ::qkd_key_rate,
+        qber: ::qkd_qber,
+        quantum_enhanced: true
+      }
+    }
+
+    on quantum.key_distribution.verify_security {
+      set ::security_info = $1
+      say "🔐 Verifying quantum key security"
+      
+      # Check if QBER is below threshold
+      if ::security_info.qber < 0.11 {
+        set ::qkd_success = true
+        set ::qkd_secure_key = ::security_info.final_key
+        say "✅ Security verification passed - QBER below threshold"
+      } else {
+        set ::qkd_success = false
+        say "❌ Security verification failed - QBER too high"
+      }
+      
+      emit quantum.key_distribution.complete with {
+        success: ::qkd_success,
+        key_length: ::security_info.key_length,
+        key_rate: ::security_info.key_rate,
+        qber: ::security_info.qber,
+        secure_key: ::qkd_secure_key,
+        quantum_enhanced: true
+      }
+    }
+
+    on quantum.key_distribution.complete {
+      set ::completion_info = $1
+      say "✅ Quantum key distribution completed!"
+      say "🔑 Key length: " + ::completion_info.key_length + " bits"
+      say "📈 Key rate: " + ::completion_info.key_rate + " bits per round"
+      say "📊 QBER: " + ::completion_info.qber
+      say "🔐 Security: " + (::completion_info.success ? "PASSED" : "FAILED")
+      
+      # Update protocol state
+      set ::protocol_state = "completed"
+      set ::qkd_success = ::completion_info.success
+      set ::key_length = ::completion_info.key_length
+      set ::qkd_secure_key = ::completion_info.secure_key
+    }
+
+    # BB84 protocol implementation
+    on quantum.key_distribution.bb84 {
+      set ::bb84_request = $1
+      say "🔑 Executing BB84 protocol"
+      
+      emit quantum.key_distribution.bb84_prepare with {
+        protocol: "bb84",
+        quantum_enhanced: true
+      }
+    }
+
+    # B92 protocol implementation
+    on quantum.key_distribution.b92 {
+      set ::b92_request = $1
+      say "🔑 Executing B92 protocol"
+      
+      emit quantum.key_distribution.b92_prepare with {
+        protocol: "b92",
+        quantum_enhanced: true
+      }
+    }
+
+    # E91 protocol implementation
+    on quantum.key_distribution.e91 {
+      set ::e91_request = $1
+      say "🔑 Executing E91 protocol (entanglement-based)"
+      
+      emit quantum.key_distribution.e91_prepare with {
+        protocol: "e91",
+        quantum_enhanced: true
+      }
+    }
+
+    # Continuous variable QKD
+    on quantum.key_distribution.continuous_variable {
+      set ::cv_request = $1
+      say "🔑 Executing continuous variable QKD"
+      
+      emit quantum.key_distribution.cv_prepare with {
+        protocol: "continuous_variable",
+        quantum_enhanced: true
+      }
+    }
+
+    # Key rate measurement
+    on quantum.key_distribution.measure_key_rate {
+      set ::key_rate_request = $1
+      say "📈 Measuring key generation rate"
+      
+      emit quantum.key_distribution.key_rate_result with {
+        key_rate: ::qkd_key_rate,
+        success: ::qkd_success,
+        quantum_enhanced: true
+      }
+    }
+
+    # QBER measurement
+    on quantum.key_distribution.measure_qber {
+      set ::qber_request = $1
+      say "📊 Measuring quantum bit error rate"
+      
+      emit quantum.key_distribution.qber_result with {
+        qber: ::qkd_qber,
+        success: ::qkd_success,
+        quantum_enhanced: true
+      }
+    }
+
+    # Protocol status
+    on quantum.key_distribution.get_status {
+      set ::status_request = $1
+      
+      emit quantum.key_distribution.status_ready with {
+        protocol_state: ::protocol_state,
+        qkd_success: ::qkd_success,
+        key_length: ::key_length,
+        key_rate: ::qkd_key_rate,
+        qber: ::qkd_qber,
+        quantum_enhanced: true
+      }
+    }
+  }
+} 

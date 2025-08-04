@@ -1,0 +1,213 @@
+// EO-Driven Action Prompter - MO System Component
+// Generates prompts based on EO states to drive behavior
+
+component ::prompting.agent {
+  init {
+    set ::last_prompt = null
+    set ::prompt_history = []
+    set ::prompt_cooldown = 10
+    set ::last_prompt_time = 0
+    set ::active_prompts = {}
+    
+    emit "prompting.agent.initialized" with { status: "ready" }
+  }
+
+  behavior {
+    // Listen for MO state updates and generate appropriate prompts
+    listen for "mo.state.updated" then {
+      set ::current_state = ::mo.state.updated_data
+      set ::current_time = now()
+      
+      // Check if enough time has passed since last prompt
+      branch when ::current_time - ::last_prompt_time > ::prompt_cooldown {
+        generate_eo_prompts(::current_state)
+      }
+    }
+
+    // Handle interaction EO
+    listen for "mo.state.eo" then {
+      set ::eo_data = ::mo.state.eo_data
+      
+      branch when ::eo_data.type = "interaction" {
+        emit "prompt.request_interaction" with {
+          priority: 0.9,
+          context: "user_engagement",
+          urgency: "high",
+          timestamp: now()
+        }
+        set ::last_prompt = "request_interaction"
+        set ::last_prompt_time = now()
+        emit "prompt.issued" with { type: "request_interaction", timestamp: now() }
+      }
+    }
+
+    // Handle attention EO
+    listen for "mo.state.eo" then {
+      set ::eo_data = ::mo.state.eo_data
+      
+      branch when ::eo_data.type = "attention" {
+        emit "prompt.request_attention" with {
+          priority: 0.8,
+          context: "attention_seeking",
+          urgency: "medium",
+          timestamp: now()
+        }
+        set ::last_prompt = "request_attention"
+        set ::last_prompt_time = now()
+        emit "prompt.issued" with { type: "request_attention", timestamp: now() }
+      }
+    }
+
+    // Handle praise EO
+    listen for "mo.state.eo" then {
+      set ::eo_data = ::mo.state.eo_data
+      
+      branch when ::eo_data.type = "praise" {
+        emit "prompt.offer_praise" with {
+          priority: 0.7,
+          context: "positive_reinforcement",
+          urgency: "medium",
+          timestamp: now()
+        }
+        set ::last_prompt = "offer_praise"
+        set ::last_prompt_time = now()
+        emit "prompt.issued" with { type: "offer_praise", timestamp: now() }
+      }
+    }
+
+    // Handle hunger EO
+    listen for "mo.state.eo" then {
+      set ::eo_data = ::mo.state.eo_data
+      
+      branch when ::eo_data.type = "hunger" {
+        emit "prompt.request_food" with {
+          priority: 0.95,
+          context: "basic_need",
+          urgency: "critical",
+          timestamp: now()
+        }
+        set ::last_prompt = "request_food"
+        set ::last_prompt_time = now()
+        emit "prompt.issued" with { type: "request_food", timestamp: now() }
+      }
+    }
+
+    // Handle emotional state changes
+    listen for "mo.emotion.frustrated" then {
+      emit "prompt.comfort" with {
+        priority: 0.8,
+        context: "emotional_support",
+        urgency: "high",
+        timestamp: now()
+      }
+      set ::last_prompt = "comfort"
+      set ::last_prompt_time = now()
+      emit "prompt.issued" with { type: "comfort", timestamp: now() }
+    }
+
+    // Handle success events
+    listen for "mo.success.recorded" then {
+      emit "prompt.celebrate" with {
+        priority: 0.6,
+        context: "achievement",
+        urgency: "low",
+        timestamp: now()
+      }
+      set ::last_prompt = "celebrate"
+      set ::last_prompt_time = now()
+      emit "prompt.issued" with { type: "celebrate", timestamp: now() }
+    }
+
+    // Handle user responses to prompts
+    listen for "user.response" then {
+      set ::response_data = ::user.response_data
+      
+      // Record prompt success
+      branch when ::response_data.context = ::last_prompt {
+        emit "prompt.success" with {
+          prompt_type: ::last_prompt,
+          response: ::response_data.response,
+          timestamp: now()
+        }
+        
+        // Add to history
+        store ::prompt_history from ::prompt_history.push({
+          type: ::last_prompt,
+          response: ::response_data.response,
+          timestamp: now(),
+          success: true
+        })
+      }
+    }
+
+    // Handle prompt timeouts
+    listen for "prompt.timeout" then {
+      set ::timeout_data = ::prompt.timeout_data
+      
+      emit "prompt.failed" with {
+        prompt_type: ::timeout_data.prompt_type,
+        reason: "timeout",
+        timestamp: now()
+      }
+      
+      // Add to history
+      store ::prompt_history from ::prompt_history.push({
+        type: ::timeout_data.prompt_type,
+        response: "timeout",
+        timestamp: now(),
+        success: false
+      })
+    }
+  }
+
+  memory {
+    last_prompt
+    prompt_history
+    prompt_cooldown
+    last_prompt_time
+    active_prompts
+  }
+
+  interface {
+    get_last_prompt
+    get_prompt_history
+    set_prompt_cooldown
+    clear_prompt_history
+    generate_custom_prompt
+  }
+}
+
+// Generate EO-based prompts
+function generate_eo_prompts(current_state) {
+  set ::eo_count = 0
+  set ::prompts_generated = 0
+  
+  // Count EO states
+  loop for ::state_type in Object.keys(::current_state) {
+    branch when ::current_state[::state_type] = "EO" {
+      set ::eo_count = ::eo_count + 1
+    }
+  }
+  
+  // Generate prompts based on EO count
+  branch when ::eo_count >= 2 {
+    emit "prompt.urgent_action" with {
+      priority: 0.95,
+      context: "multiple_eo",
+      urgency: "critical",
+      eo_count: ::eo_count,
+      timestamp: now()
+    }
+    set ::prompts_generated = ::prompts_generated + 1
+  } else branch when ::eo_count = 1 {
+    emit "prompt.moderate_action" with {
+      priority: 0.8,
+      context: "single_eo",
+      urgency: "medium",
+      timestamp: now()
+    }
+    set ::prompts_generated = ::prompts_generated + 1
+  }
+  
+  emit "prompts.generated" with { count: ::prompts_generated, eo_count: ::eo_count }
+} 

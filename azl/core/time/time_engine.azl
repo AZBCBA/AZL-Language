@@ -1,0 +1,268 @@
+component ::time.engine {
+  init {
+    set ::status = "initializing"
+    set ::start_time = 0
+    set ::current_time = 0
+    set ::time_format = "both"  // both, iso, unix, readable
+    set ::wait_queue = []
+    set ::scheduled_events = []
+    set ::id_counter = 0
+    
+    // Initialize time tracking
+    store ::initial_time from ::internal.now()
+    set ::start_time = ::initial_time.epoch
+    set ::current_time = ::start_time
+    
+    emit "time.engine.initialized" with { start_time: ::start_time }
+  }
+
+  behavior {
+    // Get current timestamp (returns both epoch and ISO)
+    listen for "time.now" then {
+      store ::current_timestamp from ::internal.now()
+      
+      branch when ::time_format = "both" {
+        return ::current_timestamp  // { epoch: 1234567890, iso: "2024-01-01T12:00:00Z" }
+      } else branch when ::time_format = "iso" {
+        return ::current_timestamp.iso
+      } else branch when ::time_format = "unix" {
+        return ::current_timestamp.epoch
+      } else {
+        // readable format
+        store ::readable from ::internal.format_time(::current_timestamp.epoch, "readable")
+        return ::readable
+      }
+    }
+
+    // Format timestamp into different formats
+    listen for "time.format" then {
+      set ::timestamp = ::format_data.timestamp
+      set ::format_type = ::format_data.format || "iso"
+      
+      branch when ::format_type = "iso" {
+        return ::internal.format_time(::timestamp, "iso")
+      } else branch when ::format_type = "unix" {
+        return ::timestamp
+      } else branch when ::format_type = "readable" {
+        return ::internal.format_time(::timestamp, "readable")
+      } else {
+        // Default to ISO
+        return ::internal.format_time(::timestamp, "iso")
+      }
+    }
+
+    // Calculate time difference in seconds
+    listen for "time.diff" then {
+      set ::start_time = ::diff_data.start
+      set ::end_time = ::diff_data.end
+      
+      store ::difference from ::internal.diff(::start_time, ::end_time)
+      return ::difference
+    }
+
+    // Wait for specified duration
+    listen for "time.wait" then {
+      set ::duration = ::wait_data.duration
+      set ::wait_id = ::generate_wait_id()
+      
+      say "⏱️ Waiting for ::duration seconds..."
+      
+      // Use internal wait function
+      emit "internal.wait" with { duration: ::duration }
+      
+      // Add to wait queue for tracking
+      set ::wait_queue.push({
+        id: ::wait_id,
+        duration: ::duration,
+        start_time: ::current_time,
+        completed: false
+      })
+      
+      emit "wait.scheduled" with {
+        id: ::wait_id,
+        duration: ::duration,
+        completion_time: ::current_time + ::duration
+      }
+      
+      return ::wait_id
+    }
+
+    // Check wait completion
+    listen for "time.check_wait" then {
+      set ::wait_id = ::check_data.wait_id
+      
+      // Find wait in queue
+      loop for ::wait in ::wait_queue {
+        branch when ::wait.id = ::wait_id {
+          set ::elapsed = ::current_time - ::wait.start_time
+          branch when ::elapsed >= ::wait.duration {
+            set ::wait.completed = true
+            emit "wait.completed" with {
+              id: ::wait_id,
+              elapsed: ::elapsed
+            }
+            return true
+          } else {
+            return false
+          }
+        }
+      }
+      
+      return false
+    }
+
+    // Schedule an event for later
+    listen for "time.schedule" then {
+      set ::event_name = ::schedule_data.event
+      set ::delay = ::schedule_data.delay
+      set ::scheduled_time = ::current_time + ::delay
+      
+      set ::scheduled_events.push({
+        event: ::event_name,
+        scheduled_time: ::scheduled_time,
+        delay: ::delay,
+        executed: false
+      })
+      
+      say "📅 Scheduled '::event_name' for ::delay seconds from now"
+      
+      emit "event.scheduled" with {
+        event: ::event_name,
+        scheduled_time: ::scheduled_time
+      }
+    }
+
+    // Check and execute scheduled events
+    listen for "time.check_scheduled" then {
+      loop for ::event in ::scheduled_events {
+        branch when ::event.executed = false and ::current_time >= ::event.scheduled_time {
+          set ::event.executed = true
+          emit ::event.event with { scheduled: true }
+          say "⏰ Executing scheduled event: ::event.event"
+        }
+      }
+    }
+
+    // Update current time (called periodically)
+    listen for "time.update" then {
+      store ::new_time from ::internal.now()
+      set ::current_time = ::new_time.epoch
+      
+      // Check scheduled events
+      emit "time.check_scheduled"
+      
+      emit "time.updated" with { 
+        current_time: ::current_time,
+        iso_time: ::new_time.iso
+      }
+    }
+
+    // Set time format preference
+    listen for "time.set_format" then {
+      set ::new_format = ::format_data.format
+      set ::time_format = ::new_format
+      
+      say "🕒 Time format set to: ::time_format"
+      emit "time.format.changed" with { format: ::time_format }
+    }
+
+    // Generate unique wait ID
+    listen for "generate_wait_id" then {
+      set ::id_counter = ::id_counter + 1
+      set ::wait_id = "wait_" + ::id_counter + "_" + ::current_time
+      return ::wait_id
+    }
+
+    // Internal system calls (implemented by interpreter)
+    listen for "internal.now" then {
+      // This would be implemented in the interpreter
+      // For now, return simulated time
+      set ::epoch = ::current_time
+      set ::iso = ::internal.format_time(::epoch, "iso")
+      
+      return {
+        epoch: ::epoch,
+        iso: ::iso
+      }
+    }
+
+    listen for "internal.format_time" then {
+      set ::timestamp = ::format_data.timestamp
+      set ::format_type = ::format_data.format || "iso"
+      
+      // Simple formatting (would be more sophisticated in real implementation)
+      branch when ::format_type = "iso" {
+        set ::date = ::timestamp_to_date(::timestamp)
+        set ::time = ::timestamp_to_time(::timestamp)
+        return ::date + "T" + ::time + "Z"
+      } else branch when ::format_type = "readable" {
+        set ::date = ::timestamp_to_date(::timestamp)
+        set ::time = ::timestamp_to_time(::timestamp)
+        return ::date + " " + ::time
+      } else {
+        return ::timestamp
+      }
+    }
+
+    listen for "internal.diff" then {
+      set ::start = ::diff_data.start
+      set ::end = ::diff_data.end
+      return ::end - ::start
+    }
+
+    listen for "internal.wait" then {
+      set ::duration = ::wait_data.duration
+      say "⏳ Waited for ::duration seconds"
+      emit "wait.completed" with { duration: ::duration }
+    }
+
+    // Helper functions for date/time conversion
+    listen for "timestamp_to_date" then {
+      set ::timestamp = ::format_data.timestamp
+      
+      // Simple date conversion (simplified for demo)
+      set ::days_since_epoch = ::timestamp / 86400
+      set ::year = 1970 + (::days_since_epoch / 365)
+      set ::month = 1 + ((::days_since_epoch % 365) / 30)
+      set ::day = 1 + ((::days_since_epoch % 365) % 30)
+      
+      set ::date_string = ::year + "-" + ::month + "-" + ::day
+      return ::date_string
+    }
+
+    listen for "timestamp_to_time" then {
+      set ::timestamp = ::format_data.timestamp
+      
+      // Simple time conversion (simplified for demo)
+      set ::seconds_in_day = ::timestamp % 86400
+      set ::hour = ::seconds_in_day / 3600
+      set ::minute = (::seconds_in_day % 3600) / 60
+      set ::second = ::seconds_in_day % 60
+      
+      set ::time_string = ::hour + ":" + ::minute + ":" + ::second
+      return ::time_string
+    }
+  }
+
+  memory {
+    status
+    start_time
+    current_time
+    time_format
+    wait_queue
+    scheduled_events
+    id_counter
+  }
+
+  interface {
+    time.now
+    time.format
+    time.diff
+    time.wait
+    time.check_wait
+    time.schedule
+    time.check_scheduled
+    time.update
+    time.set_format
+  }
+} 

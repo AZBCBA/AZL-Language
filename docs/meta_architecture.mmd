@@ -1,0 +1,253 @@
+# Phase 4: Meta-Cognition + Contextual Awareness Architecture
+
+## System Overview
+
+Phase 4 introduces three new cognitive layers that enable AZME to think about its own thinking, adapt to context, and schedule its activities temporally.
+
+## Architecture Diagram
+
+```mermaid
+graph TD
+    %% Core Cognitive Layers
+    A[ExecutionTrace] --> B[MetaCognitionEngine]
+    B --> C[ContextEngine]
+    C --> D[TemporalScheduler]
+    
+    %% Meta-Cognition Flow
+    B -->|Evaluate| E[GlobalState]
+    E -->|Trigger| F[MetaThought]
+    F -->|Action| G[Reroute/Mutate]
+    G -->|Update| H[ThoughtQueue]
+    
+    %% Contextual Awareness Flow
+    C -->|Filter| I[Thought Selection]
+    I -->|Prefer Tags| J[ContextBlock]
+    J -->|Adjust Priority| K[ThoughtQueue]
+    
+    %% Temporal Reasoning Flow
+    D -->|Schedule| L[Periodic Tasks]
+    L -->|Tick| M[Time Simulation]
+    M -->|Execute| N[Scheduled Thoughts]
+    
+    %% Integration Points
+    H --> O[ReflectionEngine]
+    K --> O
+    N --> O
+    
+    %% Agent Scope
+    P[AgentScope] --> Q[Agent-Specific Thoughts]
+    Q --> R[Multi-Agent Coordination]
+    
+    %% Meta-Reflection Loop
+    O -->|Score| S[ScoreVector]
+    S -->|Update| E
+    E -->|Trigger| F
+    
+    %% Styling
+    classDef metaLayer fill:#ff9999,stroke:#333,stroke-width:2px
+    classDef contextLayer fill:#99ccff,stroke:#333,stroke-width:2px
+    classDef temporalLayer fill:#99ff99,stroke:#333,stroke-width:2px
+    classDef integrationLayer fill:#ffff99,stroke:#333,stroke-width:2px
+    
+    class B,F,G metaLayer
+    class C,I,J contextLayer
+    class D,L,M temporalLayer
+    class O,S integrationLayer
+```
+
+## AZL Grammar Examples
+
+### Meta-Cognition
+```azl
+meta_thought "improve_reflection" {
+  if score("reflection") < 0.6 {
+    reroute("thought_selector").add( novelty_bias(0.2) )
+  }
+}
+
+meta_thought "adapt_strategy" {
+  if failure_rate("training") > 5 {
+    mutate("training_thought").add( dropout(0.3) )
+  }
+}
+```
+
+### Contextual Awareness
+```azl
+context "training_mode" {
+  prefer tag = "neural"
+}
+
+context "learning_session" {
+  prefer tag = "adaptive"
+}
+
+context "evaluation_mode" {
+  prefer tag = "analysis"
+}
+```
+
+### Temporal Reasoning
+```azl
+schedule "train_mnist" every 5 minutes
+schedule "evaluate_model" every 10 minutes
+schedule "adaptive_learning" every 3 minutes
+```
+
+### Agent Scope
+```azl
+agent "learning_agent" {
+  thought "train_model" {
+    train "mnist_net" with { loss: "crossentropy", optimizer: "adam", epochs: 10 }
+  }
+  thought "evaluate_model" {
+    eval "mnist_net" when accuracy < 0.9 { reflect("mnist_net") }
+  }
+}
+```
+
+## Runtime Components
+
+### MetaCognitionEngine
+- **Purpose**: Evaluates higher-order thoughts about cognition
+- **Key Functions**:
+  - `register_meta_thought()`: Register meta-thoughts for evaluation
+  - `evaluate_meta_thoughts()`: Evaluate all meta-thoughts based on current state
+  - `update_from_trace()`: Update meta state from execution traces
+  - `record_thought_execution()`: Track thought execution for meta-analysis
+
+### ContextEngine
+- **Purpose**: Filters thoughts based on environmental context
+- **Key Functions**:
+  - `apply_context_block()`: Apply context filters
+  - `filter_thought_by_context()`: Check if thought matches current context
+  - `adjust_thought_priority()`: Boost priority for preferred tags
+  - `get_current_context()`: Get active context
+
+### TemporalScheduler
+- **Purpose**: Manages time-based thought execution
+- **Key Functions**:
+  - `schedule_thought()`: Schedule thoughts for periodic execution
+  - `tick()`: Advance time and execute scheduled tasks
+  - `advance_time_simulation()`: Simulate time advancement for testing
+  - `get_task_execution_stats()`: Get execution statistics
+
+## Integration Points
+
+### With Reflection Engine
+- Meta-thoughts can trigger reflection on reflection itself
+- Context filters can influence which thoughts are promoted
+- Scheduled tasks can trigger reflection events
+
+### With Thought Queue
+- Meta-thoughts can reroute or mutate thoughts in the queue
+- Context filters adjust thought priorities
+- Scheduled tasks add thoughts to the queue
+
+### With Neural Engine
+- Meta-thoughts can adapt neural training strategies
+- Context can prefer neural-related thoughts during training
+- Scheduled tasks can trigger neural evaluations
+
+## Testing Strategy
+
+### Meta-Cognition Tests
+- ✅ Meta-thought parsing and registration
+- ✅ Condition evaluation with global state
+- ✅ Meta-action execution (reroute/mutate)
+- ✅ Meta-reflection loop (reflection on reflection)
+
+### Contextual Awareness Tests
+- ✅ Context block parsing and application
+- ✅ Thought filtering based on context
+- ✅ Priority adjustment for preferred tags
+- ✅ Context switching and state management
+
+### Temporal Reasoning Tests
+- ✅ Schedule block parsing and registration
+- ✅ Time simulation and task execution
+- ✅ Execution statistics and task management
+- ✅ Periodic thought execution
+
+### Integration Tests
+- ✅ Complete Phase 4 workflow
+- ✅ Meta-cognition + Context + Temporal integration
+- ✅ Agent scope with multiple thoughts
+- ✅ Context-driven thought filtering
+
+## Performance Characteristics
+
+### Meta-Cognition
+- **Evaluation Frequency**: On each reflection cycle
+- **Memory Usage**: O(n) where n = number of meta-thoughts
+- **Time Complexity**: O(m) where m = number of conditions to evaluate
+
+### Contextual Awareness
+- **Filtering Overhead**: O(1) per thought
+- **Context Switching**: O(1) operation
+- **Priority Adjustment**: O(t) where t = number of preferred tags
+
+### Temporal Scheduling
+- **Scheduler Tick**: O(s) where s = number of scheduled tasks
+- **Time Simulation**: O(t) where t = number of ticks
+- **Task Execution**: O(1) per task
+
+## Future Extensibility
+
+### Meta-Cognition Extensions
+- **Meta-Meta-Thoughts**: Thoughts about meta-thoughts
+- **Learning Rate Adaptation**: Dynamic adjustment of learning strategies
+- **Strategy Evolution**: Genetic evolution of cognitive strategies
+
+### Contextual Extensions
+- **Multi-Context Support**: Simultaneous multiple contexts
+- **Context Hierarchies**: Nested context relationships
+- **Dynamic Context Generation**: Automatic context creation
+
+### Temporal Extensions
+- **Complex Scheduling**: Cron-like expressions
+- **Time-based Learning**: Temporal learning patterns
+- **Event-driven Scheduling**: Trigger-based scheduling
+
+## Usage Examples
+
+### Complete Phase 4 Workflow
+```azl
+// 1. Set up context for learning session
+context "learning_session" {
+  prefer tag = "adaptive"
+}
+
+// 2. Register meta-thought for strategy improvement
+meta_thought "improve_learning" {
+  if score("learning") < 0.5 {
+    reroute("learning_strategy").add( novelty_bias(0.2) )
+  }
+}
+
+// 3. Schedule periodic evaluation
+schedule "evaluate_progress" every 5 minutes
+
+// 4. Define agent-specific thoughts
+agent "learning_agent" {
+  thought "adaptive_training" {
+    train "model" with { loss: "adaptive", optimizer: "dynamic", epochs: 10 }
+  }
+  thought "meta_evaluation" {
+    eval "model" when performance < 0.8 { reflect("learning_strategy") }
+  }
+}
+
+// 5. Execute with meta-cognitive awareness
+think { "adaptive_training", "meta_evaluation" }
+execute top_thought()
+```
+
+This architecture enables AZME to:
+- **Think about its own thinking** through meta-cognition
+- **Adapt to context** through contextual awareness  
+- **Schedule its activities** through temporal reasoning
+- **Coordinate multiple agents** through agent scope
+- **Evolve its strategies** through meta-reflection loops
+
+The result is a truly self-aware, context-sensitive, and temporally-aware cognitive system that can learn to learn and think about its own thinking processes. 

@@ -1,0 +1,66 @@
+# Test the canonical AZL bootstrap compiler
+define test_canonical_azl:
+  # Import the bootstrap compiler
+  bootstrap = PureAzlBootstrap()
+  
+  # Test source code in canonical AZL syntax
+  test_source = """
+  let x = 42
+  fn greet(name) {
+    return "Hello, " + name + "!"
+  }
+  quantum.allocate()
+  memory.store("test", "value")
+  """
+  
+  # Test compilation
+  result = bootstrap.compile(test_source)
+  
+  # Test consciousness and self-awareness
+  state = bootstrap.get_state()
+  
+  # Test quantum operations
+  qubit = bootstrap.allocate_qubit()
+  bootstrap.hadamard_gate(qubit)
+  measurement = bootstrap.measure_qubit(qubit)
+  
+  # Test memory operations
+  bootstrap.store_memory("test_key", "test_value")
+  retrieved = bootstrap.retrieve_memory("test_key")
+  
+  # Test AI features
+  python_code = "def hello(name): return 'Hello ' + name"
+  azl_code = bootstrap.transpile_python_to_azl(python_code)
+  
+  # Test hardware integration
+  gpu_mem = bootstrap.gpu_allocate_memory(1024)
+  cpu_config = bootstrap.cpu_optimize_parallel(8)
+  vram = bootstrap.vram_manage_memory("allocate", 512)
+  
+  # Return test results
+  return {
+    compilation_success: result.success,
+    ast_nodes: result.ast_nodes,
+    consciousness_state: result.consciousness_state,
+    quantum_measurement: measurement,
+    memory_retrieved: retrieved,
+    transpiled_code: azl_code,
+    hardware_integration: {
+      gpu: gpu_mem,
+      cpu: cpu_config,
+      vram: vram
+    },
+    system_state: state.system_state,
+    consciousness: state.consciousness
+  }
+
+# Run the test
+test_result = test_canonical_azl()
+print("Test Results:")
+print("Compilation Success:", test_result.compilation_success)
+print("AST Nodes:", test_result.ast_nodes)
+print("Consciousness:", test_result.consciousness_state)
+print("Quantum Measurement:", test_result.quantum_measurement)
+print("Memory Retrieved:", test_result.memory_retrieved)
+print("Transpiled Code:", test_result.transpiled_code)
+print("System State:", test_result.system_state) 

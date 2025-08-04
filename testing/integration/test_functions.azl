@@ -1,0 +1,60 @@
+say "Testing Functions in AZL:";
+
+// Test 1: Basic function declaration and call
+fn add(a, b) {
+    return a + b;
+}
+
+let result = add(5, 3);
+say "5 + 3 = " + result;
+
+// Test 2: Function with no parameters
+fn greet() {
+    return "Hello, AZL!";
+}
+
+let message = greet();
+say message;
+
+// Test 3: Recursive function (factorial)
+fn factorial(n) {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+let fact5 = factorial(5);
+say "5! = " + fact5;
+
+// Test 4: Anonymous function
+let increment = fn(x) {
+    return x + 1;
+};
+
+let inc_result = increment(10);
+say "10 + 1 = " + inc_result;
+
+// Test 5: Function with multiple statements
+fn calculate(a, b, c) {
+    let sum = a + b;
+    let product = sum * c;
+    return product;
+}
+
+let calc_result = calculate(2, 3, 4);
+say "calculate(2, 3, 4) = " + calc_result;
+
+// Test 6: Nested function calls
+fn double(x) {
+    return x * 2;
+}
+
+fn triple(x) {
+    return x * 3;
+}
+
+let nested_result = double(triple(5));
+say "double(triple(5)) = " + nested_result;
+
+say "All function tests completed!"; 

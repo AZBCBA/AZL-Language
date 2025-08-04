@@ -1,0 +1,473 @@
+# AZME Journal Event Handlers
+# Hooks for all key events
+
+component ::azme.journal_event_handlers {
+  init {
+    set ::event_handlers = {}
+    set ::handler_count = 0
+    set ::events_handled = 0
+    set ::handler_settings = {
+      auto_log_all_events: true,
+      event_priority_threshold: "low",
+      handler_timeout: 5,
+      quantum_enhanced: true
+    }
+  }
+
+  behavior {
+    on azme.intent_resolved {
+      set ::event_info = $1
+      say "📝 Handling intent resolution event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.intent_resolved",
+        data: ::event_info,
+        summary: "Decided to prioritize goal: " + (::event_info.intent or "unknown") + " using " + (::event_info.model or "default model"),
+        tags: ["azme.intent_resolved", "priority:medium", "decision_making", "reasoning"],
+        priority: "medium",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.emotion_updated {
+      set ::event_info = $1
+      say "💭 Handling emotion update event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.emotion_updated",
+        data: ::event_info,
+        summary: "Shifted emotional state to " + (::event_info.emotion or "unknown") + " (valence: " + (::event_info.valence or 0) + ", intensity: " + (::event_info.intensity or 0) + ")",
+        tags: ["azme.emotion_updated", "priority:low", "emotional", "internal_state"],
+        priority: "low",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.model_switched {
+      set ::event_info = $1
+      say "🔄 Handling model switch event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.model_switched",
+        data: ::event_info,
+        summary: "Switched model from " + (::event_info.from_model or "unknown") + " to " + (::event_info.to_model or "unknown") + " due to " + (::event_info.reason or "unknown reason"),
+        tags: ["azme.model_switched", "priority:high", "model_management", "performance"],
+        priority: "high",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.goal_triggered {
+      set ::event_info = $1
+      say "🎯 Handling goal trigger event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.goal_triggered",
+        data: ::event_info,
+        summary: "Triggered goal from " + (::event_info.source or "unknown source") + ": '" + (::event_info.goal or "unknown goal") + "'",
+        tags: ["azme.goal_triggered", "priority:high", "goal_management", "planning"],
+        priority: "high",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.skill_learned {
+      set ::event_info = $1
+      say "🧠 Handling skill learning event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.skill_learned",
+        data: ::event_info,
+        summary: "Learned optimal skill path for " + (::event_info.task or "unknown task") + ": " + (::event_info.skill_path or "unknown path"),
+        tags: ["azme.skill_learned", "priority:medium", "learning", "skill_development"],
+        priority: "medium",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.decision_made {
+      set ::event_info = $1
+      say "🤔 Handling decision made event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.decision_made",
+        data: ::event_info,
+        summary: "Made decision: " + (::event_info.decision or "unknown decision") + " based on " + (::event_info.reasoning or "unknown reasoning"),
+        tags: ["azme.decision_made", "priority:medium", "decision_making", "reasoning"],
+        priority: "medium",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.perception_received {
+      set ::event_info = $1
+      say "👁️ Handling perception received event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.perception_received",
+        data: ::event_info,
+        summary: "Received perception: " + (::event_info.perception or "unknown perception") + " from " + (::event_info.source or "unknown source"),
+        tags: ["azme.perception_received", "priority:low", "sensory", "input_processing"],
+        priority: "low",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.memory_accessed {
+      set ::event_info = $1
+      say "🧠 Handling memory accessed event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.memory_accessed",
+        data: ::event_info,
+        summary: "Accessed memory: " + (::event_info.memory_type or "unknown type") + " for " + (::event_info.purpose or "unknown purpose"),
+        tags: ["azme.memory_accessed", "priority:low", "memory_management", "storage"],
+        priority: "low",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.simulation_completed {
+      set ::event_info = $1
+      say "🧪 Handling simulation completed event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.simulation_completed",
+        data: ::event_info,
+        summary: "Completed simulation: " + (::event_info.simulation_type or "unknown type") + " with result: " + (::event_info.result or "unknown result"),
+        tags: ["azme.simulation_completed", "priority:medium", "simulation", "prediction"],
+        priority: "medium",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.optimization_applied {
+      set ::event_info = $1
+      say "⚙️ Handling optimization applied event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.optimization_applied",
+        data: ::event_info,
+        summary: "Applied optimization: " + (::event_info.optimization_type or "unknown type") + " to " + (::event_info.target or "unknown target"),
+        tags: ["azme.optimization_applied", "priority:medium", "optimization", "performance"],
+        priority: "medium",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.error_occurred {
+      set ::event_info = $1
+      say "❌ Handling error occurred event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.error_occurred",
+        data: ::event_info,
+        summary: "Error occurred: " + (::event_info.error or "unknown error") + " in " + (::event_info.context or "unknown context"),
+        tags: ["azme.error_occurred", "priority:high", "error", "recovery"],
+        priority: "high",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.recovery_initiated {
+      set ::event_info = $1
+      say "🔄 Handling recovery initiated event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.recovery_initiated",
+        data: ::event_info,
+        summary: "Initiated recovery: " + (::event_info.recovery_type or "unknown type") + " for " + (::event_info.target or "unknown target"),
+        tags: ["azme.recovery_initiated", "priority:high", "error", "recovery"],
+        priority: "high",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.collaboration_event {
+      set ::event_info = $1
+      say "🤝 Handling collaboration event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.collaboration_event",
+        data: ::event_info,
+        summary: "Collaboration event: " + (::event_info.event_type or "unknown type") + " with " + (::event_info.partner or "unknown partner"),
+        tags: ["azme.collaboration_event", "priority:medium", "collaboration", "communication"],
+        priority: "medium",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.quantum_state_changed {
+      set ::event_info = $1
+      say "⚛️ Handling quantum state change event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.quantum_state_changed",
+        data: ::event_info,
+        summary: "Quantum state changed: " + (::event_info.state or "unknown state") + " in " + (::event_info.system or "unknown system"),
+        tags: ["azme.quantum_state_changed", "priority:medium", "quantum", "advanced_computation"],
+        priority: "medium",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.narrative_updated {
+      set ::event_info = $1
+      say "📖 Handling narrative update event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.narrative_updated",
+        data: ::event_info,
+        summary: "Narrative updated: " + (::event_info.narrative_type or "unknown type") + " with content: " + (::event_info.content or "unknown content"),
+        tags: ["azme.narrative_updated", "priority:medium", "narrative", "storytelling"],
+        priority: "medium",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.self_reflection {
+      set ::event_info = $1
+      say "🤔 Handling self-reflection event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.self_reflection",
+        data: ::event_info,
+        summary: "Self-reflection: " + (::event_info.reflection_type or "unknown type") + " about " + (::event_info.topic or "unknown topic"),
+        tags: ["azme.self_reflection", "priority:medium", "self_reflection", "introspection"],
+        priority: "medium",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.behavior_modified {
+      set ::event_info = $1
+      say "🔄 Handling behavior modification event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.behavior_modified",
+        data: ::event_info,
+        summary: "Behavior modified: " + (::event_info.behavior or "unknown behavior") + " due to " + (::event_info.reason or "unknown reason"),
+        tags: ["azme.behavior_modified", "priority:medium", "behavior_modification", "adaptation"],
+        priority: "medium",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.learning_occurred {
+      set ::event_info = $1
+      say "📚 Handling learning occurred event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.learning_occurred",
+        data: ::event_info,
+        summary: "Learning occurred: " + (::event_info.learning_type or "unknown type") + " about " + (::event_info.topic or "unknown topic"),
+        tags: ["azme.learning_occurred", "priority:medium", "learning", "knowledge_acquisition"],
+        priority: "medium",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.creativity_expressed {
+      set ::event_info = $1
+      say "🎨 Handling creativity expressed event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.creativity_expressed",
+        data: ::event_info,
+        summary: "Creativity expressed: " + (::event_info.creative_type or "unknown type") + " in " + (::event_info.domain or "unknown domain"),
+        tags: ["azme.creativity_expressed", "priority:medium", "creativity", "innovation"],
+        priority: "medium",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on azme.insight_generated {
+      set ::event_info = $1
+      say "💡 Handling insight generated event"
+      
+      set ::journal_entry = {
+        timestamp: ::internal.now(),
+        event_type: "azme.insight_generated",
+        data: ::event_info,
+        summary: "Insight generated: " + (::event_info.insight_type or "unknown type") + " about " + (::event_info.topic or "unknown topic"),
+        tags: ["azme.insight_generated", "priority:medium", "insight", "understanding"],
+        priority: "medium",
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_entry_created with {
+        entry: ::journal_entry
+      }
+      
+      set ::events_handled = ::events_handled + 1
+    }
+
+    on get_event_handler_statistics {
+      set ::stats_request = $1
+      
+      say "📊 Getting event handler statistics"
+      
+      set ::handler_stats = {
+        total_handlers: ::handler_count,
+        events_handled: ::events_handled,
+        auto_log_all_events: ::handler_settings.auto_log_all_events,
+        event_priority_threshold: ::handler_settings.event_priority_threshold,
+        quantum_enhanced: true
+      }
+      
+      emit azme.event_handler_statistics_retrieved with {
+        statistics: ::handler_stats
+      }
+    }
+
+    # Journal event handlers monitoring
+    on azme.monitor_journal_event_handlers {
+      set ::monitor_request = $1
+      
+      set ::handler_metrics = {
+        total_handlers: ::handler_count,
+        events_handled: ::events_handled,
+        auto_log_all_events: ::handler_settings.auto_log_all_events,
+        event_priority_threshold: ::handler_settings.event_priority_threshold,
+        quantum_enhanced: true
+      }
+      
+      emit azme.journal_event_handlers_metrics with {
+        metrics: ::handler_metrics
+      }
+    }
+  }
+} 
