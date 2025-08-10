@@ -199,15 +199,15 @@ component ::net.http.server {
   ::authenticate_request = (headers) => {
     set auth_header = headers["Authorization"] || ""
     set expected_token = ::internal.env("AZL_API_TOKEN")
-    
-    if !expected_token {
-      return true  # No token required
+    set require_token = (::internal.env("AZL_REQUIRE_API_TOKEN") != "false")
+    if !require_token {
+      # Optional mode: allow if no token configured
+      if !expected_token { return true }
+    } else {
+      # Required mode: must have configured token and provided bearer
+      if !expected_token { return false }
     }
-    
-    if !auth_header.starts_with("Bearer ") {
-      return false
-    }
-    
+    if !auth_header.starts_with("Bearer ") { return false }
     set provided_token = auth_header.substring(7)
     return provided_token == expected_token
   }

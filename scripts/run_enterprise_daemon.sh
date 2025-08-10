@@ -19,6 +19,24 @@ echo "🔑 API Token: $AZL_API_TOKEN"
 echo "📁 Config: $AZL_BUILD_CONFIG"
 echo "🌐 Port: $AZL_BUILD_API_PORT"
 
+# Ensure sysproxy is running and listening (start locally if not)
+{
+  exec 5<>/dev/tcp/127.0.0.1/9099
+  ok=$?
+  exec 5>&-
+} 2>/dev/null || ok=1
+if [ "${ok}" != "0" ]; then
+  echo "🔧 Starting local sysproxy on 127.0.0.1:9099"
+  mkdir -p .azl || true
+  if [ ! -x .azl/sysproxy ]; then
+    echo "🛠️  Building sysproxy..."
+    gcc -O2 -o .azl/sysproxy tools/sysproxy.c
+  fi
+  SYSPROXY_TCP=127.0.0.1:9099 SYSFIFO_IN=.azl/engine.in SYSFIFO_IN_KEEP=1 .azl/sysproxy 2>.azl/sysproxy.log &
+  echo $! > .azl/sysproxy.pid
+  sleep 0.2
+fi
+
 # Create cache directory and ensure FIFOs exist
 mkdir -p .azl/cache
 rm -f .azl/engine.out .azl/engine.in

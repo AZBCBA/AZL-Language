@@ -24,7 +24,7 @@ exec 4>>"$ENGINE_IN"
   stdbuf -oL sed -u -n 's/.*@sysproxy[[:space:]]\{1,\}//p' "$ENGINE_OUT" \
     | stdbuf -oL tee /dev/stderr \
     | stdbuf -oL tee -a .azl/wire.requests.log \
-    > /proc/self/fd/3
+    >&3
 ) &
 
 # pump responses sysproxy->engine (log to file)

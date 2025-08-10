@@ -10,6 +10,10 @@ export AZL_STRICT=1
 
 # Collect tests
 mapfile -t TEST_FILES < <(find azl/testing -type f -name '*.azl' -print | sort)
+# include HTTP limits test if present
+if [ -f azl/testing/http/test_http_limits.azl ]; then
+  TEST_FILES+=("azl/testing/http/test_http_limits.azl")
+fi
 # Include top-level tests that match pattern
 if [ -f test_integration_final.azl ]; then
   TEST_FILES+=("test_integration_final.azl")
