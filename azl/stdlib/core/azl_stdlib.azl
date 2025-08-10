@@ -771,6 +771,81 @@ component ::azl.stdlib {
     return ::time_ticks
   }
 
+  # JSON (minimal helpers used by HTTP and build configs)
+  function json_parse(s) {
+    set str = (s || "").trim()
+    if str.length == 0 { return {} }
+    if str.charAt(0) != "{" { return {} }
+    # Very small object parser: keys as strings, values as string/number/bool/null only
+    set i = 1
+    set obj = {}
+    loop {
+      while (i < str.length && (str.charAt(i) == " " || str.charAt(i) == "\n" || str.charAt(i) == "\r" || str.charAt(i) == "\t" || str.charAt(i) == ",")) { set i = i + 1 }
+      if (i >= str.length) { break }
+      if (str.charAt(i) == "}") { set i = i + 1; break }
+      if (str.charAt(i) != '"') { break }
+      set i = i + 1
+      set key = ""
+      loop {
+        if (i >= str.length) { break }
+        set c = str.charAt(i)
+        if (c == '\\') { set i = i + 1; if (i < str.length) { set key = key + str.charAt(i); set i = i + 1 } else { break } }
+        else if (c == '"') { set i = i + 1; break }
+        else { set key = key + c; set i = i + 1 }
+      }
+      while (i < str.length && (str.charAt(i) == " " || str.charAt(i) == "\n" || str.charAt(i) == "\r" || str.charAt(i) == "\t")) { set i = i + 1 }
+      if (i >= str.length || str.charAt(i) != ":") { break }
+      set i = i + 1
+      while (i < str.length && (str.charAt(i) == " " || str.charAt(i) == "\n" || str.charAt(i) == "\r" || str.charAt(i) == "\t")) { set i = i + 1 }
+      if (i >= str.length) { break }
+      if (str.charAt(i) == '"') {
+        set i = i + 1
+        set val = ""
+        loop {
+          if (i >= str.length) { break }
+          set c2 = str.charAt(i)
+          if (c2 == '\\') { set i = i + 1; if (i < str.length) { set val = val + str.charAt(i); set i = i + 1 } else { break } }
+          else if (c2 == '"') { set i = i + 1; break }
+          else { set val = val + c2; set i = i + 1 }
+        }
+        obj[key] = val
+      } else {
+        set j = i
+        while (j < str.length) {
+          set ch = str.charAt(j)
+          if (ch == "," || ch == "}" || ch == " " || ch == "\n" || ch == "\r" || ch == "\t") { break }
+          set j = j + 1
+        }
+        set token = str.substring(i, j)
+        if (token == "true") { obj[key] = true }
+        else if (token == "false") { obj[key] = false }
+        else if (token == "null") { obj[key] = null }
+        else { obj[key] = token.toInt() }
+        set i = j
+      }
+    }
+    return obj
+  }
+
+  function json_stringify(obj) {
+    # Flat object stringify (string/number/bool/null values)
+    set out = "{"
+    set first = true
+    for k in obj {
+      if (!first) { set out = out + "," } else { set first = false }
+      set v = obj[k]
+      set vstr = "null"
+      if (v == null) { set vstr = "null" }
+      else if (v == true) { set vstr = "true" }
+      else if (v == false) { set vstr = "false" }
+      else if (v.charAt != null) { set vstr = '"' + v + '"' }
+      else { set vstr = v.toString() }
+      set out = out + '"' + k + '":' + vstr
+    }
+    set out = out + "}"
+    return out
+  }
+
   function time_timestamp(args) {
     return ::time_now([])
   }

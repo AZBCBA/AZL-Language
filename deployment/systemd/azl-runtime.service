@@ -2,6 +2,8 @@
 Description=AZL Runtime (sysproxy-backed HTTP loop)
 After=network.target azl-wire.service
 Requires=azl-wire.service
+BindsTo=azl-wire.service
+PartOf=azl-wire.service
 
 [Service]
 Type=simple

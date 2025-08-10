@@ -1,4 +1,4 @@
-.PHONY: test ci predeploy check-placeholders install-git-hooks
+.PHONY: test ci predeploy check-placeholders install-git-hooks examples
 
 test:
 	./scripts/run_all_tests.sh
@@ -15,5 +15,8 @@ check-placeholders:
 
 install-git-hooks:
 	./scripts/git-hooks/install.sh
+
+examples:
+	./scripts/run_examples.sh
 
 
