@@ -13,6 +13,7 @@ export AZL_API_TOKEN="${AZL_API_TOKEN:-$(openssl rand -hex 32)}"
 export AZL_BUILD_CONFIG="config/prod.azl.json"
 export AZL_BUILD_API_ENABLED="true"
 export AZL_BUILD_API_PORT="8080"
+export AZL_WIRE_MANAGED=1
 
 echo "🔑 API Token: $AZL_API_TOKEN"
 echo "📁 Config: $AZL_BUILD_CONFIG"

@@ -1,17 +1,20 @@
 [Unit]
 Description=AZL Production Runtime (containerized)
-After=network-online.target docker.service
+After=network-online.target docker.service azl-tests.service
 Wants=network-online.target docker.service
+Requires=azl-tests.service
 
 [Service]
 Type=simple
 Environment=AZL_LOG_LEVEL=quiet
 Environment=AZL_ENABLE_QUANTUM=1
+Environment=AZL_STRICT=1
 ExecStart=/usr/bin/docker run \
   --rm \
   --name azl-prod \
   --env AZL_LOG_LEVEL=${AZL_LOG_LEVEL} \
   --env AZL_ENABLE_QUANTUM=${AZL_ENABLE_QUANTUM} \
+  --env AZL_STRICT=${AZL_STRICT} \
   --log-driver json-file \
   --log-opt max-size=10m \
   --log-opt max-file=5 \

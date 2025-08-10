@@ -46,14 +46,21 @@ mkdir -p .azl
 # Execute the bootstrap bundle with real syscalls
 echo "🚀 Executing AZL bootstrap bundle with real syscalls..."
 
-# Start the wire to handle syscalls
-echo "🔌 Starting syscall wire..."
-bash scripts/azl_syswire.sh .azl/engine.out .azl/engine.in &
-WIRE_PID=$!
+# Start the wire to handle syscalls (unless already managed by launcher)
+if [ "${AZL_WIRE_MANAGED:-0}" != "1" ]; then
+  echo "🔌 Starting syscall wire..."
+  bash scripts/azl_syswire.sh .azl/engine.out .azl/engine.in &
+  WIRE_PID=$!
+else
+  echo "🔌 Syscall wire managed by launcher (AZL_WIRE_MANAGED=1)"
+  WIRE_PID=""
+fi
 
 cleanup() {
   echo "🧹 Cleaning up..."
-  kill $WIRE_PID 2>/dev/null || true
+  if [ -n "${WIRE_PID:-}" ]; then
+    kill $WIRE_PID 2>/dev/null || true
+  fi
   exit 0
 }
 trap cleanup SIGINT SIGTERM

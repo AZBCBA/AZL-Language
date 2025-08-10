@@ -23,28 +23,18 @@ function log(msg) { console.log(`[runtime] ${msg}`); }
 function err(msg) { console.error(`[runtime:err] ${msg}`); }
 
 function openFifos() {
-  // Open write FIFO (engine.out) in append mode
   const out = fs.createWriteStream(ENGINE_OUT, { flags: 'a' });
   out.on('error', e => err(`engine.out error: ${e.message}`));
 
-  // Open read FIFO (engine.in)
   const inStream = fs.createReadStream(ENGINE_IN, { encoding: 'utf8' });
   inStream.on('error', e => err(`engine.in error: ${e.message}`));
 
-  // Line reader for responses
   const rl = readline.createInterface({ input: inStream });
   rl.on('line', line => {
     if (!line) return;
     log(`resp line: ${line}`);
-    // Expect: @sysproxy.response {json}
     const idx = line.indexOf('@sysproxy.response');
-    let jsonPart = null;
-    if (idx >= 0) {
-      jsonPart = line.substring(idx + '@sysproxy.response'.length).trim();
-    } else {
-      // Engine might deliver raw JSON; try parse anyway
-      jsonPart = line.trim();
-    }
+    let jsonPart = idx >= 0 ? line.substring(idx + '@sysproxy.response'.length).trim() : line.trim();
     try {
       const obj = JSON.parse(jsonPart);
       log(`resp json: ${JSON.stringify(obj)}`);
@@ -55,7 +45,6 @@ function openFifos() {
         resolve(obj);
       }
     } catch (e) {
-      // Not a JSON response we care about
       err(`resp parse error: ${e.message}`);
     }
   });
@@ -69,26 +58,19 @@ function sendSysproxy(out, op, args = {}) {
   const line = `@sysproxy ${JSON.stringify(payload)}\n`;
   log(`send ${line.trim()}`);
   return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject, ts: Date.now(), op });
-    try {
-      out.write(line);
-    } catch (e) {
-      pending.delete(id);
-      reject(e);
-    }
-    // Timeout safeguard
-    setTimeout(() => {
+    const to = setTimeout(() => {
       if (pending.has(id)) {
         pending.delete(id);
         reject(new Error(`sysproxy timeout for op=${op} id=${id}`));
       }
-    }, 3000);
+    }, 1500);
+    pending.set(id, { resolve: (val) => { clearTimeout(to); resolve(val); }, reject, ts: Date.now(), op });
+    try { out.write(line); } catch (e) { pending.delete(id); reject(e); }
   });
 }
 
 async function run() {
   log(`Starting runtime at ${now()}`);
-  // Ensure FIFOs exist
   if (!fs.existsSync(ENGINE_OUT) || !fs.existsSync(ENGINE_IN)) {
     err(`FIFOs not found: ${ENGINE_OUT} / ${ENGINE_IN}`);
     process.exit(2);
@@ -96,73 +78,41 @@ async function run() {
 
   const { out } = openFifos();
 
-  // Boot keepalive
-  try {
-    const r = await sendSysproxy(out, 'keepalive', {});
-    log(`keepalive ok pid=${r && r.pid}`);
-  } catch (e) {
-    err(`keepalive failed: ${e.message}`);
-  }
+  try { const r = await sendSysproxy(out, 'keepalive', {}); log(`keepalive ok pid=${r && r.pid}`); } catch {}
 
-  // Listen on 0.0.0.0:8080
   let listenFd = null;
   try {
     const listenResp = await sendSysproxy(out, 'listen', { host: '0.0.0.0', port: PORT, backlog: 128 });
     log(`listenResp raw: ${JSON.stringify(listenResp)}`);
-    if (listenResp && listenResp.ok) {
-      listenFd = listenResp.fd || listenResp.socket || listenResp.listenfd;
-      log(`listening on :${PORT} fd=${listenFd}`);
-    } else {
-      err(`listen failed: ${JSON.stringify(listenResp)}`);
-    }
-  } catch (e) {
-    err(`listen error: ${e.message}`);
-  }
-  if (!listenFd) {
-    // Do not hard exit; keep process alive for diagnostics
-    setTimeout(() => process.exit(3), 2000);
-    return;
-  }
+    if (listenResp && listenResp.ok) { listenFd = listenResp.fd || listenResp.socket || listenResp.listenfd; log(`listening on :${PORT} fd=${listenFd}`); }
+  } catch {}
+  if (!listenFd) { setTimeout(() => process.exit(3), 2000); return; }
 
-  // Accept loop
-  async function handleConn() {
+  async function acceptLoop(loopId) {
     try {
       const acc = await sendSysproxy(out, 'accept', { socket: listenFd });
-      log(`acceptResp raw: ${JSON.stringify(acc)}`);
-      if (!acc || !acc.ok) {
-        setTimeout(handleConn, 100); // retry
-        return;
+      if (acc && acc.ok && acc.conn != null) {
+        const conn = acc.conn;
+        log(`accepted conn=${conn} (loop=${loopId})`);
+        // Read once to consume request
+        try { await sendSysproxy(out, 'read', { fd: conn, max: 8192 }); } catch {}
+        const body = 'OK';
+        const resp = [ 'HTTP/1.1 200 OK', 'Content-Type: text/plain', `Content-Length: ${body.length}`, 'Connection: close', '', body ].join('\r\n');
+        await sendSysproxy(out, 'write', { fd: conn, data: resp });
+        await sendSysproxy(out, 'close', { fd: conn });
+        log(`responded 200 and closed conn=${conn} (loop=${loopId})`);
+        setImmediate(() => acceptLoop(loopId));
+      } else {
+        setTimeout(() => acceptLoop(loopId), 5);
       }
-      const conn = acc.conn;
-      log(`accepted conn=${conn}`);
-
-      // For healthz, reply 200 OK regardless of request (simplified HTTP)
-      const body = 'OK';
-      const resp = [
-        'HTTP/1.1 200 OK',
-        'Content-Type: text/plain',
-        `Content-Length: ${body.length}`,
-        'Connection: close',
-        '',
-        body
-      ].join('\r\n');
-
-      await sendSysproxy(out, 'write', { fd: conn, data: resp });
-      await sendSysproxy(out, 'close', { fd: conn });
-      log(`responded 200 and closed conn=${conn}`);
     } catch (e) {
-      err(`accept/write error: ${e.message}`);
-    } finally {
-      // continue accepting
-      setImmediate(handleConn);
+      err(`accept loop error: ${e.message} (loop=${loopId})`);
+      setTimeout(() => acceptLoop(loopId), 20);
     }
   }
 
-  handleConn();
+  for (let i = 0; i < 4; i++) acceptLoop(i+1);
 }
 
-run().catch(e => {
-  err(`fatal: ${e.message}`);
-  process.exit(1);
-});
+run().catch(e => { err(`fatal: ${e.message}`); process.exit(1); });
 

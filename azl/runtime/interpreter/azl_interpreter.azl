@@ -649,19 +649,27 @@ component ::azl.interpreter {
       
       say "📦 Executing component: ::component_name"
       
-      # Execute init section
+      # PHASE 1: Pre-register listeners from behavior BEFORE init to ensure early emits are caught
+      if ::component.sections.behavior {
+        for ::statement in ::component.sections.behavior.statements {
+          if ::halted { break }
+          if ::statement.type == "listen" { ::execute_listen(::statement) }
+        }
+      }
+
+      # PHASE 2: Execute init section (may emit events)
       if ::component.sections.init {
         for ::statement in ::component.sections.init.statements {
           if ::halted { break }
           ::execute_statement(::statement)
         }
       }
-      
-      # Execute behavior section
+
+      # PHASE 3: Execute any non-listen behavior statements (avoid duplicate listener registration)
       if ::component.sections.behavior {
         for ::statement in ::component.sections.behavior.statements {
           if ::halted { break }
-          ::execute_statement(::statement)
+          if ::statement.type != "listen" { ::execute_statement(::statement) }
         }
       }
       
@@ -771,9 +779,8 @@ component ::azl.interpreter {
       set ::recursion_depth = ::recursion_depth + 1
       set ::dispatch_stack.push(::ev_name)
       say "📡 Emitting event: " + ::ev_name
-      # Set event context
-      set ::variables["event.name"] = ::ev_name
-      set ::variables["event.data"] = ::payload_val
+      # Set standardized event context object for handlers using ::event.{name,data}
+      set ::variables["event"] = { name: ::ev_name, data: ::payload_val }
       emit ::ev_name
       # Synchronously dispatch to registered listeners in this interpreter
       if ::listeners && ::listeners[::ev_name] {
@@ -823,6 +830,28 @@ component ::azl.interpreter {
       if ::s == "true" { return true }
       if ::s == "false" { return false }
       if ::s == "null" { return null }
+      # dotted property access like ::event.data or object.prop.sub
+      if ::s.indexOf(".") >= 0 {
+        # ignore numeric literals like 1.23
+        set ::maybe_num = ::parse_number_safe(::s)
+        if ::maybe_num == null {
+          # split by '.' into segments
+          set ::segments = ::s.split(".")
+          if ::segments.length >= 2 {
+            # resolve base variable (support optional :: prefix)
+            set ::base_name = ::segments[0]
+            set ::var_name = (::base_name.startsWith("::")) ? ::base_name.substring(2, ::base_name.length) : ::base_name
+            set ::val = ::variables[::var_name]
+            set ::idx = 1
+            while (::idx < ::segments.length && ::val != null) {
+              set ::key = ::segments[::idx]
+              set ::val = (::val[::key] != null) ? ::val[::key] : null
+              set ::idx = ::idx + 1
+            }
+            if ::val != null { return ::val }
+          }
+        }
+      }
       # array literal
       if ::s.startsWith("[") && ::s.endsWith("]") && ::is_balanced_any(::s) {
         set ::inner = ::s.substring(1, ::s.length - 1)
