@@ -1,0 +1,16 @@
+component ::tests.aggregate {
+  init {
+    say "🧪 Aggregated tests starting"
+    link ::error.system
+    link ::build.orchestrator
+    link ::build.pkg_manager
+
+    emit log_error with { type: "aggregate_smoke", message: "trigger", context: {} }
+    emit build.start to ::build.orchestrator with { files: [ { path: "azl/core/error_system.azl" } ], options: { backend: "bytecode", workers: 1, incremental: false } }
+    set _ = ::build.pkg_manager.load_registry()
+    set _r = ::build.pkg_manager.resolve("__nonexistent_pkg__")
+    say "🧪 Aggregated tests done"
+  }
+}
+
+

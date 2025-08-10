@@ -1,0 +1,57 @@
+name: Nightly Sysproxy E2E
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # every day at 02:00 UTC
+  workflow_dispatch:
+
+jobs:
+  sysproxy-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y gcc curl iproute2 ripgrep
+
+      - name: Build sysproxy
+        run: |
+          mkdir -p .azl
+          gcc -O2 -Wall -o .azl/sysproxy tools/sysproxy.c
+
+      - name: Run sysproxy integration test (timeout 90s)
+        run: |
+          timeout 90s bash scripts/test_sysproxy_setup.sh || true
+
+      - name: Verify health endpoints
+        run: |
+          # Give a bit more time for readiness
+          for i in $(seq 1 10); do
+            curl -sf http://127.0.0.1:8080/healthz && break || sleep 1
+          done
+          curl -sf http://127.0.0.1:8080/healthz
+          curl -sf http://127.0.0.1:8080/readyz || true
+          curl -sf http://127.0.0.1:8080/status || true
+
+      - name: Upload logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-sysproxy-logs
+          path: |
+            .azl/sysproxy.out
+            .azl/sysproxy.log
+            .azl/wire.log
+            .azl/daemon.out
+
+      - name: Cleanup (always)
+        if: always()
+        run: |
+          pkill -f sysproxy || true
+          pkill -f azl_syswire || true
+          pkill -f run_enterprise_daemon || true
+          echo 'Cleaned lingering processes'

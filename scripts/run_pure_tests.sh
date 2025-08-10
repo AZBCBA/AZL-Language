@@ -9,6 +9,7 @@ tests=(
   "azl/testing/integration/test_arithmetic.azl"
   "azl/testing/integration/test_strict_mode_div_zero.azl"
   "test_integration_final.azl"
+  "azl/testing/integration/tests_aggregate.azl"
 )
 
 fail=0

@@ -35,6 +35,7 @@ function openFifos() {
   const rl = readline.createInterface({ input: inStream });
   rl.on('line', line => {
     if (!line) return;
+    log(`resp line: ${line}`);
     // Expect: @sysproxy.response {json}
     const idx = line.indexOf('@sysproxy.response');
     let jsonPart = null;
@@ -46,6 +47,7 @@ function openFifos() {
     }
     try {
       const obj = JSON.parse(jsonPart);
+      log(`resp json: ${JSON.stringify(obj)}`);
       const id = obj && obj.id;
       if (id && pending.has(id)) {
         const { resolve } = pending.get(id);
@@ -54,6 +56,7 @@ function openFifos() {
       }
     } catch (e) {
       // Not a JSON response we care about
+      err(`resp parse error: ${e.message}`);
     }
   });
 
@@ -64,6 +67,7 @@ function sendSysproxy(out, op, args = {}) {
   const id = nextId++;
   const payload = { id, op, ...args };
   const line = `@sysproxy ${JSON.stringify(payload)}\n`;
+  log(`send ${line.trim()}`);
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject, ts: Date.now(), op });
     try {
@@ -104,21 +108,27 @@ async function run() {
   let listenFd = null;
   try {
     const listenResp = await sendSysproxy(out, 'listen', { host: '0.0.0.0', port: PORT, backlog: 128 });
+    log(`listenResp raw: ${JSON.stringify(listenResp)}`);
     if (listenResp && listenResp.ok) {
       listenFd = listenResp.fd || listenResp.socket || listenResp.listenfd;
       log(`listening on :${PORT} fd=${listenFd}`);
     } else {
-      throw new Error(`listen failed ${JSON.stringify(listenResp)}`);
+      err(`listen failed: ${JSON.stringify(listenResp)}`);
     }
   } catch (e) {
     err(`listen error: ${e.message}`);
-    process.exit(3);
+  }
+  if (!listenFd) {
+    // Do not hard exit; keep process alive for diagnostics
+    setTimeout(() => process.exit(3), 2000);
+    return;
   }
 
   // Accept loop
   async function handleConn() {
     try {
-      const acc = await sendSysproxy(out, 'accept', { fd: listenFd });
+      const acc = await sendSysproxy(out, 'accept', { socket: listenFd });
+      log(`acceptResp raw: ${JSON.stringify(acc)}`);
       if (!acc || !acc.ok) {
         setTimeout(handleConn, 100); // retry
         return;
