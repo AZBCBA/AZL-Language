@@ -33,8 +33,10 @@ bash scripts/azl_syswire.sh .azl/engine.out .azl/engine.in 2>.azl/wire.log &
 echo $! > .azl/syswire.pid
 sleep 0.2
 
-# Start the daemon
+// Start the daemon with token required by default
 echo "🚀 Starting daemon..."
+export AZL_REQUIRE_API_TOKEN="true"
+export AZL_API_TOKEN="test-token-azl"
 ./scripts/run_enterprise_daemon.sh &
 echo $! > .azl/daemon.pid
 

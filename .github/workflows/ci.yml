@@ -46,4 +46,9 @@ jobs:
       - name: Perf smoke
         run: bash scripts/perf_smoke.sh
 
+      - name: Run all AZL tests (strict)
+        run: |
+          chmod +x scripts/run_all_tests.sh || true
+          ./scripts/run_all_tests.sh
+
 

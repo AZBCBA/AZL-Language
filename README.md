@@ -9,12 +9,12 @@ Unified, component-based, event-driven programming language running in pure AZL.
   - `python3 azl_runner.py test_integration_final.azl`
 - Sysproxy + daemon (host bridge):
   - `gcc -O2 -Wall -o .azl/sysproxy tools/sysproxy.c`
-  - `bash scripts/test_sysproxy_setup.sh`
+  - `AZL_REQUIRE_API_TOKEN=true AZL_API_TOKEN=your-token bash scripts/test_sysproxy_setup.sh`
 
 See OPERATIONS.md for the full runbook.
 
 ## CI
-- `ci.yml`: placeholder/v2 guards, smoke tests, perf smoke
+- `ci.yml`: placeholder/v2 guards, smoke tests, perf smoke, full tests
 - `nightly.yml`: sysproxy E2E with logs
 
 ## 🎯 Quick Start

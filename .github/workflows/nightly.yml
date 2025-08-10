@@ -33,9 +33,17 @@ jobs:
           for i in $(seq 1 10); do
             curl -sf http://127.0.0.1:8080/healthz && break || sleep 1
           done
-          curl -sf http://127.0.0.1:8080/healthz
-          curl -sf http://127.0.0.1:8080/readyz || true
-          curl -sf http://127.0.0.1:8080/status || true
+          # Use Bearer token if required
+          if [ "${AZL_REQUIRE_API_TOKEN:-true}" != "false" ] && [ -n "${AZL_API_TOKEN:-}" ]; then
+            H="Authorization: Bearer ${AZL_API_TOKEN}"
+            curl -sf -H "$H" http://127.0.0.1:8080/healthz
+            curl -sf -H "$H" http://127.0.0.1:8080/readyz || true
+            curl -sf -H "$H" http://127.0.0.1:8080/status || true
+          else
+            curl -sf http://127.0.0.1:8080/healthz
+            curl -sf http://127.0.0.1:8080/readyz || true
+            curl -sf http://127.0.0.1:8080/status || true
+          fi
 
       - name: Upload logs (always)
         if: always()
