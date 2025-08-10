@@ -46,7 +46,7 @@ component ::quantum.hpqvpn {
   }
 
   behavior {
-    on quantum.hpqvpn.register {
+    listen for "quantum.hpqvpn.register" { 
       set ::registration_info = $1
       say "🔄 Hybrid Post-Quantum VPN subsystem registering with core"
       
@@ -58,7 +58,7 @@ component ::quantum.hpqvpn {
       }
     }
 
-    on quantum.hpqvpn.execute {
+    listen for "quantum.hpqvpn.execute" { 
       set ::vpn_request = $1
       say "🔒 Executing Hybrid Post-Quantum VPN protocol"
       
@@ -72,7 +72,7 @@ component ::quantum.hpqvpn {
       }
     }
 
-    on quantum.hpqvpn.establish_tunnel {
+    listen for "quantum.hpqvpn.establish_tunnel" { 
       set ::tunnel_info = $1
       say "🔗 Establishing quantum-enhanced VPN tunnel"
       
@@ -86,7 +86,7 @@ component ::quantum.hpqvpn {
       }
     }
 
-    on quantum.hpqvpn.hybrid_key_exchange {
+    listen for "quantum.hpqvpn.hybrid_key_exchange" { 
       set ::key_exchange_info = $1
       say "🔑 Performing hybrid quantum-classical key exchange"
       
@@ -121,7 +121,7 @@ component ::quantum.hpqvpn {
       }
     }
 
-    on quantum.hpqvpn.encrypt_traffic {
+    listen for "quantum.hpqvpn.encrypt_traffic" { 
       set ::encryption_info = $1
       say "🔐 Encrypting traffic with hybrid quantum-classical keys"
       
@@ -141,7 +141,7 @@ component ::quantum.hpqvpn {
       }
     }
 
-    on quantum.hpqvpn.manage_tunnel {
+    listen for "quantum.hpqvpn.manage_tunnel" { 
       set ::management_info = $1
       say "🔧 Managing VPN tunnel and encryption"
       
@@ -163,7 +163,7 @@ component ::quantum.hpqvpn {
       }
     }
 
-    on quantum.hpqvpn.complete {
+    listen for "quantum.hpqvpn.complete" { 
       set ::completion_info = $1
       say "✅ Hybrid Post-Quantum VPN operations completed successfully!"
       say "🔗 Tunnel active: " + ::completion_info.tunnel_active
@@ -177,7 +177,7 @@ component ::quantum.hpqvpn {
     }
 
     # Tunnel establishment
-    on quantum.hpqvpn.establish_quantum_tunnel {
+    listen for "quantum.hpqvpn.establish_quantum_tunnel" { 
       set ::quantum_tunnel_request = $1
       say "🔗 Establishing quantum-enhanced tunnel"
       
@@ -188,7 +188,7 @@ component ::quantum.hpqvpn {
     }
 
     # Key rotation
-    on quantum.hpqvpn.rotate_keys {
+    listen for "quantum.hpqvpn.rotate_keys" { 
       set ::rotation_request = $1
       say "🔄 Rotating hybrid VPN keys"
       
@@ -215,7 +215,7 @@ component ::quantum.hpqvpn {
     }
 
     # Traffic encryption
-    on quantum.hpqvpn.encrypt_packet {
+    listen for "quantum.hpqvpn.encrypt_packet" { 
       set ::packet_request = $1
       say "📦 Encrypting VPN packet with hybrid keys"
       
@@ -234,7 +234,7 @@ component ::quantum.hpqvpn {
     }
 
     # Traffic decryption
-    on quantum.hpqvpn.decrypt_packet {
+    listen for "quantum.hpqvpn.decrypt_packet" { 
       set ::packet_request = $1
       say "📦 Decrypting VPN packet with hybrid keys"
       
@@ -252,7 +252,7 @@ component ::quantum.hpqvpn {
     }
 
     # Tunnel monitoring
-    on quantum.hpqvpn.monitor_tunnel {
+    listen for "quantum.hpqvpn.monitor_tunnel" { 
       set ::monitoring_request = $1
       say "📊 Monitoring VPN tunnel health"
       
@@ -271,7 +271,7 @@ component ::quantum.hpqvpn {
     }
 
     # Protocol status
-    on quantum.hpqvpn.get_status {
+    listen for "quantum.hpqvpn.get_status" { 
       set ::status_request = $1
       
       emit quantum.hpqvpn.status_ready with {

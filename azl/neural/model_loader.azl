@@ -1,0 +1,326 @@
+############################################
+# azl/neural/model_loader.azl
+############################################
+component ::neural.model_loader {
+
+  init {
+    say "🧠 Neural Model Loader Initialized"
+    set ::loaded_models = {}
+    set ::model_registry = {}
+  }
+
+  listen for "load_quantum_neural" {
+    set ::model_name = $1
+    set ::config = $2
+    
+    say "🔮 Loading Quantum Neural Model: "
+    say ::model_name
+    
+    # Load quantum neural network
+    emit "load_component" with "azl/quantum/neural/quantum_neural.azl"
+    
+    # Initialize quantum model with configuration
+    set ::quantum_config = {
+      "layers": ::config.layers,
+      "hidden_size": ::config.hidden_size,
+      "quantum_bits": ::config.quantum_bits,
+      "entanglement": true
+    }
+    
+    emit "init_quantum_model" with ::model_name ::quantum_config
+  }
+
+  listen for "load_real_neural" {
+    set ::model_name = $1
+    set ::config = $2
+    
+    say "🧠 Loading Real Neural Network: "
+    say ::model_name
+    
+    # Load real neural network
+    emit "load_component" with "azl/neural/real_neural_network.azl"
+    
+    # Initialize neural model with configuration
+    set ::neural_config = {
+      "layers": ::config.layers,
+      "hidden_size": ::config.hidden_size,
+      "activation": ::config.activation,
+      "dropout": 0.1
+    }
+    
+    emit "init_neural_model" with ::model_name ::neural_config
+  }
+
+  listen for "load_qwen_quantum" {
+    set ::model_name = $1
+    set ::config = $2
+    
+    say "🌟 Loading Qwen Quantum Attention Model: "
+    say ::model_name
+    
+    # Load Qwen quantum attention
+    emit "load_component" with "azl/neural/qwen_72b_quantum_attention.azl"
+    
+    # Initialize Qwen model with configuration
+    set ::qwen_config = {
+      "attention_heads": ::config.attention_heads,
+      "hidden_size": ::config.hidden_size,
+      "quantum_entanglement": ::config.quantum_entanglement,
+      "vocab_size": 51200
+    }
+    
+    emit "init_qwen_model" with ::model_name ::qwen_config
+  }
+
+  listen for "init_quantum_model" {
+    set ::model_name = $1
+    set ::config = $2
+    
+    say "🔮 Initializing quantum model with config: "
+    say ::config
+    
+    # Register quantum model
+    set ::model_registry[::model_name] = {
+      "type": "quantum",
+      "config": ::config,
+      "status": "initialized"
+    }
+    
+    emit "model_ready" with ::model_name "quantum"
+  }
+
+  listen for "init_neural_model" {
+    set ::model_name = $1
+    set ::config = $2
+    
+    say "🧠 Initializing neural model with config: "
+    say ::config
+    
+    # Register neural model
+    set ::model_registry[::model_name] = {
+      "type": "neural",
+      "config": ::config,
+      "status": "initialized"
+    }
+    
+    emit "model_ready" with ::model_name "neural"
+  }
+
+  listen for "init_qwen_model" {
+    set ::model_name = $1
+    set ::config = $2
+    
+    say "🌟 Initializing Qwen model with config: "
+    say ::config
+    
+    # Register Qwen model
+    set ::model_registry[::model_name] = {
+      "type": "qwen_quantum",
+      "config": ::config,
+      "status": "initialized"
+    }
+    
+    emit "model_ready" with ::model_name "qwen_quantum"
+  }
+
+  listen for "model_ready" {
+    set ::model_name = $1
+    set ::model_type = $2
+    
+    say "✅ Model ready: "
+    say ::model_name
+    say " Type: "
+    say ::model_type
+    
+    # Add to loaded models
+    set ::loaded_models[::model_name] = ::model_type
+    
+    emit "model_loaded" with ::model_name ::model_type
+  }
+
+  listen for "get_model_config" {
+    set ::model_name = $1
+    
+    if ::model_registry[::model_name] exists {
+      set ::config = ::model_registry[::model_name]
+      emit "model_config" with ::model_name ::config
+    } else {
+      say "❌ Model not found: "
+      say ::model_name
+      emit "model_not_found" with ::model_name
+      # Log error for debugging
+      emit "log_error" with { type: "model_not_found", message: "Model not found: " + ::model_name, context: { where: "model_config_lookup" } }
+    }
+  }
+
+  listen for "list_loaded_models" {
+    say "📋 Loaded Models:"
+    
+    for model_name in ::loaded_models.keys {
+      say "  - "
+      say model_name
+      say " ("
+      say ::loaded_models[model_name]
+      say ")"
+    }
+    
+    emit "models_listed" with ::loaded_models
+  }
+
+  listen for "train_model" {
+    set ::model_name = $1
+    set ::training_data = $2
+    set ::epochs = $3
+    
+    say "🎯 Starting training for model: "
+    say ::model_name
+    
+    if ::loaded_models[::model_name] exists {
+      set ::model_type = ::loaded_models[::model_name]
+      
+      say "📚 Training "
+      say ::model_type
+      say " model for "
+      say ::epochs
+      say " epochs"
+      
+      # Start training based on model type
+      if ::model_type == "quantum" {
+        emit "train_quantum_model" with ::model_name ::training_data ::epochs
+      } else if ::model_type == "neural" {
+        emit "train_neural_model" with ::model_name ::training_data ::epochs
+      } else if ::model_type == "qwen_quantum" {
+        emit "train_qwen_model" with ::model_name ::training_data ::epochs
+      }
+    } else {
+      say "❌ Model not loaded: "
+      say ::model_name
+    }
+  }
+
+  listen for "train_quantum_model" {
+    set ::model_name = $1
+    set ::training_data = $2
+    set ::epochs = $3
+    
+    say "🔮 Training quantum model: "
+    say ::model_name
+    
+    # Quantum training logic
+    for epoch in 0..::epochs {
+      say "📚 Quantum epoch "
+      say epoch
+      say " of "
+      say ::epochs
+      
+      # Simulate quantum training
+      set ::quantum_loss = 2.5 - (epoch * 0.2)
+      if ::quantum_loss < 0.1 {
+        set ::quantum_loss = 0.1
+      }
+      
+      say "🔮 Quantum loss: "
+      say ::quantum_loss
+      
+      emit "quantum_training_step" with ::model_name epoch ::quantum_loss
+    }
+    
+    emit "quantum_training_complete" with ::model_name
+  }
+
+  listen for "train_neural_model" {
+    set ::model_name = $1
+    set ::training_data = $2
+    set ::epochs = $3
+    
+    say "🧠 Training neural model: "
+    say ::model_name
+    
+    # Neural training logic
+    for epoch in 0..::epochs {
+      say "📚 Neural epoch "
+      say epoch
+      say " of "
+      say ::epochs
+      
+      # Simulate neural training
+      set ::neural_loss = 3.0 - (epoch * 0.25)
+      if ::neural_loss < 0.1 {
+        set ::neural_loss = 0.1
+      }
+      
+      say "🧠 Neural loss: "
+      say ::neural_loss
+      
+      emit "neural_training_step" with ::model_name epoch ::neural_loss
+    }
+    
+    emit "neural_training_complete" with ::model_name
+  }
+
+  listen for "train_qwen_model" {
+    set ::model_name = $1
+    set ::training_data = $2
+    set ::epochs = $3
+    
+    say "🌟 Training Qwen model: "
+    say ::model_name
+    
+    # Qwen training logic
+    for epoch in 0..::epochs {
+      say "📚 Qwen epoch "
+      say epoch
+      say " of "
+      say ::epochs
+      
+      # Simulate Qwen training
+      set ::qwen_loss = 2.8 - (epoch * 0.22)
+      if ::qwen_loss < 0.1 {
+        set ::qwen_loss = 0.1
+      }
+      
+      say "🌟 Qwen loss: "
+      say ::qwen_loss
+      
+      emit "qwen_training_step" with ::model_name epoch ::qwen_loss
+    }
+    
+    emit "qwen_training_complete" with ::model_name
+  }
+
+  listen for "quantum_training_complete" {
+    set ::model_name = $1
+    say "🎉 Quantum training completed for: "
+    say ::model_name
+    
+    # Save quantum model
+    set ::save_path = "weights/" + ::model_name + "_quantum_trained.bin"
+    emit "save_weights" to ::ffi.torch with ::model_name ::save_path
+    
+    emit "model_training_finished" with ::model_name "quantum"
+  }
+
+  listen for "neural_training_complete" {
+    set ::model_name = $1
+    say "🎉 Neural training completed for: "
+    say ::model_name
+    
+    # Save neural model
+    set ::save_path = "weights/" + ::model_name + "_neural_trained.bin"
+    emit "save_weights" to ::ffi.torch with ::model_name ::save_path
+    
+    emit "model_training_finished" with ::model_name "neural"
+  }
+
+  listen for "qwen_training_complete" {
+    set ::model_name = $1
+    say "🎉 Qwen training completed for: "
+    say ::model_name
+    
+    # Save Qwen model
+    set ::save_path = "weights/" + ::model_name + "_qwen_trained.bin"
+    emit "save_weights" to ::ffi.torch with ::model_name ::save_path
+    
+    emit "model_training_finished" with ::model_name "qwen_quantum"
+  }
+}

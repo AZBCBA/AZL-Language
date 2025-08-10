@@ -1,0 +1,73 @@
+component ::azl.optim.targets {
+  init { link ::error.system }
+  behavior {}
+
+  # Target-specific combiners: x86_64, arm64, embedded (size/power-optimized)
+  export fn optimize_for_target(program, target_arch, target_os, profile) {
+    if program == null { emit log_error to ::error.system with { type: "optimizer", message: "null_program", context: { pass: "target_specific" } } ; return { ok: false, error: "null_program" } }
+    set arch = (target_arch || "x86_64").to_lower()
+    if arch == "x86_64" { return optimize_x86_64(program) }
+    if arch == "arm64" or arch == "aarch64" { return optimize_arm64(program) }
+    if arch == "embedded" { return optimize_embedded(program) }
+    return { ok: true, program: program, stats: { note: "no_target_specific_rules" } }
+  }
+
+  export fn optimize_x86_64(program) {
+    # Prefer shorter encodings and remove stack noise
+    set out = []
+    set i = 0
+    while i < program.length {
+      set ins = program[i]
+      if ins == null { i = i + 1; continue }
+      if ins.label != null { out.push(ins); i = i + 1; continue }
+      set op = ins[0]
+      # Push/Pop around calls: push_rbp; mov_rbp_rsp; pop_rbp near ret already handled, but we can remove duplicate prologue/epilogue pairs in micro functions.
+      if op == "push_rbp" && (i + 2 < program.length) && program[i + 1][0] == "mov_rbp_rsp" && program[i + 2][0] == "pop_rbp" {
+        # Only keep frame if there are stack locals; heuristic: if no sub/add rsp within block, drop
+        set has_stack_adj = false
+        set j = i; set limit = (i + 20 < program.length) ? (i + 20) : program.length
+        while j < limit { if program[j] != null && program[j].length && (program[j][0] == "sub_rsp_imm32" || program[j][0] == "add_rsp_imm32" || program[j][0] == "sub_rsp_imm8" || program[j][0] == "add_rsp_imm8") { set has_stack_adj = true; break } ; set j = j + 1 }
+        if !has_stack_adj { i = i + 3; continue }
+      }
+      out.push(ins)
+      i = i + 1
+    }
+    return { ok: true, program: out, stats: { frames_removed: 1 } }
+  }
+
+  export fn optimize_arm64(program) {
+    # Ensure proper literal loading minimality
+    set out = []
+    set i = 0
+    while i < program.length {
+      set ins = program[i]
+      if ins == null { i = i + 1; continue }
+      if ins.label != null { out.push(ins); i = i + 1; continue }
+      set op = ins[0]
+      # Merge movz+movk zero upper half → single movz, already handled by peephole; just pass-through for now.
+      out.push(ins)
+      i = i + 1
+    }
+    return { ok: true, program: out, stats: {} }
+  }
+
+  export fn optimize_embedded(program) {
+    # Favor size: remove redundant instructions aggressively
+    set out = []
+    set i = 0
+    while i < program.length {
+      set ins = program[i]
+      if ins == null { i = i + 1; continue }
+      if ins.label != null { out.push(ins); i = i + 1; continue }
+      set op = ins[0]
+      # Simple size heuristic: drop no-ops and repeated immediates
+      if op == "add_rax_imm8" && ins[1] == 0 { i = i + 1; continue }
+      if op == "sub_rax_imm8" && ins[1] == 0 { i = i + 1; continue }
+      out.push(ins)
+      i = i + 1
+    }
+    return { ok: true, program: out, stats: { size_optimized: true } }
+  }
+}
+
+

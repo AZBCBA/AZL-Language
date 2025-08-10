@@ -1,0 +1,19 @@
+// Maintains internal counter in the agent VM
+let counter = 0; // if you support module globals, otherwise keep state in a closure cell
+
+fn counter_agent(env) {
+  if env.kind == "inc" {
+    // emulate state via global or persistent object; adjust to your language
+    set("counter", get("counter") + 1);
+    return to_json({ ok: true, value: get("counter") });
+  }
+  return to_json({ error: "unknown" });
+}
+
+fn main() {
+  azme.spawn("cnt", counter_agent);
+  let r1 = azme.ask("cnt", "inc", to_json(null), 1000);
+  print("r1 = " + r1);
+  let r2 = azme.ask("cnt", "inc", to_json(null), 1000);
+  print("r2 = " + r2);
+}

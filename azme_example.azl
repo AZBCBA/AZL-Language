@@ -1,0 +1,272 @@
+# AZME Example - Pure AZL Implementation
+# This demonstrates how to use AZME (Advanced Zonal Machine Environment) in pure AZL
+
+component ::azme.example {
+  init {
+    set ::status = "initializing"
+    set ::agents = {}
+    set ::messages = []
+    set ::correlations = {}
+    
+    say "🚀 AZME Example Starting..."
+    say "🤖 Pure AZL AZME Implementation"
+    say "🚀 NO RUST DEPENDENCIES!"
+    
+    emit start_azme_example
+  }
+
+  behavior {
+    # Start AZME example
+    listen for "start_azme_example" then {
+      say "🎯 Starting AZME Example..."
+      
+      # Step 1: Spawn agents
+      emit spawn_agents
+    }
+    
+    # Spawn AZME agents
+    listen for "spawn_agents" then {
+      say "🤖 Spawning AZME agents..."
+      
+      # Spawn a calculator agent
+      emit azme.spawn with "calculator" "calculator_behavior"
+      
+      # Spawn a greeter agent
+      emit azme.spawn with "greeter" "greeter_behavior"
+      
+      # Spawn a coordinator agent
+      emit azme.spawn with "coordinator" "coordinator_behavior"
+      
+      say "✅ Agents spawned successfully"
+      
+      # Wait a moment then start interactions
+      emit start_interactions
+    }
+    
+    # Start agent interactions
+    listen for "start_interactions" then {
+      say "🔄 Starting agent interactions..."
+      
+      # Send a greeting message
+      emit azme.send with "coordinator" "greeter" "greet" "Hello from coordinator!"
+      
+      # Ask calculator to add numbers
+      emit azme.ask with "coordinator" "calculator" "add" [5, 3]
+      
+      # Ask greeter for a personalized message
+      emit azme.ask with "coordinator" "greeter" "personalize" "Alice"
+    }
+    
+    # Handle agent spawned events
+    listen for "agent.spawned" then {
+      set ::agent_id = $1
+      say "✅ Agent spawned: ::agent_id"
+      set ::agents[::agent_id] = "active"
+    }
+    
+    # Handle message sent events
+    listen for "message.sent" then {
+      set ::message = $1
+      say "📨 Message sent: ::message.from -> ::message.to (::message.kind)"
+      set ::messages.push(::message)
+    }
+    
+    # Handle ask sent events
+    listen for "ask.sent" then {
+      set ::correlation_id = $1
+      say "❓ Ask sent with correlation: ::correlation_id"
+      set ::correlations[::correlation_id] = "pending"
+    }
+    
+    # Handle reply events
+    listen for "reply.sent" then {
+      set ::correlation_id = $1
+      say "💬 Reply received for correlation: ::correlation_id"
+      set ::correlations[::correlation_id] = "completed"
+    }
+    
+    # Handle stats
+    listen for "stats.ready" then {
+      set ::stats = $1
+      say "📊 AZME Stats:"
+      say "  🤖 Agents: ::stats.agents"
+      say "  📨 Messages: ::stats.messages"
+      say "  ❓ Correlations: ::stats.correlations"
+      say "  🚀 Runtime: ::stats.runtime"
+      say "  📦 Version: ::stats.version"
+    }
+  }
+
+  memory {
+    ::status = "ready"
+    ::agents = {}
+    ::messages = []
+    ::correlations = {}
+  }
+}
+
+# Calculator Agent Behavior
+component ::calculator_behavior {
+  init {
+    set ::status = "ready"
+    set ::operations = ["add", "subtract", "multiply", "divide"]
+    
+    say "🧮 Calculator agent ready"
+  }
+
+  behavior {
+    # Handle add operation
+    listen for "process_ask" then {
+      set ::ask = $1
+      
+      if ::ask.kind == "add" {
+        set ::numbers = ::ask.payload
+        set ::result = ::add_numbers(::numbers)
+        
+        say "🧮 Calculator: ::numbers[0] + ::numbers[1] = ::result"
+        
+        # Reply with result
+        emit azme.reply with ::ask.correlation ::result
+      }
+    }
+    
+    # Handle other operations
+    listen for "process_message" then {
+      set ::message = $1
+      
+      if ::message.kind == "calculate" {
+        set ::operation = ::message.payload.operation
+        set ::numbers = ::message.payload.numbers
+        
+        if ::operation == "add" {
+          set ::result = ::add_numbers(::numbers)
+        } else if ::operation == "subtract" {
+          set ::result = ::subtract_numbers(::numbers)
+        } else if ::operation == "multiply" {
+          set ::result = ::multiply_numbers(::numbers)
+        } else if ::operation == "divide" {
+          set ::result = ::divide_numbers(::numbers)
+        }
+        
+        say "🧮 Calculator: ::numbers[0] ::operation ::numbers[1] = ::result"
+        
+        # Send result back
+        emit azme.send with "calculator" ::message.from "result" ::result
+      }
+    }
+  }
+
+  memory {
+    ::add_numbers = (numbers) => {
+      return ::numbers[0] + ::numbers[1]
+    }
+    
+    ::subtract_numbers = (numbers) => {
+      return ::numbers[0] - ::numbers[1]
+    }
+    
+    ::multiply_numbers = (numbers) => {
+      return ::numbers[0] * ::numbers[1]
+    }
+    
+    ::divide_numbers = (numbers) => {
+      if ::numbers[1] != 0 {
+        return ::numbers[0] / ::numbers[1]
+      } else {
+        return "Error: Division by zero"
+      }
+    }
+  }
+}
+
+# Greeter Agent Behavior
+component ::greeter_behavior {
+  init {
+    set ::status = "ready"
+    set ::greetings = ["Hello", "Hi", "Welcome", "Greetings"]
+    
+    say "👋 Greeter agent ready"
+  }
+
+  behavior {
+    # Handle greet message
+    listen for "process_message" then {
+      set ::message = $1
+      
+      if ::message.kind == "greet" {
+        set ::greeting = ::generate_greeting()
+        say "👋 Greeter: ::greeting! ::message.payload"
+        
+        # Send greeting back
+        emit azme.send with "greeter" ::message.from "greeting" ::greeting
+      }
+    }
+    
+    # Handle personalize ask
+    listen for "process_ask" then {
+      set ::ask = $1
+      
+      if ::ask.kind == "personalize" {
+        set ::name = ::ask.payload
+        set ::personalized = ::generate_personalized_greeting(::name)
+        
+        say "👋 Greeter: Personalized greeting for ::name"
+        
+        # Reply with personalized greeting
+        emit azme.reply with ::ask.correlation ::personalized
+      }
+    }
+  }
+
+  memory {
+    ::generate_greeting = () => {
+      set ::index = ::math.random() * ::greetings.length
+      return ::greetings[::index.floor()]
+    }
+    
+    ::generate_personalized_greeting = (name) => {
+      set ::greeting = ::generate_greeting()
+      return "::greeting, ::name! Welcome to AZME!"
+    }
+  }
+}
+
+# Coordinator Agent Behavior
+component ::coordinator_behavior {
+  init {
+    set ::status = "ready"
+    set ::tasks = []
+    
+    say "🎯 Coordinator agent ready"
+  }
+
+  behavior {
+    # Handle greeting responses
+    listen for "process_message" then {
+      set ::message = $1
+      
+      if ::message.kind == "greeting" {
+        say "🎯 Coordinator: Received greeting: ::message.payload"
+      } else if ::message.kind == "result" {
+        say "🎯 Coordinator: Received result: ::message.payload"
+      }
+    }
+    
+    # Handle replies
+    listen for "process_reply" then {
+      set ::reply = $1
+      say "🎯 Coordinator: Received reply: ::reply.payload"
+    }
+    
+    # Handle task completion
+    listen for "task_complete" then {
+      set ::task = $1
+      say "🎯 Coordinator: Task completed: ::task"
+    }
+  }
+
+  memory {
+    ::status = "ready"
+    ::tasks = []
+  }
+}

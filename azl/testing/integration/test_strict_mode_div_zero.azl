@@ -1,0 +1,15 @@
+component ::test.strict_div_zero {
+  init {
+    say "🧪 Strict mode div-zero test starting"
+    set ::x = 1 / 0
+    say "❌ This should not be printed if strict mode is active"
+    emit "after_div"
+  }
+
+  behavior {
+    listen for "after_div" then {
+      say "❌ After-div event should not run in strict mode"
+    }
+  }
+}
+

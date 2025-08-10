@@ -174,8 +174,9 @@ component ::math.engine {
             set ::stack.push(::a * ::b)
           } else branch when ::token = "/" {
             branch when ::b = 0 {
-              emit "math.error" with "division_by_zero"
-              return 0
+              # hard error: record and halt via central error system
+              emit log_error with { type: "division_by_zero", message: "division by zero", context: { a: ::a, b: ::b } }
+              return null
             } else {
               set ::stack.push(::a / ::b)
             }

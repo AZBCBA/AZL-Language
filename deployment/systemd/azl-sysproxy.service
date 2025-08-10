@@ -1,0 +1,18 @@
+[Unit]
+Description=AZL Sysproxy (TCP bridge)
+After=network.target
+Wants=network.target
+ConditionPathExists=/usr/local/bin/azl-sysproxy
+
+[Service]
+Type=simple
+User=abdulrahman-alzalameh
+WorkingDirectory=/home/abdulrahman-alzalameh/azl-language
+EnvironmentFile=-/etc/default/azl
+ExecStartPre=/bin/bash -lc 'mkdir -p .azl'
+ExecStart=/bin/bash -lc 'SYSPROXY_TCP=${SYSPROXY_TCP:-127.0.0.1:9099} /usr/local/bin/azl-sysproxy 1>.azl/sysproxy.out 2>.azl/sysproxy.log'
+Restart=on-failure
+RestartSec=2s
+
+[Install]
+WantedBy=multi-user.target

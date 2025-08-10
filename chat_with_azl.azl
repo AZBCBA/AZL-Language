@@ -1,0 +1,41 @@
+# Chat Interface for AZL System
+# Simple chat interface to interact with the trained system
+
+component ::chat.interface {
+  init {
+    say "🤖 AZL Chat Interface Initialized"
+    say "💬 Ready to chat with the AZL system"
+    say "📝 Type your messages and press Enter"
+  }
+
+  listen for "chat.input" {
+    let input = ::event.data.message
+    say "👤 User: " + input
+    
+    # Process the input through the quantum processor
+    emit "generate.text.bytes" with {
+      req_id: uuid(),
+      prompt: input,
+      max_bytes: 1024,
+    }
+  }
+
+  listen for "stream.utf8" {
+    let response = ::event.data
+    say "🤖 AZL: " + response.text
+  }
+
+  listen for "chat.error" {
+    let error = ::event.data
+    say "❌ Error: " + error.reason
+  }
+}
+
+# Start the chat interface
+say "🚀 Starting AZL Chat Interface..."
+say "💬 Type 'exit' to quit"
+
+# Example conversation starter
+emit "chat.input" with {
+  message: "Hello! Tell me about the AZL training system."
+}

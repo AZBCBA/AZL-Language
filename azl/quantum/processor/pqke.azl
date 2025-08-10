@@ -33,7 +33,7 @@ component ::quantum.pqke {
   }
 
   behavior {
-    on quantum.pqke.register {
+    listen for "quantum.pqke.register" { 
       set ::registration_info = $1
       say "🔄 Post-Quantum Key Exchange subsystem registering with core"
       
@@ -45,7 +45,7 @@ component ::quantum.pqke {
       }
     }
 
-    on quantum.pqke.execute {
+    listen for "quantum.pqke.execute" { 
       set ::pqke_request = $1
       say "🔑 Executing Post-Quantum Key Exchange protocol"
       
@@ -58,7 +58,7 @@ component ::quantum.pqke {
       }
     }
 
-    on quantum.pqke.generate_keypair {
+    listen for "quantum.pqke.generate_keypair" { 
       set ::keypair_info = $1
       say "🔐 Generating post-quantum keypair using " + ::keypair_info.algorithm
       
@@ -95,7 +95,7 @@ component ::quantum.pqke {
       }
     }
 
-    on quantum.pqke.exchange_keys {
+    listen for "quantum.pqke.exchange_keys" { 
       set ::exchange_info = $1
       say "📡 Exchanging public keys between parties"
       
@@ -112,7 +112,7 @@ component ::quantum.pqke {
       }
     }
 
-    on quantum.pqke.compute_shared_secret {
+    listen for "quantum.pqke.compute_shared_secret" { 
       set ::computation_info = $1
       say "🧮 Computing shared secret using post-quantum algorithms"
       
@@ -131,7 +131,7 @@ component ::quantum.pqke {
       }
     }
 
-    on quantum.pqke.verify_security {
+    listen for "quantum.pqke.verify_security" { 
       set ::security_info = $1
       say "🔒 Verifying post-quantum security properties"
       
@@ -156,7 +156,7 @@ component ::quantum.pqke {
       }
     }
 
-    on quantum.pqke.complete {
+    listen for "quantum.pqke.complete" { 
       set ::completion_info = $1
       say "✅ Post-Quantum Key Exchange completed successfully!"
       say "🔐 Algorithm: " + ::completion_info.algorithm
@@ -170,7 +170,7 @@ component ::quantum.pqke {
     }
 
     # Kyber algorithm implementation
-    on quantum.pqke.kyber {
+    listen for "quantum.pqke.kyber" { 
       set ::kyber_request = $1
       say "🔬 Executing Kyber post-quantum key exchange"
       
@@ -183,7 +183,7 @@ component ::quantum.pqke {
     }
 
     # Dilithium algorithm implementation
-    on quantum.pqke.dilithium {
+    listen for "quantum.pqke.dilithium" { 
       set ::dilithium_request = $1
       say "🔬 Executing Dilithium post-quantum key exchange"
       
@@ -196,7 +196,7 @@ component ::quantum.pqke {
     }
 
     # Saber algorithm implementation
-    on quantum.pqke.saber {
+    listen for "quantum.pqke.saber" { 
       set ::saber_request = $1
       say "🔬 Executing Saber post-quantum key exchange"
       
@@ -207,7 +207,7 @@ component ::quantum.pqke {
     }
 
     # NTRU algorithm implementation
-    on quantum.pqke.ntru {
+    listen for "quantum.pqke.ntru" { 
       set ::ntru_request = $1
       say "🔬 Executing NTRU post-quantum key exchange"
       
@@ -218,7 +218,7 @@ component ::quantum.pqke {
     }
 
     # Security verification
-    on quantum.pqke.verify_quantum_resistance {
+    listen for "quantum.pqke.verify_quantum_resistance" { 
       set ::verification_request = $1
       say "🔍 Verifying quantum resistance properties"
       
@@ -231,7 +231,7 @@ component ::quantum.pqke {
     }
 
     # Protocol status
-    on quantum.pqke.get_status {
+    listen for "quantum.pqke.get_status" { 
       set ::status_request = $1
       
       emit quantum.pqke.status_ready with {

@@ -1,0 +1,28 @@
+# UTF-8 Aggregator - Full AZL Component
+# Dedicated component for UTF-8 handling and aggregation
+
+component ::codec.utf8_aggregator {
+  init {
+    say "🔤 UTF-8 Aggregator Initialized - Full AZL Mode"
+    say "📊 Dedicated component for UTF-8 handling and aggregation"
+    set ::buffers = {}
+  }
+
+  listen for "bytes.stream" {
+    let d = ::event.data
+    let buf = ::buffers[d.req_id] ?? []
+
+    buf.push(d.chunk)
+    ::buffers[d.req_id] = buf
+
+    if d.eos == true {
+      let all = buf.reduce("", _ + _)
+      if utf8.validate(all) {
+        emit "stream.utf8" with { req_id: d.req_id, text: from_bytes(all) }
+      } else {
+        emit "stream.utf8" with { req_id: d.req_id, text: from_bytes(utf8.repair(all)), repaired: true }
+      }
+      ::buffers[d.req_id] = []
+    }
+  }
+}

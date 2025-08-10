@@ -1,0 +1,178 @@
+# AZL JSON Utilities (pure AZL)
+# Provides parse() and stringify() for common JSON structures
+
+component ::azl.json {
+  init {}
+  behavior {}
+
+  memory {
+    ::is_digit = (ch) => { return ch >= '0' && ch <= '9' }
+    ::skip_ws = (s, i) => {
+      while i < s.length {
+        set c = s[i]
+        if c == ' ' || c == '\n' || c == '\r' || c == '\t' { set i = i + 1 } else { break }
+      }
+      return i
+    }
+
+    ::parse_value = (s, i) => {
+      set i = ::skip_ws(s, i)
+      if i >= s.length { return { ok: false, error: "unexpected_eof", next: i } }
+      set c = s[i]
+      if c == '"' { return ::parse_string(s, i) }
+      if c == '{' { return ::parse_object(s, i) }
+      if c == '[' { return ::parse_array(s, i) }
+      if c == 't' || c == 'f' || c == 'n' { return ::parse_keyword(s, i) }
+      return ::parse_number(s, i)
+    }
+
+    ::parse_string = (s, i) => {
+      # s[i] == '"'
+      set i = i + 1
+      set out = ""
+      while i < s.length {
+        set c = s[i]
+        if c == '"' { return { ok: true, value: out, next: i + 1 } }
+        if c == '\\' {
+          set i = i + 1
+          if i >= s.length { return { ok: false, error: "bad_escape", next: i } }
+          set e = s[i]
+          if e == '"' { set out = out + '"' }
+          else if e == '\\' { set out = out + '\\' }
+          else if e == '/' { set out = out + '/' }
+          else if e == 'b' { set out = out + '\b' }
+          else if e == 'f' { set out = out + '\f' }
+          else if e == 'n' { set out = out + '\n' }
+          else if e == 'r' { set out = out + '\r' }
+          else if e == 't' { set out = out + '\t' }
+          else { return { ok: false, error: "unsupported_escape", next: i } }
+          set i = i + 1
+          continue
+        }
+        set out = out + c
+        set i = i + 1
+      }
+      return { ok: false, error: "string_eof", next: i }
+    }
+
+    ::parse_number = (s, i) => {
+      set start = i
+      if s[i] == '-' { set i = i + 1 }
+      if i < s.length && s[i] == '0' { set i = i + 1 }
+      else {
+        while i < s.length && ::is_digit(s[i]) { set i = i + 1 }
+      }
+      if i < s.length && s[i] == '.' {
+        set i = i + 1
+        while i < s.length && ::is_digit(s[i]) { set i = i + 1 }
+      }
+      if i < s.length && (s[i] == 'e' || s[i] == 'E') {
+        set i = i + 1
+        if i < s.length && (s[i] == '+' || s[i] == '-') { set i = i + 1 }
+        while i < s.length && ::is_digit(s[i]) { set i = i + 1 }
+      }
+      set num_str = s.substring(start, i)
+      # Pure AZL: approximate to integer if possible
+      set value = ::to_number(num_str)
+      return { ok: true, value: value, next: i }
+    }
+
+    ::parse_keyword = (s, i) => {
+      if s.substring(i, i+4) == "true" { return { ok: true, value: true, next: i + 4 } }
+      if s.substring(i, i+5) == "false" { return { ok: true, value: false, next: i + 5 } }
+      if s.substring(i, i+4) == "null" { return { ok: true, value: null, next: i + 4 } }
+      return { ok: false, error: "bad_keyword", next: i }
+    }
+
+    ::parse_array = (s, i) => {
+      # s[i] == '['
+      set arr = []
+      set i = i + 1
+      i = ::skip_ws(s, i)
+      if i < s.length && s[i] == ']' { return { ok: true, value: arr, next: i + 1 } }
+      while i < s.length {
+        set val = ::parse_value(s, i)
+        if !val.ok { return val }
+        set arr.push(val.value)
+        set i = ::skip_ws(s, val.next)
+        if i < s.length && s[i] == ',' { set i = i + 1; continue }
+        if i < s.length && s[i] == ']' { return { ok: true, value: arr, next: i + 1 } }
+        return { ok: false, error: "array_expected_comma_or_end", next: i }
+      }
+      return { ok: false, error: "array_eof", next: i }
+    }
+
+    ::parse_object = (s, i) => {
+      # s[i] == '{'
+      set obj = {}
+      set i = i + 1
+      i = ::skip_ws(s, i)
+      if i < s.length && s[i] == '}' { return { ok: true, value: obj, next: i + 1 } }
+      while i < s.length {
+        set i = ::skip_ws(s, i)
+        if i >= s.length || s[i] != '"' { return { ok: false, error: "object_key_expected", next: i } }
+        set key = ::parse_string(s, i)
+        if !key.ok { return key }
+        set i = ::skip_ws(s, key.next)
+        if i >= s.length || s[i] != ':' { return { ok: false, error: "object_colon_expected", next: i } }
+        set i = ::skip_ws(s, i + 1)
+        set val = ::parse_value(s, i)
+        if !val.ok { return val }
+        set obj[key.value] = val.value
+        set i = ::skip_ws(s, val.next)
+        if i < s.length && s[i] == ',' { set i = i + 1; continue }
+        if i < s.length && s[i] == '}' { return { ok: true, value: obj, next: i + 1 } }
+        return { ok: false, error: "object_expected_comma_or_end", next: i }
+      }
+      return { ok: false, error: "object_eof", next: i }
+    }
+
+    ::stringify_internal = (o) => {
+      if o == null { return "null" }
+      if typeof(o) == "Boolean" { return o ? "true" : "false" }
+      if typeof(o) == "Number" { return "" + o }
+      if typeof(o) == "String" { return '"' + ::escape_string(o) + '"' }
+      if typeof(o) == "Array" {
+        set i = 0; set parts = []
+        while i < o.length { set parts.push(::stringify_internal(o[i])); set i = i + 1 }
+        return "[" + parts.join(",") + "]"
+      }
+      # Object
+      set parts2 = []
+      for k in o { if k != null { set parts2.push('"' + ::escape_string(k) + '":' + ::stringify_internal(o[k])) } }
+      return "{" + parts2.join(",") + "}"
+    }
+
+    ::escape_string = (s) => {
+      set out = ""; set i = 0
+      while i < s.length {
+        set c = s[i]
+        if c == '\\' { set out = out + "\\\\" }
+        else if c == '"' { set out = out + "\\\"" }
+        else if c == '\n' { set out = out + "\\n" }
+        else if c == '\r' { set out = out + "\\r" }
+        else if c == '\t' { set out = out + "\\t" }
+        else { set out = out + c }
+        set i = i + 1
+      }
+      return out
+    }
+  }
+
+  interface {
+    export fn parse(text) {
+      set s = text || ""
+      set res = ::parse_value(s, 0)
+      if !res.ok { emit log_error with { type: "json", message: ("parse_error:" + res.error), context: { at: res.next } } ; return { ok: false, error: res.error } }
+      set idx = ::skip_ws(s, res.next)
+      if idx != s.length { emit log_error with { type: "json", message: "trailing_data", context: { at: idx } } ; return { ok: false, error: "trailing_data" } }
+      return { ok: true, value: res.value }
+    }
+
+    export fn stringify(obj) {
+      return { text: ::stringify_internal(obj) }
+    }
+  }
+}
+
+

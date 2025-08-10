@@ -1,0 +1,115 @@
+// stdlib/core/array.azl
+// Core array utility functions
+
+export fn map(array, func) {
+    let result = [];
+    let i = 0;
+    while (i < array.length) {
+        let transformed = func(array[i]);
+        result.push(transformed);
+        i = i + 1;
+    }
+    return result;
+}
+
+export fn filter(array, predicate) {
+    let result = [];
+    let i = 0;
+    while (i < array.length) {
+        let val = array[i];
+        if (predicate(val, i, array)) {
+            result.push(val);
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+export fn reduce(array, func, initial) {
+    let accumulator = initial;
+    let i = 0;
+    while (i < array.length) {
+        accumulator = func(accumulator, array[i], i, array);
+        i = i + 1;
+    }
+    return accumulator;
+}
+
+export fn length(array) {
+    return array.length;
+}
+
+export fn push(array, item) {
+    array[array.length] = item;
+    return array.length;
+}
+
+export fn slice(array, start, end) {
+    if (start < 0) {
+        start = array.length + start;
+    }
+    if (end < 0) {
+        end = array.length + end;
+    }
+    
+    let result = [];
+    let i = start;
+    while (i < end) {
+        result.push(array[i]);
+        i = i + 1;
+    }
+    return result;
+}
+
+export fn flatten(array) {
+    let result = [];
+    let i = 0;
+    while (i < array.length) {
+        let item = array[i];
+        if (typeof(item) == "array") {
+            let j = 0;
+            while (j < item.length) {
+                result.push(item[j]);
+                j = j + 1;
+            }
+        } else {
+            result.push(item);
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+export fn find(array, predicate) {
+    let i = 0;
+    while (i < array.length) {
+        if (predicate(array[i], i, array)) {
+            return array[i];
+        }
+        i = i + 1;
+    }
+    return null;
+}
+
+export fn find_index(array, predicate) {
+    let i = 0;
+    while (i < array.length) {
+        if (predicate(array[i], i, array)) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+export fn includes(array, value) {
+    let i = 0;
+    while (i < array.length) {
+        if (array[i] == value) {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+} 

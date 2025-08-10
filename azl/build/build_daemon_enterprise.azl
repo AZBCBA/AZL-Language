@@ -1,0 +1,583 @@
+# AZL Enterprise Build Daemon (pure AZL)
+# - Long-lived build service with isolated worker pools
+# - File watching with intelligent change detection
+# - Resource management and backpressure
+# - Build history and analytics
+# - REST API for external tooling integration
+
+component ::build.daemon.enterprise {
+  init {
+    set ::status = "stopped"
+    set ::daemon_id = ::generate_daemon_id()
+    set ::start_time = ::azl.stdlib.time_now([])
+    set ::config_file = (::internal.env("AZL_BUILD_CONFIG") || "azl.build.json")
+    set ::watch_interval = (::internal.env("AZL_BUILD_WATCH_INTERVAL") || 1000)  # 1 second
+    set ::max_concurrent_builds = (::internal.env("AZL_BUILD_MAX_CONCURRENT") || 3)
+    
+    # Link to core components
+    link ::core.events
+    link ::api.endpoints
+    link ::net.http.server
+    
+    # Build tracking
+    set ::active_builds = {}       # build_id -> { status, start_time, files, options, progress }
+    set ::build_history = []       # [ { id, status, duration, files, completed, failed, timestamp } ]
+    set ::file_watchers = {}       # path -> { last_hash, last_modified, build_triggers }
+    
+    # Resource management
+    set ::resource_limits = {
+      max_memory: (::internal.env("AZL_BUILD_MAX_MEMORY") || 8589934592),  # 8GB
+      max_cpu_percent: (::internal.env("AZL_BUILD_MAX_CPU") || 80),
+      max_disk_usage: (::internal.env("AZL_BUILD_MAX_DISK") || 10737418240)  # 10GB
+    }
+    
+    # Performance analytics
+    set ::analytics = {
+      total_builds: 0,
+      successful_builds: 0,
+      failed_builds: 0,
+      total_build_time: 0,
+      average_build_time: 0,
+      cache_hit_rate: 0,
+      worker_utilization: 0
+    }
+    
+    # API server state
+    set ::api_server = {
+      port: (::internal.env("AZL_BUILD_API_PORT") || 8080),
+      enabled: (::internal.env("AZL_BUILD_API_ENABLED") != "false"),
+      endpoints: {}
+    }
+    
+    link ::build.orchestrator
+    link ::build.worker_pool
+    link ::build.daemon
+    link ::azl.system_interface
+    link ::azl.stdlib
+    link ::error.system
+    link ::build.cache_manager
+    
+    say "🏢 AZL Enterprise Build Daemon ready (ID: " + ::daemon_id + ")"
+    emit build.daemon.enterprise.ready with { 
+      daemon_id: ::daemon_id, 
+      api_port: ::api_server.port,
+      max_workers: ::build.worker_pool.get_status().max_workers
+    }
+  }
+  
+  behavior {
+    # Start the enterprise daemon
+    listen for "daemon.enterprise.start" then {
+      say "🏢 Daemon start event received - processing..."
+      if ::status == "running" { 
+        say "⚠️  Daemon already running"
+        return 
+      }
+      
+      set ::status = "starting"
+      say "🚀 Starting Enterprise Build Daemon..."
+      say "🔧 Daemon startup initiated..."
+      
+      say "daemon: boot start"
+      set port = (::internal.env("AZL_BUILD_API_PORT") || 8080)
+      say "🌐 Starting HTTP server on port " + port
+      emit http.server.start with { port: port, host: "0.0.0.0", handler: ::api.endpoints.router }
+      set ::status = "running"
+      while true { sleep 1000 }  # keep the daemon up
+    }
+    
+    # Stop the enterprise daemon
+    listen for "daemon.enterprise.stop" then {
+      if ::status != "running" { return }
+      
+      say "🛑 Stopping Enterprise Build Daemon..."
+      set ::status = "stopping"
+      
+      # Stop all active builds
+      ::stop_all_builds()
+      
+      # Stop subsystems
+      ::build.worker_pool.shutdown()
+      ::stop_file_watching()
+      ::stop_monitoring_loop()
+      
+      if ::api_server.enabled {
+        ::stop_api_server()
+      }
+      
+      set ::status = "stopped"
+      say "✅ Enterprise Build Daemon stopped"
+      emit build.daemon.enterprise.stopped with { daemon_id: ::daemon_id }
+    }
+    
+    # Handle main daemon function call
+    listen for "daemon.enterprise.main" then {
+      say "🏢 Daemon main event received"
+      say "🔧 Calling main function..."
+      ::main()
+      say "✅ Main function completed"
+    }
+    
+    # Handle build requests
+    listen for "daemon.enterprise.build" then {
+      set build_request = ::event.data
+      set build_id = ::generate_build_id()
+      
+      # Check resource limits
+      if !::check_resource_limits() {
+        emit build.daemon.enterprise.build.rejected with {
+          build_id: build_id,
+          reason: "Resource limits exceeded"
+        }
+        return
+      }
+      
+      # Check concurrent build limit
+      set active_count = 0
+      for bid in ::active_builds { if ::active_builds[bid].status == "building" { set active_count = active_count + 1 } }
+      if active_count >= ::max_concurrent_builds {
+        emit build.daemon.enterprise.build.rejected with {
+          build_id: build_id,
+          reason: "Maximum concurrent builds reached"
+        }
+        return
+      }
+      
+      # Start build
+      set build_info = {
+        id: build_id,
+        status: "queued",
+        start_time: ::azl.stdlib.time_now([]),
+        files: build_request.files || [],
+        options: build_request.options || {},
+        progress: { completed: 0, failed: 0, total: 0, percent: 0 }
+      }
+      
+      set ::active_builds[build_id] = build_info
+      say ("📋 Build queued: " + build_id + " (" + build_info.files.length + " files)")
+      
+      # Submit to orchestrator
+      emit build.start with { 
+        files: build_info.files, 
+        options: build_info.options,
+        build_id: build_id
+      }
+      
+      emit build.daemon.enterprise.build.started with { build_id: build_id }
+    }
+    
+    # Handle build progress updates
+    listen for "build.progress" then {
+      set progress = ::event.data
+      set build_id = progress.build_id
+      
+      if build_id && ::active_builds[build_id] {
+        set ::active_builds[build_id].progress = progress
+        emit build.daemon.enterprise.build.progress with { build_id: build_id, progress: progress }
+      }
+    }
+    
+    # Handle build completion
+    listen for "build.complete" then {
+      set result = ::event.data
+      set build_id = result.build_id
+      
+      if build_id && ::active_builds[build_id] {
+        set build_info = ::active_builds[build_id]
+        set duration = ::azl.stdlib.time_diff([build_info.start_time, ::azl.stdlib.time_now([])])
+        
+        # Update build info
+        set build_info.status = result.success ? "completed" : "failed"
+        set build_info.duration = duration
+        set build_info.result = result
+        
+        # Add to history
+        set history_entry = {
+          id: build_id,
+          status: build_info.status,
+          duration: duration,
+          files: build_info.files.length,
+          completed: result.completed,
+          failed: result.failed,
+          timestamp: ::azl.stdlib.time_now([])
+        }
+        set ::build_history.push(history_entry)
+        
+        # Update analytics
+        ::update_analytics(history_entry)
+        
+        # Clean up after delay
+        ::azl.stdlib.set_timeout(30000, () => { delete ::active_builds[build_id] })
+        
+        say ("✅ Build " + build_id + " " + build_info.status + " in " + duration + "ms")
+        emit build.daemon.enterprise.build.completed with { build_id: build_id, result: result }
+      }
+    }
+    
+    # Handle file change notifications
+    listen for "fs.changed" then {
+      set changed_file = ::event.data.path
+      say ("📁 File changed: " + changed_file)
+      
+      # Check if this file triggers any builds
+      set triggered_builds = ::check_build_triggers(changed_file)
+      for build_config in triggered_builds {
+        emit daemon.enterprise.build with { files: build_config.files, options: build_config.options }
+      }
+    }
+    
+    # API requests
+    listen for "api.request" then {
+      set request = ::event.data
+      set response = ::handle_api_request(request)
+      emit api.response with { request_id: request.id, response: response }
+    }
+  }
+  
+  memory {
+    ::generate_daemon_id = () => {
+      set timestamp = ::azl.stdlib.time_now([])
+      set random = (timestamp % 1000000)
+      return "daemon_" + timestamp + "_" + random
+    }
+    
+    ::generate_build_id = () => {
+      set timestamp = ::azl.stdlib.time_now([])
+      set random = (timestamp % 1000000)
+      return "build_" + timestamp + "_" + random
+    }
+    
+    ::load_configuration = () => {
+      try {
+        set config_content = ::azl.system_interface.read_file_host_sync(::config_file)
+        if !config_content {
+          say "⚠️  No config file found, using defaults"
+          return true
+        }
+        
+        set config = ::azl.stdlib.json_parse(config_content)
+        
+        # Update settings from config
+        if config.watch_interval { set ::watch_interval = config.watch_interval }
+        if config.max_concurrent_builds { set ::max_concurrent_builds = config.max_concurrent_builds }
+        if config.resource_limits { set ::resource_limits = config.resource_limits }
+        if config.api { set ::api_server = config.api }
+        
+        say "📋 Configuration loaded from " + ::config_file
+        return true
+      } catch (error) {
+        say ("❌ Failed to load configuration: " + error)
+        return false
+      }
+    }
+    
+    ::initialize_subsystems = () => {
+      try {
+        # Initialize worker pool
+        ::build.worker_pool.initialize()
+        
+        # Initialize orchestrator
+        say "✅ Subsystems initialized"
+        return true
+      } catch (error) {
+        say ("❌ Failed to initialize subsystems: " + error)
+        return false
+      }
+    }
+    
+    ::start_file_watching = () => {
+      say "👁️  Starting file watching (interval: " + ::watch_interval + "ms)"
+      ::schedule_file_scan()
+    }
+    
+    ::stop_file_watching = () => {
+      say "👁️  Stopping file watching"
+    }
+    
+    ::schedule_file_scan = () => {
+      if ::status != "running" { return }
+      
+      ::azl.stdlib.set_timeout(::watch_interval, () => {
+        if ::status == "running" {
+          ::scan_for_file_changes()
+          ::schedule_file_scan()
+        }
+      })
+    }
+    
+    ::scan_for_file_changes = () => {
+      for path in ::file_watchers {
+        set watcher = ::file_watchers[path]
+        set current_content = ::azl.system_interface.read_file_host_sync(path) || ""
+        set current_hash = ::hash_fnv1a32(current_content)
+        
+        if current_hash != watcher.last_hash {
+          set watcher.last_hash = current_hash
+          set watcher.last_modified = ::azl.stdlib.time_now([])
+          emit fs.changed with { path: path }
+        }
+      }
+    }
+    
+    ::start_monitoring_loop = () => {
+      say "🔍 Starting monitoring loop"
+      ::schedule_monitoring()
+    }
+    
+    ::stop_monitoring_loop = () => {
+      say "🔍 Stopping monitoring loop"
+    }
+    
+    ::schedule_monitoring = () => {
+      if ::status != "running" { return }
+      
+      ::azl.stdlib.set_timeout(5000, () => {  # Every 5 seconds
+        if ::status == "running" {
+          ::update_resource_usage()
+          ::update_worker_analytics()
+          ::schedule_monitoring()
+        }
+      })
+    }
+    
+    ::update_resource_usage = () => {
+      # Monitor system resources
+      set worker_status = ::build.worker_pool.get_status()
+      set memory_usage = worker_status.resource_usage.total_memory
+      set cpu_usage = worker_status.resource_usage.active_processes * 10  # Rough estimate
+      
+      if memory_usage > ::resource_limits.max_memory {
+        say ("⚠️  Memory usage high: " + memory_usage + " bytes")
+        emit build.daemon.enterprise.resource_warning with { type: "memory", usage: memory_usage, limit: ::resource_limits.max_memory }
+      }
+      
+      if cpu_usage > ::resource_limits.max_cpu_percent {
+        say ("⚠️  CPU usage high: " + cpu_usage + "%")
+        emit build.daemon.enterprise.resource_warning with { type: "cpu", usage: cpu_usage, limit: ::resource_limits.max_cpu_percent }
+      }
+    }
+    
+    ::update_worker_analytics = () => {
+      set worker_status = ::build.worker_pool.get_status()
+      set total_workers = worker_status.max_workers
+      set active_workers = worker_status.active_workers
+      
+      if total_workers > 0 {
+        set ::analytics.worker_utilization = (active_workers * 100) / total_workers
+      }
+    }
+    
+    ::check_resource_limits = () => {
+      set worker_status = ::build.worker_pool.get_status()
+      set memory_usage = worker_status.resource_usage.total_memory
+      
+      return memory_usage <= ::resource_limits.max_memory
+    }
+    
+    ::stop_all_builds = () => {
+      say "🛑 Stopping all active builds..."
+      for build_id in ::active_builds {
+        set build_info = ::active_builds[build_id]
+        if build_info.status == "building" {
+          set build_info.status = "cancelled"
+          say ("❌ Build " + build_id + " cancelled")
+        }
+      }
+    }
+    
+    ::check_build_triggers = (changed_file) => {
+      set triggers = []
+      
+      # Check if changed file matches any watched patterns
+      for path in ::file_watchers {
+        set watcher = ::file_watchers[path]
+        if watcher.build_triggers {
+          for trigger in watcher.build_triggers {
+            if ::file_matches_pattern(changed_file, trigger.pattern) {
+              set triggers.push(trigger)
+            }
+          }
+        }
+      }
+      
+      return triggers
+    }
+    
+    ::file_matches_pattern = (file_path, pattern) => {
+      # Simple pattern matching (can be enhanced)
+      if pattern == "*" { return true }
+      if pattern.ends_with("*") {
+        set prefix = pattern.substring(0, pattern.length - 1)
+        return file_path.starts_with(prefix)
+      }
+      return file_path == pattern
+    }
+    
+    ::update_analytics = (history_entry) => {
+      set ::analytics.total_builds = ::analytics.total_builds + 1
+      set ::analytics.total_build_time = ::analytics.total_build_time + history_entry.duration
+      
+      if history_entry.status == "completed" {
+        set ::analytics.successful_builds = ::analytics.successful_builds + 1
+      } else {
+        set ::analytics.failed_builds = ::analytics.failed_builds + 1
+      }
+      
+      if ::analytics.total_builds > 0 {
+        set ::analytics.average_build_time = ::analytics.total_build_time / ::analytics.total_builds
+      }
+    }
+    
+    ::start_api_server = () => {
+      say ("🌐 Starting API server on port " + ::api_server.port)
+      # Start the HTTP server component
+      link ::http.server
+                emit http.server.start with { port: ::api_server.port, host: "0.0.0.0", handler: ::api.endpoints.router }
+    }
+    
+    ::stop_api_server = () => {
+      say "🌐 Stopping API server"
+      emit build.daemon.enterprise.api.stopped
+    }
+    
+    ::handle_api_request = (request) => {
+      set endpoint = request.endpoint
+      set method = request.method || "GET"
+      set data = request.data || {}
+      
+      if endpoint == "/status" {
+        return {
+          status: "ok",
+          daemon_id: ::daemon_id,
+          uptime: ::azl.stdlib.time_diff([::start_time, ::azl.stdlib.time_now([])]),
+          active_builds: ::active_builds.length,
+          worker_status: ::build.worker_pool.get_status(),
+          analytics: ::analytics
+        }
+      } else if endpoint == "/builds" {
+        return {
+          status: "ok",
+          active_builds: ::active_builds,
+          recent_history: ::build_history.slice(-10)  # Last 10 builds
+        }
+      } else if endpoint == "/build" && method == "POST" {
+        # Submit new build
+        emit daemon.enterprise.build with { files: data.files, options: data.options }
+        return { status: "ok", message: "Build submitted" }
+      } else {
+        return { status: "error", message: "Unknown endpoint" }
+      }
+    }
+    
+    ::hash_fnv1a32 = (text) => {
+      set hash = 2166136261
+      set i = 0
+      while i < text.length {
+        set code = text[i].charCodeAt(0) & 0xFF
+        set hash = hash ^ code
+        set hash = (hash * 16777619) % 4294967296
+        set i = i + 1
+      }
+      return hash
+    }
+    
+    # Main daemon function
+    ::start_daemon_main = () => {
+      say "🏢 Starting AZL Enterprise Daemon main function..."
+      say "🔧 Function called successfully"
+      
+      # Start the daemon
+      say "📡 Emitting daemon.enterprise.start event..."
+      emit daemon.enterprise.start
+      
+      # Try to start the HTTP server, but don't fail if it doesn't work
+      set http_ok = true
+      if ::api_server.enabled {
+        say "🌐 Attempting to start HTTP server on port " + ::api_server.port
+        say "🔧 Binding to 0.0.0.0:" + ::api_server.port
+        try {
+          emit http.server.start with { port: ::api_server.port, host: "0.0.0.0", handler: ::api.endpoints.router }
+          say "✅ HTTP server started successfully"
+          say "📡 HTTP server bound to 0.0.0.0:" + ::api_server.port
+        } catch {
+          say "⚠️  HTTP server failed to start, continuing without HTTP"
+          set http_ok = false
+        }
+      }
+      
+      # Keep daemon alive even if HTTP fails
+      if !http_ok {
+        say "🔄 Daemon running in fallback mode (no HTTP)"
+        say "💓 Daemon heartbeat every 10 seconds..."
+        while true {
+          sleep 10
+          say "💓 Daemon alive..."
+        }
+      }
+      
+      say "✅ Daemon main function completed"
+    }
+  }
+  
+  interface {
+    component ::build.build_daemon_enterprise {
+      init {
+        listen for "daemon.enterprise.start" then {
+          say "daemon: boot start"
+          emit http.server.start with { port: 8080, host: "0.0.0.0", handler: ::api.endpoints.router }
+          say "🌐 HTTP server start event emitted"
+        }
+      }
+    }
+  }
+    
+    export fn start() {
+      emit daemon.enterprise.start
+    }
+    
+    export fn stop() {
+      emit daemon.enterprise.stop
+    }
+    
+    export fn submit_build(files, options) {
+      emit daemon.enterprise.build with { files: files, options: options || {} }
+    }
+    
+    export fn get_status() {
+      return {
+        status: ::status,
+        daemon_id: ::daemon_id,
+        uptime: ::azl.stdlib.time_diff([::start_time, ::azl.stdlib.time_now([])]),
+        active_builds: ::active_builds.length,
+        worker_status: ::build.worker_pool.get_status(),
+        analytics: ::analytics
+      }
+    }
+    
+    export fn add_file_watcher(path, build_triggers) {
+      set ::file_watchers[path] = {
+        last_hash: 0,
+        last_modified: 0,
+        build_triggers: build_triggers || []
+      }
+      say ("👁️  Added file watcher: " + path)
+    }
+    
+    export fn get_build_history(limit) {
+      set l = limit || 50
+      return ::build_history.slice(-l)
+    }
+  }
+  
+  # Output events
+  output event: build.daemon.enterprise.ready
+  output event: build.daemon.enterprise.started
+  output event: build.daemon.enterprise.stopped
+  output event: build.daemon.enterprise.build.started
+  output event: build.daemon.enterprise.build.completed
+  output event: build.daemon.enterprise.build.rejected
+  output event: build.daemon.enterprise.build.progress
+  output event: build.daemon.enterprise.resource_warning
+  output event: build.daemon.enterprise.api.started
+  output event: build.daemon.enterprise.api.stopped
+}

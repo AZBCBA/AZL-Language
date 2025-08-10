@@ -1,0 +1,148 @@
+component ::azl.optim.scheduler {
+  init { link ::error.system }
+  behavior {}
+
+  # Schedules a lowered linear program into latency-aware order within basic blocks.
+  # Conservative: never crosses labels or control-transfer barriers.
+  # Returns { ok: true, program, stats } or { ok: false, error }
+  export fn schedule_program(program, target_arch) {
+    if program == null { emit log_error to ::error.system with { type: "optimizer", message: "null_program", context: { pass: "scheduler" } } ; return { ok: false, error: "null_program" } }
+    set arch = (target_arch || "x86_64").to_lower()
+
+    # Split into basic blocks
+    set blocks = []
+    set current = []
+    set i = 0
+    while i < program.length {
+      set ins = program[i]
+      if ins == null { i = i + 1; continue }
+      if ins.label != null {
+        # flush current block
+        if current.length > 0 { blocks.push({ label: null, body: current }); set current = [] }
+        blocks.push({ label: ins.label, is_label: true })
+        i = i + 1
+        continue
+      }
+      current.push(ins)
+      if ::is_barrier(ins, arch) {
+        blocks.push({ label: null, body: current })
+        set current = []
+      }
+      i = i + 1
+    }
+    if current.length > 0 { blocks.push({ label: null, body: current }) }
+
+    # Schedule each block
+    set scheduled = []
+    set b = 0
+    while b < blocks.length {
+      set blk = blocks[b]
+      if blk.is_label { scheduled.push({ label: blk.label }); b = b + 1; continue }
+      if blk.body == null { b = b + 1; continue }
+      set scheduled_blk = ::schedule_block(blk.body, arch)
+      for x in scheduled_blk { scheduled.push(x) }
+      b = b + 1
+    }
+
+    return { ok: true, program: scheduled, stats: { blocks: blocks.length } }
+  }
+
+  ::schedule_block = (body, arch) => {
+    # Simple bubble scheduling: attempt to swap adjacent independent instructions
+    set out = []
+    set tmp = []
+    # Copy to tmp
+    set i = 0
+    while i < body.length { tmp.push(body[i]); i = i + 1 }
+    # Perform multiple passes with diminishing returns cap
+    set pass = 0
+    set max_pass = 2
+    while pass < max_pass {
+      set i2 = 0
+      while i2 + 1 < tmp.length {
+        set a = tmp[i2]
+        set c = tmp[i2 + 1]
+        if ::can_swap(a, c, arch) {
+          # Heuristic benefit: prioritize moving loads/immediates upward before ALU/syscall
+          if ::prefers_ac_before_bc(a, c, arch) { 
+            # swap
+            set tmp[i2] = c
+            set tmp[i2 + 1] = a
+          }
+        }
+        set i2 = i2 + 1
+      }
+      set pass = pass + 1
+    }
+    # Emit
+    set j = 0
+    while j < tmp.length { out.push(tmp[j]); j = j + 1 }
+    return out
+  }
+
+  ::is_barrier = (ins, arch) => {
+    if ins == null || ins.length == null { return false }
+    set op = ins[0]
+    # Control flow or serializing ops
+    if op == "ret" || op == "syscall" || op == "call_rel32" || op == "jmp_rel32" || op.starts_with("je_") || op.starts_with("jne_") || op.starts_with("jg_") || op.starts_with("jl_") || op.starts_with("jge_") || op.starts_with("jle_") { return true }
+    return false
+  }
+
+  ::defs = (ins, arch) => {
+    set op = ins[0]
+    if arch == "x86_64" {
+      if op == "mov_rax_imm64" || op == "mov_rax_imm32" || op == "add_rax_imm8" || op == "sub_rax_imm8" || op == "add_rax_rcx" || op == "sub_rax_rcx" || op == "xor_rax_rax" || op == "imul_rax_rcx" || op == "idiv_rcx" || op == "cmp_rax_rcx" || op == "cmp_rcx_rax" { return { rax: true } }
+      if op == "mov_rdi_imm64" || op == "mov_rdi_imm32" { return { rdi: true } }
+      if op == "mov_rsi_imm64" || op == "mov_rsi_label64" { return { rsi: true } }
+      if op == "mov_rdx_imm64" { return { rdx: true } }
+    }
+    if arch == "arm64" {
+      if op == "movz_x0_imm16_hw0" || op == "movk_x0_imm16_hw1" { return { x0: true } }
+      if op == "movz_x8_imm16_hw0" { return { x8: true } }
+    }
+    return {}
+  }
+
+  ::uses = (ins, arch) => {
+    set op = ins[0]
+    if arch == "x86_64" {
+      if op == "add_rax_rcx" || op == "sub_rax_rcx" || op == "imul_rax_rcx" || op == "cmp_rax_rcx" || op == "cmp_rcx_rax" { return { rax: true, rcx: true } }
+      if op == "idiv_rcx" { return { rax: true, rcx: true, rdx: true } }
+      if op == "syscall" { return { rax: true, rdi: true, rsi: true, rdx: true } }
+    }
+    if arch == "arm64" {
+      if op == "svc_0" { return { x8: true, x0: true } }
+    }
+    return {}
+  }
+
+  ::can_swap = (a, b, arch) => {
+    if a == null || b == null || a.length == null || b.length == null { return false }
+    # Never swap across barriers
+    if ::is_barrier(a, arch) || ::is_barrier(b, arch) { return false }
+    set da = ::defs(a, arch)
+    set ua = ::uses(a, arch)
+    set db = ::defs(b, arch)
+    set ub = ::uses(b, arch)
+    # Data hazards
+    # RAW: a defines reg used by b
+    for r in da { if ub[r] { return false } }
+    # WAR: a uses reg defined by b
+    for r2 in ua { if db[r2] { return false } }
+    # WAW: a defines reg also defined by b
+    for r3 in da { if db[r3] { return false } }
+    return true
+  }
+
+  ::prefers_ac_before_bc = (a, b, arch) => {
+    # Heuristic: prefer moving loads/immediate moves upward before ALU/syscalls
+    set op_a = a[0]; set op_b = b[0]
+    # imm moves first
+    if op_a.starts_with("mov_") && !op_b.starts_with("mov_") { return true }
+    # move over ALU towards syscall
+    if op_b == "syscall" && op_a.starts_with("mov_") { return true }
+    return false
+  }
+}
+
+

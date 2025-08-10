@@ -1,0 +1,181 @@
+# Build Cache Manager (content-addressed, persistent)
+
+component ::build.cache_manager {
+  init {
+    set ::status = "ready"
+    set ::cache_path = ( ::internal.env("AZL_BUILD_CACHE") || "build/.azl_cache.json" )
+    set ::mem_cache = {}      # path -> record
+    set ::version = "v1"
+    ::load()
+  }
+
+  interface {
+    export fn get(path) { return ::mem_cache[path] }
+    export fn set(path, rec) { set ::mem_cache[path] = rec ; ::save_throttled() }
+    export fn clear() { set ::mem_cache = {} ; ::save() }
+    export fn stats() { return { entries: ::count_entries(), version: ::version, path: ::cache_path } }
+  }
+
+  memory {
+    ::count_entries = () => { set n = 0 ; for k in ::mem_cache { if ::mem_cache[k] { set n = n + 1 } } ; return n }
+
+    ::serialize = () => {
+      # very simple JSON-like (line-based) to stay pure AZL friendly
+      set lines = []
+      set header = "#AZL_CACHE|" + ::version
+      set lines.push(header)
+      for p in ::mem_cache {
+        set r = ::mem_cache[p]
+        if r != null {
+          set l = "E|" + p + "|" + (r.hash || 0) + "|" + (r.backend || "") + "|" + (r.success ? "1" : "0") + "|" + (r.last_build_tick || 0) + "|" + (r.fingerprint || "")
+          set lines.push(l)
+        }
+      }
+      return ::join_lines(lines)
+    }
+
+    ::deserialize = (content) => {
+      set out = {}
+      if !content || content.length == 0 { return out }
+      set lines = ::split_lines(content)
+      set ok_hdr = false
+      for i = 0; i < lines.length; i = i + 1 {
+        set ln = lines[i]
+        if ln.length == 0 { continue }
+        if ln.substring(0, 11) == "#AZL_CACHE|" { set ok_hdr = true ; continue }
+        if ln.substring(0, 2) == "E|" {
+          set body = ln.substring(2, ln.length)
+          set parts = ::split_by_char(body, '|')
+          if parts.length >= 5 {
+            set p = parts[0]
+            set h = ::to_num(parts[1])
+            set be = parts[2]
+            set ok = (parts[3] == "1")
+            set tick = ::to_num(parts[4])
+            set fp = (parts.length >= 6) ? parts[5] : ""
+            set out[p] = { hash: h, backend: be, success: ok, last_build_tick: tick, fingerprint: fp }
+          }
+        }
+      }
+      return out
+    }
+
+    ::load = () => {
+      set content = (::azl.system_interface.read_file_host_sync(::cache_path) || ::azl.system_interface.read_file_sync(::cache_path) || "")
+      if !content { set ::mem_cache = {} ; return }
+      set ::mem_cache = ::deserialize(content)
+    }
+
+    ::save = () => {
+      set content = ::serialize()
+      # Prefer virtual OS write; fall back to host when available
+      emit syscall with { type: "write_file", args: { path: ::cache_path, content: content } }
+    }
+
+    # simple debounce to reduce disk writes during large builds
+    ::save_pending = false
+    ::save_throttled = () => {
+      if ::save_pending { return }
+      set ::save_pending = true
+      # emulate tick-based debounce
+      set _ = ::azl.stdlib.time_now([])
+      ::save()
+      set ::save_pending = false
+    }
+
+    # helpers
+    ::split_lines = (s) => { set arr = [] ; set cur = "" ; for i = 0; i < s.length; i = i + 1 { set c = s[i] ; if c == '\n' { set arr.push(cur) ; set cur = "" } else { set cur = cur + c } } ; set arr.push(cur) ; return arr }
+    ::join_lines = (arr) => { set out = "" ; for i = 0; i < arr.length; i = i + 1 { if i > 0 { set out = out + "\n" } ; set out = out + arr[i] } ; return out }
+    ::split_by_char = (s, ch) => { set out = [] ; set cur = "" ; for i = 0; i < s.length; i = i + 1 { set c = s[i] ; if c == ch { set out.push(cur) ; set cur = "" } else { set cur = cur + c } } ; set out.push(cur) ; return out }
+    ::to_num = (s) => { set n = 0 ; if !s { return 0 } ; for i = 0; i < s.length; i = i + 1 { set c = s[i] ; if c >= '0' && c <= '9' { set n = n * 10 + (c - '0') } else { break } } ; return n }
+  }
+}
+
+# AZL Build Cache Manager (pure AZL)
+# - Stores per-file build metadata
+# - Persists to JSON file under build/.cache.json
+
+component ::build.cache_manager {
+  init {
+    set ::cache_path = "build/.cache.json"
+    set ::cache = {}
+    ::load()
+    emit build.cache.ready with "ready"
+  }
+
+  behavior {}
+
+  memory {
+    ::json_stringify = (obj) => {
+      # Minimal stringify (sync with compiler json_stringify for consistency)
+      fn esc(str) {
+        set o = ""; set i = 0
+        while i < str.length {
+          set c = str[i]
+          if c == "\\" { set o = o + "\\\\" }
+          else if c == '"' { set o = o + "\\\"" }
+          else if c == "\n" { set o = o + "\\n" }
+          else if c == "\r" { set o = o + "\\r" }
+          else if c == "\t" { set o = o + "\\t" }
+          else { set o = o + c }
+          set i = i + 1
+        }
+        return o
+      }
+      fn str(o) {
+        if o == null { return "null" }
+        if typeof(o) == "Boolean" { return o ? "true" : "false" }
+        if typeof(o) == "Number" { return "" + o }
+        if typeof(o) == "String" { return '"' + esc(o) + '"' }
+        if typeof(o) == "Array" {
+          set i = 0; set parts = []
+          while i < o.length { set parts.push(str(o[i])); set i = i + 1 }
+          return "[" + parts.join(",") + "]"
+        }
+        set parts2 = []
+        for k in o { if k != null { set parts2.push('"' + esc(k) + '":' + str(o[k])) } }
+        return "{" + parts2.join(",") + "}"
+      }
+      return str(obj)
+    }
+
+    ::bytes_from_string = (s) => {
+      set out = []
+      if s == null { return out }
+      set i = 0
+      while i < s.length { set out.push(s.charCodeAt(i) & 0xFF); set i = i + 1 }
+      return out
+    }
+
+    ::load = () => {
+      # Try host file first
+      set txt = (::azl.system_interface.read_file_host_sync(::cache_path) || ::azl.system_interface.read_file_sync(::cache_path) || "")
+      if txt == null || txt == "" { return true }
+      set J = import("azl/stdlib/core/json.azl")
+      set parsed = J.parse(txt)
+      if !parsed.ok { emit log_error with { type: "cache", message: "cache_parse_failed", context: { path: ::cache_path } } ; return false }
+      set ::cache = parsed.value || {}
+      return true
+    }
+
+    ::save = () => {
+      set json = ::json_stringify(::cache)
+      set bytes = ::bytes_from_string(json)
+      # Attempt host write via syscall bridge (best-effort)
+      emit syscall with { type: "write_binary_file", args: { path: ::cache_path, data: bytes, mode: "0644" } }
+      # Mirror in virtual fs for current session
+      set std = import("azl/stdlib/core/azl_stdlib.azl")
+      set ok = std.file_write([::cache_path, bytes])
+      if !ok { emit log_error with { type: "cache", message: "cache_virtual_write_failed", context: { path: ::cache_path } } }
+      return ok
+    }
+  }
+
+  interface {
+    export fn get(path) { return ::cache[path] }
+    export fn set(path, entry) { set ::cache[path] = entry; ::save(); return true }
+    export fn clear() { set ::cache = {}; ::save(); return true }
+  }
+}
+
+

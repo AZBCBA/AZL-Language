@@ -1,0 +1,28 @@
+# AZL Progress Monitor (pure AZL)
+# - Listens to build.progress and formats status lines
+
+component ::build.progress_monitor {
+  init {
+    set ::last = {}
+    emit build.progress_monitor.ready with "ready"
+  }
+
+  behavior {
+    listen for "build.progress" then {
+      set p = ::event.data
+      set completed = p.completed || 0
+      set failed = p.failed || 0
+      set skipped = p.skipped || 0
+      set total = p.total || 0
+      set percent = p.percent || ((completed * 100) / (total == 0 ? 1 : total))
+      say ("[BUILD] " + completed + "/" + total + " (" + percent + "%) fail=" + failed + " skip=" + skipped)
+      set ::last = p
+    }
+    listen for "build.complete" then {
+      set r = ::event.data
+      say ("[BUILD DONE] success=" + r.success + ", completed=" + r.completed + ", failed=" + r.failed + ", skipped=" + r.skipped + ", backend=" + r.backend)
+    }
+  }
+}
+
+

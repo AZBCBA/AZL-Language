@@ -1,0 +1,55 @@
+# AZL Linker (pure AZL)
+# - Combines multiple assembled code arrays into a single executable
+# - Uses platform writer to generate the final binary
+
+component ::build.linker {
+  init {
+    set ::platform = "linux"
+    set ::arch = "x86_64"
+    emit build.linker.ready with "ready"
+  }
+
+  behavior {}
+
+  memory {
+    ::concat_bytes = (arrays) => {
+      set out = []
+      if arrays == null { return out }
+      set i = 0
+      while i < arrays.length {
+        set a = arrays[i] || []
+        set j = 0
+        while j < a.length { set out.push(a[j]); set j = j + 1 }
+        set i = i + 1
+      }
+      return out
+    }
+  }
+
+  interface {
+    # objects: [ { bytes: [...], base?: number, text_off?: number } ]
+    # returns { ok, bytes?, error? }
+    export fn link_objects(objects, entry_offset) {
+      set plat = ::platform
+      set arch = ::arch
+      set text = []
+      set i = 0
+      while i < objects.length {
+        set obj = objects[i]
+        set data = (obj && obj.bytes) || []
+        set text = ::concat_bytes([text, data])
+        set i = i + 1
+      }
+
+      # entry virtual addr: base + 0x1000 by convention in elf64_writer
+      set base = 0x400000
+      set entry = base + (entry_offset || 0x1000)
+      set writer = import("azl/backend/format/platform_writer.azl")
+      set out = writer.write_exec(plat, arch, entry, text, base)
+      if out.ok == false { emit log_error with { type: "link", message: ("Link failed: " + out.error), context: { plat: plat, arch: arch } } ; return out }
+      return out
+    }
+  }
+}
+
+

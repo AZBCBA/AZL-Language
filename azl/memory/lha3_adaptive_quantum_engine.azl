@@ -1,1 +1,49 @@
- 
+# LHA3 Adaptive Quantum Memory Engine (fast-path buffers)
+
+component ::memory.lha3 {
+  init {
+    set ::processing_queue = []
+    set ::response_history = []
+    set ::quantum_states = []
+    set ::neural_layers = []
+  }
+
+  behavior {
+    # Append-only, zero-alloc semantic API (implementation uses push)
+    listen for "lha3.store.processing_queue" {
+      let item = ::event.data
+      set ::processing_queue = ::processing_queue.push(item)
+    }
+
+    listen for "lha3.store.response_history" {
+      let item = ::event.data
+      set ::response_history = ::response_history.push(item)
+    }
+
+    listen for "lha3.store.quantum_state" {
+      let item = ::event.data
+      set ::quantum_states = ::quantum_states.push(item)
+    }
+
+    listen for "lha3.store.neural_layer" {
+      let item = ::event.data
+      set ::neural_layers = ::neural_layers.push(item)
+    }
+
+    listen for "lha3.get.stats" {
+      emit "lha3.stats" with {
+        processing_queue_len: ::processing_queue.length,
+        response_history_len: ::response_history.length,
+        quantum_states_len: ::quantum_states.length,
+        neural_layers_len: ::neural_layers.length,
+      }
+    }
+  }
+
+  memory {
+    processing_queue
+    response_history
+    quantum_states
+    neural_layers
+  }
+}

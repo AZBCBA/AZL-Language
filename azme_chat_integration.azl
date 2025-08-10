@@ -1,0 +1,75 @@
+# AZME Chat Integration - Full AZL Component
+# Integrates AZL training system with AZME chat interface
+
+component ::azme.chat_integration {
+  init {
+    say "🤖 AZME Chat Integration Initialized - Full AZL Mode"
+    say "🔗 Connecting AZL training system with AZME chat interface"
+    set ::chat_history = []
+    set ::current_session = null
+    set ::model_loaded = false
+  }
+
+  listen for "azme.chat.start" {
+    let session_data = ::event.data
+    say "🚀 Starting AZME chat session: " + session_data
+    
+    set ::current_session = {
+      session_id: session_data,
+      user_id: "default_user",
+      start_time: now(),
+      messages: [],
+      context: {}
+    }
+    
+    # Load the trained model if available
+    emit "weights.load" with "azl_trained_model"
+    
+    emit "azme.chat.ready" with "ready"
+  }
+
+  listen for "azme.chat.message" {
+    let message_data = ::event.data
+    say "💬 Processing AZME chat message: " + message_data
+    
+    # Add to chat history
+    set ::chat_history = ::chat_history.push({
+      user_id: "default_user",
+      message: message_data,
+      timestamp: now(),
+      session_id: ::current_session.session_id
+    })
+    
+    # Process through AZL quantum processor
+    emit "generate.text.bytes" with message_data
+  }
+
+  listen for "stream.utf8" {
+    let response_data = ::event.data
+    say "🤖 AZL Response: " + response_data
+    
+    # Send response back to AZME
+    emit "azme.chat.response" with response_data
+  }
+
+  listen for "weights.loaded" {
+    let weights_data = ::event.data
+    say "✅ Model weights loaded: " + weights_data
+    set ::model_loaded = true
+    set ::current_model = weights_data
+    
+    emit "azme.chat.model_ready" with weights_data
+  }
+
+  listen for "weights.error" {
+    let error_data = ::event.data
+    say "⚠️ Model weights not found: " + error_data
+    say "🔄 Using default quantum processing"
+    
+    emit "azme.chat.model_error" with error_data
+  }
+}
+
+# Start AZME chat integration
+say "🚀 Starting AZME Chat Integration..."
+emit "azme.chat.start" with "default_user"

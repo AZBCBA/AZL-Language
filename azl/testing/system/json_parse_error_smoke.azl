@@ -1,0 +1,10 @@
+component ::smoke.json_parse_error {
+  init {
+    say "Starting JSON parse error smoke"
+    set J = import("azl/stdlib/core/json.azl")
+    set res = J.parse("{\"a\":1}}")
+    if !res.ok { say "JSON_ERROR_OK" }
+  }
+}
+
+

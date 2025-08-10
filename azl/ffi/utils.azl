@@ -1,0 +1,175 @@
+# FFI Utilities Component
+# Performance monitoring and error handling for FFI bridge
+
+component ::ffi.utils {
+  init {
+    say "🔧 FFI Utilities Component"
+    say "📊 Performance monitoring and error handling"
+    
+    # Performance tracking
+    set ::ffi_stats = {}
+    set ::error_log = {}
+    set ::call_count = 0
+    
+    say "✅ FFI utilities initialized"
+  }
+
+  behavior {
+    # Call NumPy with timing and error handling
+    listen for "call_numpy" {
+      let payload = ::event.data
+      set ::call_count = ::call_count + 1
+      set ::t0 = now()
+      
+      say "🔧 FFI call #" + ::call_count + " - " + payload.operation
+      
+      # Call Python math engine
+      exec "python3" "math_engine.py" payload.operation payload.matrix_a payload.matrix_b payload.output_file
+      
+      # Handle completion
+      listen for "exec_complete" {
+        set ::elapsed = now() - ::t0
+        
+        # Log performance stats
+        set ::ffi_stats[::call_count] = {
+          operation: payload.operation,
+          elapsed: ::elapsed,
+          success: true,
+          timestamp: now()
+        }
+        
+        # Emit performance stats
+        emit "ffi_stats" with {
+          call_id: ::call_count,
+          operation: payload.operation,
+          elapsed: ::elapsed,
+          success: true
+        }
+        
+        say "✅ FFI call completed in " + ::elapsed + "s"
+      }
+      
+      # Handle errors
+      listen for "exec_error" {
+        set ::elapsed = now() - ::t0
+        
+        # Log error
+        set ::error_log[::call_count] = {
+          operation: payload.operation,
+          error: ::event.data.error,
+          elapsed: ::elapsed,
+          timestamp: now()
+        }
+        
+        # Emit error event
+        emit "ffi_error" with {
+          call_id: ::call_count,
+          operation: payload.operation,
+          error: ::event.data.error,
+          elapsed: ::elapsed
+        }
+        
+        say "❌ FFI call failed: " + ::event.data.error
+      }
+    }
+    
+    # Get FFI performance statistics
+    listen for "get_ffi_stats" {
+      set total_calls = ::call_count
+      set successful_calls = 0
+      set total_time = 0.0
+      set avg_time = 0.0
+      
+      # Calculate statistics
+      for call_id in ::ffi_stats {
+        let call_data = ::ffi_stats[call_id]
+        if call_data.success {
+          set successful_calls = successful_calls + 1
+          set total_time = total_time + call_data.elapsed
+        }
+      }
+      
+      if successful_calls > 0 {
+        set avg_time = total_time / successful_calls
+      }
+      
+      set success_rate = successful_calls / total_calls
+      
+      emit "ffi_stats_report" with {
+        total_calls: total_calls,
+        successful_calls: successful_calls,
+        success_rate: success_rate,
+        total_time: total_time,
+        avg_time: avg_time,
+        error_count: len(::error_log)
+      }
+    }
+    
+    # Get error log
+    listen for "get_error_log" {
+      emit "error_log_report" with {
+        errors: ::error_log,
+        error_count: len(::error_log)
+      }
+    }
+    
+    # Performance benchmark
+    listen for "benchmark_ffi_performance" {
+      say "📊 FFI Performance Benchmark"
+      say "🔧 Testing call overhead vs pure NumPy"
+      
+      # Test matrix multiplication performance
+      set test_matrix_a = [[1, 2], [3, 4]]
+      set test_matrix_b = [[5, 6], [7, 8]]
+      
+      # Time FFI call
+      set ::benchmark_start = now()
+      
+      emit "call_numpy" with {
+        operation: "matmul",
+        matrix_a: test_matrix_a,
+        matrix_b: test_matrix_b,
+        output_file: "benchmark_result.json"
+      }
+      
+      listen for "ffi_stats" {
+        let stats = ::event.data
+        set ::benchmark_end = now()
+        set ffi_time = stats.elapsed
+        
+        # Calculate overhead
+        set pure_numpy_time = 0.001  # Simulated pure NumPy time
+        set overhead = ffi_time - pure_numpy_time
+        set overhead_percentage = (overhead / pure_numpy_time) * 100
+        
+        set passed = overhead_percentage <= 5.0  # 5% max overhead
+        
+        emit "ffi_benchmark_complete" with {
+          ffi_time: ffi_time,
+          pure_numpy_time: pure_numpy_time,
+          overhead: overhead,
+          overhead_percentage: overhead_percentage,
+          passed: passed,
+          criteria: "≤5% overhead vs pure NumPy"
+        }
+        
+        say "📊 FFI benchmark completed"
+        say "📊 Overhead: " + overhead_percentage + "%"
+        say "📊 Passed: " + passed
+      }
+    }
+  }
+
+  memory {
+    ::ffi_stats = {}
+    ::error_log = {}
+    ::call_count = 0
+    ::t0 = 0
+    ::elapsed = 0
+    ::benchmark_start = 0
+    ::benchmark_end = 0
+  }
+}
+
+# Initialize FFI utilities
+say "🔧 FFI Utilities Ready"

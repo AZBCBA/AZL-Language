@@ -1,0 +1,43 @@
+component ::azl.tests.backend_codegen {
+  init {
+    say "🧪 Running backend codegen tests"
+
+    set asm = import("azl/backend/asm/assembler.azl")
+    set elf = import("azl/backend/format/elf64_writer.azl")
+    set pe = import("azl/backend/format/pe64_writer.azl")
+    set macho = import("azl/backend/format/macho64_writer.azl")
+
+    # Build x86_64 exit(0) program and ELF
+    set prog = asm.program_exit_linux_x86_64(0)
+    set enc = asm.assemble_x86_64(prog)
+    if enc.ok == false { say "❌ assemble_x86_64 failed: " + enc.error; return }
+
+    set base = 0x400000
+    set entry = base + 0x1000
+    set elfout = elf.write_exec(entry, enc.bytes, base)
+    if elfout.ok == false { say "❌ elf.write_exec failed: " + elfout.error; return }
+
+    # Validate ELF magic and fields
+    set bin = elfout.bytes
+    if !(bin[0] == 0x7F && bin[1] == 0x45 && bin[2] == 0x4C && bin[3] == 0x46) { say "❌ ELF magic mismatch"; return }
+    if !(bin[4] == 2 && bin[5] == 1) { say "❌ ELF class/data mismatch"; return }
+
+    say "✅ ELF64 writer basic checks passed (x86_64)"
+
+    # PE64: craft entry RVA 0x1000
+    set peout = pe.write_exec(0x1000, enc.bytes, 0x140000000)
+    if peout.ok == false { say "❌ pe.write_exec failed: " + peout.error; return }
+    set pebin = peout.bytes
+    if !(pebin[0] == 0x4D && pebin[1] == 0x5A) { say "❌ MZ header missing"; return }
+    say "✅ PE64 writer basic checks passed (x86_64)"
+
+    # Mach-O: entry at file offset 0
+    set mout = macho.write_exec(0, enc.bytes)
+    if mout.ok == false { say "❌ macho.write_exec failed: " + mout.error; return }
+    set mbin = mout.bytes
+    if !(mbin[0] == 0xCF && mbin[1] == 0xFA && mbin[2] == 0xED && mbin[3] == 0xFE) { say "❌ Mach-O magic missing"; return }
+    say "✅ Mach-O 64 writer basic checks passed (x86_64)"
+
+    say "🎉 All backend codegen smoke tests passed"
+  }
+}

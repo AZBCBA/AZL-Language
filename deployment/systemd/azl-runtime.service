@@ -1,0 +1,18 @@
+[Unit]
+Description=AZL Runtime (sysproxy-backed HTTP loop)
+After=network.target azl-wire.service
+Requires=azl-wire.service
+
+[Service]
+Type=simple
+User=abdulrahman-alzalameh
+WorkingDirectory=/home/abdulrahman-alzalameh/azl-language
+EnvironmentFile=-/etc/default/azl
+ExecStart=/usr/bin/env node scripts/azl_runtime.js
+Restart=always
+RestartSec=2s
+StandardOutput=append:/home/abdulrahman-alzalameh/azl-language/.azl/daemon.out
+StandardError=append:/home/abdulrahman-alzalameh/azl-language/.azl/daemon.err
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,33 @@
+# azl/ffi/torch_bridge.azl
+component ::ffi.torch {
+  init { set ::enabled = false }
+  # forward
+  listen for "forward" {
+    if !::enabled { emit "ffi.torch.disabled"; }
+    emit log_error with { type: "ffi_disabled", message: "Torch forward unavailable in pure AZL", context: { op: "forward" } }
+    emit "forward_done" with null
+  }
+
+  listen for "loss" {
+    if !::enabled { emit "ffi.torch.disabled"; }
+    emit log_error with { type: "ffi_disabled", message: "Torch loss unavailable in pure AZL", context: { op: "loss" } }
+    emit "loss_done" with null
+  }
+
+  listen for "backward" {
+    if !::enabled { emit "ffi.torch.disabled"; }
+    emit log_error with { type: "ffi_disabled", message: "Torch backward unavailable in pure AZL", context: { op: "backward" } }
+    emit "backward_done"
+  }
+
+  listen for "load_weights" {
+    if !::enabled { emit "ffi.torch.disabled"; }
+    emit log_error with { type: "ffi_disabled", message: "Torch load_weights unavailable in pure AZL", context: { op: "load_weights" } }
+    emit "weights_loaded" with null
+  }
+
+  listen for "save_weights" {
+    if !::enabled { emit "ffi.torch.disabled"; }
+    emit log_error with { type: "ffi_disabled", message: "Torch save_weights unavailable in pure AZL", context: { op: "save_weights" } }
+  }
+}

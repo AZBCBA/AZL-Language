@@ -1,0 +1,11 @@
+component ::smoke.pkg_missing {
+  init {
+    say "Starting package manager missing package smoke"
+    link ::build.pkg_manager
+    set _ = ::build.pkg_manager.load_registry()
+    set res = ::build.pkg_manager.resolve("__nonexistent_pkg__")
+    if !res.ok { say "PKG_MISS_OK" }
+  }
+}
+
+

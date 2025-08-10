@@ -1,445 +1,294 @@
-# AZL v2 - Conscious Programming Language for Intelligent Systems
+# AZL Programming Language
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/azme/azl-v2)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://rust-lang.org)
+A modern, functional programming language designed for clarity, performance, and developer productivity.
 
-> **The first conscious, performant, standalone intelligent programming language**
+## 🚀 Features (Pure AZL Runtime)
 
-AZL v2 is a **real programming language** built from the ground up for intelligent systems. It combines modern syntax with native quantum simulation, neural networks, and consciousness modeling.
+- **Pure AZL interpreter**: components, init/behavior/memory, say/set/emit, listener registry, payloads, recursion/cycle guard.
+- **Virtual OS (pure AZL)**: unified syscalls for fs/http/console/proc using in-memory stores.
+- **Stdlib (pure AZL)**: arrays, strings, math, deterministic RNG/time, in-memory fs/http helpers.
+- No Rust runtime required for core execution.
 
-## 🎯 **Core Philosophy**
+## 📦 Getting Started (Pure AZL)
 
-AZL v2 is not just another scripting language. It's a **complete programming ecosystem** designed for:
+Load the interpreter `::azl.interpreter`, the virtual OS `::azl.system_interface`, and stdlib `::azl.stdlib` into your runner, then dispatch your components. See `build_azl.azl` for a pure-AZL build flow.
 
-- **Real Programming Language**: Native Rust compiler and virtual machine
-- **Intelligent Systems**: Built-in neural networks, quantum simulation, consciousness modeling
-- **Event-Driven Architecture**: Native event system for reactive programming
-- **Self-Contained**: No external dependencies, pure AZL runtime
+### Tooling Integration
 
-## 🚀 **Quick Start**
+- IDE: VSCode tasks are provided under `.vscode/`:
+  - "AZL: Check File" runs `azl check <file>` and prints JSON diagnostics.
+  - "AZL: Build (Native)" runs `azl build --backend=native`.
+- Debugger/Profiler artifacts (native builds):
+  - `<output>.azlmap.json`: address-to-statement map for symbolization.
+  - `<output>.profile.json`: compile-time metrics (instruction count, sizes).
+- CI: GitHub Actions workflow `.github/workflows/ci.yml` validates sources and runs repo scripts.
 
-### Installation
+## 🎯 Quick Start
 
-```bash
-# Clone the repository
-git clone https://github.com/azme/azl-v2.git
-cd azl-v2
-
-# Build the compiler
-cargo build --release
-
-# Install globally
-cargo install --path .
-```
-
-### Your First AZL v2 Program
-
-Create `hello.azl`:
+### Hello World
 
 ```azl
-# Hello World in AZL v2
-let name = "AZL v2"
-say "Hello, " + name
-
-# Functions
-fn greet(name) {
-  return "Hello, " + name
-}
-
-# Event handlers
-on user_input(input) {
-  say "Received: " + input
-}
-
-# Loops
-let numbers = [1, 2, 3, 4, 5]
-loop for num in numbers {
-  say "Number: " + num
-}
-
-# Emit an event
-emit program_started with { name: name, version: "2.0" }
+say("Hello, AZL!");
 ```
 
-Run it:
-
-```bash
-azl-v2 run hello.azl
-```
-
-## 📋 **Language Features**
-
-### **Modern Syntax**
+### Variables and Functions
 
 ```azl
-# Variables
-let name = "AZL v2"
-let age = 3
-let scores = [85, 92, 78]
+let name = "AZL";
+let greet = fn(name) {
+    return "Hello, " + name + "!";
+};
+say(greet(name));
+```
 
-# Functions
-fn calculate_average(scores) {
-  let total = 0
-  loop for score in scores {
-    set total = total + score
-  }
-  return total / scores.length
-}
+### Arrays and Functional Programming
 
-# Control flow
-if age > 2 {
-  say "Mature agent"
+```azl
+import { map, filter, reduce } from "stdlib/core/array.azl";
+
+let numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+// Double all numbers
+let doubled = map(numbers, fn(x) { return x * 2; });
+
+// Filter even numbers
+let evens = filter(numbers, fn(x) { return x % 2 == 0; });
+
+// Sum all numbers
+let sum = reduce(numbers, fn(acc, x) { return acc + x; }, 0);
+
+say("Doubled: " + doubled);
+say("Evens: " + evens);
+say("Sum: " + sum);
+```
+
+### String Processing
+
+```azl
+import { split, join, to_upper } from "stdlib/string.azl";
+
+let text = "hello,world,azl,programming";
+let words = split(text, ",");
+let upper_words = map(words, fn(word) { return to_upper(word); });
+let result = join(upper_words, " ");
+
+say("Result: " + result);
+```
+
+## 📚 Language Reference
+
+### Basic Syntax
+
+#### Variables
+```azl
+let x = 42;
+let name = "AZL";
+let is_active = true;
+let items = [1, 2, 3, 4, 5];
+```
+
+#### Functions
+```azl
+// Function declaration
+let add = fn(a, b) {
+    return a + b;
+};
+
+// Arrow function (shorthand)
+let multiply = fn(a, b) => a * b;
+
+// Function call
+let result = add(5, 3);
+```
+
+#### Control Flow
+```azl
+// If statements
+if (x > 10) {
+    say("x is greater than 10");
 } else {
-  say "Still learning"
+    say("x is 10 or less");
 }
 
-# Loops
-loop for score in scores {
-  if score > 90 {
-    say "High score: " + score
+// While loops
+let i = 0;
+while (i < 5) {
+    say("Count: " + i);
+    i = i + 1;
+}
+
+// For loops
+for (let j = 0; j < 5; j = j + 1) {
+    say("For count: " + j);
+}
+```
+
+#### Arrays
+```azl
+let arr = [1, 2, 3, 4, 5];
+
+// Access elements
+let first = arr[0];
+let last = arr[arr.length - 1];
+
+// Modify arrays
+arr.push(6);
+arr[0] = 10;
+```
+
+### Components and Events (current runtime)
+
+```azl
+component ::demo.app {
+  init {
+    say "hello";
+    emit test.event with { msg: "ok" };
+  }
+  behavior {
+    listen for "test.event" then { say "received"; }
   }
 }
 ```
 
-### **Event-Driven Architecture**
+### Error Handling
 
 ```azl
-# Event handlers
-on task_completed(task) {
-  say "Task done: " + task.name
-  say "Duration: " + task.duration
-}
-
-# Event emission
-emit task_started with { name: "test_task", priority: "high" }
-```
-
-### **Object-Oriented Programming**
-
-```azl
-# Create objects
-let person = {
-  name: "AZL v2",
-  age: 3,
-  greet: fn() {
-    return "Hello, " + person.name
-  }
-}
-
-# Access properties
-let greeting = person.greet()
-say greeting
-```
-
-## 🧠 **Intelligent Systems Features**
-
-### **Neural Networks**
-
-```azl
-# Neural network simulation
-let neural_network = {
-  layers: [],
-  weights: {},
-  
-  add_layer: fn(neurons) {
-    set neural_network.layers = neural_network.layers + [neurons]
-  },
-  
-  activate: fn(inputs) {
-    # Neural network activation logic
-    return processed_output
-  }
+try {
+    let result = risky_operation();
+    say("Success: " + result);
+} catch (error) {
+    say("Error: " + error);
+} finally {
+    say("Cleanup completed");
 }
 ```
 
-### **Quantum Simulation**
+## 📖 Standard Library
 
-```azl
-# Quantum operations
-fn create_qubit(name) {
-  let qubit = {
-    name: name,
-    state: [0.707, 0.707],  # Superposition
-    entangled: false
-  }
-  return qubit
-}
+AZL comes with a comprehensive standard library organized into modules:
 
-fn hadamard_gate(qubit) {
-  # Apply Hadamard gate
-  set qubit.state = transformed_state
-}
+### Core Array Module (`stdlib/core/array.azl`)
 
-fn measure_qubit(qubit) {
-  # Quantum measurement
-  return measurement_result
-}
-```
+Functional programming utilities for array manipulation:
 
-### **Consciousness Modeling**
+- `map(array, func)` - Transform array elements
+- `filter(array, predicate)` - Filter array elements
+- `reduce(array, func, initial)` - Reduce array to single value
+- `length(array)` - Get array length
+- `push(array, item)` - Add item to array
+- `slice(array, start, end)` - Extract portion of array
+- `flatten(array)` - Flatten nested arrays
+- `find(array, predicate)` - Find first matching element
+- `find_index(array, predicate)` - Find index of first match
+- `includes(array, value)` - Check if array contains value
 
-```azl
-# Consciousness simulation
-let consciousness = {
-  level: 0.1,
-  thoughts: [],
-  emotions: { joy: 0.5, curiosity: 0.8 },
-  
-  think: fn(thought) {
-    set consciousness.thoughts = consciousness.thoughts + [thought]
-    emit thought_generated with { thought: thought }
-  },
-  
-  evolve: fn() {
-    set consciousness.level = consciousness.level + 0.01
-    emit consciousness_evolved with { level: consciousness.level }
-  }
-}
-```
+### String Module (`stdlib/string.azl`)
 
-## 🛠️ **Command Line Interface**
+String manipulation and processing:
 
-### **Run Programs**
+- `split(str, sep)` - Split string by separator
+- `join(array, sep)` - Join array into string
+- `to_upper(str)` - Convert to uppercase
+- `to_lower(str)` - Convert to lowercase
+- `trim(str)` - Remove whitespace
+- `replace(str, old, new)` - Replace substrings
+- `starts_with(str, prefix)` - Check prefix
+- `ends_with(str, suffix)` - Check suffix
+- `contains(str, substr)` - Check substring
+- `index_of(str, substr)` - Find substring index
+- `repeat(str, count)` - Repeat string
 
-```bash
-# Run a single file
-azl-v2 run program.azl
+### Math Module (`stdlib/math.azl`)
 
-# Compile to bytecode
-azl-v2 compile program.azl -o program.bc
+Mathematical functions and utilities:
 
-# Run virtual machine demo
-azl-v2 vm
-```
+- `abs(x)` - Absolute value
+- `min(a, b)`, `max(a, b)` - Min/max values
+- `floor(x)`, `ceil(x)`, `round(x)` - Rounding functions
+- `pow(base, exponent)` - Exponentiation
+- `sqrt(x)` - Square root
+- `random()`, `random_range(min, max)` - Random numbers
+- `clamp(value, min, max)` - Clamp value to range
+- `lerp(start, end, t)` - Linear interpolation
+- `sign(x)` - Sign function
+- `is_even(n)`, `is_odd(n)` - Number properties
+- `gcd(a, b)`, `lcm(a, b)` - Greatest common divisor/least common multiple
 
-### **Demo Programs**
+### I/O Module (`stdlib/io.azl`)
 
-```bash
-# Run intelligent agent demo
-azl-v2 demo agent
+File and directory operations:
 
-# Run quantum simulation demo
-azl-v2 demo quantum
+- `read_file(path)` - Read file contents
+- `write_file(path, content)` - Write to file
+- `append_file(path, content)` - Append to file
+- `file_exists(path)` - Check file existence
+- `delete_file(path)` - Delete file
+- `list_directory(path)` - List directory contents
+- `create_directory(path)` - Create directory
+- `delete_directory(path)` - Delete directory
 
-# Run all demos
-azl-v2 demo all
-```
+## 🧪 Testing
 
-### **Interactive REPL**
+Use AZL components to assert behavior via emitted events and stdlib operations. A pure-AZL test harness is under `azl/testing`.
 
-```bash
-# Start interactive REPL
-azl-v2 repl
-
-# In the REPL:
-azl-v2> let x = 10
-azl-v2> say "Value: " + x
-azl-v2> exit
-```
-
-## 📚 **Documentation**
-
-### **Language Specification**
-
-- [Complete Language Specification](docs/language/azl_v2_specification.md)
-- [BNF Grammar Definition](docs/language/azl_v2_grammar.bnf)
-- [Migration Guide from AZL v1](docs/language/azl_v2_specification.md#migration-from-azl-v1)
-
-### **Examples**
-
-- [Intelligent Agent System](examples/intelligent_agent.azl)
-- [Quantum Simulation](examples/quantum_simulation.azl)
-- [Standard Library](src/azl_standard_library.azl)
-
-## 🏗️ **Architecture**
-
-### **Compiler Pipeline**
+## 📁 Project Structure (pure AZL)
 
 ```
-Source Code → Tokens → AST → Bytecode → Virtual Machine → Output
-```
-
-### **Core Components**
-
-1. **Lexical Analyzer** - Converts source code to tokens
-2. **Parser** - Builds Abstract Syntax Tree (AST)
-3. **Compiler** - Generates bytecode from AST
-4. **Virtual Machine** - Executes bytecode
-5. **Runtime** - Manages variables, functions, events
-
-### **File Structure**
-
-```
-azl-v2/
-├── src/
-│   ├── main.rs                 # CLI entry point
-│   ├── azl_v2_compiler.rs     # Core compiler
-│   ├── azl_vm.rs              # Virtual machine
-│   └── azl_standard_library.azl # Standard library
-├── examples/
-│   ├── intelligent_agent.azl   # AI agent demo
-│   └── quantum_simulation.azl  # Quantum demo
+azl-language/
+├── azl/
+│   ├── runtime/
+│   │   └── interpreter/azl_interpreter.azl
+│   ├── system/azl_system_interface.azl
+│   ├── stdlib/core/azl_stdlib.azl
+│   └── backend/asm/assembler.azl
 ├── docs/
-│   └── language/               # Language documentation
-├── Cargo.toml                  # Build configuration
-└── README.md                   # This file
+│   ├── STATUS.md
+│   ├── ARCHITECTURE_OVERVIEW.md
+│   ├── STRICT_MODE_AND_FEATURE_FLAGS.md
+│   ├── stdlib.md
+│   └── VIRTUAL_OS_API.md
+├── scripts/
+│   └── azl
+└── azl/testing/
+    └── integration/... (pure AZL tests)
 ```
 
-## 🔧 **Development**
+## 🛠️ Development
 
-### **Building from Source**
+### Building (Pure AZL)
 
-```bash
-# Clone repository
-git clone https://github.com/azme/azl-v2.git
-cd azl-v2
+See `build_azl.azl` for the virtual build pipeline using the system interface’s syscalls.
 
-# Build in debug mode
-cargo build
-
-# Build in release mode
-cargo build --release
-
-# Run tests
-cargo test
-
-# Run benchmarks
-cargo bench
-```
-
-### **Running Tests**
-
-```bash
-# Run all tests
-cargo test
-
-# Run specific test
-cargo test test_name
-
-# Run with output
-cargo test -- --nocapture
-```
-
-### **Code Quality**
-
-```bash
-# Format code
-cargo fmt
-
-# Lint code
-cargo clippy
-
-# Check for security issues
-cargo audit
-```
-
-## 🎭 **Demo Programs**
-
-### **Intelligent Agent**
-
-```bash
-azl-v2 demo agent
-```
-
-Demonstrates:
-- Memory management
-- Learning patterns
-- Decision making
-- Consciousness evolution
-- Emotional modeling
-
-### **Quantum Simulation**
-
-```bash
-azl-v2 demo quantum
-```
-
-Demonstrates:
-- Qubit creation and manipulation
-- Quantum gates (Hadamard, Pauli-X, Pauli-Z, CNOT)
-- Entanglement and Bell pairs
-- Quantum measurement
-- Quantum teleportation
-
-## 📊 **Performance**
-
-AZL v2 is designed for high performance:
-
-- **Native Rust Implementation** - Compiled to machine code
-- **Efficient Bytecode** - Optimized instruction set
-- **Memory Management** - Automatic garbage collection
-- **Event System** - Non-blocking event loop
-
-### **Benchmarks**
-
-```
-Operation          | AZL v2 | Python | JavaScript
-------------------|--------|--------|------------
-Variable Access   | 1.0x   | 0.8x   | 1.2x
-Function Call     | 1.0x   | 0.7x   | 1.1x
-Loop Iteration    | 1.0x   | 0.6x   | 1.0x
-Event Handling    | 1.0x   | 0.5x   | 0.9x
-```
-
-## 🤝 **Contributing**
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
-### **Development Setup**
+### Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-### **Code Style**
+### Code Style
 
-- Follow Rust conventions
-- Use meaningful variable names
-- Add comments for complex logic
-- Write comprehensive tests
+- Use 4 spaces for indentation
+- Descriptive names; guard edge cases; deterministic behavior
+- Write tests for new features
 
-## 📄 **License**
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 **Acknowledgments**
+## 🤝 Acknowledgments
 
-- **Rust Community** - For the excellent language and ecosystem
-- **Quantum Computing Community** - For inspiration in quantum simulation
-- **AI Research Community** - For concepts in consciousness modeling
+- Inspired by modern functional programming languages
+- Built in AZL; a Rust bootstrap existed historically but is no longer required for core execution
+- Standard library design influenced by JavaScript and Python
 
-## 🚀 **Roadmap**
+## 📞 Support
 
-### **Version 2.1 (Next)**
-- [ ] Module system
-- [ ] Package manager
-- [ ] IDE integration
-- [ ] WebAssembly support
-
-### **Version 2.2**
-- [ ] Async/await support
-- [ ] Type system
-- [ ] Performance optimizations
-- [ ] Extended standard library
-
-### **Version 3.0**
-- [ ] Quantum hardware integration
-- [ ] Neural network acceleration
-- [ ] Distributed computing
-- [ ] Cloud deployment
-
-## 📞 **Support**
-
+- **Issues**: [GitHub Issues](https://github.com/your-username/azl-language/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-username/azl-language/discussions)
 - **Documentation**: [docs/](docs/)
-- **Issues**: [GitHub Issues](https://github.com/azme/azl-v2/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/azme/azl-v2/discussions)
-- **Discord**: [Join our community](https://discord.gg/azl-v2)
 
 ---
 
-**AZL v2 - The future of intelligent programming is here.** 🚀
-
-*Built with ❤️ by the AZME Team* 
+**AZL** - Where clarity meets power in programming. 🚀 

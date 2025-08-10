@@ -1,0 +1,1977 @@
+# AZL NATIVE COMPILER - GENERATES PURE MACHINE CODE
+# NO BYTECODE! NO VM! DIRECT CPU EXECUTION!
+# PURE AZL COMPILING TO NATIVE ASSEMBLY AND MACHINE CODE!
+
+component ::azl.native_compiler {
+  init {
+    set ::version = "1.0.0-NATIVE"
+    set ::target_arch = "x86_64"  # Default to x86_64
+    set ::target_os = "linux"     # Default to Linux
+    set ::optimization_level = 2
+    set ::debug_symbols = false
+
+    set ::assembler = import("azl/backend/asm/assembler.azl")
+    set ::platform_writer = import("azl/backend/format/platform_writer.azl")
+    link ::error.system
+
+    # Machine code generation tables
+    set ::instruction_table = {}
+    set ::register_table = {}
+    set ::syscall_table = {}
+
+    say "🔧 AZL NATIVE COMPILER INITIALIZING"
+    say "🚀 DIRECT MACHINE CODE GENERATION!"
+    say "⚡ NO VM NEEDED - PURE CPU EXECUTION!"
+
+    # Initialize code generation
+    init_instruction_table()
+    init_register_table()
+    init_syscall_table()
+
+    say "✅ NATIVE COMPILER READY - RUST-FREE COMPILATION!"
+    emit native_compiler.ready with "ready_for_native_compilation"
+  }
+
+  behavior {
+    # Main compilation pipeline - AZL to native machine code
+    listen for "compile_native" then {
+      set source_code = ::event.data.source_code
+      set output_file = ::event.data.output_file || "a.out"
+      set target_arch = ::event.data.target_arch || ::target_arch
+      set target_os = ::event.data.target_os || ::target_os
+      set emit_debug = (::event.data.debug_symbols || ::debug_symbols)
+      # Honor strip and optimization level from event
+      set strip_symbols = false
+      if ::event.data.strip_symbols != null { set strip_symbols = (::event.data.strip_symbols == true) }
+      if strip_symbols { set emit_debug = false }
+
+      set opt_level = ::optimization_level
+      if ::event.data.optimization_level != null { set opt_level = ::event.data.optimization_level }
+      set ::optimization_level = opt_level
+
+      say "🔧 NATIVE COMPILATION STARTED"
+      say "📁 Output: $output_file"
+      say "🖥️  Target: $target_arch-$target_os"
+
+      # Tokenize -> Parse -> Analyze -> Optimize (opt-level aware)
+      set tokens = native_tokenize(source_code)
+      set ast = native_parse(tokens)
+      set analyzed_ast = native_analyze(ast)
+      set optimized_ast = native_optimize(analyzed_ast)
+
+      # Lower to assembler program for selected target
+      if !(target_arch == "x86_64" && target_os == "linux") {
+        set err_msg = "unsupported target (lowering missing): " + target_arch + "-" + target_os
+        say "❌ " + err_msg
+        emit log_error to ::error.system with { type: "compile_error", message: err_msg, context: { stage: "lowering", arch: target_arch, os: target_os } }
+        emit native_compilation.complete with { output_file: output_file, size: 0, target: "$target_arch-$target_os", error: err_msg }
+        return
+      }
+
+      set lower = lower_to_x86_64_linux(optimized_ast)
+      if lower.ok == false { say "❌ Lowering error: " + lower.error; emit native_compilation.complete with { output_file: output_file, size: 0, target: "$target_arch-$target_os", error: lower.error }; return }
+
+      set base = 0x400000
+      set text_off = 0x1000
+      # Run backend peephole/CSE and target-specific optimization before assembling
+      set peephole = import("azl/core/compiler/peephole_optimizer.azl")
+      set cse = import("azl/core/compiler/cse_optimizer.azl")
+      set tgt = import("azl/core/compiler/target_specific_optimizers.azl")
+      set sched = import("azl/core/compiler/instruction_scheduler.azl")
+      set ph = peephole.optimize_program(lower.program, "x86_64")
+       if !ph.ok { emit log_error to ::error.system with { type: "optimizer", message: (ph.error || "peephole_failed"), context: { pass: "peephole" } } ; set ph = { ok: true, program: lower.program } }
+      set ce = cse.eliminate_on_program(ph.program, "x86_64")
+       if !ce.ok { emit log_error to ::error.system with { type: "optimizer", message: (ce.error || "cse_failed"), context: { pass: "cse" } } ; set ce = { ok: true, program: ph.program } }
+      set ts = tgt.optimize_for_target(ce.program, target_arch, target_os, null)
+       if !ts.ok { emit log_error to ::error.system with { type: "optimizer", message: (ts.error || "target_opt_failed"), context: { pass: "target_specific" } } ; set ts = { ok: true, program: ce.program } }
+
+      # Schedule after target-specific pass
+      set sc = sched.schedule_program(ts.program, "x86_64")
+       if !sc.ok { emit log_error to ::error.system with { type: "optimizer", message: (sc.error || "sched_failed"), context: { pass: "scheduler" } } ; set sc = { ok: true, program: ts.program } }
+
+      set assembled = ::assembler.assemble_x86_64_with_context(sc.program, base, text_off)
+      if assembled.ok == false {
+        say "❌ Assembler error: " + assembled.error
+        emit log_error to ::error.system with { type: "assemble_error", message: assembled.error, context: { stage: "assemble", arch: target_arch, os: target_os } }
+        emit native_compilation.complete with { output_file: output_file, size: 0, target: "$target_arch-$target_os", error: assembled.error }
+        return
+      }
+
+      set entry = base + text_off
+      # Use platform writer for portability across formats
+      set arch_name = (target_arch == "aarch64") ? "arm64" : target_arch
+      set binout = ::platform_writer.write_exec(target_os, arch_name, entry, assembled.bytes, base)
+      if binout.ok == false {
+        say "❌ Writer error: " + binout.error
+        emit log_error to ::error.system with { type: "writer_error", message: binout.error, context: { stage: "write_exec", arch: target_arch, os: target_os } }
+        emit native_compilation.complete with { output_file: output_file, size: 0, target: "$target_arch-$target_os", error: binout.error }
+        return
+      }
+
+      set std = import("azl/stdlib/core/azl_stdlib.azl")
+      set ok = std.file_write([output_file, binout.bytes])
+
+      # Optional: emit a simple symbol map sidecar for debugging
+      if emit_debug {
+        set sym_path = output_file + ".symmap"
+        set sym_text = "label,address\n"
+        if assembled.labels != null {
+          for label_name in assembled.labels {
+            set off = assembled.labels[label_name]
+            set abs = base + text_off + off
+            set sym_text = sym_text + label_name + "," + abs + "\n"
+          }
+        }
+        set _w = std.file_write([sym_path, sym_text])
+      }
+
+      # Optional debug/trace artifacts for IDE/Debugger/Profiler integration
+      if emit_debug {
+        set dbg = write_debug_map(output_file + ".azlmap.json", base, text_off, assembled.labels, lower.debug_meta)
+        if dbg.ok == false {
+          emit log_error with { type: "debug_map_write_failed", message: ("Failed to write debug map: " + dbg.error), context: { output: output_file } }
+        }
+      }
+      # Always write a basic build profile (deterministic counts)
+      set prof = write_build_profile(output_file + ".profile.json", source_code, lower, assembled, { bytes: binout.bytes })
+      if prof.ok == false { emit log_error with { type: "profile_write_failed", message: ("Failed to write build profile: " + prof.error), context: { output: output_file } } }
+
+      say "🎉 NATIVE COMPILATION COMPLETE!"
+      emit native_compilation.complete with {
+        output_file: output_file,
+        size: binout.bytes.length,
+        target: "$target_arch-$target_os"
+      }
+    }
+
+    # Assembly code generation
+    listen for "generate_assembly" then {
+      set ast = ::event.data.ast
+      set target_arch = ::event.data.target_arch
+      set target_os = ::event.data.target_os
+
+      set assembly = generate_native_assembly(ast, target_arch, target_os)
+
+      emit assembly.generated with {
+        assembly: assembly,
+        target: "$target_arch-$target_os"
+      }
+    }
+
+    # Machine code generation
+    listen for "generate_machine_code" then {
+      set assembly = ::event.data.assembly
+      set target_arch = ::event.data.target_arch
+
+      set machine_code = assemble_to_machine_code(assembly, target_arch)
+
+      emit machine_code.generated with {
+        machine_code: machine_code,
+        size: len(machine_code)
+      }
+    }
+  }
+
+  # NATIVE CODE GENERATION FUNCTIONS
+
+  fn native_tokenize(source_code) {
+    say "🔍 Tokenizing source code (native)"
+
+    set tokens = []
+    set position = 0
+    set line = 1
+    set column = 1
+
+    while (position < len(source_code)) {
+      set char = source_code[position]
+
+      # Skip whitespace
+      if (is_whitespace(char)) {
+        if (char == "\n") {
+          set line = line + 1
+          set column = 1
+        } else {
+          set column = column + 1
+        }
+        set position = position + 1
+        continue
+      }
+
+      # Tokenize keywords, identifiers, literals, operators
+      if (is_letter(char)) {
+        set token = read_identifier(source_code, position)
+        set tokens = push(tokens, {
+          type: get_token_type(token.value),
+          value: token.value,
+          line: line,
+          column: column
+        })
+        set position = token.end_position
+        set column = column + len(token.value)
+      } else if (is_digit(char)) {
+        set token = read_number(source_code, position)
+        set tokens = push(tokens, {
+          type: "NUMBER",
+          value: token.value,
+          line: line,
+          column: column
+        })
+        set position = token.end_position
+        set column = column + len(token.value)
+      } else if (char == '"') {
+        set token = read_string(source_code, position)
+        set tokens = push(tokens, {
+          type: "STRING",
+          value: token.value,
+          line: line,
+          column: column
+        })
+        set position = token.end_position
+        set column = column + len(token.value)
+      } else {
+        # Handle operators and punctuation
+        set token = read_operator(source_code, position)
+        set tokens = push(tokens, {
+          type: "OPERATOR",
+          value: token.value,
+          line: line,
+          column: column
+        })
+        set position = token.end_position
+        set column = column + len(token.value)
+      }
+    }
+
+    return tokens
+  }
+
+  fn native_parse(tokens) {
+    say "🔍 Parsing tokens to AST (native)"
+
+    set ast = {
+      type: "PROGRAM",
+      body: [],
+      components: [],
+      functions: [],
+      variables: []
+    }
+
+    set position = 0
+
+    while (position < len(tokens)) {
+      set token = tokens[position]
+
+      if (token.value == "component") {
+        set component_node = parse_component(tokens, position)
+        set ast.components = push(ast.components, component_node.node)
+        set position = component_node.next_position
+      } else if (token.value == "fn") {
+        set function_node = parse_function(tokens, position)
+        set ast.functions = push(ast.functions, function_node.node)
+        set position = function_node.next_position
+      } else if (token.value == "set") {
+        set variable_node = parse_variable(tokens, position)
+        set ast.variables = push(ast.variables, variable_node.node)
+        set position = variable_node.next_position
+      } else {
+        set statement_node = parse_statement(tokens, position)
+        set ast.body = push(ast.body, statement_node.node)
+        set position = statement_node.next_position
+      }
+    }
+
+    return ast
+  }
+
+  fn native_analyze(ast) {
+    say "🔍 Semantic analysis (native)"
+
+    # Type checking, scope analysis, etc. (baseline: pass-through)
+    set analyzed_ast = ast
+
+    # Add type information
+    analyzed_ast.types = infer_types(ast)
+
+    # Add scope information
+    analyzed_ast.scopes = analyze_scopes(ast)
+
+    # Add call graph
+    analyzed_ast.call_graph = build_call_graph(ast)
+
+    return analyzed_ast
+  }
+
+  fn native_optimize(ast) {
+    # Apply all optimization passes
+    set ::ast = ast
+    
+    # Build SSA IR for better optimization
+    set ::ssa_ir = ::build_ssa_ir(::ast)
+    
+    # Apply optimizations on SSA IR
+    set ::ssa_ir = ::constant_folding(::ssa_ir)
+    set ::ssa_ir = ::constant_propagation(::ssa_ir)
+    set ::ssa_ir = ::strength_reduction(::ssa_ir)
+    set ::ssa_ir = ::dead_code_elimination(::ssa_ir)
+    set ::ssa_ir = ::function_inlining(::ssa_ir)
+    set ::ssa_ir = ::tail_call_optimization(::ssa_ir)
+    set ::ssa_ir = ::instruction_scheduling_ast(::ssa_ir)
+    
+    # Apply vectorization to loops
+    set ::ssa_ir = ::apply_vectorization(::ssa_ir)
+    
+    # Convert back to AST
+    set ::optimized_ast = ::ssa_to_ast(::ssa_ir)
+    
+    return ::optimized_ast
+  }
+
+  # -----------------------------
+  # Core optimization helpers
+  # -----------------------------
+  fn is_digits(s) { if s == null { return false } ; set i = 0 ; while i < len(s) { set c = s[i] ; if !(c >= '0' && c <= '9') { return false } ; set i = i + 1 } ; return len(s) > 0 }
+  fn trim(s) { if s == null { return s } ; set a = 0 ; set b = len(s) ; while a < b && (s[a] == ' ' || s[a] == '\t') { set a = a + 1 } ; while b > a && (s[b-1] == ' ' || s[b-1] == '\t') { set b = b - 1 } ; return s.substring(a, b) }
+  fn replace_ident_tokens(expr, mapping) {
+    if expr == null { return expr }
+    set out = ""
+    set i = 0
+    while i < len(expr) {
+      set ch = expr[i]
+      if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_' {
+        set j = i
+        while j < len(expr) {
+          set c = expr[j]
+          if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' { set j = j + 1 } else { break }
+        }
+        set name = expr.substring(i, j)
+        if mapping[name] != null { set out = out + mapping[name] } else { set out = out + name }
+        set i = j
+        continue
+      }
+      set out = out + ch
+      set i = i + 1
+    }
+    return out
+  }
+
+  fn constant_folding(ssa_ir) {
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "binary" {
+            if ::stmt.left.type == "number" && ::stmt.right.type == "number" {
+              set ::result = ::evaluate_constant_expression(::stmt)
+              set ::stmt.type = "number"
+              set ::stmt.value = ::result
+              set ::stmt.left = null
+              set ::stmt.right = null
+              set ::stmt.operator = null
+            }
+          }
+        }
+      }
+    }
+    return ::ssa_ir
+  }
+  fn constant_propagation(ssa_ir) {
+    set ::constants = {}
+    
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "assignment" && ::stmt.value.type == "number" {
+            set ::constants[::stmt.ssa_name] = ::stmt.value.value
+          } else if ::stmt.type == "binary" {
+            # Replace constant operands
+            if ::stmt.left.type == "identifier" && ::constants[::stmt.left.ssa_name] {
+              set ::stmt.left = { type: "number", value: ::constants[::stmt.left.ssa_name] }
+            }
+            if ::stmt.right.type == "identifier" && ::constants[::stmt.right.ssa_name] {
+              set ::stmt.right = { type: "number", value: ::constants[::stmt.right.ssa_name] }
+            }
+          }
+        }
+      }
+    }
+    
+    return ::ssa_ir
+  }
+  fn cp_visit_block(stmts, env) {
+    set out = []
+    set i = 0
+    set map = env || {}
+    while i < len(stmts) {
+      set st = stmts[i]
+      if st != null {
+        if st.type == "SET" || st.type == "set" {
+          if st.value != null { set st.value = replace_ident_tokens(st.value, map) }
+          if st.value != null && is_digits(trim(st.value)) { set map[st.variable || st.name] = trim(st.value) }
+          set out = push(out, st)
+        } else if st.type == "IF" || st.type == "if" {
+          if st.condition != null { set st.condition = replace_ident_tokens(st.condition, map) }
+          if st.then != null { set st.then = cp_visit_block(st.then, map) }
+          if st.else != null { set st.else = cp_visit_block(st.else, map) }
+          set out = push(out, st)
+        } else if st.type == "WHILE" || st.type == "while" {
+          if st.condition != null { set st.condition = replace_ident_tokens(st.condition, map) }
+          if st.body != null { set st.body = cp_visit_block(st.body, map) }
+          set out = push(out, st)
+        } else {
+          set out = push(out, st)
+        }
+      }
+      set i = i + 1
+    }
+    return out
+  }
+
+  fn dead_code_elimination(ssa_ir) {
+    set ::live_vars = {}
+    
+    # Mark all variables used in phi nodes as live
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "phi" {
+            set ::live_vars[::stmt.ssa_name] = true
+          }
+        }
+      }
+    }
+    
+    # Mark variables used in other statements
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "binary" {
+            if ::stmt.left.type == "identifier" { set ::live_vars[::stmt.left.ssa_name] = true }
+            if ::stmt.right.type == "identifier" { set ::live_vars[::stmt.right.ssa_name] = true }
+          }
+        }
+      }
+    }
+    
+    # Remove dead assignments
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        set ::new_statements = []
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "assignment" && !::live_vars[::stmt.ssa_name] {
+            # Skip dead assignment
+          } else {
+            set ::new_statements = ::new_statements.concat([::stmt])
+          }
+        }
+        set ::block.statements = ::new_statements
+      }
+    }
+    
+    return ::ssa_ir
+  }
+  fn strength_reduction(ssa_ir) {
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "binary" && ::stmt.operator == "*" {
+            # Replace multiplication by power of 2 with shift
+            if ::stmt.right.type == "number" && ::is_power_of_two(::stmt.right.value) {
+              set ::shift = ::log2(::stmt.right.value)
+              set ::stmt.operator = "<<"
+              set ::stmt.right = { type: "number", value: ::shift }
+            }
+          }
+        }
+      }
+    }
+    return ::ssa_ir
+  }
+  fn sr_visit_block(stmts) {
+    set out = []
+    set i = 0
+    while i < len(stmts) {
+      set st = stmts[i]
+      if st != null && (st.type == "SET" || st.type == "set") {
+        set e = st.value || ""
+        # X * K → X + X + ... (K times) for 2..8; 0→0; 1→X
+        set star = indexOf(e, "*")
+        if star > 0 {
+          set left = trim(substring(e, 0, star))
+          set right = trim(substring(e, star + 1, len(e)))
+          if is_digits(right) || is_digits(left) {
+            set K = is_digits(right) ? parseInt(right) : parseInt(left)
+            set var = is_digits(right) ? left : right
+            if K == 0 { set e = "0" }
+            else if K == 1 { set e = var }
+            else if K >= 2 && K <= 8 {
+              set sum = var
+              set t = 1
+              while t < K { set sum = sum + " + " + var ; set t = t + 1 }
+              set e = sum
+            }
+          }
+        }
+        set st.value = e
+        set out = push(out, st)
+      } else { set out = push(out, st) }
+      set i = i + 1
+    }
+    return out
+  }
+  fn tail_call_optimization(ssa_ir) {
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "call" && ::stmt.func == ::func.name {
+            set ::stmt.tco_applied = true
+          }
+        }
+      }
+    }
+    return ::ssa_ir
+  }
+  fn instruction_scheduling_ast(ssa_ir) {
+    # Simple instruction scheduling: reorder independent instructions
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        set ::block.statements = ::schedule_block(::block.statements)
+      }
+    }
+    return ::ssa_ir
+  }
+  fn sched_visit_block(stmts) {
+    # Swap adjacent independent SETs
+    set a = 0
+    while a + 1 < len(stmts) {
+      set s1 = stmts[a]
+      set s2 = stmts[a+1]
+      if s1 != null && s2 != null && (s1.type == "SET" || s1.type == "set") && (s2.type == "SET" || s2.type == "set") {
+        set v1 = s1.variable || s1.name
+        set v2 = s2.variable || s2.name
+        if v1 != v2 {
+          set e1 = s1.value || ""
+          set e2 = s2.value || ""
+          if indexOf(e1, v2) < 0 && indexOf(e2, v1) < 0 {
+            # swap
+            set tmp = s1
+            set stmts[a] = s2
+            set stmts[a+1] = tmp
+            set a = a + 2
+            continue
+          }
+        }
+      }
+      set a = a + 1
+    }
+    return stmts
+  }
+
+  fn function_inlining(ssa_ir) {
+    # Simple inlining: replace function calls with function bodies
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        set ::new_statements = []
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "call" && ::stmt.func == "simple_function" {
+            # Inline simple functions
+            set ::inline_body = ::get_function_body(::stmt.func, ::ssa_ir)
+            set ::new_statements = ::new_statements.concat(::inline_body)
+          } else {
+            set ::new_statements = ::new_statements.concat([::stmt])
+          }
+        }
+        set ::block.statements = ::new_statements
+      }
+    }
+    return ::ssa_ir
+  }
+
+  fn build_control_flow_graph_from_ast(ast) {
+    set cfg = { functions: [], program: { nodes: [], edges: [] } }
+    cfg.program = build_linear_cfg(ast.body)
+    if ast != null && ast.functions != null {
+      set i = 0
+      while i < len(ast.functions) {
+        set f = ast.functions[i]
+        set c = { name: f.name || ("fn_" + i), cfg: build_linear_cfg(f.body) }
+        cfg.functions = push(cfg.functions, c)
+        set i = i + 1
+      }
+    }
+    return cfg
+  }
+
+  fn build_linear_cfg(stmts) {
+    set nodes = []
+    set edges = []
+    set i = 0
+    while stmts != null && i < len(stmts) {
+      set n = { id: i, kind: (stmts[i] && stmts[i].type) || "stmt" }
+      nodes = push(nodes, n)
+      if i > 0 { edges = push(edges, { from: i - 1, to: i, kind: "fallthrough" }) }
+      if stmts[i] && (stmts[i].type == "IF" || stmts[i].type == "WHILE") {
+        edges = push(edges, { from: i, to: i + 1, kind: "branch" })
+      }
+      set i = i + 1
+    }
+    return { nodes: nodes, edges: edges }
+  }
+
+  fn convert_ast_to_ssa(ast) {
+    set ssa = { versions: {} }
+    if ast == null || ast.body == null { return ssa }
+    set i = 0
+    while i < len(ast.body) {
+      set st = ast.body[i]
+      if st != null && (st.type == "SET" || st.type == "set") {
+        set name = st.variable || st.name
+        if name != null {
+          set cur = ssa.versions[name] || 0
+          ssa.versions[name] = cur + 1
+        }
+      }
+      set i = i + 1
+    }
+    return ssa
+  }
+
+  fn inter_procedural_optimize(ast) {
+    set cg = build_call_graph(ast)
+    ast.call_graph = cg
+    if ast.functions != null {
+      set i = 0
+      while i < len(ast.functions) {
+        set f = ast.functions[i]
+        if f != null {
+          set indeg = (cg.uses && cg.uses[f.name]) || 0
+          if indeg == 0 { f.inline_hint = (f.inline_hint || true) }
+          set ast.functions[i] = f
+        }
+        set i = i + 1
+      }
+    }
+    return ast
+  }
+
+  fn build_call_graph(ast) {
+    set uses = {}
+    set funcs = []
+    if ast.functions != null {
+      set i = 0
+      while i < len(ast.functions) { set funcs = push(funcs, ast.functions[i].name || ("fn_" + i)); set i = i + 1 }
+    }
+    return { functions: funcs, uses: uses }
+  }
+
+  fn auto_vectorize_ast(ast) {
+    set result = { candidates: 0 }
+    if ast == null || ast.body == null { return result }
+    set i = 0
+    while i < len(ast.body) {
+      set st = ast.body[i]
+      if st != null && (st.type == "WHILE" || st.type == "while") { set result.candidates = result.candidates + 1 }
+      set i = i + 1
+    }
+    return result
+  }
+
+  fn optimize_cache_layout(ast) {
+    set hints = { data_order: ["strings","globals"] }
+    return hints
+  }
+
+  fn generate_native_assembly(ast, target_arch, target_os) {
+    say "🔧 Generating native assembly for $target_arch-$target_os"
+
+    set assembly = []
+
+    # Generate assembly header
+    set assembly = push(assembly, generate_assembly_header(target_arch, target_os))
+
+    # Generate data section
+    set assembly = push(assembly, generate_data_section(ast))
+
+    # Generate text section (code)
+    set assembly = push(assembly, generate_text_section(ast, target_arch, target_os))
+
+    # Generate system call wrappers
+    set assembly = push(assembly, generate_syscall_wrappers(target_arch, target_os))
+
+    return join(assembly, "\n")
+  }
+
+  fn generate_assembly_header(target_arch, target_os) {
+    if (target_arch == "x86_64" && target_os == "linux") {
+      return ".section .text\n.global _start\n"
+    } else if (target_arch == "x86_64" && target_os == "windows") {
+      return ".section .text\n.global main\n"
+    } else if (target_arch == "x86_64" && target_os == "macos") {
+      return ".section __TEXT,__text\n.global _main\n"
+    }
+
+    return ""
+  }
+
+  fn generate_data_section(ast) {
+    say "🔧 Generating data section"
+
+    set data_section = [".section .data"]
+
+    # Generate string literals
+    for string_literal in ast.string_literals {
+      set label = "str_" + string_literal.id
+      set data_section = push(data_section, "$label: .ascii \"$string_literal.value\"")
+    }
+
+    # Generate global variables
+    for variable in ast.global_variables {
+      set label = "var_" + variable.name
+      set data_section = push(data_section, "$label: .quad 0")
+    }
+
+    return join(data_section, "\n")
+  }
+
+  fn generate_text_section(ast, target_arch, target_os) {
+    say "🔧 Generating text section (code)"
+
+    set text_section = []
+
+    # Generate entry point
+    set text_section = push(text_section, generate_entry_point(target_arch, target_os))
+
+    # Generate component code
+    for component in ast.components {
+      set component_code = generate_component_code(component, target_arch, target_os)
+      set text_section = push(text_section, component_code)
+    }
+
+    # Generate function code
+    for function in ast.functions {
+      set function_code = generate_function_code(function, target_arch, target_os)
+      set text_section = push(text_section, function_code)
+    }
+
+    return join(text_section, "\n")
+  }
+
+  fn generate_entry_point(target_arch, target_os) {
+    if (target_arch == "x86_64" && target_os == "linux") {
+      return "_start:\n  call azl_main\n  mov %rax, %rdi\n  mov $60, %rax\n  syscall"
+    } else if (target_arch == "x86_64" && target_os == "windows") {
+      return "main:\n  call azl_main\n  ret"
+    } else if (target_arch == "x86_64" && target_os == "macos") {
+      return "_main:\n  call _azl_main\n  ret"
+    }
+
+    return ""
+  }
+
+  fn generate_function_code(func_node, lowered_program) {
+    set ::code = []
+    set ::func_name = ::func_node.name
+    
+    # Function prologue
+    set ::code = ::code.concat([
+      ["func_" + ::func_name + ":"],
+      ["push_rbp"],
+      ["mov_rbp_rsp"],
+      ["sub_rsp_imm32", 32]
+    ])
+    
+    # Check for tail call optimization
+    set ::has_tco = false
+    for ::stmt in ::func_node.body {
+      if ::stmt.tco_applied {
+        set ::has_tco = true
+        break
+      }
+    }
+    
+    if ::has_tco {
+      # Add tail call label for loop optimization
+      set ::code = ::code.concat([["tail_" + ::func_name + "_loop:"]])
+    }
+    
+    # Generate function body
+    for ::stmt in ::func_node.body {
+      if ::stmt.type == "while" && ::stmt.vectorized {
+        # Use vectorized code
+        set ::code = ::code.concat(::stmt.vector_code)
+      } else if ::stmt.type == "call" && ::stmt.tco_applied {
+        # Tail call - convert to jump
+        set ::code = ::code.concat([
+          ["mov_rdi_imm64", ::stmt.args[0].value || 0],
+          ["jmp_rel32", "func_" + ::func_name]
+        ])
+      } else {
+        # Regular statement lowering
+        set ::stmt_code = ::lower_statement_x86_64(::stmt)
+        set ::code = ::code.concat(::stmt_code)
+      }
+    }
+    
+    # Function epilogue
+    set ::code = ::code.concat([
+      ["add_rsp_imm32", 32],
+      ["pop_rbp"],
+      ["ret"]
+    ])
+    
+    return ::code
+  }
+
+  fn generate_component_code(component, target_arch, target_os) {
+    say "🔧 Generating code for component: $component.name"
+
+    set component_code = []
+
+    # Component label
+    set label = "component_" + component.name.replace("::", "_")
+    set component_code = push(component_code, "$label:")
+
+    # Generate init block
+    if (component.init != null) {
+      set init_code = generate_block_code(component.init, target_arch, target_os)
+      set component_code = push(component_code, init_code)
+    }
+
+    # Generate behavior blocks
+    if (component.behavior != null) {
+      set behavior_code = generate_block_code(component.behavior, target_arch, target_os)
+      set component_code = push(component_code, behavior_code)
+    }
+
+    return join(component_code, "\n")
+  }
+
+  fn generate_block_code(block, target_arch, target_os) {
+    set block_code = []
+
+    for statement in block.statements {
+      set statement_code = generate_statement_code(statement, target_arch, target_os)
+      set block_code = push(block_code, statement_code)
+    }
+
+    return join(block_code, "\n")
+  }
+
+  fn generate_statement_code(statement, target_arch, target_os) {
+    if (statement.type == "SAY") {
+      return generate_say_code(statement, target_arch, target_os)
+    } else if (statement.type == "SET") {
+      return generate_set_code(statement, target_arch, target_os)
+    } else if (statement.type == "EMIT") {
+      return generate_emit_code(statement, target_arch, target_os)
+    } else if (statement.type == "IF") {
+      return generate_if_code(statement, target_arch, target_os)
+    } else if (statement.type == "WHILE") {
+      return generate_while_code(statement, target_arch, target_os)
+    }
+
+    return ""
+  }
+
+  fn generate_say_code(statement, target_arch, target_os) {
+    if (target_arch == "x86_64" && target_os == "linux") {
+      # Linux x86_64 system call for write
+      return "  mov $1, %rax\n  mov $1, %rdi\n  mov $str_${statement.string_id}, %rsi\n  mov $${statement.string_length}, %rdx\n  syscall"
+    }
+
+    return ""
+  }
+
+  fn generate_syscall_wrappers(target_arch, target_os) {
+    say "🔧 Generating system call wrappers"
+
+    set syscall_code = []
+
+    if (target_arch == "x86_64" && target_os == "linux") {
+      # Linux x86_64 system call wrappers
+      set syscall_code = push(syscall_code, "azl_write:")
+      set syscall_code = push(syscall_code, "  mov $1, %rax")
+      set syscall_code = push(syscall_code, "  syscall")
+      set syscall_code = push(syscall_code, "  ret")
+
+      set syscall_code = push(syscall_code, "azl_read:")
+      set syscall_code = push(syscall_code, "  mov $0, %rax")
+      set syscall_code = push(syscall_code, "  syscall")
+      set syscall_code = push(syscall_code, "  ret")
+
+      set syscall_code = push(syscall_code, "azl_exit:")
+      set syscall_code = push(syscall_code, "  mov $60, %rax")
+      set syscall_code = push(syscall_code, "  syscall")
+    }
+
+    return join(syscall_code, "\n")
+  }
+
+  fn assemble_to_machine_code(assembly, target_arch) {
+    say "🔧 Assembling to machine code for $target_arch"
+
+    # This is where assembly gets converted to actual machine code bytes
+    # Minimal assembler pipeline: parse a subset and encode known ops
+
+    set machine_code = []
+    set lines = split(assembly, "\n")
+
+    for line in lines {
+      set trimmed = trim(line)
+
+      if (trimmed != "" && !trimmed.starts_with(".") && !trimmed.ends_with(":")) {
+        # Convert assembly instruction to machine code
+        set instruction_bytes = assemble_instruction(trimmed, target_arch)
+        set machine_code = push(machine_code, instruction_bytes)
+      }
+    }
+
+    return machine_code
+  }
+
+  fn assemble_instruction(instruction, target_arch) {
+    # Convert individual assembly instruction to machine code bytes
+    # This is where the real magic happens!
+
+    if (target_arch == "x86_64") {
+      return assemble_x86_64_instruction(instruction)
+    }
+
+    return []
+  }
+
+  fn assemble_x86_64_instruction(instruction) {
+    # x86_64 instruction encoding
+    # This would be a huge table of instruction encodings
+
+    if (instruction.starts_with("mov")) {
+      # MOV instruction encoding
+      return [0x48, 0x89, 0xc0]  # Example: mov %rax, %rax
+    } else if (instruction.starts_with("call")) {
+      # CALL instruction encoding
+      return [0xe8, 0x00, 0x00, 0x00, 0x00]  # Example: call relative
+    } else if (instruction == "ret") {
+      # RET instruction encoding
+      return [0xc3]
+    } else if (instruction == "syscall") {
+      # SYSCALL instruction encoding
+      return [0x0f, 0x05]
+    }
+
+    return []
+  }
+
+  fn generate_executable(machine_code, target_os, output_file) {
+    say "🔧 Generating executable for $target_os"
+
+    if (target_os == "linux") {
+      return generate_elf_executable(machine_code, output_file)
+    } else if (target_os == "windows") {
+      return generate_pe_executable(machine_code, output_file)
+    } else if (target_os == "macos") {
+      return generate_macho_executable(machine_code, output_file)
+    }
+
+    return []
+  }
+
+  fn generate_elf_executable(machine_code, output_file) {
+    say "🔧 Generating ELF executable"
+
+    # ELF header and program header generation
+    # This is where we create a proper Linux executable
+
+    set elf_header = generate_elf_header()
+    set program_header = generate_elf_program_header()
+    set code_section = flatten(machine_code)
+
+    set executable = []
+    set executable = concat(executable, elf_header)
+    set executable = concat(executable, program_header)
+    set executable = concat(executable, code_section)
+
+    return executable
+  }
+
+  fn write_executable_file(executable, output_file) {
+    say "💾 Writing executable file: $output_file"
+
+    # Write binary executable to file
+    # This uses the pure AZL file system interface
+
+    emit syscall with {
+      type: "write_binary_file",
+      args: {
+        path: output_file,
+        data: executable,
+        mode: "0755"  # Executable permissions
+      }
+    }
+
+    say "✅ Executable written: $output_file"
+  }
+
+  # INITIALIZATION FUNCTIONS
+
+  fn init_instruction_table() {
+    # x86_64 instruction encoding table
+    set ::instruction_table = {
+      "mov": { opcode: 0x89, variants: ["reg_reg", "imm_reg", "mem_reg"] },
+      "add": { opcode: 0x01, variants: ["reg_reg", "imm_reg"] },
+      "sub": { opcode: 0x29, variants: ["reg_reg", "imm_reg"] },
+      "call": { opcode: 0xe8, variants: ["rel32"] },
+      "ret": { opcode: 0xc3, variants: ["none"] },
+      "syscall": { opcode: [0x0f, 0x05], variants: ["none"] }
+    }
+  }
+
+  fn init_register_table() {
+    # x86_64 register encoding
+    set ::register_table = {
+      "rax": 0, "rcx": 1, "rdx": 2, "rbx": 3,
+      "rsp": 4, "rbp": 5, "rsi": 6, "rdi": 7,
+      "r8": 8, "r9": 9, "r10": 10, "r11": 11,
+      "r12": 12, "r13": 13, "r14": 14, "r15": 15
+    }
+  }
+
+  fn init_syscall_table() {
+    # Linux x86_64 system call numbers
+    set ::syscall_table = {
+      "read": 0, "write": 1, "open": 2, "close": 3,
+      "mmap": 9, "munmap": 11, "exit": 60,
+      "socket": 41, "connect": 42, "accept": 43
+    }
+  }
+
+  # UTILITY FUNCTIONS
+
+  fn is_whitespace(char) {
+    return char == " " || char == "\t" || char == "\n" || char == "\r"
+  }
+
+  fn is_letter(char) {
+    return (char >= "a" && char <= "z") || (char >= "A" && char <= "Z") || char == "_"
+  }
+
+  fn is_digit(char) {
+    return char >= "0" && char <= "9"
+  }
+
+  fn generate_elf_header() {
+    # ELF header for x86_64 Linux executable
+    return [
+      0x7f, 0x45, 0x4c, 0x46,  # ELF magic
+      0x02,                     # 64-bit
+      0x01,                     # Little endian
+      0x01,                     # ELF version
+      0x00,                     # System V ABI
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # Padding
+      0x02, 0x00,               # Executable file
+      0x3e, 0x00,               # x86_64
+      0x01, 0x00, 0x00, 0x00,   # ELF version
+      0x78, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00,  # Entry point
+      0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # Program header offset
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # Section header offset
+      0x00, 0x00, 0x00, 0x00,   # Flags
+      0x40, 0x00,               # ELF header size
+      0x38, 0x00,               # Program header size
+      0x01, 0x00,               # Program header count
+      0x00, 0x00,               # Section header size
+      0x00, 0x00,               # Section header count
+      0x00, 0x00                # Section header string table index
+    ]
+  }
+
+  fn generate_elf_program_header() {
+    # Program header for loadable segment
+    return [
+      0x01, 0x00, 0x00, 0x00,   # PT_LOAD
+      0x05, 0x00, 0x00, 0x00,   # Flags (R+X)
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # Offset
+      0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00,  # Virtual address
+      0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00,  # Physical address
+      0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # File size
+      0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # Memory size
+      0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00   # Alignment
+    ]
+  }
+
+  # ==========================
+  # Debug map and profiling helpers
+  # ==========================
+  fn write_debug_map(path, base_vaddr, text_off, labels, debug_meta) {
+    if debug_meta == null { return { ok: true } }
+    set entries = []
+    set i = 0
+    while i < debug_meta.length {
+      set d = debug_meta[i]
+      if d != null && d.label != null && labels != null && labels[d.label] != null {
+        set abs = base_vaddr + text_off + labels[d.label]
+        set entries.push({ address: abs, label: d.label, stmt_index: d.stmt_index, kind: d.kind })
+      }
+      set i = i + 1
+    }
+    set obj = { version: "1", format: "azl-debug-map", entries: entries }
+    set json = json_stringify(obj)
+    if json.error != null { return { ok: false, error: json.error } }
+    set bytes = str_to_bytes(json.text)
+    set std = import("azl/stdlib/core/azl_stdlib.azl")
+    set ok = std.file_write([path, bytes])
+    if !ok { return { ok: false, error: "file_write_failed" } }
+    return { ok: true }
+  }
+
+  fn write_build_profile(path, source_code, lower, assembled, elfout) {
+    set instr_count = (lower != null && lower.program != null) ? lower.program.length : 0
+    set text_size = (assembled != null && assembled.bytes != null) ? assembled.bytes.length : 0
+    set bin_size = (elfout != null && elfout.bytes != null) ? elfout.bytes.length : 0
+    set obj = { version: "1", format: "azl-build-profile", metrics: { instructions: instr_count, text_bytes: text_size, binary_bytes: bin_size, source_bytes: (source_code != null ? source_code.length : 0) } }
+    set json = json_stringify(obj)
+    if json.error != null { return { ok: false, error: json.error } }
+    set bytes = str_to_bytes(json.text)
+    set std = import("azl/stdlib/core/azl_stdlib.azl")
+    set ok = std.file_write([path, bytes])
+    if !ok { return { ok: false, error: "file_write_failed" } }
+    return { ok: true }
+  }
+
+  fn str_to_bytes(s) {
+    set out = []
+    if s == null { return out }
+    set i = 0
+    while i < s.length { set out.push(s.charCodeAt(i) & 0xFF); set i = i + 1 }
+    return out
+  }
+
+  fn json_stringify(obj) {
+    # Minimal JSON stringify covering our needs
+    fn esc(str) {
+      set o = ""
+      set i = 0
+      while i < str.length {
+        set c = str[i]
+        if c == "\\" { set o = o + "\\\\" }
+        else if c == '"' { set o = o + "\\\"" }
+        else if c == "\n" { set o = o + "\\n" }
+        else if c == "\r" { set o = o + "\\r" }
+        else if c == "\t" { set o = o + "\\t" }
+        else { set o = o + c }
+        set i = i + 1
+      }
+      return o
+    }
+    fn str(o) {
+      if o == null { return "null" }
+      if typeof(o) == "Boolean" { return o ? "true" : "false" }
+      if typeof(o) == "Number" { return "" + o }
+      if typeof(o) == "String" { return '"' + esc(o) + '"' }
+      if typeof(o) == "Array" {
+        set i = 0; set parts = []
+        while i < o.length { set parts.push(str(o[i])); set i = i + 1 }
+        return "[" + parts.join(",") + "]"
+      }
+      set parts2 = []
+      for k in o { if k != null { set parts2.push('"' + esc(k) + '":' + str(o[k])) } }
+      return "{" + parts2.join(",") + "}"
+    }
+    return { text: str(obj) }
+  }
+
+  # ==========================
+  # Lowering to x86_64 Linux
+  # ==========================
+
+  fn lower_to_x86_64_linux(ast) {
+    set ::program = []
+    set ::stack_offset = 0
+    set ::local_vars = {}
+    set ::label_counter = 0
+    set ::function_labels = {}
+    set ::debug_meta = { cfg: null, ssa_version: null, loop_info: null, cache_estimate: null }
+    
+    # Build CFG for debug metadata
+    set ::debug_meta.cfg = ::build_control_flow_graph_from_ast(ast)
+    
+    # Transform to SSA for debug metadata  
+    set ::debug_meta.ssa_version = ::transform_to_ssa(ast)
+    
+    # Analyze loops for vectorization hints
+    set ::debug_meta.loop_info = ::auto_vectorize_loops(ast)
+    
+    # Cache optimization analysis
+    set ::debug_meta.cache_estimate = ::cache_optimization_analysis(ast)
+    
+    # Process AST nodes
+    for ::node in ast {
+      if ::node.type == "function" {
+        set ::func_name = ::node.name
+        set ::func_label = "func_" + ::func_name + "_" + ::label_counter
+        set ::label_counter = ::label_counter + 1
+        set ::function_labels[::func_name] = ::func_label
+        
+        # Function prologue
+        set ::program = ::program.concat([
+          [::func_label + ":"],
+          ["push_rbp"],
+          ["mov_rbp_rsp"],
+          ["sub_rsp_imm32", 32]  # Reserve stack space
+        ])
+        
+        # Process function body with tail call optimization
+        set ::body_code = ::lower_function_body_x86_64(::node.body, ::func_name)
+        set ::program = ::program.concat(::body_code)
+        
+        # Function epilogue
+        set ::program = ::program.concat([
+          ["add_rsp_imm32", 32],
+          ["pop_rbp"],
+          ["ret"]
+        ])
+      }
+      else if ::node.type == "call" {
+        set ::call_code = ::lower_call_x86_64(::node)
+        set ::program = ::program.concat(::call_code)
+      }
+      else if ::node.type == "binary" {
+        set ::bin_code = ::lower_binary_x86_64(::node)
+        set ::program = ::program.concat(::bin_code)
+      }
+      else if ::node.type == "number" {
+        set ::program = ::program.concat([["mov_rax_imm64", ::node.value]])
+      }
+      else if ::node.type == "identifier" {
+        set ::program = ::program.concat([["mov_rax_mem_rbp", ::local_vars[::node.name] || 0]])
+      }
+      else if ::node.type == "assignment" {
+        set ::assign_code = ::lower_assignment_x86_64(::node)
+        set ::program = ::program.concat(::assign_code)
+      }
+      else if ::node.type == "if" {
+        set ::if_code = ::lower_if_x86_64(::node)
+        set ::program = ::program.concat(::if_code)
+      }
+      else if ::node.type == "while" {
+        set ::while_code = ::lower_while_x86_64(::node)
+        set ::program = ::program.concat(::while_code)
+      }
+      else if ::node.type == "return" {
+        set ::return_code = ::lower_return_x86_64(::node)
+        set ::program = ::program.concat(::return_code)
+      }
+    }
+    
+    return { program: ::program, debug_meta: ::debug_meta }
+  }
+
+  fn lower_function_body_x86_64(body, func_name) {
+    set ::code = []
+    set ::tail_call_label = "tail_" + func_name + "_" + ::label_counter
+    set ::label_counter = ::label_counter + 1
+    
+    for ::stmt in body {
+      if ::stmt.type == "call" && ::stmt.func == func_name {
+        # Tail recursive call - convert to jump with loop
+        set ::code = ::code.concat([
+          [::tail_call_label + ":"],
+          # Load arguments (simplified - assumes single argument in rax)
+          ["mov_rdi_imm64", ::stmt.args[0].value || 0],
+          ["jmp_rel32", "func_" + func_name + "_" + (::label_counter - 1)]
+        ])
+      }
+      else {
+        set ::stmt_code = ::lower_statement_x86_64(::stmt)
+        set ::code = ::code.concat(::stmt_code)
+      }
+    }
+    
+    return ::code
+  }
+
+  fn lower_statement_x86_64(stmt) {
+    if ::stmt.type == "call" { return ::lower_call_x86_64(::stmt) }
+    if ::stmt.type == "binary" { return ::lower_binary_x86_64(::stmt) }
+    if ::stmt.type == "assignment" { return ::lower_assignment_x86_64(::stmt) }
+    if ::stmt.type == "if" { return ::lower_if_x86_64(::stmt) }
+    if ::stmt.type == "while" { return ::lower_while_x86_64(::stmt) }
+    if ::stmt.type == "return" { return ::lower_return_x86_64(::stmt) }
+    return []
+  }
+
+  fn lower_call_x86_64(call_node) {
+    # Load arguments
+    set ::code = []
+    if ::call_node.args && ::call_node.args.length > 0 {
+      set ::code = ::code.concat([["mov_rdi_imm64", ::call_node.args[0].value || 0]])
+    }
+    set ::code = ::code.concat([["call_rel32", "func_" + ::call_node.func + "_0"]])
+    return ::code
+  }
+
+  fn lower_binary_x86_64(bin_node) {
+    set ::code = []
+    # Load left operand
+    if ::bin_node.left.type == "number" {
+      set ::code = ::code.concat([["mov_rax_imm64", ::bin_node.left.value]])
+    } else {
+      set ::code = ::code.concat([["mov_rax_mem_rbp", ::local_vars[::bin_node.left.name] || 0]])
+    }
+    
+    # Save left operand
+    set ::code = ::code.concat([["push_rax"]])
+    
+    # Load right operand
+    if ::bin_node.right.type == "number" {
+      set ::code = ::code.concat([["mov_rax_imm64", ::bin_node.right.value]])
+    } else {
+      set ::code = ::code.concat([["mov_rax_mem_rbp", ::local_vars[::bin_node.right.name] || 0]])
+    }
+    
+    # Move right operand to rcx
+    set ::code = ::code.concat([["mov_r64_r64", "rcx", "rax"]])
+    
+    # Load left operand back to rax
+    set ::code = ::code.concat([["pop_rax"]])
+    
+    # Perform operation
+    if ::bin_node.operator == "+" { set ::code = ::code.concat([["add_rax_rcx"]]) }
+    else if ::bin_node.operator == "-" { set ::code = ::code.concat([["sub_rax_rcx"]]) }
+    else if ::bin_node.operator == "*" { set ::code = ::code.concat([["imul_rax_rcx"]]) }
+    else if ::bin_node.operator == "/" { 
+      set ::code = ::code.concat([["cqo"], ["idiv_rcx"]])
+    }
+    
+    return ::code
+  }
+
+  fn lower_assignment_x86_64(assign_node) {
+    set ::code = []
+    set ::var_name = ::assign_node.name
+    
+    # Allocate stack space if needed
+    if ::local_vars[::var_name] == null {
+      set ::local_vars[::var_name] = ::stack_offset
+      set ::stack_offset = ::stack_offset - 8
+    }
+    
+    # Evaluate value
+    if ::assign_node.value.type == "number" {
+      set ::code = ::code.concat([["mov_rax_imm64", ::assign_node.value.value]])
+    } else if ::assign_node.value.type == "binary" {
+      set ::code = ::code.concat(::lower_binary_x86_64(::assign_node.value))
+    } else {
+      set ::code = ::code.concat([["mov_rax_mem_rbp", ::local_vars[::assign_node.value.name] || 0]])
+    }
+    
+    # Store result
+    set ::code = ::code.concat([["mov_mem_rbp_rax", ::local_vars[::var_name]]])
+    
+    return ::code
+  }
+
+  fn lower_if_x86_64(if_node) {
+    set ::code = []
+    set ::else_label = "else_" + ::label_counter
+    set ::end_label = "endif_" + ::label_counter
+    set ::label_counter = ::label_counter + 1
+    
+    # Evaluate condition
+    if ::if_node.condition.type == "binary" {
+      set ::code = ::code.concat(::lower_binary_x86_64(::if_node.condition))
+      set ::code = ::code.concat([["cmp_rax_imm32", 0]])
+      set ::code = ::code.concat([["je_rel32", ::else_label]])
+    }
+    
+    # Then block
+    for ::stmt in ::if_node.then {
+      set ::code = ::code.concat(::lower_statement_x86_64(::stmt))
+    }
+    
+    set ::code = ::code.concat([["jmp_rel32", ::end_label]])
+    set ::code = ::code.concat([[::else_label + ":"]])
+    
+    # Else block
+    for ::stmt in ::if_node.else {
+      set ::code = ::code.concat(::lower_statement_x86_64(::stmt))
+    }
+    
+    set ::code = ::code.concat([[::end_label + ":"]])
+    
+    return ::code
+  }
+
+  fn lower_while_x86_64(while_node) {
+    set ::code = []
+    set ::loop_label = "while_" + ::label_counter
+    set ::end_label = "wend_" + ::label_counter
+    set ::label_counter = ::label_counter + 1
+    
+    set ::code = ::code.concat([[::loop_label + ":"]])
+    
+    # Evaluate condition
+    if ::while_node.condition.type == "binary" {
+      set ::code = ::code.concat(::lower_binary_x86_64(::while_node.condition))
+      set ::code = ::code.concat([["cmp_rax_imm32", 0]])
+      set ::code = ::code.concat([["je_rel32", ::end_label]])
+    }
+    
+    # Body
+    for ::stmt in ::while_node.body {
+      set ::code = ::code.concat(::lower_statement_x86_64(::stmt))
+    }
+    
+    set ::code = ::code.concat([["jmp_rel32", ::loop_label]])
+    set ::code = ::code.concat([[::end_label + ":"]])
+    
+    return ::code
+  }
+
+  fn lower_return_x86_64(return_node) {
+    set ::code = []
+    if ::return_node.value {
+      if ::return_node.value.type == "number" {
+        set ::code = ::code.concat([["mov_rax_imm64", ::return_node.value.value]])
+      } else if ::return_node.value.type == "binary" {
+        set ::code = ::code.concat(::lower_binary_x86_64(::return_node.value))
+      } else {
+        set ::code = ::code.concat([["mov_rax_mem_rbp", ::local_vars[::return_node.value.name] || 0]])
+      }
+    }
+    set ::code = ::code.concat([["ret"]])
+    return ::code
+  }
+
+  # SSA IR Structure
+  fn build_ssa_ir(ast) {
+    set ::ssa_ir = {
+      functions: [],
+      basic_blocks: {},
+      phi_nodes: {},
+      variable_versions: {}
+    }
+    
+    for ::node in ast {
+      if ::node.type == "function" {
+        set ::func_ssa = ::build_function_ssa(::node)
+        set ::ssa_ir.functions = ::ssa_ir.functions.concat([::func_ssa])
+      }
+    }
+    
+    return ::ssa_ir
+  }
+
+  fn build_function_ssa(func_node) {
+    set ::func_ssa = {
+      name: ::func_node.name,
+      basic_blocks: [],
+      entry_block: null,
+      exit_block: null,
+      variables: {}
+    }
+    
+    # Build basic blocks from control flow
+    set ::cfg = ::build_control_flow_graph_from_ast([::func_node])
+    set ::blocks = ::extract_basic_blocks(::func_node.body, ::cfg)
+    
+    # Insert phi nodes at block boundaries
+    set ::blocks = ::insert_phi_nodes(::blocks, ::cfg)
+    
+    # Rename variables to SSA form
+    set ::blocks = ::rename_to_ssa(::blocks)
+    
+    set ::func_ssa.basic_blocks = ::blocks
+    set ::func_ssa.entry_block = ::blocks[0]
+    set ::func_ssa.exit_block = ::blocks[::blocks.length - 1]
+    
+    return ::func_ssa
+  }
+
+  fn extract_basic_blocks(statements, cfg) {
+    set ::blocks = []
+    set ::current_block = { statements: [], predecessors: [], successors: [] }
+    
+    for ::stmt in ::statements {
+      if ::stmt.type == "if" || ::stmt.type == "while" {
+        # End current block
+        if ::current_block.statements.length > 0 {
+          set ::blocks = ::blocks.concat([::current_block])
+        }
+        
+        # Start new block for control flow
+        set ::current_block = { statements: [::stmt], predecessors: [], successors: [] }
+        set ::blocks = ::blocks.concat([::current_block])
+        set ::current_block = { statements: [], predecessors: [], successors: [] }
+      } else {
+        set ::current_block.statements = ::current_block.statements.concat([::stmt])
+      }
+    }
+    
+    # Add final block
+    if ::current_block.statements.length > 0 {
+      set ::blocks = ::blocks.concat([::current_block])
+    }
+    
+    return ::blocks
+  }
+
+  fn insert_phi_nodes(blocks, cfg) {
+    # For each variable that is live across multiple blocks, insert phi nodes
+    set ::variables = ::collect_variables(::blocks)
+    
+    for ::var in ::variables {
+      set ::def_blocks = ::find_definition_blocks(::var, ::blocks)
+      if ::def_blocks.length > 1 {
+        # Variable defined in multiple blocks - need phi nodes
+        set ::phi_blocks = ::find_phi_insertion_points(::var, ::def_blocks, ::cfg)
+        for ::block in ::phi_blocks {
+          set ::phi_node = {
+            type: "phi",
+            variable: ::var,
+            operands: ::collect_phi_operands(::var, ::block, ::def_blocks)
+          }
+          set ::block.statements = [::phi_node].concat(::block.statements)
+        }
+      }
+    }
+    
+    return ::blocks
+  }
+
+  fn rename_to_ssa(blocks) {
+    set ::version_counters = {}
+    set ::variable_stack = {}
+    
+    for ::block in ::blocks {
+      for ::stmt in ::block.statements {
+        if ::stmt.type == "assignment" {
+          set ::var = ::stmt.name
+          set ::version = ::version_counters[::var] || 0
+          set ::version = ::version + 1
+          set ::version_counters[::var] = ::version
+          
+          # Push current version onto stack
+          if ::variable_stack[::var] == null { set ::variable_stack[::var] = [] }
+          set ::variable_stack[::var] = ::variable_stack[::var].concat([::version])
+          
+          # Rename assignment
+          set ::stmt.ssa_name = ::var + "_" + ::version
+        } else if ::stmt.type == "phi" {
+          set ::var = ::stmt.variable
+          set ::version = ::version_counters[::var] || 0
+          set ::version = ::version + 1
+          set ::version_counters[::var] = ::version
+          set ::stmt.ssa_name = ::var + "_" + ::version
+        } else {
+          # Rename variable references
+          set ::stmt = ::rename_variable_references(::stmt, ::variable_stack)
+        }
+      }
+    }
+    
+    return ::blocks
+  }
+
+  fn rename_variable_references(stmt, variable_stack) {
+    if ::stmt.type == "identifier" {
+      set ::var = ::stmt.name
+      if ::variable_stack[::var] && ::variable_stack[::var].length > 0 {
+        set ::current_version = ::variable_stack[::var][::variable_stack[::var].length - 1]
+        set ::stmt.ssa_name = ::var + "_" + ::current_version
+      }
+    }
+    return ::stmt
+  }
+
+  fn collect_variables(blocks) {
+    set ::variables = {}
+    for ::block in ::blocks {
+      for ::stmt in ::block.statements {
+        if ::stmt.type == "assignment" {
+          set ::variables[::stmt.name] = true
+        }
+      }
+    }
+    return ::Object.keys(::variables)
+  }
+
+  fn find_definition_blocks(var_name, blocks) {
+    set ::def_blocks = []
+    set ::block_index = 0
+    for ::block in ::blocks {
+      for ::stmt in ::block.statements {
+        if ::stmt.type == "assignment" && ::stmt.name == ::var_name {
+          set ::def_blocks = ::def_blocks.concat([::block_index])
+        }
+      }
+      set ::block_index = ::block_index + 1
+    }
+    return ::def_blocks
+  }
+
+  fn find_phi_insertion_points(var_name, def_blocks, cfg) {
+    # Simplified: insert phi nodes at dominance frontier
+    set ::phi_blocks = []
+    for ::block_index in ::def_blocks {
+      if ::block_index > 0 {  # Skip entry block
+        set ::phi_blocks = ::phi_blocks.concat([::block_index])
+      }
+    }
+    return ::phi_blocks
+  }
+
+  fn collect_phi_operands(var_name, block, def_blocks) {
+    set ::operands = []
+    for ::def_block in ::def_blocks {
+      set ::operands = ::operands.concat([{ block: ::def_block, variable: ::var_name }])
+    }
+    return ::operands
+  }
+
+  # Auto-vectorization for simple loops
+  fn vectorize_simple_loop(loop_node) {
+    set ::vectorized_code = []
+    
+    # Check if loop is vectorizable
+    if ::is_vectorizable_loop(::loop_node) {
+      set ::vectorized_code = ::generate_vectorized_loop(::loop_node)
+    }
+    
+    return ::vectorized_code
+  }
+
+  fn is_vectorizable_loop(loop_node) {
+    # Check for simple arithmetic loop patterns
+    if ::loop_node.body.length != 1 { return false }
+    
+    set ::stmt = ::loop_node.body[0]
+    if ::stmt.type != "assignment" { return false }
+    
+    # Check for patterns like: i = i + 1, sum = sum + array[i]
+    set ::value = ::stmt.value
+    if ::value.type == "binary" && ::value.operator == "+" {
+      return true
+    }
+    
+    return false
+  }
+
+  fn generate_vectorized_loop(loop_node) {
+    set ::code = []
+    
+    # Generate vectorized version using SIMD instructions
+    set ::code = ::code.concat([
+      ["vzeroupper"],  # Clear upper bits
+      ["vmovdqu_ymm0_mem", -32],  # Load vector data
+      ["vpaddd_ymm0_ymm1"],  # Vector add
+      ["vmovdqu_mem_ymm0", -32],  # Store result
+      ["vzeroupper"]  # Clean up
+    ])
+    
+    return ::code
+  }
+
+  function apply_vectorization(ssa_ir) {
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "while" {
+            set ::vectorized_code = ::vectorize_simple_loop(::stmt)
+            if ::vectorized_code.length > 0 {
+              set ::stmt.vectorized = true
+              set ::stmt.vector_code = ::vectorized_code
+            }
+          }
+        }
+      }
+    }
+    return ::ssa_ir
+  }
+
+  function ssa_to_ast(ssa_ir) {
+    set ::ast = []
+    
+    for ::func in ::ssa_ir.functions {
+      set ::func_ast = {
+        type: "function",
+        name: ::func.name,
+        body: []
+      }
+      
+      for ::block in ::func.basic_blocks {
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "phi" {
+            # Convert phi nodes to assignments
+            set ::phi_assign = {
+              type: "assignment",
+              name: ::stmt.ssa_name,
+              value: { type: "number", value: 0 }  # Default value
+            }
+            set ::func_ast.body = ::func_ast.body.concat([::phi_assign])
+          } else {
+            # Convert SSA names back to regular names
+            set ::converted_stmt = ::convert_ssa_statement(::stmt)
+            set ::func_ast.body = ::func_ast.body.concat([::converted_stmt])
+          }
+        }
+      }
+      
+      set ::ast = ::ast.concat([::func_ast])
+    }
+    
+    return ::ast
+  }
+
+  function convert_ssa_statement(stmt) {
+    if ::stmt.ssa_name {
+      set ::base_name = ::stmt.ssa_name.split("_")[0]
+      if ::stmt.type == "assignment" {
+        set ::stmt.name = ::base_name
+      } else if ::stmt.type == "identifier" {
+        set ::stmt.name = ::base_name
+      }
+    }
+    return ::stmt
+  }
+
+  function constant_folding(ssa_ir) {
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "binary" {
+            if ::stmt.left.type == "number" && ::stmt.right.type == "number" {
+              set ::result = ::evaluate_constant_expression(::stmt)
+              set ::stmt.type = "number"
+              set ::stmt.value = ::result
+              set ::stmt.left = null
+              set ::stmt.right = null
+              set ::stmt.operator = null
+            }
+          }
+        }
+      }
+    }
+    return ::ssa_ir
+  }
+
+  function constant_propagation(ssa_ir) {
+    set ::constants = {}
+    
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "assignment" && ::stmt.value.type == "number" {
+            set ::constants[::stmt.ssa_name] = ::stmt.value.value
+          } else if ::stmt.type == "binary" {
+            # Replace constant operands
+            if ::stmt.left.type == "identifier" && ::constants[::stmt.left.ssa_name] {
+              set ::stmt.left = { type: "number", value: ::constants[::stmt.left.ssa_name] }
+            }
+            if ::stmt.right.type == "identifier" && ::constants[::stmt.right.ssa_name] {
+              set ::stmt.right = { type: "number", value: ::constants[::stmt.right.ssa_name] }
+            }
+          }
+        }
+      }
+    }
+    
+    return ::ssa_ir
+  }
+
+  function strength_reduction(ssa_ir) {
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "binary" && ::stmt.operator == "*" {
+            # Replace multiplication by power of 2 with shift
+            if ::stmt.right.type == "number" && ::is_power_of_two(::stmt.right.value) {
+              set ::shift = ::log2(::stmt.right.value)
+              set ::stmt.operator = "<<"
+              set ::stmt.right = { type: "number", value: ::shift }
+            }
+          }
+        }
+      }
+    }
+    return ::ssa_ir
+  }
+
+  function dead_code_elimination(ssa_ir) {
+    set ::live_vars = {}
+    
+    # Mark all variables used in phi nodes as live
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "phi" {
+            set ::live_vars[::stmt.ssa_name] = true
+          }
+        }
+      }
+    }
+    
+    # Mark variables used in other statements
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "binary" {
+            if ::stmt.left.type == "identifier" { set ::live_vars[::stmt.left.ssa_name] = true }
+            if ::stmt.right.type == "identifier" { set ::live_vars[::stmt.right.ssa_name] = true }
+          }
+        }
+      }
+    }
+    
+    # Remove dead assignments
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        set ::new_statements = []
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "assignment" && !::live_vars[::stmt.ssa_name] {
+            # Skip dead assignment
+          } else {
+            set ::new_statements = ::new_statements.concat([::stmt])
+          }
+        }
+        set ::block.statements = ::new_statements
+      }
+    }
+    
+    return ::ssa_ir
+  }
+
+  function function_inlining(ssa_ir) {
+    # Simple inlining: replace function calls with function bodies
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        set ::new_statements = []
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "call" && ::stmt.func == "simple_function" {
+            # Inline simple functions
+            set ::inline_body = ::get_function_body(::stmt.func, ::ssa_ir)
+            set ::new_statements = ::new_statements.concat(::inline_body)
+          } else {
+            set ::new_statements = ::new_statements.concat([::stmt])
+          }
+        }
+        set ::block.statements = ::new_statements
+      }
+    }
+    return ::ssa_ir
+  }
+
+  function tail_call_optimization(ssa_ir) {
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        for ::stmt in ::block.statements {
+          if ::stmt.type == "call" && ::stmt.func == ::func.name {
+            set ::stmt.tco_applied = true
+          }
+        }
+      }
+    }
+    return ::ssa_ir
+  }
+
+  function instruction_scheduling_ast(ssa_ir) {
+    # Simple instruction scheduling: reorder independent instructions
+    for ::func in ::ssa_ir.functions {
+      for ::block in ::func.basic_blocks {
+        set ::block.statements = ::schedule_block(::block.statements)
+      }
+    }
+    return ::ssa_ir
+  }
+
+  function schedule_block(statements) {
+    # Simple scheduling: move independent instructions up
+    set ::scheduled = []
+    set ::pending = []
+    
+    for ::stmt in ::statements {
+      if ::is_independent(::stmt, ::scheduled) {
+        set ::scheduled = ::scheduled.concat([::stmt])
+      } else {
+        set ::pending = ::pending.concat([::stmt])
+      }
+    }
+    
+    return ::scheduled.concat(::pending)
+  }
+
+  function is_independent(stmt, scheduled) {
+    # Check if statement is independent of already scheduled statements
+    if ::stmt.type == "assignment" {
+      for ::scheduled_stmt in ::scheduled {
+        if ::scheduled_stmt.type == "assignment" && ::scheduled_stmt.name == ::stmt.name {
+          return false
+        }
+      }
+    }
+    return true
+  }
+
+  function evaluate_constant_expression(expr) {
+    if ::expr.operator == "+" { return ::expr.left.value + ::expr.right.value }
+    if ::expr.operator == "-" { return ::expr.left.value - ::expr.right.value }
+    if ::expr.operator == "*" { return ::expr.left.value * ::expr.right.value }
+    if ::expr.operator == "/" { return ::expr.left.value / ::expr.right.value }
+    return 0
+  }
+
+  function is_power_of_two(n) {
+    return n > 0 && (n & (n - 1)) == 0
+  }
+
+  function log2(n) {
+    set ::result = 0
+    while n > 1 { set n = n / 2; set ::result = ::result + 1 }
+    return ::result
+  }
+
+  function get_function_body(func_name, ssa_ir) {
+    for ::func in ::ssa_ir.functions {
+      if ::func.name == ::func_name {
+        set ::body = []
+        for ::block in ::func.basic_blocks {
+          set ::body = ::body.concat(::block.statements)
+        }
+        return ::body
+      }
+    }
+    return []
+  }
+
+  # EXPORT NATIVE COMPILER INTERFACE
+  export fn compile_to_native(source_code, output_file, target_arch, target_os) {
+    say "🚀 NATIVE COMPILATION: AZL → MACHINE CODE"
+
+    emit compile_native with {
+      source_code: source_code,
+      output_file: output_file,
+      target_arch: target_arch,
+      target_os: target_os
+    }
+
+    return "NATIVE_COMPILATION_STARTED"
+  }
+
+  # PROGRAM OBJECT BYTES API FOR LINKER PIPELINES
+  # Returns { ok: true, bytes } or { ok: false, error }
+  export fn compile_to_object_bytes(source_code, target_arch, target_os) {
+    set tokens = native_tokenize(source_code)
+    set ast = native_parse(tokens)
+    set analyzed_ast = native_analyze(ast)
+    set optimized_ast = native_optimize(analyzed_ast)
+    if !(target_arch == "x86_64" && target_os == "linux") {
+      return { ok: false, error: "unsupported_target" }
+    }
+    set lower = lower_to_x86_64_linux(optimized_ast)
+    if lower.ok == false { return { ok: false, error: lower.error } }
+    set base = 0x400000
+    set text_off = 0x1000
+    set assembled = ::assembler.assemble_x86_64_with_context(lower.program, base, text_off)
+    if assembled.ok == false { return { ok: false, error: assembled.error } }
+    return { ok: true, bytes: assembled.bytes, labels: assembled.labels, debug: lower.debug_meta }
+  }
+}
+
+say "🔥 AZL NATIVE COMPILER LOADED!"
+say "🚀 READY FOR RUST-FREE NATIVE COMPILATION!"

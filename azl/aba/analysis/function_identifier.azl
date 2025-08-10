@@ -483,8 +483,20 @@ function calculate_sequence_confidence(function_pattern, temporal_pattern) {
 
 // Additional helper functions would be implemented here
 function calculate_interval(behavior, sequence) {
-  // Calculate time interval between behaviors
-  return 0  // Placeholder
+  # Calculate time interval since previous item in sequence with same type
+  if behavior == null || sequence == null { return 0 }
+  set idx = -1
+  set i = 0
+  while i < sequence.length {
+    if sequence[i].timestamp == behavior.timestamp { set idx = i; break }
+    set i = i + 1
+  }
+  if idx <= 0 { return 0 }
+  set prev = sequence[idx - 1]
+  if prev && prev.timestamp != null && behavior.timestamp != null {
+    return max(0, behavior.timestamp - prev.timestamp)
+  }
+  return 0
 }
 
 function count_functions(function_pattern) {
@@ -498,8 +510,28 @@ function count_functions(function_pattern) {
 }
 
 function analyze_temporal_consistency(temporal_pattern) {
-  // Analyze consistency of temporal intervals
-  return 0.5  // Placeholder
+  # Compute normalized variance of intervals (lower variance → higher consistency)
+  if temporal_pattern == null || temporal_pattern.length < 3 { return 0.0 }
+  set intervals = []
+  set i = 1
+  while i < temporal_pattern.length {
+    set intervals.push(max(0, temporal_pattern[i].timestamp - temporal_pattern[i-1].timestamp))
+    set i = i + 1
+  }
+  if intervals.length == 0 { return 0.0 }
+  # mean
+  set sum = 0.0
+  for v in intervals { set sum = sum + v }
+  set mean = sum / intervals.length
+  if mean <= 0 { return 0.0 }
+  # variance
+  set vsum = 0.0
+  for v in intervals { set d = v - mean; set vsum = vsum + (d * d) }
+  set var = vsum / intervals.length
+  # Coefficient of variation (cv = sqrt(var)/mean). Map to consistency = 1/(1+cv)
+  set cv = sqrt(var) / mean
+  set consistency = 1.0 / (1.0 + cv)
+  return clamp(consistency, 0.0, 1.0)
 }
 
 function calculate_function_confidence(function_pattern) {
@@ -509,12 +541,12 @@ function calculate_function_confidence(function_pattern) {
     total_confidence = total_confidence + func.confidence
   }
   
+  if function_pattern.length == 0 { return 0.0 }
   return total_confidence / function_pattern.length
 }
 
 function calculate_temporal_confidence(temporal_pattern) {
-  // Calculate confidence based on temporal consistency
-  return 0.7  // Placeholder
+  return analyze_temporal_consistency(temporal_pattern)
 }
 
 // Enhanced Function Identifier Functions

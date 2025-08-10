@@ -1,0 +1,15 @@
+fn worker(env) {
+  if env.kind == "start" {
+    azme.reply(env.correlation, to_json({ status: "accepted" }));
+    azme.reply(env.correlation, to_json({ progress: 0.25 }));
+    azme.reply(env.correlation, to_json({ progress: 0.75 }));
+    return to_json({ status: "done" });
+  }
+  return to_json({ error: "unknown" });
+}
+
+fn main() {
+  azme.spawn("w", worker);
+  let final = azme.ask("w", "start", to_json({}), 2000);
+  print("final = " + final);
+}

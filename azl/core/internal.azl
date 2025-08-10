@@ -1,0 +1,44 @@
+# AZL Internal Component - Provides core internal functionality
+# This includes environment variable access and other internal functions
+
+component ::internal {
+  init {
+    say "🔧 Internal component initializing..."
+    
+    # Initialize environment storage
+    set ::env_vars = {}
+    
+    # Try to read from actual environment (simulated)
+    ::load_environment()
+    
+    say "✅ Internal component ready"
+  }
+  
+  # Load environment variables
+  ::load_environment = () => {
+    say "🔧 Loading environment variables..."
+    
+    # Try to read from actual environment variables
+    # These will be set by the executor script
+    set ::env_vars["AZL_COMBINED_PATH"] = ""
+    set ::env_vars["AZL_ENTRY"] = ""
+    set ::env_vars["AZL_API_TOKEN"] = ""
+    set ::env_vars["AZL_BUILD_CONFIG"] = ""
+    set ::env_vars["AZL_BUILD_API_PORT"] = "8080"
+    set ::env_vars["AZL_BUILD_API_ENABLED"] = "true"
+    
+    say "🔧 Environment variables loaded"
+  }
+  
+  # Get environment variable
+  ::env = (name) => {
+    set value = ::env_vars[name] || ""
+    return value
+  }
+  
+  # Set environment variable
+  ::set_env = (name, value) => {
+    set ::env_vars[name] = value
+    say "🔧 Set env: " + name + " = " + value
+  }
+}

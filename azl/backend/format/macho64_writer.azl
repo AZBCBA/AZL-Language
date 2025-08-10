@@ -1,0 +1,122 @@
+component ::azl.backend.format.macho64_writer {
+  init {}
+  behavior {}
+
+  export fn write_exec(entry_file_offset, text_bytes) {
+    return ::write_exec([[entry_file_offset, text_bytes]])
+  }
+
+  # Minimal Mach-O 64 (x86_64) with one __TEXT segment and __text section
+  # entry_offset: file offset within __TEXT,__text where execution begins (for LC_MAIN)
+  # text_bytes: array of bytes
+  # returns { ok: true, bytes } or { ok: false, error }
+  function write_exec(args) {
+    set ::entry_offset = args[0]
+    set ::text = args[1] || []
+
+    # Constants
+    set ::MH_MAGIC_64 = 0xFEEDFACF
+    set ::CPU_TYPE_X86_64 = 0x01000007
+    set ::CPU_SUBTYPE_X86_64_ALL = 3
+    set ::MH_EXECUTE = 2
+
+    # Layout
+    # mach_header_64 (32)
+    # LC_SEGMENT_64 for __TEXT (72 + section_64 80 = 152)
+    # LC_MAIN (24)
+    # Total header ~208 bytes -> align to 0x1000 for simplicity
+
+    set ::header_target = 0x1000
+
+    # mach_header_64
+    set ::mh = []
+    set ::mh = ::mh.concat(::u32le(::MH_MAGIC_64))
+    set ::mh = ::mh.concat(::u32le(::CPU_TYPE_X86_64))
+    set ::mh = ::mh.concat(::u32le(::CPU_SUBTYPE_X86_64_ALL))
+    set ::mh = ::mh.concat(::u32le(::MH_EXECUTE))
+    set ::ncmds = 2
+    set ::sizeofcmds = (72 + 80) + 24
+    set ::mh = ::mh.concat(::u32le(::ncmds))
+    set ::mh = ::mh.concat(::u32le(::sizeofcmds))
+    set ::mh = ::mh.concat(::u32le(0)) # flags
+    set ::mh = ::mh.concat(::u32le(0)) # reserved
+
+    # LC_SEGMENT_64
+    set ::LC_SEGMENT_64 = 0x19
+    set ::vmaddr = 0x100000000
+    set ::fileoff = ::header_target
+    set ::vmsize = ::align(::text.length, 0x1000)
+    set ::filesize = ::text.length
+
+    set ::seg = []
+    set ::seg = ::seg.concat(::u32le(::LC_SEGMENT_64))
+    set ::seg = ::seg.concat(::u32le(72 + 80))
+    set ::seg = ::seg.concat(::name16("__TEXT"))
+    set ::seg = ::seg.concat(::u64le(::vmaddr))
+    set ::seg = ::seg.concat(::u64le(::vmsize))
+    set ::seg = ::seg.concat(::u64le(::fileoff))
+    set ::seg = ::seg.concat(::u64le(::filesize))
+    set ::seg = ::seg.concat(::u32le(5)) # maxprot R+X
+    set ::seg = ::seg.concat(::u32le(5)) # initprot R+X
+    set ::seg = ::seg.concat(::u32le(1)) # nsects
+    set ::seg = ::seg.concat(::u32le(0)) # flags
+
+    # section_64 __text
+    set ::sect = []
+    set ::sect = ::sect.concat(::name16("__text"))
+    set ::sect = ::sect.concat(::name16("__TEXT"))
+    set ::sect = ::sect.concat(::u64le(::vmaddr))
+    set ::sect = ::sect.concat(::u64le(::filesize))
+    set ::sect = ::sect.concat(::u32le(::fileoff))
+    set ::sect = ::sect.concat(::u32le(0)) # align
+    set ::sect = ::sect.concat(::u32le(0)) # reloff
+    set ::sect = ::sect.concat(::u32le(0)) # nreloc
+    set ::sect = ::sect.concat(::u32le(0x80000400)) # flags: S_REGULAR | ATTR_SOME_INSTRUCTIONS
+    set ::sect = ::sect.concat(::u32le(0)) # reserved1
+    set ::sect = ::sect.concat(::u32le(0)) # reserved2
+    set ::sect = ::sect.concat(::u32le(0)) # reserved3
+
+    # LC_MAIN
+    set ::LC_MAIN = 0x80000028
+    set ::entryoff = ::entry_offset
+    set ::stacksize = 0
+    set ::lcmain = []
+    set ::lcmain = ::lcmain.concat(::u32le(::LC_MAIN))
+    set ::lcmain = ::lcmain.concat(::u32le(24))
+    set ::lcmain = ::lcmain.concat(::u64le(::entryoff))
+    set ::lcmain = ::lcmain.concat(::u64le(::stacksize))
+
+    set ::hdr = []
+    set ::hdr = ::hdr.concat(::mh)
+    set ::hdr = ::hdr.concat(::seg)
+    set ::hdr = ::hdr.concat(::sect)
+    set ::hdr = ::hdr.concat(::lcmain)
+
+    # Pad to fileoff
+    set ::pad = ::header_target - ::hdr.length
+    if ::pad < 0 { return { ok: false, error: "Header too large" } }
+    set ::i = 0
+    while ::i < ::pad { set ::hdr.push(0); set ::i = ::i + 1 }
+
+    set ::out = ::hdr.concat(::text)
+    return { ok: true, bytes: ::out }
+  }
+
+  function align(v, a) { set ::r = v % a; if ::r == 0 { return v } else { return v + (a - ::r) } }
+
+  function name16(s) {
+    set ::bytes = []
+    set ::i = 0
+    while ::i < s.length { set ::bytes.push(s.charCodeAt(::i)); set ::i = ::i + 1 }
+    while ::bytes.length < 16 { set ::bytes.push(0) }
+    if ::bytes.length > 16 { set ::bytes = ::bytes.slice(0, 16) }
+    return ::bytes
+  }
+
+  function u32le(v) { return [ (v & 0xFF), ((v >> 8) & 0xFF), ((v >> 16) & 0xFF), ((v >> 24) & 0xFF) ] }
+  function u64le(v) {
+    set ::lo = v & 0xFFFFFFFF
+    set ::hi = (v >> 32) & 0xFFFFFFFF
+    return ::u32le(::lo).concat(::u32le(::hi))
+  }
+}

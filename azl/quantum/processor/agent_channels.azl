@@ -37,7 +37,7 @@ component ::quantum.agent_channels {
   }
 
   behavior {
-    on quantum.agent_channels.register {
+    listen for "quantum.agent_channels.register" { 
       set ::registration_info = $1
       say "🔄 Agent Channels subsystem registering with core"
       
@@ -49,7 +49,7 @@ component ::quantum.agent_channels {
       }
     }
 
-    on quantum.agent_channels.execute {
+    listen for "quantum.agent_channels.execute" { 
       set ::channel_request = $1
       say "🤖 Executing Agent Channels protocol"
       
@@ -61,7 +61,7 @@ component ::quantum.agent_channels {
       }
     }
 
-    on quantum.agent_channels.authenticate_agent {
+    listen for "quantum.agent_channels.authenticate_agent" { 
       set ::auth_info = $1
       say "🔐 Authenticating quantum AI agent"
       
@@ -81,7 +81,7 @@ component ::quantum.agent_channels {
       }
     }
 
-    on quantum.agent_channels.establish_channel {
+    listen for "quantum.agent_channels.establish_channel" { 
       set ::channel_info = $1
       say "🔗 Establishing secure agent communication channel"
       
@@ -110,7 +110,7 @@ component ::quantum.agent_channels {
       }
     }
 
-    on quantum.agent_channels.secure_communication {
+    listen for "quantum.agent_channels.secure_communication" { 
       set ::communication_info = $1
       say "💬 Establishing secure agent communication"
       
@@ -130,7 +130,7 @@ component ::quantum.agent_channels {
       }
     }
 
-    on quantum.agent_channels.manage_trust {
+    listen for "quantum.agent_channels.manage_trust" { 
       set ::trust_info = $1
       say "🤝 Managing agent trust relationships"
       
@@ -153,7 +153,7 @@ component ::quantum.agent_channels {
       }
     }
 
-    on quantum.agent_channels.complete {
+    listen for "quantum.agent_channels.complete" { 
       set ::completion_info = $1
       say "✅ Agent Channels completed successfully!"
       say "🔗 Secure channel: " + ::completion_info.secure_channel.channel_id
@@ -167,7 +167,7 @@ component ::quantum.agent_channels {
     }
 
     # Agent authentication
-    on quantum.agent_channels.verify_agent_identity {
+    listen for "quantum.agent_channels.verify_agent_identity" { 
       set ::verification_request = $1
       say "🔍 Verifying agent identity with quantum signatures"
       
@@ -186,7 +186,7 @@ component ::quantum.agent_channels {
     }
 
     # Channel encryption
-    on quantum.agent_channels.encrypt_channel {
+    listen for "quantum.agent_channels.encrypt_channel" { 
       set ::encryption_request = $1
       say "🔐 Encrypting agent communication channel"
       
@@ -205,7 +205,7 @@ component ::quantum.agent_channels {
     }
 
     # Trust management
-    on quantum.agent_channels.manage_agent_trust {
+    listen for "quantum.agent_channels.manage_agent_trust" { 
       set ::trust_request = $1
       say "🤝 Managing agent trust and reputation"
       
@@ -224,7 +224,7 @@ component ::quantum.agent_channels {
     }
 
     # Secure messaging
-    on quantum.agent_channels.send_secure_message {
+    listen for "quantum.agent_channels.send_secure_message" { 
       set ::message_request = $1
       say "📤 Sending secure message to agent"
       
@@ -245,7 +245,7 @@ component ::quantum.agent_channels {
     }
 
     # Channel monitoring
-    on quantum.agent_channels.monitor_channel {
+    listen for "quantum.agent_channels.monitor_channel" { 
       set ::monitoring_request = $1
       say "📊 Monitoring agent communication channel"
       
@@ -264,7 +264,7 @@ component ::quantum.agent_channels {
     }
 
     # Protocol status
-    on quantum.agent_channels.get_status {
+    listen for "quantum.agent_channels.get_status" { 
       set ::status_request = $1
       
       emit quantum.agent_channels.status_ready with {

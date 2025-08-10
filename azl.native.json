@@ -1,0 +1,23 @@
+{
+  "files": [
+    "azl/runtime/interpreter/azl_interpreter.azl",
+    "azl/core/compiler/azl_compiler.azl",
+    "azl/compiler/azl_native_compiler.azl",
+    "azl/backend/asm/assembler.azl",
+    "azl/backend/format/elf64_writer.azl",
+    "azl/backend/format/platform_writer.azl",
+    "azl/stdlib/core/azl_stdlib.azl",
+    "azl/system/azl_system_interface.azl"
+  ],
+  "options": {
+    "backend": "native",
+    "workers": 8,
+    "incremental": true,
+    "build_mode": "release",
+    "optimization_level": 2,
+    "debug_symbols": false,
+    "strip_symbols": true,
+    "target_arch": "x86_64",
+    "target_os": "linux"
+  }
+}

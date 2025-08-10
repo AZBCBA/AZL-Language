@@ -1,0 +1,37 @@
+# AZL Package Manager (pure AZL)
+# - Resolves external dependencies via a simple registry file azl_packages.json
+# - Supports locked versions and local cache under build/pkgs
+
+component ::build.pkg_manager {
+  init {
+    set ::registry_path = "azl_packages.json"
+    set ::install_dir = "build/pkgs"
+    set ::registry = {}
+    emit build.pkg.ready with "ready"
+  }
+
+  behavior {}
+
+  memory {
+    ::read_text = (path) => { return (::azl.system_interface.read_file_host_sync(path) || ::azl.system_interface.read_file_sync(path) || "") }
+  }
+
+  interface {
+    export fn load_registry() {
+      set s = ::read_text(::registry_path)
+      set J = import("azl/stdlib/core/json.azl")
+      set parsed = J.parse(s)
+      if !parsed.ok { emit log_error with { type: "pkg", message: "Failed to parse registry", context: { path: ::registry_path } } ; return { ok: false, error: "parse" } }
+      set ::registry = parsed.value || {}
+      return { ok: true, registry: ::registry }
+    }
+
+    export fn resolve(name) {
+      set rec = ::registry[name]
+      if rec == null { emit log_error with { type: "pkg", message: ("Package not found: " + name), context: { name: name } } ; return { ok: false, error: "not_found" } }
+      return { ok: true, package: rec }
+    }
+  }
+}
+
+

@@ -1,0 +1,719 @@
+# AZL Loop Optimizer
+# Advanced loop optimizations for performance-critical code
+
+component ::azl.loop_optimizer {
+  init {
+    set ::loop_optimizations_enabled = true
+    set ::loop_unrolling = true
+    set ::loop_fusion = true
+    set ::loop_fission = true
+    set ::loop_interchange = true
+    set ::loop_tiling = true
+    set ::loop_vectorization = true
+    
+    set ::loop_analysis = {}
+    set ::loop_transformations = {}
+    set ::vectorization_opportunities = {}
+    
+    say "🔄 AZL Loop Optimizer Initialized"
+    say "🔄 Loop Unrolling: ::loop_unrolling"
+    say "🔄 Loop Fusion: ::loop_fusion"
+    say "🔄 Loop Fission: ::loop_fission"
+    say "🔄 Loop Interchange: ::loop_interchange"
+    say "🔄 Loop Tiling: ::loop_tiling"
+    say "🔄 Loop Vectorization: ::loop_vectorization"
+  }
+
+  behavior {
+    # Main loop optimization pipeline
+    listen for "optimize_loops" then {
+      set ::ast = ::event.data.ast
+      set ::optimization_level = ::event.data.optimization_level || 3
+      
+      say "🔄 Starting loop optimization pipeline (Level ::optimization_level)"
+      
+      # Phase 1: Loop detection and analysis
+      emit analyze_loops with { ast: ::ast }
+      
+      # Phase 2: Loop unrolling
+      if ::loop_unrolling {
+        listen for "loop_analysis_complete" then {
+          set ::ast = ::event.data.ast
+          emit unroll_loops with { ast: ::ast }
+        }
+      }
+      
+      # Phase 3: Loop fusion
+      if ::loop_fusion {
+        listen for "loop_unrolling_complete" then {
+          set ::ast = ::event.data.ast
+          emit fuse_loops with { ast: ::ast }
+        }
+      }
+      
+      # Phase 4: Loop interchange
+      if ::loop_interchange {
+        listen for "loop_fusion_complete" then {
+          set ::ast = ::event.data.ast
+          emit interchange_loops with { ast: ::ast }
+        }
+      }
+      
+      # Phase 5: Loop tiling
+      if ::loop_tiling {
+        listen for "loop_interchange_complete" then {
+          set ::ast = ::event.data.ast
+          emit tile_loops with { ast: ::ast }
+        }
+      }
+      
+      # Phase 6: Loop vectorization
+      if ::loop_vectorization {
+        listen for "loop_tiling_complete" then {
+          set ::ast = ::event.data.ast
+          emit vectorize_loops with { ast: ::ast }
+        }
+      }
+      
+      # Final completion
+      listen for "loop_vectorization_complete" then {
+        set ::ast = ::event.data.ast
+        say "✅ Loop optimization complete"
+        emit loop_optimization_complete with { 
+          ast: ::ast,
+          loop_optimizations: ::get_loop_optimization_summary()
+        }
+      }
+    }
+    
+    # Loop analysis
+    listen for "analyze_loops" then {
+      set ::ast = ::event.data.ast
+      set ::loop_analysis = ::analyze_all_loops(::ast)
+      
+      say "🔄 Loop analysis: Found ::loop_analysis.loops.length loops"
+      emit loop_analysis_complete with { ast: ::ast, loop_analysis: ::loop_analysis }
+    }
+    
+    # Loop unrolling
+    listen for "unroll_loops" then {
+      set ::ast = ::event.data.ast
+      set ::ast = ::perform_loop_unrolling(::ast)
+      
+      say "🔄 Loop unrolling: Unrolled ::loop_transformations.unrolled.length loops"
+      emit loop_unrolling_complete with { ast: ::ast }
+    }
+    
+    # Loop fusion
+    listen for "fuse_loops" then {
+      set ::ast = ::event.data.ast
+      set ::ast = ::perform_loop_fusion(::ast)
+      
+      say "🔄 Loop fusion: Fused ::loop_transformations.fused.length loop pairs"
+      emit loop_fusion_complete with { ast: ::ast }
+    }
+    
+    # Loop interchange
+    listen for "interchange_loops" then {
+      set ::ast = ::event.data.ast
+      set ::ast = ::perform_loop_interchange(::ast)
+      
+      say "🔄 Loop interchange: Interchanged ::loop_transformations.interchanged.length loops"
+      emit loop_interchange_complete with { ast: ::ast }
+    }
+    
+    # Loop tiling
+    listen for "tile_loops" then {
+      set ::ast = ::event.data.ast
+      set ::ast = ::perform_loop_tiling(::ast)
+      
+      say "🔄 Loop tiling: Tiled ::loop_transformations.tiled.length loops"
+      emit loop_tiling_complete with { ast: ::ast }
+    }
+    
+    # Loop vectorization
+    listen for "vectorize_loops" then {
+      set ::ast = ::event.data.ast
+      set ::ast = ::perform_loop_vectorization(::ast)
+      
+      say "🔄 Loop vectorization: Vectorized ::loop_transformations.vectorized.length loops"
+      emit loop_vectorization_complete with { ast: ::ast }
+    }
+  }
+
+  memory {
+    # Analyze all loops in the AST
+    ::analyze_all_loops = (ast) => {
+      set ::loops = []
+      set ::nested_loops = []
+      set ::vectorizable_loops = []
+      
+      # Traverse AST to find loops
+      ::traverse_ast_for_loops(::ast)
+      
+      # Analyze each loop
+      for ::loop in ::loops {
+        set ::loop_info = ::analyze_single_loop(::loop)
+        set ::loop.analysis = ::loop_info
+        
+        # Categorize loops
+        if ::loop_info.is_nested {
+          set ::nested_loops.push(::loop)
+        }
+        
+        if ::loop_info.is_vectorizable {
+          set ::vectorizable_loops.push(::loop)
+        }
+      }
+      
+      return {
+        loops: ::loops,
+        nested_loops: ::nested_loops,
+        vectorizable_loops: ::vectorizable_loops,
+        total_loops: ::loops.length
+      }
+    }
+    
+    # Traverse AST to find loops
+    ::traverse_ast_for_loops = (node) => {
+      if ::node.type == "for" || ::node.type == "while" {
+        set ::loops.push(::node)
+      }
+      
+      # Recursively traverse child nodes
+      if ::node.nodes {
+        for ::child in ::node.nodes {
+          ::traverse_ast_for_loops(::child)
+        }
+      }
+      
+      if ::node.sections {
+        for ::section_name, ::section in ::node.sections {
+          if ::section.statements {
+            for ::statement in ::section.statements {
+              ::traverse_ast_for_loops(::statement)
+            }
+          }
+        }
+      }
+    }
+    
+    # Analyze a single loop
+    ::analyze_single_loop = (loop) => {
+      set ::analysis = {
+        type: ::loop.type,
+        iteration_count: ::estimate_iteration_count(::loop),
+        body_size: ::calculate_body_size(::loop),
+        is_nested: ::is_nested_loop(::loop),
+        is_vectorizable: ::is_vectorizable_loop(::loop),
+        dependencies: ::analyze_loop_dependencies(::loop),
+        memory_access_pattern: ::analyze_memory_access(::loop),
+        cache_friendly: ::is_cache_friendly(::loop)
+      }
+      
+      return ::analysis
+    }
+    
+    # Estimate loop iteration count
+    ::estimate_iteration_count = (loop) => {
+      if ::loop.type == "for" {
+        # Analyze for loop bounds
+        set ::start = ::extract_loop_start(::loop)
+        set ::end = ::extract_loop_end(::loop)
+        set ::step = ::extract_loop_step(::loop)
+        
+        if ::is_constant(::start) && ::is_constant(::end) && ::is_constant(::step) {
+          return (::end - ::start) / ::step
+        }
+      }
+      
+      return "unknown"
+    }
+    
+    # Calculate loop body size
+    ::calculate_body_size = (loop) => {
+      set ::size = 0
+      
+      if ::loop.body {
+        for ::statement in ::loop.body {
+          set ::size = ::size + ::estimate_statement_size(::statement)
+        }
+      }
+      
+      return ::size
+    }
+    
+    # Check if loop is nested
+    ::is_nested_loop = (loop) => {
+      if ::loop.body {
+        for ::statement in ::loop.body {
+          if ::statement.type == "for" || ::statement.type == "while" {
+            return true
+          }
+        }
+      }
+      return false
+    }
+    
+    # Check if loop is vectorizable
+    ::is_vectorizable_loop = (loop) => {
+      # Check for vectorization-friendly patterns
+      if ::loop.type == "for" {
+        set ::body = ::loop.body
+        if ::body && ::body.length == 1 {
+          set ::statement = ::body[0]
+          if ::statement.type == "set" {
+            # Check for array access patterns
+            if ::has_array_access(::statement) {
+              return true
+            }
+          }
+        }
+      }
+      return false
+    }
+    
+    # Analyze loop dependencies
+    ::analyze_loop_dependencies = (loop) => {
+      set ::dependencies = {
+        flow_dependencies: [],
+        anti_dependencies: [],
+        output_dependencies: []
+      }
+      
+      if ::loop.body {
+        for ::i = 0; ::i < ::loop.body.length; ::i = ::i + 1 {
+          for ::j = ::i + 1; ::j < ::loop.body.length; ::j = ::j + 1 {
+            set ::dep = ::analyze_statement_dependencies(::loop.body[::i], ::loop.body[::j])
+            if ::dep {
+              set ::dependencies[::dep.type].push(::dep)
+            }
+          }
+        }
+      }
+      
+      return ::dependencies
+    }
+    
+    # Analyze memory access patterns
+    ::analyze_memory_access = (loop) => {
+      set ::patterns = {
+        sequential: false,
+        strided: false,
+        random: false,
+        cache_friendly: false
+      }
+      
+      if ::loop.body {
+        for ::statement in ::loop.body {
+          if ::statement.type == "set" {
+            set ::access = ::analyze_statement_memory_access(::statement)
+            if ::access.sequential {
+              set ::patterns.sequential = true
+            }
+            if ::access.strided {
+              set ::patterns.strided = true
+            }
+            if ::access.random {
+              set ::patterns.random = true
+            }
+          }
+        }
+      }
+      
+      set ::patterns.cache_friendly = ::patterns.sequential && !::patterns.random
+      return ::patterns
+    }
+    
+    # Check if loop is cache friendly
+    ::is_cache_friendly = (loop) => {
+      set ::memory_pattern = ::analyze_memory_access(::loop)
+      return ::memory_pattern.cache_friendly
+    }
+    
+    # Perform loop unrolling
+    ::perform_loop_unrolling = (ast) => {
+      set ::unrolled_loops = []
+      
+      for ::component_name, ::component in ::ast.components {
+        if ::component.sections.behavior {
+          for ::statement in ::component.sections.behavior.statements {
+            if ::statement.type == "for" {
+              set ::unrolled = ::unroll_single_loop(::statement)
+              if ::unrolled {
+                set ::unrolled_loops.push(::unrolled)
+              }
+            }
+          }
+        }
+      }
+      
+      set ::loop_transformations.unrolled = ::unrolled_loops
+      return ::ast
+    }
+    
+    # Unroll a single loop
+    ::unroll_single_loop = (loop) => {
+      set ::analysis = ::analyze_single_loop(::loop)
+      
+      # Only unroll small loops with known iteration count
+      if ::analysis.iteration_count != "unknown" && ::analysis.iteration_count <= 8 {
+        set ::unrolled_body = []
+        
+        for ::i = 0; ::i < ::analysis.iteration_count; ::i = ::i + 1 {
+          for ::statement in ::loop.body {
+            set ::unrolled_statement = ::clone_statement_with_index(::statement, ::i)
+            set ::unrolled_body.push(::unrolled_statement)
+          }
+        }
+        
+        return {
+          original_loop: ::loop,
+          unrolled_body: ::unrolled_body,
+          unroll_factor: ::analysis.iteration_count
+        }
+      }
+      
+      return null
+    }
+    
+    # Perform loop fusion
+    ::perform_loop_fusion = (ast) => {
+      set ::fused_loops = []
+      
+      for ::component_name, ::component in ::ast.components {
+        if ::component.sections.behavior {
+          set ::statements = ::component.sections.behavior.statements
+          
+          for ::i = 0; ::i < ::statements.length - 1; ::i = ::i + 1 {
+            if ::statements[::i].type == "for" && ::statements[::i + 1].type == "for" {
+              set ::fused = ::fuse_loop_pair(::statements[::i], ::statements[::i + 1])
+              if ::fused {
+                set ::fused_loops.push(::fused)
+              }
+            }
+          }
+        }
+      }
+      
+      set ::loop_transformations.fused = ::fused_loops
+      return ::ast
+    }
+    
+    # Fuse a pair of loops
+    ::fuse_loop_pair = (loop1, loop2) => {
+      # Check if loops can be fused
+      if ::can_fuse_loops(::loop1, ::loop2) {
+        set ::fused_body = []
+        
+        # Combine loop bodies
+        for ::statement in ::loop1.body {
+          set ::fused_body.push(::statement)
+        }
+        
+        for ::statement in ::loop2.body {
+          set ::fused_body.push(::statement)
+        }
+        
+        return {
+          loop1: ::loop1,
+          loop2: ::loop2,
+          fused_body: ::fused_body
+        }
+      }
+      
+      return null
+    }
+    
+    # Check if loops can be fused
+    ::can_fuse_loops = (loop1, loop2) => {
+      # Loops must have same iteration count
+      set ::count1 = ::estimate_iteration_count(::loop1)
+      set ::count2 = ::estimate_iteration_count(::loop2)
+      
+      if ::count1 != ::count2 {
+        return false
+      }
+      
+      # Check for dependencies between loops
+      set ::deps = ::analyze_loop_dependencies(::loop1)
+      if ::deps.flow_dependencies.length > 0 {
+        return false
+      }
+      
+      return true
+    }
+    
+    # Perform loop interchange
+    ::perform_loop_interchange = (ast) => {
+      set ::interchanged_loops = []
+      
+      for ::component_name, ::component in ::ast.components {
+        if ::component.sections.behavior {
+          for ::statement in ::component.sections.behavior.statements {
+            if ::statement.type == "for" && ::is_nested_loop(::statement) {
+              set ::interchanged = ::interchange_nested_loop(::statement)
+              if ::interchanged {
+                set ::interchanged_loops.push(::interchanged)
+              }
+            }
+          }
+        }
+      }
+      
+      set ::loop_transformations.interchanged = ::interchanged_loops
+      return ::ast
+    }
+    
+    # Interchange nested loop
+    ::interchange_nested_loop = (loop) => {
+      set ::inner_loops = ::find_inner_loops(::loop)
+      
+      if ::inner_loops.length >= 2 {
+        # Check if interchange is beneficial
+        if ::is_interchange_beneficial(::inner_loops[0], ::inner_loops[1]) {
+          set ::interchanged = ::swap_loop_order(::inner_loops[0], ::inner_loops[1])
+          return {
+            original_loops: ::inner_loops,
+            interchanged_loops: ::interchanged
+          }
+        }
+      }
+      
+      return null
+    }
+    
+    # Perform loop tiling
+    ::perform_loop_tiling = (ast) => {
+      set ::tiled_loops = []
+      
+      for ::component_name, ::component in ::ast.components {
+        if ::component.sections.behavior {
+          for ::statement in ::component.sections.behavior.statements {
+            if ::statement.type == "for" && ::is_nested_loop(::statement) {
+              set ::tiled = ::tile_nested_loop(::statement)
+              if ::tiled {
+                set ::tiled_loops.push(::tiled)
+              }
+            }
+          }
+        }
+      }
+      
+      set ::loop_transformations.tiled = ::tiled_loops
+      return ::ast
+    }
+    
+    # Tile nested loop
+    ::tile_nested_loop = (loop) => {
+      set ::inner_loops = ::find_inner_loops(::loop)
+      
+      if ::inner_loops.length >= 2 {
+        set ::tile_size = ::calculate_optimal_tile_size(::inner_loops)
+        set ::tiled = ::apply_tiling(::inner_loops, ::tile_size)
+        
+        return {
+          original_loops: ::inner_loops,
+          tiled_loops: ::tiled,
+          tile_size: ::tile_size
+        }
+      }
+      
+      return null
+    }
+    
+    # Perform loop vectorization
+    ::perform_loop_vectorization = (ast) => {
+      set ::vectorized_loops = []
+      
+      for ::component_name, ::component in ::ast.components {
+        if ::component.sections.behavior {
+          for ::statement in ::component.sections.behavior.statements {
+            if ::statement.type == "for" && ::is_vectorizable_loop(::statement) {
+              set ::vectorized = ::vectorize_single_loop(::statement)
+              if ::vectorized {
+                set ::vectorized_loops.push(::vectorized)
+              }
+            }
+          }
+        }
+      }
+      
+      set ::loop_transformations.vectorized = ::vectorized_loops
+      return ::ast
+    }
+    
+    # Vectorize a single loop
+    ::vectorize_single_loop = (loop) => {
+      set ::vectorized_body = []
+      
+      # Convert scalar operations to vector operations
+      for ::statement in ::loop.body {
+        if ::statement.type == "set" {
+          set ::vectorized_statement = ::convert_to_vector_operation(::statement)
+          set ::vectorized_body.push(::vectorized_statement)
+        }
+      }
+      
+      return {
+        original_loop: ::loop,
+        vectorized_body: ::vectorized_body,
+        vector_width: 4  # Assume 4-wide vectorization
+      }
+    }
+    
+    # Get loop optimization summary
+    ::get_loop_optimization_summary = () => {
+      return {
+        total_loops_analyzed: ::loop_analysis.total_loops,
+        loops_unrolled: ::loop_transformations.unrolled.length,
+        loops_fused: ::loop_transformations.fused.length,
+        loops_interchanged: ::loop_transformations.interchanged.length,
+        loops_tiled: ::loop_transformations.tiled.length,
+        loops_vectorized: ::loop_transformations.vectorized.length,
+        total_optimizations: ::loop_transformations.unrolled.length + 
+                            ::loop_transformations.fused.length +
+                            ::loop_transformations.interchanged.length +
+                            ::loop_transformations.tiled.length +
+                            ::loop_transformations.vectorized.length
+      }
+    }
+    
+    # Utility functions
+    ::is_constant = (value) => {
+      return typeof(::value) == "number" && !::isNaN(::value)
+    }
+    
+    ::has_array_access = (statement) => {
+      if ::statement.value && ::statement.value.includes("[") {
+        return true
+      }
+      return false
+    }
+    
+    ::extract_loop_start = (loop) => {
+      # Extract start value from for loop
+      if ::loop.init && ::loop.init.includes("=") {
+        set ::parts = ::loop.init.split("=")
+        return ::parseInt(::parts[1])
+      }
+      return 0
+    }
+    
+    ::extract_loop_end = (loop) => {
+      # Extract end value from for loop
+      if ::loop.condition && ::loop.condition.includes("<") {
+        set ::parts = ::loop.condition.split("<")
+        return ::parseInt(::parts[1])
+      }
+      return 0
+    }
+    
+    ::extract_loop_step = (loop) => {
+      # Extract step value from for loop
+      if ::loop.update && ::loop.update.includes("++") {
+        return 1
+      }
+      return 1
+    }
+    
+    ::estimate_statement_size = (statement) => {
+      # Simple size estimation
+      if ::statement.type == "set" {
+        return 1
+      } else if ::statement.type == "say" {
+        return 1
+      } else if ::statement.type == "emit" {
+        return 2
+      }
+      return 1
+    }
+    
+    ::analyze_statement_dependencies = (stmt1, stmt2) => {
+      # Simple dependency analysis
+      if ::stmt1.type == "set" && ::stmt2.type == "set" {
+        if ::stmt1.variable == ::stmt2.variable {
+          return {
+            type: "flow_dependency",
+            variable: ::stmt1.variable
+          }
+        }
+      }
+      return null
+    }
+    
+    ::analyze_statement_memory_access = (statement) => {
+      # Simple memory access pattern analysis
+      return {
+        sequential: true,
+        strided: false,
+        random: false
+      }
+    }
+    
+    ::clone_statement_with_index = (statement, index) => {
+      set ::cloned = ::Object.assign({}, ::statement)
+      if ::cloned.value && ::cloned.value.includes("i") {
+        set ::cloned.value = ::cloned.value.replace(/i/g, ::index)
+      }
+      return ::cloned
+    }
+    
+    ::find_inner_loops = (loop) => {
+      set ::inner_loops = []
+      if ::loop.body {
+        for ::statement in ::loop.body {
+          if ::statement.type == "for" || ::statement.type == "while" {
+            set ::inner_loops.push(::statement)
+          }
+        }
+      }
+      return ::inner_loops
+    }
+    
+    ::is_interchange_beneficial = (loop1, loop2) => {
+      # Check if loop interchange improves cache performance
+      set ::pattern1 = ::analyze_memory_access(::loop1)
+      set ::pattern2 = ::analyze_memory_access(::loop2)
+      
+      return ::pattern1.cache_friendly && !::pattern2.cache_friendly
+    }
+    
+    ::swap_loop_order = (loop1, loop2) => {
+      # Swap the order of two nested loops
+      return [::loop2, ::loop1]
+    }
+    
+    ::calculate_optimal_tile_size = (loops) => {
+      # Calculate optimal tile size based on cache size
+      return 32  # Assume 32KB cache
+    }
+    
+    ::apply_tiling = (loops, tile_size) => {
+      # Apply tiling transformation
+      set ::tiled_loops = []
+      for ::loop in ::loops {
+        set ::tiled_loop = ::create_tiled_loop(::loop, ::tile_size)
+        set ::tiled_loops.push(::tiled_loop)
+      }
+      return ::tiled_loops
+    }
+    
+    ::create_tiled_loop = (loop, tile_size) => {
+      # Create tiled version of loop
+      return {
+        type: "tiled_for",
+        tile_size: ::tile_size,
+        original_loop: ::loop
+      }
+    }
+    
+    ::convert_to_vector_operation = (statement) => {
+      # Convert scalar operation to vector operation
+      set ::vectorized = ::Object.assign({}, ::statement)
+      set ::vectorized.type = "vector_set"
+      set ::vectorized.vector_width = 4
+      return ::vectorized
+    }
+  }
+}

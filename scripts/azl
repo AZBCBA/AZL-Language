@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Pure AZL runner scaffold: bundles core AZL modules and target into a single file
+# Usage:
+#   scripts/azl run <file.azl>
+#   scripts/azl build <dir_or_file1> [file2 ...] [--native] [--workers N]
+
+cmd="${1:-}"
+TARGET=""
+if [ "$cmd" = "run" ]; then
+  if [ $# -lt 2 ]; then
+    echo "Usage: scripts/azl run <file.azl>" >&2
+    exit 1
+  fi
+  TARGET="$2"
+  if [ ! -f "$TARGET" ]; then
+    echo "Target AZL file not found: $TARGET" >&2
+    exit 1
+  fi
+elif [ "$cmd" = "build" ]; then
+  shift
+  BACKEND="bytecode"
+  WORKERS="4"
+  INPUTS=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --native) BACKEND="native" ; shift ;;
+      --workers) WORKERS="$2" ; shift 2 ;;
+      *) INPUTS+=("$1") ; shift ;;
+    esac
+  done
+  if [ ${#INPUTS[@]} -eq 0 ]; then
+    echo "Usage: scripts/azl build <dir_or_file1> [file2 ...] [--native] [--workers N]" >&2
+    exit 1
+  fi
+  # Expand directories into file list
+  FILES=()
+  for x in "${INPUTS[@]}"; do
+    if [ -d "$x" ]; then
+      while IFS= read -r -d '' f; do FILES+=("$f"); done < <(find "$x" -type f -name '*.azl' -print0)
+    elif [ -f "$x" ]; then
+      FILES+=("$x")
+    fi
+  done
+  # Emit manifest JSON for build orchestrator consumption by host interpreter
+  MANIFEST="/tmp/azl_build_manifest_$$.json"
+  {
+    printf '{"backend":"%s","workers":%s,"files":[' "$BACKEND" "$WORKERS"
+    first=1
+    for f in "${FILES[@]}"; do
+      [ $first -eq 0 ] && printf ',' || first=0
+      esc=$(printf '%s' "$f" | sed 's/\\/\\\\/g; s/"/\\"/g')
+      printf '{"path":"%s"}' "$esc"
+    done
+    printf ']}'
+  } > "$MANIFEST"
+  echo "Build manifest written: $MANIFEST"
+  echo "NOTE: Invoke your AZL runtime to read manifest and call ::azl.runtime_integration.build_project"
+  exit 0
+else
+  echo "Usage: scripts/azl run <file.azl> | build <dir_or_file1> [file2 ...] [--native] [--workers N]" >&2
+  exit 1
+fi
+
+BOOT_FILE="/tmp/azl_boot_$$.azl"
+COMBINED="/tmp/azl_combined_$$.azl"
+
+# Bootstrap component: prefer interpreter path (VM/bytecode are design-only)
+  cat > "$BOOT_FILE" <<AZL
+component ::azl.selfhost.runner {
+  init {
+    # link ::azl.compiler   # design-only
+    # link ::azl.vm         # design-only
+      link ::azl.system_interface
+    emit compile_target with { path: "__TARGET__" }
+  }
+  behavior {
+    listen for "compile_target" then {
+      set ::path = ::event.data.path
+      set ::source = ::fs_store[::path] || ""
+      emit "compile" with { source_code: ::source, component_name: "::file.main" }
+    }
+    listen for "generate_bytecode_complete" then {
+      set ::bytecode = ::event.data.bytecode
+      emit "execute_bytecode" with { bytecode: ::bytecode, component_name: "::file.main" }
+    }
+  }
+}
+AZL
+sed -i "s#__TARGET__#${TARGET//\//\\/}#g" "$BOOT_FILE"
+
+# Bundle core modules + target
+CORE=(
+  "azl/stdlib/core/azl_stdlib.azl"
+  "azl/system/azl_system_interface.azl"
+  "azl/system/platform.azl"
+  "azl/system/process.azl"
+  "azl/system/hw.azl"
+  "azl/core/error_system.azl"
+  # "azl/core/compiler/azl_compiler.azl"  # design-only
+  # "azl/runtime/vm/azl_vm.azl"          # design-only
+  "azl/runtime/interpreter/azl_interpreter.azl"
+)
+> "$COMBINED"
+echo -e "# ===== FILE: ::bootstrap =====\n" >> "$COMBINED"
+cat "$BOOT_FILE" >> "$COMBINED"
+for f in "${CORE[@]}" "$TARGET"; do
+  if [ -f "$f" ]; then
+    echo -e "\n\n# ===== FILE: $f =====\n" >> "$COMBINED"
+    cat "$f" >> "$COMBINED"
+  fi
+done
+
+  if [ -n "$TARGET" ]; then
+    echo "Combined AZL created at: $COMBINED"
+    echo "To run: Use your pure AZL interpreter loader (in azl/runtime/interpreter) to load $COMBINED"
+  fi

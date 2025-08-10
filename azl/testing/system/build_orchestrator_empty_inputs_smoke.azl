@@ -1,0 +1,9 @@
+component ::smoke.build_empty_inputs {
+  init {
+    say "Starting build orchestrator empty inputs smoke"
+    link ::build.orchestrator
+    emit build.start to ::build.orchestrator with { files: [], options: {} }
+  }
+}
+
+

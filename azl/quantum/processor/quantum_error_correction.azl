@@ -113,7 +113,7 @@ component ::quantum.error_correction {
   }
 
   behavior {
-    on quantum.error_correction.register {
+    listen for "quantum.error_correction.register" { 
       set ::registration_info = $1
       say "🔄 Quantum error correction subsystem registering with core"
       
@@ -125,7 +125,7 @@ component ::quantum.error_correction {
       }
     }
 
-    on quantum.error_correction.execute {
+    listen for "quantum.error_correction.execute" { 
       set ::error_correction_request = $1
       say "🛡️ Executing quantum error correction protocol"
       
@@ -137,7 +137,7 @@ component ::quantum.error_correction {
       }
     }
 
-    on quantum.error_correction.encode {
+    listen for "quantum.error_correction.encode" { 
       set ::encoding_info = $1
       say "🔒 Encoding quantum state for error correction"
       
@@ -159,7 +159,7 @@ component ::quantum.error_correction {
       }
     }
 
-    on quantum.error_correction.inject_error {
+    listen for "quantum.error_correction.inject_error" { 
       set ::injection_info = $1
       say "⚠️ Injecting simulated error into encoded state"
       
@@ -181,7 +181,7 @@ component ::quantum.error_correction {
       }
     }
 
-    on quantum.error_correction.measure_syndrome {
+    listen for "quantum.error_correction.measure_syndrome" { 
       set ::syndrome_info = $1
       say "📊 Measuring error syndrome"
       
@@ -198,7 +198,7 @@ component ::quantum.error_correction {
       }
     }
 
-    on quantum.error_correction.correct_error {
+    listen for "quantum.error_correction.correct_error" { 
       set ::correction_info = $1
       say "🔧 Applying error correction based on syndrome"
       
@@ -223,7 +223,7 @@ component ::quantum.error_correction {
       }
     }
 
-    on quantum.error_correction.decode {
+    listen for "quantum.error_correction.decode" { 
       set ::decoding_info = $1
       say "🔓 Decoding logical qubit from corrected state"
       
@@ -240,7 +240,7 @@ component ::quantum.error_correction {
       }
     }
 
-    on quantum.error_correction.verify {
+    listen for "quantum.error_correction.verify" { 
       set ::verification_info = $1
       say "✅ Verifying error correction fidelity"
       
@@ -258,7 +258,7 @@ component ::quantum.error_correction {
       }
     }
 
-    on quantum.error_correction.complete {
+    listen for "quantum.error_correction.complete" { 
       set ::completion_info = $1
       say "✅ Quantum error correction completed successfully!"
       say "📊 Fidelity: " + ::completion_info.fidelity
@@ -272,7 +272,7 @@ component ::quantum.error_correction {
     }
 
     # Shor code implementation
-    on quantum.error_correction.shor_code {
+    listen for "quantum.error_correction.shor_code" { 
       set ::shor_request = $1
       say "🔬 Executing Shor code (9-qubit universal error correction)"
       
@@ -283,7 +283,7 @@ component ::quantum.error_correction {
     }
 
     # Steane code implementation
-    on quantum.error_correction.steane_code {
+    listen for "quantum.error_correction.steane_code" { 
       set ::steane_request = $1
       say "🔬 Executing Steane code (7-qubit CSS-based error correction)"
       
@@ -294,7 +294,7 @@ component ::quantum.error_correction {
     }
 
     # Surface code implementation
-    on quantum.error_correction.surface_code {
+    listen for "quantum.error_correction.surface_code" { 
       set ::surface_request = $1
       say "🔬 Executing Surface code (topological error correction)"
       
@@ -305,7 +305,7 @@ component ::quantum.error_correction {
     }
 
     # Error rate measurement
-    on quantum.error_correction.measure_error_rate {
+    listen for "quantum.error_correction.measure_error_rate" { 
       set ::error_rate_request = $1
       say "📈 Measuring logical error rate"
       
@@ -317,7 +317,7 @@ component ::quantum.error_correction {
     }
 
     # Protocol status
-    on quantum.error_correction.get_status {
+    listen for "quantum.error_correction.get_status" { 
       set ::status_request = $1
       
       emit quantum.error_correction.status_ready with {

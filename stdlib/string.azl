@@ -1,0 +1,142 @@
+// stdlib/string.azl
+// String utility functions
+
+export fn split(str, sep) {
+    // For simplicity, assume sep is a single character
+    let result = [];
+    let current = "";
+    let i = 0;
+    while (i < str.length) {
+        let c = str.char_at(i);
+        if (c == sep) {
+            result.push(current);
+            current = "";
+        } else {
+            current = current + c;
+        }
+        i = i + 1;
+    }
+    result.push(current);
+    return result;
+}
+
+export fn join(array, sep) {
+    let result = "";
+    let i = 0;
+    while (i < array.length) {
+        if (i > 0) {
+            result = result + sep;
+        }
+        result = result + array[i];
+        i = i + 1;
+    }
+    return result;
+}
+
+export fn to_upper(str) {
+    let result = "";
+    let i = 0;
+    while (i < str.length) {
+        let c = str.char_at(i);
+        if (c >= "a" && c <= "z") {
+            result = result + char(c.char_code() - 32);
+        } else {
+            result = result + c;
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+export fn to_lower(str) {
+    let result = "";
+    let i = 0;
+    while (i < str.length) {
+        let c = str.char_at(i);
+        if (c >= "A" && c <= "Z") {
+            result = result + char(c.char_code() + 32);
+        } else {
+            result = result + c;
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+export fn trim(str) {
+    let start = 0;
+    let end = str.length;
+    
+    // Find start of non-whitespace
+    while (start < str.length && str.char_at(start) == " ") {
+        start = start + 1;
+    }
+    
+    // Find end of non-whitespace
+    while (end > start && str.char_at(end - 1) == " ") {
+        end = end - 1;
+    }
+    
+    return str.slice(start, end);
+}
+
+export fn replace(str, old, new) {
+    let result = "";
+    let i = 0;
+    while (i < str.length) {
+        if (i + old.length <= str.length && str.slice(i, i + old.length) == old) {
+            result = result + new;
+            i = i + old.length;
+        } else {
+            result = result + str.char_at(i);
+            i = i + 1;
+        }
+    }
+    return result;
+}
+
+export fn starts_with(str, prefix) {
+    if (prefix.length > str.length) {
+        return false;
+    }
+    return str.slice(0, prefix.length) == prefix;
+}
+
+export fn ends_with(str, suffix) {
+    if (suffix.length > str.length) {
+        return false;
+    }
+    return str.slice(str.length - suffix.length) == suffix;
+}
+
+export fn contains(str, substr) {
+    let i = 0;
+    while (i <= str.length - substr.length) {
+        if (str.slice(i, i + substr.length) == substr) {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+export fn index_of(str, substr) {
+    let i = 0;
+    while (i <= str.length - substr.length) {
+        if (str.slice(i, i + substr.length) == substr) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+export fn repeat(str, count) {
+    let result = "";
+    let i = 0;
+    while (i < count) {
+        result = result + str;
+        i = i + 1;
+    }
+    return result;
+} 

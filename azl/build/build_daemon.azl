@@ -1,0 +1,180 @@
+# AZL Build Daemon (pure AZL)
+# - Watches files for changes
+# - Triggers targeted rebuilds via ::build.orchestrator
+# - No duplicate events; reuses existing fs.changed -> orchestrator behavior
+
+component ::build.daemon {
+  init {
+    set ::status = "idle"
+    set ::running = false
+    set ::interval_ticks = (::internal.env("AZL_BUILD_WATCH_INTERVAL") || 500)
+    set ::watch_files = []         # [ path ]
+    set ::watch_options = {}       # orchestrator options
+    set ::baseline_hash = {}       # path -> hash
+    set ::last_build_started = 0
+    set ::scan_counter = 0
+
+    link ::build.orchestrator
+    link ::azl.system_interface
+    link ::build.cache_manager
+    link ::build.dep_graph
+    link ::azl.build.config
+
+    say "👁️  AZL Build Daemon ready"
+    emit build.daemon.ready with "ready"
+  }
+
+  behavior {
+    # Start daemon with config file
+    listen for "daemon.start.config" then {
+      set cfg_path = ::event.data.path || "azl.build.json"
+      set loaded = ::build.config_parser.load(cfg_path)
+      if !loaded.ok {
+        say "❌ Daemon: failed to load config: " + cfg_path
+        return
+      }
+      set cfg = ::build.config_parser.get()
+      set files = cfg.files || []
+      set options = cfg.options || {}
+      emit daemon.start.files with { files: files, options: options }
+    }
+
+    # Start daemon with explicit files
+    listen for "daemon.start.files" then {
+      set files = ::event.data.files || []
+      set options = ::event.data.options || {}
+      if files.length == 0 { say "❌ Daemon: no files to watch" ; return }
+
+      # Normalize to paths list and baseline hashes
+      set ::watch_files = []
+      set ::watch_options = options
+      set ::baseline_hash = {}
+
+      set prepared = []
+      set i = 0
+      while i < files.length {
+        set p = (typeof(files[i]) == "Object") ? files[i].path : files[i]
+        set s = ::azl.system_interface.read_file_host_sync(p) || ::azl.system_interface.read_file_sync(p) || ""
+        set h = ::hash_fnv1a32(s)
+        if !::contains(::watch_files, p) { set ::watch_files.push(p) }
+        set ::baseline_hash[p] = h
+        set prepared.push({ path: p, source: s })
+        set i = i + 1
+      }
+
+      say ("🟢 Daemon started. Watching " + ::watch_files.length + " files")
+      set ::running = true
+      set ::status = "running"
+      set ::last_build_started = ::now_tick()
+
+      # Kick an initial build through orchestrator
+      emit build.start to ::build.orchestrator with { files: prepared, options: ::watch_options }
+    }
+
+    # Manual pulse to scan for changes (callable externally)
+    listen for "daemon.pulse" then {
+      if !::running { return }
+      ::scan_counter = ::scan_counter + 1
+      ::scan_once()
+    }
+
+    # Stop daemon
+    listen for "daemon.stop" then {
+      set ::running = false
+      set ::status = "idle"
+      say "🛑 Daemon stopped"
+    }
+
+    # Forward orchestrator progress
+    listen for "build.progress" then {
+      set pr = $1
+      say ("⏳ Build progress: " + pr.completed + "/" + pr.total + " (" + pr.percent + "%)")
+      emit daemon.build.progress with pr
+    }
+
+    # Forward orchestrator completion
+    listen for "build.complete" then {
+      set res = $1
+      say ("✅ Build complete: success=" + res.success + ", ok=" + res.completed + ", fail=" + res.failed + ", skip=" + res.skipped)
+      emit daemon.build.complete with res
+    }
+  }
+
+  memory {
+    # Single scan for changes
+    ::scan_once = () => {
+      set changed = []
+      set j = 0
+      while j < ::watch_files.length {
+        set p = ::watch_files[j]
+        set s = ::azl.system_interface.read_file_host_sync(p) || ::azl.system_interface.read_file_sync(p) || ""
+        set h = ::hash_fnv1a32(s)
+        set prev = ::baseline_hash[p]
+        if prev == null { set ::baseline_hash[p] = h } else {
+          if h != prev {
+            set ::baseline_hash[p] = h
+            set changed.push(p)
+          }
+        }
+        set j = j + 1
+      }
+
+      if changed.length > 0 {
+        # Notify orchestrator; it already listens to fs.changed and will rebuild appropriately
+        set k = 0
+        while k < changed.length {
+          set cp = changed[k]
+          say ("📁 Change detected: " + cp)
+          emit fs.changed to ::build.orchestrator with { path: cp }
+          set k = k + 1
+        }
+      }
+    }
+
+    ::contains = (arr, v) => { for idx = 0; idx < arr.length; idx = idx + 1 { if arr[idx] == v { return true } } ; return false }
+
+    ::now_tick = () => { return ::azl.stdlib.time_now([]) }
+
+    # Local FNV-1a hash
+    ::hash_fnv1a32 = (text) => {
+      set hash = 2166136261
+      set i = 0
+      while i < text.length {
+        set code = text[i].charCodeAt(0) & 0xFF
+        set hash = hash ^ code
+        set hash = (hash * 16777619) % 4294967296
+        set i = i + 1
+      }
+      return hash
+    }
+  }
+
+  interface {
+    export fn start_with_config(config_path, options) {
+      emit daemon.start.config with { path: (config_path || "azl.build.json"), options: options || {} }
+    }
+    export fn start_with_files(files, options) {
+      emit daemon.start.files with { files: files || [], options: options || {} }
+    }
+    export fn stop() {
+      emit daemon.stop
+    }
+    export fn pulse() {
+      emit daemon.pulse
+    }
+    export fn status() {
+      return {
+        running: ::running,
+        watched: ::watch_files.length,
+        interval: ::interval_ticks
+      }
+    }
+
+    # Output events
+    output event: build.daemon.ready
+    output event: daemon.build.progress
+    output event: daemon.build.complete
+  }
+}
+
+

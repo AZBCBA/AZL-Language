@@ -1,0 +1,295 @@
+# Weight Registry Component
+# Version-controlled weight storage and management
+
+component ::weights.registry {
+  init {
+    say "📦 Weight Registry Component"
+    say "🔄 Version-controlled weight storage"
+    
+    # Weight storage
+    set ::weight_registry = {}
+    set ::current_weights = {}
+    set ::weight_versions = {}
+    
+    # Registry paths
+    set ::weights_path = "/weights"
+    set ::config_path = "/config"
+    
+    say "✅ Weight registry initialized"
+  }
+
+  behavior {
+    # Save weights with versioning
+    listen for "save_weights" {
+      let weight_data = ::event.data
+      let model_name = weight_data.model_name
+      let version = weight_data.version
+      let weights = weight_data.weights
+      let config = weight_data.config
+      
+      # Create version directory
+      set version_dir = ::weights_path + "/" + now() + "-" + model_name + "-v" + version
+      
+      # Save weights
+      set ::weight_registry[model_name] = {
+        version: version,
+        path: version_dir,
+        weights: weights,
+        config: config,
+        timestamp: now(),
+        sha256: calculate_sha256(weights)
+      }
+      
+      # Save to file (simplified)
+      save_weights_to_file(version_dir, weights, config)
+      
+      say "✅ Weights saved: " + model_name + " v" + version
+      say "📁 Path: " + version_dir
+      
+      emit "weights_saved" with {
+        model_name: model_name,
+        version: version,
+        path: version_dir,
+        sha256: ::weight_registry[model_name].sha256
+      }
+    }
+    
+    # Fetch weights by name and version
+    listen for "fetch_weights" {
+      let request = ::event.data
+      let model_name = request.model_name
+      let version = request.version
+      
+      if version == "latest" {
+        # Get latest version
+        set latest_version = get_latest_version(model_name)
+        set weights_data = ::weight_registry[model_name]
+      } else {
+        # Get specific version
+        set weights_data = get_version_weights(model_name, version)
+      }
+      
+      if weights_data {
+        emit "weights_fetched" with {
+          model_name: model_name,
+          version: weights_data.version,
+          path: weights_data.path,
+          weights: weights_data.weights,
+          config: weights_data.config,
+          sha256: weights_data.sha256
+        }
+        
+        say "✅ Weights fetched: " + model_name + " v" + weights_data.version
+      } else {
+        emit "weights_not_found" with {
+          model_name: model_name,
+          version: version,
+          error: "Weights not found"
+        }
+        
+        say "❌ Weights not found: " + model_name + " v" + version
+      }
+    }
+    
+    # List available weights
+    listen for "list_weights" {
+      set available_weights = []
+      
+      for model_name in ::weight_registry {
+        let weight_data = ::weight_registry[model_name]
+        set available_weights = available_weights + [{
+          model_name: model_name,
+          version: weight_data.version,
+          timestamp: weight_data.timestamp,
+          path: weight_data.path,
+          sha256: weight_data.sha256
+        }]
+      }
+      
+      emit "weights_list" with {
+        weights: available_weights,
+        count: len(available_weights)
+      }
+      
+      say "📋 Available weights: " + len(available_weights) + " models"
+    }
+    
+    # Load weights for training
+    listen for "load_training_weights" {
+      let request = ::event.data
+      let model_name = request.model_name
+      let version = request.version
+      
+      emit "fetch_weights" with {
+        model_name: model_name,
+        version: version
+      }
+      
+      listen for "weights_fetched" {
+        let weights_data = ::event.data
+        
+        # Load weights into neural network
+        emit "load_weights" with {
+          weights: weights_data.weights,
+          config: weights_data.config
+        }
+        
+        say "🔄 Training weights loaded: " + model_name + " v" + weights_data.version
+      }
+    }
+    
+    # Save training checkpoint
+    listen for "save_checkpoint" {
+      let checkpoint_data = ::event.data
+      let model_name = checkpoint_data.model_name
+      let epoch = checkpoint_data.epoch
+      let weights = checkpoint_data.weights
+      let loss = checkpoint_data.loss
+      let accuracy = checkpoint_data.accuracy
+      
+      # Create checkpoint
+      set checkpoint_dir = ::weights_path + "/" + now() + "-" + model_name + "-epoch-" + epoch
+      
+      set checkpoint = {
+        model_name: model_name,
+        epoch: epoch,
+        weights: weights,
+        loss: loss,
+        accuracy: accuracy,
+        timestamp: now(),
+        path: checkpoint_dir
+      }
+      
+      # Save checkpoint
+      save_checkpoint_to_file(checkpoint_dir, checkpoint)
+      
+      say "💾 Checkpoint saved: " + model_name + " epoch " + epoch
+      say "📊 Loss: " + loss + " | Accuracy: " + accuracy
+      
+      emit "checkpoint_saved" with checkpoint
+    }
+    
+    # Restore from checkpoint
+    listen for "restore_checkpoint" {
+      let request = ::event.data
+      let checkpoint_path = request.path
+      
+      # Load checkpoint
+      set checkpoint = load_checkpoint_from_file(checkpoint_path)
+      
+      if checkpoint {
+        # Restore weights
+        emit "load_weights" with {
+          weights: checkpoint.weights,
+          config: checkpoint.config
+        }
+        
+        say "🔄 Checkpoint restored: " + checkpoint.model_name + " epoch " + checkpoint.epoch
+        say "📊 Loss: " + checkpoint.loss + " | Accuracy: " + checkpoint.accuracy
+        
+        emit "checkpoint_restored" with checkpoint
+      } else {
+        emit "checkpoint_not_found" with {
+          path: checkpoint_path,
+          error: "Checkpoint not found"
+        }
+        
+        say "❌ Checkpoint not found: " + checkpoint_path
+      }
+    }
+    
+    # Clean up old weights
+    listen for "cleanup_weights" {
+      let request = ::event.data
+      let max_versions = request.max_versions
+      let older_than_days = request.older_than_days
+      
+      set cleaned_count = 0
+      
+      for model_name in ::weight_registry {
+        let weight_data = ::weight_registry[model_name]
+        let age_days = (now() - weight_data.timestamp) / 86400  # Convert to days
+        
+        if age_days > older_than_days {
+          # Remove old weights
+          remove_weights_from_file(weight_data.path)
+          set ::weight_registry[model_name] = null
+          set cleaned_count = cleaned_count + 1
+        }
+      }
+      
+      say "🧹 Cleanup completed: " + cleaned_count + " old weights removed"
+      
+      emit "cleanup_complete" with {
+        cleaned_count: cleaned_count,
+        max_versions: max_versions,
+        older_than_days: older_than_days
+      }
+    }
+  }
+
+  memory {
+    ::weight_registry = {}
+    ::current_weights = {}
+    ::weight_versions = {}
+    ::weights_path = "/weights"
+    ::config_path = "/config"
+  }
+}
+
+# Helper functions
+function calculate_sha256(data) {
+  # Calculate SHA256 hash (simplified)
+  return "sha256_" + len(data) + "_" + now()
+}
+
+function get_latest_version(model_name) {
+  # Get latest version for model
+  if ::weight_registry[model_name] {
+    return ::weight_registry[model_name].version
+  }
+  return null
+}
+
+function get_version_weights(model_name, version) {
+  # Get specific version weights
+  if ::weight_registry[model_name] {
+    return ::weight_registry[model_name]
+  }
+  return null
+}
+
+function save_weights_to_file(path, weights, config) {
+  # Save weights to file (simplified)
+  say "💾 Saving weights to: " + path
+  # Actual file I/O would go here
+}
+
+function save_checkpoint_to_file(path, checkpoint) {
+  # Save checkpoint to file (simplified)
+  say "💾 Saving checkpoint to: " + path
+  # Actual file I/O would go here
+}
+
+function load_checkpoint_from_file(path) {
+  # Load checkpoint from file (simplified)
+  say "📂 Loading checkpoint from: " + path
+  # Actual file I/O would go here
+  return {
+    model_name: "test_model",
+    epoch: 10,
+    weights: [[1, 2], [3, 4]],
+    loss: 0.1,
+    accuracy: 0.95,
+    timestamp: now()
+  }
+}
+
+function remove_weights_from_file(path) {
+  # Remove weights file (simplified)
+  say "🗑️ Removing weights: " + path
+  # Actual file deletion would go here
+}
+
+# Initialize weight registry
+say "📦 Weight Registry Ready"

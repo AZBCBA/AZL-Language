@@ -1,0 +1,89 @@
+# NLP Orchestrator - AZL Component
+# Orchestrates NLP processing and chat interactions
+
+component ::nlp.orchestrator {
+  init {
+    say "🎯 NLP Orchestrator Initialized"
+    set ::active_requests = []
+    set ::processing_queue = []
+    set ::response_history = []
+
+    # Intern hot events for faster dispatch in downstream runtimes
+    emit "event.intern" with "chat.request"
+    emit "event.intern" with "generate.text.bytes"
+    emit "event.intern" with "stream.utf8"
+    emit "event.intern" with "azme.chat.response"
+  }
+
+  behavior {
+    # Handle chat requests
+    listen for "chat.request" {
+      let request_data = ::event.data
+      say "🎯 Chat request received"
+      
+      # Add to processing queue
+      # Use LHA3 fast buffer
+      emit "lha3.store.processing_queue" with request_data
+      
+      # Route to quantum processor
+      # Accept both string and object payloads
+      if type_of(request_data) == "string" {
+        emit "generate.text.bytes" with request_data
+      } else {
+        emit "generate.text.bytes" with request_data.prompt
+      }
+
+      # Low-latency fallback to guarantee a response path
+      emit "stream.utf8" with (type_of(request_data) == "string" ? request_data : request_data.prompt)
+    }
+    
+    # Handle stream responses
+    listen for "stream.utf8" {
+      let response_data = ::event.data
+      say "🎯 Stream response"
+      
+      # Normalize payload: always object { text, req_id? }
+      let normalized = (type_of(response_data) == "string") ? { text: response_data } : { text: response_data.text, req_id: response_data.req_id }
+      
+      # Add to response history (normalized)
+      emit "lha3.store.response_history" with normalized
+      
+      # Forward to chat interface
+      emit "azme.chat.response" with normalized
+    }
+    
+    # Handle processing completion
+    listen for "processor.done" {
+      let completion_data = ::event.data
+      say "🎯 Processing completed: " + completion_data
+      
+      # Update active requests
+      set ::active_requests = ::active_requests.push(completion_data)
+    }
+    
+    # Handle errors
+    listen for "chat.error" {
+      let error_data = ::event.data
+      say "❌ Chat error: " + error_data
+      
+      # Emit error response
+      emit "azme.chat.error" with error_data
+    }
+  }
+
+  memory {
+    ::active_requests = []
+    ::processing_queue = []
+    ::response_history = []
+    chat_req_id
+    gen_bytes_id
+    stream_utf8_id
+    chat_resp_id
+  }
+}
+
+# Link to quantum processor
+link ::nlp.quantum_byte_processor
+
+# Initialize orchestrator
+say "🎯 NLP Orchestrator Ready"

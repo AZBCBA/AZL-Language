@@ -1,0 +1,18 @@
+############################################
+# azl/orchestrator/dataset_table.azl
+############################################
+component ::tbl.datasets {
+  init {
+    set ::count = 3
+    set ::d.0 = "wikitext"
+    set ::d.1 = "openwebtext"
+    set ::d.2 = "pile"
+  }
+
+  listen for "get_dataset" {          # $1 = index
+    branch when $1 == 0 { emit "dataset_out" with ::d.0 }
+    branch when $1 == 1 { emit "dataset_out" with ::d.1 }
+    branch when $1 == 2 { emit "dataset_out" with ::d.2 }
+    branch default       { emit "no_more_datasets" }
+  }
+}

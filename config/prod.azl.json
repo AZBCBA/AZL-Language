@@ -1,0 +1,60 @@
+{
+  "mode": "production",
+  "orchestrator": { 
+    "concurrency": { 
+      "min": 2, 
+      "max": 32 
+    } 
+  },
+  "workers": {
+    "isolation": "process",
+    "limits": { 
+      "cpu_percent": 85, 
+      "rss_mb": 2048 
+    }
+  },
+  "cache": {
+    "type": "content_addressed",
+    "path": ".azl/cache",
+    "eviction": { 
+      "strategy": "lru", 
+      "target_gb": 50 
+    }
+  },
+  "watch": { 
+    "enabled": true, 
+    "debounce_ms": 120 
+  },
+  "analytics": { 
+    "enabled": true, 
+    "export": { 
+      "interval_s": 10, 
+      "path": ".azl/metrics.ndjson" 
+    } 
+  },
+  "api": {
+    "bind": "0.0.0.0:8080",
+    "auth": { 
+      "type": "token", 
+      "env": "AZL_API_TOKEN" 
+    },
+    "cors": { 
+      "allowed_origins": [] 
+    }
+  },
+  "logging": { 
+    "level": "info", 
+    "format": "json" 
+  },
+  "build": {
+    "backend": "bytecode",
+    "workers": 8,
+    "incremental": true,
+    "targets": {
+      "daemon": "azl/build/build_daemon_enterprise.azl",
+      "orchestrator": "azl/build/build_orchestrator.azl",
+      "worker_pool": "azl/build/worker_pool.azl",
+      "cache_manager": "azl/build/cache_manager.azl"
+    }
+  }
+}

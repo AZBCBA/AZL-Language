@@ -1,0 +1,207 @@
+# PURE AZL BUILD SCRIPT - THE ULTIMATE INDEPENDENCE!
+# THIS SCRIPT BUILDS THE ENTIRE AZL SYSTEM FROM PURE AZL SOURCE
+# NO MAKEFILES! NO CMAKE! NO EXTERNAL BUILD TOOLS!
+# PURE AZL BUILDING ITSELF!
+
+component ::azl.build_system {
+  init {
+    say "🔥🔥🔥 PURE AZL BUILD SYSTEM 🔥🔥🔥"
+    say "🚀 BUILDING AZL FROM PURE AZL SOURCE!"
+    say "⚡ NO EXTERNAL BUILD TOOLS NEEDED!"
+    say "🎯 ACHIEVING COMPLETE BUILD INDEPENDENCE!"
+    
+    # Load centralized build configuration
+    set ::cfg = import("azl/build/config/build_config_manager.azl")
+    set ::config = ::cfg.get_config()
+
+    set ::build_target = "azl"
+    set ::build_mode = ::config.build_mode
+    set ::target_arch = ::config.target_arch
+    set ::target_os = ::config.target_os
+    
+    say "✅ Pure AZL build system ready!"
+    emit build_system.ready with "ready_for_pure_build"
+  }
+
+  behavior {
+    # MAIN BUILD PROCESS
+    listen for "build" then {
+      say "🚀 STARTING PURE AZL BUILD PROCESS"
+      say "🎯 Building: $::build_target"
+      say "🖥️  Target: $::target_arch-$::target_os"
+      say "🔧 Mode: $::build_mode (O$::config.optimization_level, debug_symbols=$::config.debug_symbols, strip=$::config.strip_symbols)"
+      
+      # Step 1: Initialize build environment
+      initialize_build_environment()
+      
+      # Step 2: Load the build orchestrator and run project build
+      say "📦 Loading AZL Build Orchestrator..."
+      set orchestrator = import("azl/build/build_orchestrator.azl")
+      
+      say "🚀 Running orchestrator with azl.build.json"
+      orchestrator.build_project("azl.build.json")
+      
+      # Step 3: Wait for orchestrator completion and report
+      listen for "build.complete" then {
+        if (::event.data.success) {
+          say "✅ Orchestrator build completed successfully"
+        } else {
+          say "❌ Orchestrator build failed"
+        }
+        emit build.complete with ::event.data
+      }
+    }
+
+    # CLEAN BUILD ARTIFACTS
+    listen for "clean" then {
+      say "🧹 Cleaning build artifacts..."
+      
+      # Remove temporary files
+      emit syscall with {
+        type: "remove_files",
+        args: {
+          pattern: "*.o",
+          recursive: true
+        }
+      }
+      
+      say "✅ Build artifacts cleaned!"
+      emit clean.complete with "build_artifacts_removed"
+    }
+
+    # INSTALL THE NATIVE EXECUTABLE
+    listen for "install" then {
+      set install_path = ::event.data.path || "/usr/local/bin"
+      say "📦 Installing AZL to: $install_path"
+      
+      emit syscall with {
+        type: "copy_file",
+        args: {
+          source: ::build_target,
+          destination: "$install_path/$::build_target",
+          mode: "0755"
+        }
+      }
+      
+      say "✅ AZL installed to: $install_path/$::build_target"
+      say "🚀 AZL is now available system-wide!"
+      emit install.complete with { path: "$install_path/$::build_target" }
+    }
+  }
+
+  # Initialize the build environment
+  fn initialize_build_environment() {
+    say "🔧 Initializing pure AZL build environment..."
+    
+    # Create build directories
+    emit syscall with {
+      type: "create_directory",
+      args: { path: "build" }
+    }
+    
+    emit syscall with {
+      type: "create_directory", 
+      args: { path: "build/objects" }
+    }
+    
+    say "✅ Build environment initialized!"
+  }
+
+  # Test the native executable
+  fn test_native_executable(executable_path) {
+    say "🧪 Testing native AZL executable..."
+    
+    # Test basic functionality
+    emit syscall with {
+      type: "exec",
+      args: {
+        command: "./$executable_path",
+        args: ["version"]
+      }
+    }
+    
+    listen for "syscall.response" then {
+      if (::event.data.exit_code == 0) {
+        say "✅ Native executable test PASSED!"
+        say "🔥 AZL is fully functional and independent!"
+      } else {
+        say "❌ Native executable test FAILED!"
+        say "🚨 Build verification failed!"
+      }
+    }
+  }
+
+  # MAIN BUILD ENTRY POINTS
+  export fn build() {
+    say "🚀 Starting pure AZL build..."
+    emit build with "start_pure_build"
+  }
+
+  export fn clean() {
+    say "🧹 Cleaning build..."
+    emit clean with "start_clean"
+  }
+
+  export fn install(path) {
+    say "📦 Installing AZL..."
+    emit install with { path: path }
+  }
+
+  export fn help() {
+    say "🔥 PURE AZL BUILD SYSTEM HELP 🔥"
+    say ""
+    say "Commands:"
+    say "  build()             - Build AZL from pure AZL source (config: azl.build.json)"
+    say "  build_watch()       - Watch and rebuild on changes (config: azl.build.json)"
+    say "  build_native()      - Build native bundle (config: azl.native.json)"
+    say "  clean()   - Clean build artifacts" 
+    say "  install() - Install AZL system-wide"
+    say "  help()    - Show this help"
+    say ""
+    say "🚀 ACHIEVING COMPLETE LANGUAGE INDEPENDENCE!"
+    say "⚡ NO EXTERNAL BUILD TOOLS NEEDED!"
+  }
+}
+
+# MAIN EXECUTION - BUILD AZL WHEN THIS SCRIPT IS RUN
+component ::main {
+  init {
+    say "🔥🔥🔥 BUILDING AZL WITH PURE AZL! 🔥🔥🔥"
+    
+    set build_system = import("build_azl.azl")
+    build_system.build()
+    
+    listen for "build.complete" then {
+      say "🎉🎉🎉 PURE AZL BUILD SUCCESS! 🎉🎉🎉"
+      say "🔥 COMPLETE LANGUAGE INDEPENDENCE ACHIEVED!"
+      say "⚡ AZL IS NOW FULLY SELF-SUFFICIENT!"
+    }
+  }
+}
+
+# Expose native build entry for long-term distributions
+component ::azl.build_system.native_entry {
+  init {}
+  behavior {}
+  export fn build_native() {
+    set orchestrator = import("azl/build/build_orchestrator.azl")
+    orchestrator.build_project("azl.native.json")
+  }
+}
+
+# Watch-and-build entry for long-term development workflows
+component ::azl.build_system.watch_entry {
+  init {}
+  behavior {}
+  export fn build_watch() {
+    say "👀 Starting watch build (azl.build.json)"
+    set orchestrator = import("azl/build/build_orchestrator.azl")
+    set cfgp = import("azl/build/config_parser.azl")
+    set res = cfgp.load("azl.build.json")
+    if !res.ok { say "❌ Failed to load azl.build.json"; return }
+    set cfg = cfgp.get()
+    set files = cfg.files || []
+    set options = cfg.options || {}
+    orchestrator.watch_files(files, options)
+  }
+}

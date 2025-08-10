@@ -1,7 +1,0 @@
-// Simple test to debug jump issue
-let i = 0;
-while (i < 2) {
-    say i;
-    i = i + 1;
-}
-say "Loop completed!"; 

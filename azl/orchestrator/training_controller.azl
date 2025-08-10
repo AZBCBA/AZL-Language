@@ -1,0 +1,82 @@
+############################################
+# azl/orchestrator/training_controller.azl
+############################################
+component ::orchestrator.training_controller {
+
+  init {
+    say "🚀 Training Controller Initialized"
+    
+    # Global configuration
+    set ::cfg.total_epochs = 3
+    set ::cfg.dataset_list = ["wikitext", "openwebtext", "pile"]
+    set ::cfg.checkpoint_every = 50
+    
+    # Global state
+    set ::state.current_dataset_idx = 0
+    set ::state.current_dataset_name = ::cfg.dataset_list[0]
+    set ::state.epoch = 0
+    set ::state.step = 0
+    
+    # Metrics storage
+    set ::metrics.steps = []
+    set ::metrics.loss = []
+    set ::metrics.log_file = "logs/loss.tsv"
+    
+    # Create logs directory
+    emit "create_directory" to ::ffi.fs with "logs"
+    emit "create_directory" to ::ffi.fs with "weights"
+    
+    say "📊 Metrics will be logged to: "
+    say ::metrics.log_file
+  }
+
+  listen for "training_metric" {
+    let step = $1.step
+    let loss = $1.loss
+    
+    # Store metrics
+    push ::metrics.steps step
+    push ::metrics.loss loss
+    
+    # Append to TSV file for TensorBoard
+    set ::log_line = step + "\t" + loss + "\n"
+    emit "append_file" to ::ffi.fs with ::metrics.log_file ::log_line
+    
+    # Every 50 steps, trigger loss curve plotting
+    if (step % 50) == 0 {
+      emit "plot_loss" with step
+    }
+    
+    say "📉 Step "
+    say step
+    say " Loss: "
+    say loss
+  }
+
+  listen for "epoch_done" {
+    set ::state.epoch = ::state.epoch + 1
+    
+    # Save checkpoint every 50 epochs
+    if (::state.epoch % ::cfg.checkpoint_every) == 0 {
+      set ::ckpt_path = "weights/ckpt_" + ::state.current_dataset_name + "_" + ::state.epoch + ".pt"
+      emit "save_weights" to ::ffi.torch with "gpt_mini" ::ckpt_path
+      say "💾 Checkpoint saved: "
+      say ::ckpt_path
+    }
+    
+    say "✅ Epoch "
+    say ::state.epoch
+    say " completed"
+  }
+
+  listen for "training_complete" {
+    say "🎉 Training completed!"
+    say "📊 Final metrics:"
+    say "  Total steps: "
+    say ::state.step
+    say "  Total epochs: "
+    say ::state.epoch
+    say "  Final loss: "
+    say ::metrics.loss[-1]
+  }
+}

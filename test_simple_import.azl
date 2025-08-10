@@ -1,7 +1,0 @@
-say "🧪 Testing Simple Import";
-
-import "modules/math" as math;
-
-say "Math module imported successfully!";
-say "PI constant:";
-say math::PI; 

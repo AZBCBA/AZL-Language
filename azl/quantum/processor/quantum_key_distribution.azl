@@ -38,7 +38,7 @@ component ::quantum.key_distribution {
   }
 
   behavior {
-    on quantum.key_distribution.register {
+    listen for "quantum.key_distribution.register" { 
       set ::registration_info = $1
       say "🔄 Quantum key distribution subsystem registering with core"
       
@@ -50,7 +50,7 @@ component ::quantum.key_distribution {
       }
     }
 
-    on quantum.key_distribution.execute {
+    listen for "quantum.key_distribution.execute" { 
       set ::qkd_request = $1
       say "🔑 Executing quantum key distribution protocol (BB84)"
       
@@ -61,7 +61,7 @@ component ::quantum.key_distribution {
       }
     }
 
-    on quantum.key_distribution.prepare_qubits {
+    listen for "quantum.key_distribution.prepare_qubits" { 
       set ::preparation_info = $1
       say "🎲 Alice preparing quantum states for transmission"
       
@@ -78,7 +78,7 @@ component ::quantum.key_distribution {
       }
     }
 
-    on quantum.key_distribution.transmit_qubits {
+    listen for "quantum.key_distribution.transmit_qubits" { 
       set ::transmission_info = $1
       say "📡 Quantum states transmitted through quantum channel"
       
@@ -97,7 +97,7 @@ component ::quantum.key_distribution {
       }
     }
 
-    on quantum.key_distribution.classical_exchange {
+    listen for "quantum.key_distribution.classical_exchange" { 
       set ::exchange_info = $1
       say "📢 Classical exchange of basis information"
       
@@ -121,7 +121,7 @@ component ::quantum.key_distribution {
       }
     }
 
-    on quantum.key_distribution.privacy_amplification {
+    listen for "quantum.key_distribution.privacy_amplification" { 
       set ::amplification_info = $1
       say "🔒 Performing privacy amplification"
       
@@ -148,7 +148,7 @@ component ::quantum.key_distribution {
       }
     }
 
-    on quantum.key_distribution.verify_security {
+    listen for "quantum.key_distribution.verify_security" { 
       set ::security_info = $1
       say "🔐 Verifying quantum key security"
       
@@ -172,7 +172,7 @@ component ::quantum.key_distribution {
       }
     }
 
-    on quantum.key_distribution.complete {
+    listen for "quantum.key_distribution.complete" { 
       set ::completion_info = $1
       say "✅ Quantum key distribution completed!"
       say "🔑 Key length: " + ::completion_info.key_length + " bits"
@@ -188,7 +188,7 @@ component ::quantum.key_distribution {
     }
 
     # BB84 protocol implementation
-    on quantum.key_distribution.bb84 {
+    listen for "quantum.key_distribution.bb84" { 
       set ::bb84_request = $1
       say "🔑 Executing BB84 protocol"
       
@@ -199,7 +199,7 @@ component ::quantum.key_distribution {
     }
 
     # B92 protocol implementation
-    on quantum.key_distribution.b92 {
+    listen for "quantum.key_distribution.b92" { 
       set ::b92_request = $1
       say "🔑 Executing B92 protocol"
       
@@ -210,7 +210,7 @@ component ::quantum.key_distribution {
     }
 
     # E91 protocol implementation
-    on quantum.key_distribution.e91 {
+    listen for "quantum.key_distribution.e91" { 
       set ::e91_request = $1
       say "🔑 Executing E91 protocol (entanglement-based)"
       
@@ -221,7 +221,7 @@ component ::quantum.key_distribution {
     }
 
     # Continuous variable QKD
-    on quantum.key_distribution.continuous_variable {
+    listen for "quantum.key_distribution.continuous_variable" { 
       set ::cv_request = $1
       say "🔑 Executing continuous variable QKD"
       
@@ -232,7 +232,7 @@ component ::quantum.key_distribution {
     }
 
     # Key rate measurement
-    on quantum.key_distribution.measure_key_rate {
+    listen for "quantum.key_distribution.measure_key_rate" { 
       set ::key_rate_request = $1
       say "📈 Measuring key generation rate"
       
@@ -244,7 +244,7 @@ component ::quantum.key_distribution {
     }
 
     # QBER measurement
-    on quantum.key_distribution.measure_qber {
+    listen for "quantum.key_distribution.measure_qber" { 
       set ::qber_request = $1
       say "📊 Measuring quantum bit error rate"
       
@@ -256,7 +256,7 @@ component ::quantum.key_distribution {
     }
 
     # Protocol status
-    on quantum.key_distribution.get_status {
+    listen for "quantum.key_distribution.get_status" { 
       set ::status_request = $1
       
       emit quantum.key_distribution.status_ready with {

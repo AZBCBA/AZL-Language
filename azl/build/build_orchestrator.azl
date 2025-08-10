@@ -1,0 +1,754 @@
+# AZL Build Orchestrator
+# Incremental + Parallel compilation with progress + error recovery (pure AZL)
+
+component ::build.orchestrator {
+  init {
+    set ::status = "idle"
+    set ::worker_count = (::internal.env("AZL_BUILD_WORKERS") || 4)
+    set ::backend = (::internal.env("AZL_BUILD_BACKEND") || "bytecode")  # "bytecode" | "native"
+    set ::output_dir = (::internal.env("AZL_BUILD_OUT") || "build/out")
+    set ::use_isolated_workers = (::internal.env("AZL_BUILD_ISOLATED") != "false")  # Default to true
+
+    set ::file_cache = {}         # path -> { hash, last_build_tick, backend, success, output }
+    set ::dependency_graph = {}   # path -> [ deps ]
+    set ::job_queue = []          # array of paths pending
+    set ::inflight_jobs = {}      # path -> true
+    set ::job_meta = {}           # path -> { source, hash }
+
+    set ::total_jobs = 0
+    set ::completed_jobs = 0
+    set ::failed_jobs = 0
+    set ::skipped_jobs = 0
+    set ::start_tick = 0
+    set ::last_files = []
+    set ::last_options = {}
+    set ::built_paths = []
+    set ::manifest_written = false
+
+    link ::azl.compiler
+    link ::azl.native_compiler
+    link ::azl.stdlib
+    link ::azl.system_interface
+    link ::error.system
+    link ::azl.build.config
+    # Build subsystems
+    link ::build.dep_graph
+    link ::build.cache_manager
+    link ::build.linker
+    link ::build.progress_monitor
+    link ::build.config_parser
+    link ::build.fs_monitor
+    link ::build.pkg_manager
+    link ::build.worker_pool
+
+    say "🛠️ AZL Build Orchestrator ready"
+    emit build.orchestrator.ready with "ready"
+  }
+
+  behavior {
+    # Entry: build project from explicit file entries
+    # data: { files: [ { path, source } ], options?: { backend, workers, incremental } }
+    listen for "build.start" then {
+      set ::status = "building"
+      set ::completed_jobs = 0
+      set ::failed_jobs = 0
+      set ::skipped_jobs = 0
+      set ::start_tick = ::azl.stdlib.time_now([])
+      set ::backend = (::event.data.options && ::event.data.options.backend) || ::backend
+      set ::worker_count = (::event.data.options && ::event.data.options.workers) || ::worker_count
+      set ::incremental_enabled = ((::event.data.options && ::event.data.options.incremental) != null) ? ::event.data.options.incremental : true
+      # Merge compile options (arch/os/opt/debug/strip) into central config for this run
+      if ::event.data.options { ::azl.build.config.merge(::event.data.options) }
+
+      set ::job_queue = []
+      set ::inflight_jobs = {}
+      set ::job_meta = {}
+      set ::last_files = ::event.data.files || []
+      set ::last_options = ::event.data.options || {}
+      set ::built_paths = []
+      set ::manifest_written = false
+
+      # Ingest inputs, compute hashes, build dep graph, decide work set
+      set input_files = ::event.data.files || []
+      if input_files.length == 0 {
+        emit log_error with { type: "build", message: "No input files provided to build.start", context: { stage: "ingest" } }
+        say "❌ build: no input files"
+        emit build.complete with { success: false, completed: 0, failed: 0, skipped: 0 }
+        return
+      }
+
+      # Prepare jobs (collect content + build dependency graph)
+      set prepped = []
+      for f in input_files {
+        set p = f.path
+        # Prefer host file contents if not provided explicitly
+        set src = f.source || (::azl.system_interface.read_file_host_sync(p) || ::azl.system_interface.read_file_sync(p) || "")
+        set h = ::hash_fnv1a32(src)
+        set ::job_meta[p] = { source: src, hash: h }
+        set prepped.push({ path: p, source: src })
+      }
+
+      # Use dedicated dependency graph builder
+      set dg = ::build.dep_graph.build(prepped)
+      if !dg.ok {
+        emit log_error with { type: "build", message: ("Dependency graph failed: " + (dg.error || "unknown")), context: { stage: "dep_graph", node: dg.node } }
+        say "❌ build: dependency graph failed"
+        emit build.complete with { success: false, completed: 0, failed: 0, skipped: 0 }
+        return
+      }
+      set ::dependency_graph = dg.graph
+
+      # Select workset honoring persistent cache and toolchain fingerprint
+      set order = dg.order || []
+      set ::job_queue = []
+      set i_q = 0
+      while i_q < order.length {
+        set pth = order[i_q]
+        set meta = ::job_meta[pth]
+        set prev = ::build.cache_manager.get(pth)
+        set fp = ::toolchain_fingerprint()
+        if ::incremental_enabled && prev && prev.hash == meta.hash && prev.backend == ::backend && prev.fingerprint == fp {
+          set ::skipped_jobs = ::skipped_jobs + 1
+        } else {
+          set ::job_queue.push(pth)
+        }
+        set i_q = i_q + 1
+      }
+
+      # Expand to include dependents of changed nodes
+      set workset = ::compute_rebuild_closure(::job_queue)
+      set ::job_queue = workset
+      # Initialize dependency-aware scheduler
+      ::init_scheduler(::job_queue)
+      set ::total_jobs = ::ready_total_jobs
+      if ::total_jobs == 0 {
+        ::report_progress()
+        say "✅ Up to date. Skipped ::skipped_jobs files"
+        set ::status = "idle"
+        emit build.complete with { success: true, completed: 0, failed: 0, skipped: ::skipped_jobs }
+        return
+      }
+
+      say "🚀 Build started: ::total_jobs tasks, workers=::worker_count, backend=::backend, isolated=::use_isolated_workers"
+      ::report_progress()
+
+      # Initialize worker pool if using isolated workers
+      if ::use_isolated_workers {
+        ::build.worker_pool.initialize()
+        # Start monitoring loop for worker completions
+        ::start_worker_monitoring()
+      }
+
+      # Dispatch up to worker_count initial jobs from the ready queue
+      set slots = ::worker_count
+      while slots > 0 {
+        if ::ready_queue.length == 0 { break }
+        set p2 = ::ready_queue.shift()
+        ::dispatch_compile_job(p2)
+        set slots = slots - 1
+      }
+    }
+
+    # Rebuild on file changes (from fs_monitor)
+    listen for "fs.changed" then {
+      if ::last_files.length == 0 { return }
+      set changed_path = ::event.data.path
+      say ("🔄 Change detected: " + changed_path + ", rebuilding…")
+      # Refresh sources
+      set refreshed = []
+      set i = 0
+      while i < ::last_files.length {
+        set rec = ::last_files[i]
+        set p = (typeof(rec) == "Object") ? rec.path : rec
+        set s = (typeof(rec) == "Object" && rec.source != null) ? rec.source : ( ::azl.system_interface.read_file_host_sync(p) || ::azl.system_interface.read_file_sync(p) || "" )
+        set refreshed.push({ path: p, source: s })
+        set i = i + 1
+      }
+      emit build.start with { files: refreshed, options: ::last_options }
+    }
+
+    # Periodic worker pool monitoring (when using isolated workers)
+    listen for "build.monitor_workers" then {
+      if ::use_isolated_workers && ::status == "building" {
+        ::build.worker_pool.check_completions()
+        ::build.worker_pool.monitor_resources()
+      }
+    }
+
+    # Handle bytecode compilation completion
+    listen for "compilation_complete" then {
+      set comp_name = ::event.data.component_name
+      if !::inflight_jobs[comp_name] { return }  # not ours
+
+      set bytecode = ::event.data.bytecode
+      set errors = ::event.data.errors || []
+      set warnings = ::event.data.warnings || []
+
+      if errors.length > 0 {
+        set ::failed_jobs = ::failed_jobs + 1
+        emit log_error with { type: "compile_error", message: ("Compilation failed for " + comp_name), context: { backend: "bytecode", errors: errors } }
+        set ::file_cache[comp_name] = {
+          hash: ::job_meta[comp_name].hash,
+          backend: ::backend,
+          success: false,
+          last_build_tick: ::azl.stdlib.time_now([]),
+          output: null,
+          warnings: warnings,
+          errors: errors,
+          fingerprint: ::toolchain_fingerprint()
+        }
+        ::build.cache_manager.set(comp_name, ::file_cache[comp_name])
+      } else {
+        set out_rec = {
+          hash: ::job_meta[comp_name].hash,
+          backend: ::backend,
+          success: true,
+          last_build_tick: ::azl.stdlib.time_now([]),
+          output: { kind: "bytecode", size: bytecode.length },
+          warnings: warnings,
+          fingerprint: ::toolchain_fingerprint()
+        }
+        set ::file_cache[comp_name] = out_rec
+        ::build.cache_manager.set(comp_name, out_rec)
+        set ::completed_jobs = ::completed_jobs + 1
+        # Write artifact for visibility
+        ::write_bytecode_artifact(comp_name, bytecode)
+        # Track built path
+        if !::contains(::built_paths, comp_name) { set ::built_paths.push(comp_name) }
+      }
+
+      delete ::inflight_jobs[comp_name]
+      ::on_job_finished(comp_name, errors.length == 0)
+      ::report_progress()
+      ::maybe_dispatch_next()
+      ::maybe_finish_build()
+    }
+
+    # Handle native compilation completion
+    listen for "native_compilation.complete" then {
+      set out_file = ::event.data.output_file
+      set err = ::event.data.error
+      set matched_path = ::match_path_by_output(out_file)
+      if !matched_path { return }
+
+      if err {
+        set ::failed_jobs = ::failed_jobs + 1
+        emit log_error with { type: "compile_error", message: ("Native compilation failed for " + matched_path), context: { backend: "native", error: err, output_file: out_file } }
+        set ::file_cache[matched_path] = {
+          hash: ::job_meta[matched_path].hash,
+          backend: ::backend,
+          success: false,
+          last_build_tick: ::azl.stdlib.time_now([]),
+          output: null,
+          errors: [err],
+          fingerprint: ::toolchain_fingerprint()
+        }
+        ::build.cache_manager.set(matched_path, ::file_cache[matched_path])
+      } else {
+        set ::file_cache[matched_path] = {
+          hash: ::job_meta[matched_path].hash,
+          backend: ::backend,
+          success: true,
+          last_build_tick: ::azl.stdlib.time_now([]),
+          output: { kind: "native", file: out_file, size: ::event.data.size },
+          fingerprint: ::toolchain_fingerprint()
+        }
+        ::build.cache_manager.set(matched_path, ::file_cache[matched_path])
+        set ::completed_jobs = ::completed_jobs + 1
+        if !::contains(::built_paths, matched_path) { set ::built_paths.push(matched_path) }
+      }
+
+      delete ::inflight_jobs[matched_path]
+      ::on_job_finished(matched_path, !err)
+      ::report_progress()
+      ::maybe_dispatch_next()
+      ::maybe_finish_build()
+    }
+
+    # Handle worker pool job completion
+    listen for "worker.job.complete" then {
+      set job_data = ::event.data
+      set path = job_data.path
+      
+      if !::inflight_jobs[path] { return }  # not ours
+      
+      if job_data.success {
+        set ::completed_jobs = ::completed_jobs + 1
+        set out_rec = {
+          hash: ::job_meta[path].hash,
+          backend: ::backend,
+          success: true,
+          last_build_tick: ::azl.stdlib.time_now([]),
+          output: job_data.output,
+          fingerprint: ::toolchain_fingerprint()
+        }
+        set ::file_cache[path] = out_rec
+        ::build.cache_manager.set(path, out_rec)
+        
+        # Write artifact if needed
+        if job_data.output.kind == "bytecode" {
+          ::write_bytecode_artifact(path, job_data.output.data || [])
+        }
+        
+        if !::contains(::built_paths, path) { set ::built_paths.push(path) }
+        say ("✅ Worker completed: " + path + " in " + job_data.duration + "ms")
+      } else {
+        set ::failed_jobs = ::failed_jobs + 1
+        emit log_error with { type: "compile_error", message: ("Worker compilation failed for " + path), context: { backend: ::backend, error: job_data.error, duration: job_data.duration } }
+        set ::file_cache[path] = {
+          hash: ::job_meta[path].hash,
+          backend: ::backend,
+          success: false,
+          last_build_tick: ::azl.stdlib.time_now([]),
+          output: null,
+          errors: [job_data.error],
+          fingerprint: ::toolchain_fingerprint()
+        }
+        ::build.cache_manager.set(path, ::file_cache[path])
+        say ("❌ Worker failed: " + path + " - " + job_data.error)
+      }
+      
+      delete ::inflight_jobs[path]
+      ::on_job_finished(path, job_data.success)
+      ::report_progress()
+      ::maybe_dispatch_next()
+      ::maybe_finish_build()
+    }
+  }
+
+  memory {
+    # Dependency-aware scheduler state
+    ready_queue: [],
+    ready_total_jobs: 0,
+    dep_indegree: {},
+    dep_out_edges: {},
+    finished_ok: {},
+    finished_any: {},
+
+    ::init_scheduler = (workset) => {
+      # Build a subgraph restricted to workset
+      set in_ws = {}
+      for i0 = 0; i0 < workset.length; i0 = i0 + 1 { set in_ws[workset[i0]] = true }
+      set ::dep_indegree = {}
+      set ::dep_out_edges = {}
+      set ::finished_ok = {}
+      set ::finished_any = {}
+      set ::ready_queue = []
+      set ::ready_total_jobs = 0
+
+      # Initialize nodes
+      for n in ::dependency_graph {
+        if in_ws[n] {
+          set ::dep_indegree[n] = 0
+          set ::dep_out_edges[n] = []
+          set ::ready_total_jobs = ::ready_total_jobs + 1
+        }
+      }
+      # Edges (dep -> user)
+      for owner in ::dependency_graph {
+        if !in_ws[owner] { continue }
+        set deps = ::dependency_graph[owner] || []
+        for d in deps {
+          if in_ws[d] {
+            set ::dep_indegree[owner] = (::dep_indegree[owner] || 0) + 1
+            set ::dep_out_edges[d] = (::dep_out_edges[d] || [])
+            set ::dep_out_edges[d].push(owner)
+          }
+        }
+      }
+      # Seed ready queue with nodes having indegree 0
+      for k in ::dep_indegree { if ::dep_indegree[k] == 0 { set ::ready_queue.push(k) } }
+    }
+
+    ::on_job_finished = (path, ok) => {
+      set ::finished_any[path] = true
+      if ok { set ::finished_ok[path] = true }
+      # Reduce indegree of dependents and enqueue those now ready
+      set outs = ::dep_out_edges[path] || []
+      for i1 = 0; i1 < outs.length; i1 = i1 + 1 {
+        set v = outs[i1]
+        # If a dependency failed, keep tracking but still allow scheduling to propagate errors via compile-time
+        set ::dep_indegree[v] = (::dep_indegree[v] || 0) - 1
+        if ::dep_indegree[v] <= 0 {
+          # Only enqueue once and only if still in the current cycle
+          if !::finished_any[v] {
+            set ::ready_queue.push(v)
+          }
+        }
+      }
+    }
+    # Dispatch one compile job for path
+    ::dispatch_compile_job = (path) => {
+      if ::inflight_jobs[path] { return }
+      set ::inflight_jobs[path] = true
+
+      set meta = ::job_meta[path]
+      set src = meta.source
+      set sanitized = ::sanitize_path_for_name(path)
+
+      if ::use_isolated_workers {
+        # Use isolated worker pool
+        set cfg = ::azl.build.config.get_config()
+        set job_options = {
+          target_arch: cfg.target_arch,
+          target_os: cfg.target_os,
+          debug_symbols: cfg.debug_symbols,
+          optimization_level: cfg.optimization_level,
+          strip_symbols: cfg.strip_symbols
+        }
+        
+        say ("🔧 [isolated] Dispatching: " + path + " to worker pool")
+        ::build.worker_pool.submit_job(path, src, ::backend, job_options)
+      } else {
+        # Use in-process compilation (legacy mode)
+        if ::backend == "native" {
+          set out_file = ::derive_output_path(path, ".bin")
+          say "🔧 [native] Compiling: " + path
+          set cfg = ::azl.build.config.get_config()
+          emit compile_native with {
+            source_code: src,
+            output_file: out_file,
+            target_arch: cfg.target_arch,
+            target_os: cfg.target_os,
+            debug_symbols: cfg.debug_symbols,
+            optimization_level: cfg.optimization_level,
+            strip_symbols: cfg.strip_symbols
+          }
+        } else {
+          say "🔧 [bytecode] Compiling: " + path
+          set cfg2 = ::azl.build.config.get_config()
+          emit compile with { source_code: src, component_name: path, optimization_level: cfg2.optimization_level }
+        }
+      }
+    }
+
+    # When a slot is free, dispatch the next queued job
+    ::maybe_dispatch_next = () => {
+      # Count inflight
+      set inflight = 0
+      for k in ::inflight_jobs { if ::inflight_jobs[k] { set inflight = inflight + 1 } }
+      if inflight >= ::worker_count { return }
+      if ::ready_queue.length == 0 { return }
+
+      set p = ::ready_queue.shift()
+      ::dispatch_compile_job(p)
+    }
+
+    # Finish build if all done
+    ::maybe_finish_build = () => {
+      set inflight2 = 0
+      for k in ::inflight_jobs { if ::inflight_jobs[k] { set inflight2 = inflight2 + 1 } }
+      if inflight2 == 0 && ::job_queue.length == 0 {
+        set elapsed = ::azl.stdlib.time_diff([::start_tick, ::azl.stdlib.time_now([])])
+        say "🎉 Build complete in ::elapsed ticks. ✅ ::completed_jobs, ❌ ::failed_jobs, ⏭️ ::skipped_jobs"
+        set success_all = (::failed_jobs == 0)
+        set ::status = "idle"
+        
+        # Clean up worker pool if using isolated workers
+        if ::use_isolated_workers {
+          ::stop_worker_monitoring()
+          say "🏭 Worker pool monitoring stopped"
+        }
+        
+        # Write a manifest once per build
+        ::write_build_manifest()
+        emit build.complete with {
+          success: success_all,
+          completed: ::completed_jobs,
+          failed: ::failed_jobs,
+          skipped: ::skipped_jobs,
+          backend: ::backend
+        }
+      }
+    }
+
+    # Progress report
+    ::report_progress = () => {
+      set done = ::completed_jobs + ::failed_jobs
+      set total_considered = ::total_jobs + ::skipped_jobs
+      set denom = (::total_jobs == 0) ? 1 : ::total_jobs
+      set pct = (done * 100) / denom
+      say ("📊 Progress: " + done + "/" + ::total_jobs + " (" + pct + "%) | ok=" + ::completed_jobs + ", fail=" + ::failed_jobs + ", skip=" + ::skipped_jobs)
+      emit build.progress with {
+        completed: ::completed_jobs,
+        failed: ::failed_jobs,
+        skipped: ::skipped_jobs,
+        total: ::total_jobs,
+        percent: pct
+      }
+    }
+
+    # Output mapping helper for native path → owning source path
+    ::match_path_by_output = (output_file) => {
+      # Derive by reverse mapping rule; check inflight entries
+      for p in ::inflight_jobs {
+        if ::inflight_jobs[p] {
+          set candidate = ::derive_output_path(p, ".bin")
+          if candidate == output_file { return p }
+        }
+      }
+      return null
+    }
+
+    # Derive output path within output_dir using sanitized source path
+    ::derive_output_path = (path, ext) => {
+      set name = ::sanitize_path_for_name(path)
+      return ::output_dir + "/" + name + ext
+    }
+
+    # Sanitize a path to a filesystem-safe flat name
+    ::sanitize_path_for_name = (path) => {
+      set out = ""
+      for i = 0; i < path.length; i = i + 1 {
+        set c = path[i]
+        if (c == '/' || c == '\\' || c == ':' || c == ' ' || c == '.') { set out = out + '_' } else { set out = out + c }
+      }
+      return out
+    }
+
+    # Bytecode artifact emit (plaintext for now)
+    ::write_bytecode_artifact = (path, bytecode) => {
+      set out_path = ::derive_output_path(path, ".azbc")
+      set content = ::encode_bytecode_text(bytecode)
+      ::azl.system_interface.write_file_host_sync(out_path, content)
+    }
+
+    ::encode_bytecode_text = (bytecode) => {
+      set out = ""
+      for i = 0; i < bytecode.length; i = i + 1 {
+        set instr = bytecode[i]
+        set line = (instr.opcode || instr.op || instr.type || "?")
+        if instr.operand != null { set line = line + ":" + instr.operand }
+        if instr.value != null { set line = line + ":" + instr.value }
+        if instr.name != null { set line = line + ":" + instr.name }
+        set out = out + line + "\n"
+      }
+      return out
+    }
+
+    # Build manifest
+    ::write_build_manifest = () => {
+      if ::manifest_written { return }
+      set path = ::output_dir + "/manifest.txt"
+      set lines = []
+      set i = 0
+      while i < ::built_paths.length {
+        set p = ::built_paths[i]
+        set rec = ::file_cache[p]
+        if rec != null && rec.success {
+          set out_info = rec.output || {}
+          set line = p + "|" + rec.backend + "|" + (rec.success ? "1" : "0") + "|" + (out_info.kind || "-") + "|" + (out_info.file || ("size=" + (out_info.size || 0))) + "|" + rec.hash + "|" + (rec.fingerprint || 0)
+          set lines.push(line)
+        }
+        set i = i + 1
+      }
+      set content = ::join_lines(lines)
+      emit syscall with { type: "write_file", args: { path: path, content: content } }
+      set ::manifest_written = true
+    }
+
+    ::join_lines = (arr) => {
+      set out = ""
+      for i2 = 0; i2 < arr.length; i2 = i2 + 1 { if i2 > 0 { set out = out + "\n" } ; set out = out + arr[i2] }
+      return out
+    }
+
+    # Extract a simple set of dependencies from source code
+    ::extract_dependencies = (source) => {
+      set deps = []
+      set cur = ""
+      set i = 0
+      while i < source.length {
+        # Detect 'import "..."' or "import ..." pattern
+        if source.substring(i, i+6) == "import" {
+          # advance to first quote or whitespace token
+          set j = i + 6
+          while j < source.length && (source[j] == ' ' || source[j] == '\t') { set j = j + 1 }
+          if j < source.length && (source[j] == '"' || source[j] == '\'') {
+            set q = source[j]
+            set j = j + 1
+            set k = j
+            while k < source.length && source[k] != q { set k = k + 1 }
+            if k < source.length {
+              set dep = source.substring(j, k)
+              set deps.push(dep)
+              set i = k + 1
+              continue
+            }
+          } else {
+            # read bare token until whitespace
+            set k2 = j
+            while k2 < source.length && source[k2] != ' ' && source[k2] != '\n' && source[k2] != '\t' { set k2 = k2 + 1 }
+            if k2 > j { set deps.push(source.substring(j, k2)) }
+            set i = k2 + 1
+            continue
+          }
+        }
+        # Detect 'link ' pattern
+        if source.substring(i, i+4) == "link" {
+          set j3 = i + 4
+          while j3 < source.length && (source[j3] == ' ' || source[j3] == '\t') { set j3 = j3 + 1 }
+          set k3 = j3
+          while k3 < source.length && source[k3] != '\n' && source[k3] != ' ' && source[k3] != '\t' && source[k3] != '{' { set k3 = k3 + 1 }
+          if k3 > j3 { set deps.push(source.substring(j3, k3)) }
+          set i = k3 + 1
+          continue
+        }
+        set i = i + 1
+      }
+      return deps
+    }
+
+    # Compute reverse dependency closure for a set of changed paths
+    ::compute_rebuild_closure = (initial_list) => {
+      # Build reverse map: dep -> [ users ]
+      set rev = {}
+      for owner in ::dependency_graph {
+        set deps = ::dependency_graph[owner] || []
+        for d in deps {
+          if !rev[d] { set rev[d] = [] }
+          set rev[d].push(owner)
+        }
+      }
+
+      # BFS from initial_list to include all dependents
+      set queue = []
+      set seen = {}
+      for p in initial_list { set queue.push(p); set seen[p] = true }
+      set out = []
+      while queue.length > 0 {
+        set n = queue.shift()
+        if !::contains(out, n) { set out.push(n) }
+        # Enqueue direct users of n
+        set users = rev[n] || []
+        for u in users {
+          if !seen[u] {
+            set seen[u] = true
+            set queue.push(u)
+          }
+        }
+      }
+      return out
+    }
+
+    # Contains helper
+    ::contains = (arr, val) => {
+      for i = 0; i < arr.length; i = i + 1 { if arr[i] == val { return true } }
+      return false
+    }
+
+    # FNV-1a 32-bit hash for content-based change detection
+    ::hash_fnv1a32 = (text) => {
+      set hash = 2166136261
+      set i = 0
+      while i < text.length {
+        set code = text[i].charCodeAt(0) & 0xFF
+        set hash = hash ^ code
+        # multiply by 16777619 with overflow in 32-bit space
+        set hash = (hash * 16777619) % 4294967296
+        set i = i + 1
+      }
+      return hash
+    }
+
+    # Toolchain fingerprint for cache keys (backend + cfg)
+    ::toolchain_fingerprint = () => {
+      set cfg = ::azl.build.config.get_config()
+      set s = ::backend + "|" + (cfg.target_arch || "-") + "|" + (cfg.target_os || "-") + "|" + (cfg.optimization_level || 0) + "|" + (cfg.debug_symbols ? 1 : 0) + "|" + (cfg.strip_symbols ? 1 : 0)
+      return ::hash_fnv1a32(s)
+    }
+
+    # Worker monitoring functions
+    ::monitoring_active = false,
+    ::monitoring_interval = 100,  # ms
+
+    ::start_worker_monitoring = () => {
+      if ::monitoring_active { return }
+      set ::monitoring_active = true
+      say "🔍 Starting worker monitoring loop (interval: " + ::monitoring_interval + "ms)"
+      ::schedule_next_monitoring()
+    }
+
+    ::stop_worker_monitoring = () => {
+      set ::monitoring_active = false
+      say "🔍 Stopping worker monitoring loop"
+    }
+
+    ::schedule_next_monitoring = () => {
+      if !::monitoring_active { return }
+      # Schedule next monitoring pulse
+      set timer_id = ::azl.stdlib.set_timeout(::monitoring_interval, () => {
+        if ::monitoring_active {
+          emit build.monitor_workers
+          ::schedule_next_monitoring()
+        }
+      })
+    }
+  }
+
+  interface {
+    # External API
+    export fn build_files(files, options) {
+      emit build.start with { files: files, options: options || {} }
+    }
+
+    export fn clean_cache() {
+      set ::file_cache = {}
+      say "🧹 Build cache cleared"
+    }
+
+    # High-level: Build a project from azl.build.json
+    export fn build_project(config_path) {
+      set loaded = ::build.config_parser.load(config_path || null)
+      if !loaded.ok { emit log_error with { type: "build", message: "config_load_failed", context: { path: config_path } } ; return }
+      set cfg = ::build.config_parser.get()
+      set files = cfg.files || []
+      set prepared = []
+      set i = 0
+      while i < files.length {
+        set p = files[i]
+        set s = ::azl.system_interface.read_file_host_sync(p) || ::azl.system_interface.read_file_sync(p) || ""
+        set prepared.push({ path: p, source: s })
+        set i = i + 1
+      }
+      emit build.start with { files: prepared, options: cfg.options || {} }
+    }
+
+    # Bundle native into a single binary via linker
+    export fn build_bundle(files, options) {
+      set opts = options || {}
+      set out_name = opts.output || ("app.bin")
+      # Turn files into {path,source}
+      set prepared = []
+      set j = 0
+      while j < files.length {
+        set p = files[j]
+        set s2 = ::azl.system_interface.read_file_host_sync(p) || ::azl.system_interface.read_file_sync(p) || ""
+        set prepared.push({ path: p, source: s2 })
+        set j = j + 1
+      }
+      # Compile to objects
+      set objs = []
+      set k = 0
+      while k < prepared.length {
+        set rec = prepared[k]
+        set obj = ::azl.native_compiler.compile_to_object_bytes(rec.source, "x86_64", "linux")
+        if !obj.ok { emit build.complete with { success: false, completed: 0, failed: 1, skipped: 0, backend: "bundle-native", error: obj.error } ; return }
+        set objs.push({ bytes: obj.bytes })
+        set k = k + 1
+      }
+      # Link
+      set linked = ::build.linker.link_objects(objs, 0x1000)
+      if !linked.ok { emit build.complete with { success: false, completed: 0, failed: 1, skipped: 0, backend: "bundle-native", error: linked.error } ; return }
+      set std = import("azl/stdlib/core/azl_stdlib.azl")
+      set ok = std.file_write([out_name, linked.bytes])
+      emit build.complete with { success: ok, completed: prepared.length, failed: ok ? 0 : 1, skipped: 0, backend: "bundle-native", output: out_name }
+    }
+
+    # Output events
+    output event: build.progress
+    output event: build.complete
+  }
+}
+
+

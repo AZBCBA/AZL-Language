@@ -1,0 +1,29 @@
+############################################
+# azl/utils/plot_loss.azl
+############################################
+component ::utils.loss_plotter {
+
+  init {
+    say "📊 Loss Plotter Initialized"
+    set ::plot_output_dir = "mnt/data"
+    set ::plot_script = "python_helpers/plot_loss.py"
+  }
+
+  listen for "plot_loss" {
+    let step = $1
+    
+    say "📈 Generating loss curve for step: "
+    say step
+    
+    # Call Python helper to plot the loss curve
+    emit "execute_python" to ::ffi.python with ::plot_script
+    
+    say "🖼️ Loss curve generated and saved to: "
+    say ::plot_output_dir
+    say "/loss_curve.png"
+  }
+
+  listen for "plot_complete" {
+    say "✅ Loss curve plotting completed!"
+  }
+}

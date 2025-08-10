@@ -1,0 +1,81 @@
+component ::azl.backend.format.platform_writer {
+  init {}
+  behavior {}
+
+  export fn write_exec(platform, arch, entry_vaddr, text_bytes, base_vaddr) {
+    return ::write_exec([[platform, arch, entry_vaddr, text_bytes, base_vaddr]])
+  }
+
+  # Unified platform writer that routes to appropriate format writer
+  # platform: "linux", "windows", "macos"
+  # arch: "x86_64", "arm64"
+  # entry_vaddr: virtual entry address
+  # text_bytes: array of bytes
+  # base_vaddr: virtual load address (optional)
+  # returns { ok: true, bytes } or { ok: false, error }
+  function write_exec(args) {
+    set ::platform = args[0]
+    set ::arch = args[1]
+    set ::entry_vaddr = args[2]
+    set ::text_bytes = args[3] || []
+    set ::base_vaddr = args[4]
+
+    # Route to appropriate writer based on platform and architecture
+    if ::platform == "linux" {
+      if ::arch == "x86_64" {
+        return ::azl.backend.format.elf64_writer.write_exec(::entry_vaddr, ::text_bytes, ::base_vaddr)
+      }
+      if ::arch == "arm64" {
+        return ::azl.backend.format.elf64_arm64_writer.write_exec(::entry_vaddr, ::text_bytes, ::base_vaddr)
+      }
+      return { ok: false, error: "Unsupported Linux architecture: " + ::arch }
+    }
+
+    if ::platform == "windows" {
+      if ::arch == "x86_64" {
+        return ::azl.backend.format.pe64_writer.write_exec(::entry_vaddr, ::text_bytes, ::base_vaddr)
+      }
+      return { ok: false, error: "Unsupported Windows architecture: " + ::arch }
+    }
+
+    if ::platform == "macos" {
+      if ::arch == "x86_64" {
+        # For Mach-O, entry_vaddr is file offset within __TEXT,__text
+        return ::azl.backend.format.macho64_writer.write_exec(::entry_vaddr, ::text_bytes)
+      }
+      if ::arch == "arm64" {
+        # For Mach-O ARM64, entry_vaddr is file offset within __TEXT,__text
+        return ::azl.backend.format.macho64_arm64_writer.write_exec(::entry_vaddr, ::text_bytes)
+      }
+      return { ok: false, error: "Unsupported macOS architecture: " + ::arch }
+    }
+
+    return { ok: false, error: "Unsupported platform: " + ::platform }
+  }
+
+  # Get supported platforms and architectures
+  export fn get_supported_platforms() {
+    return {
+      linux: ["x86_64", "arm64"],
+      windows: ["x86_64"],
+      macos: ["x86_64", "arm64"]
+    }
+  }
+
+  # Validate platform and architecture combination
+  export fn validate_platform(platform, arch) {
+    set ::supported = ::get_supported_platforms()
+    if ::supported[::platform] == null {
+      return { ok: false, error: "Unsupported platform: " + ::platform }
+    }
+    set ::archs = ::supported[::platform]
+    set ::i = 0
+    while ::i < ::archs.length {
+      if ::archs[::i] == ::arch {
+        return { ok: true }
+      }
+      set ::i = ::i + 1
+    }
+    return { ok: false, error: "Unsupported architecture " + ::arch + " for platform " + ::platform }
+  }
+}

@@ -1,0 +1,17 @@
+# Environment Probe - Test env.get syscall functionality
+component ::diag.env_probe {
+  init {
+    say "🔍 Environment Probe starting..."
+    
+    # Test environment variable access
+    set combined_path = ::internal.env("AZL_COMBINED_PATH") || "NOT_SET"
+    set entry_point = ::internal.env("AZL_ENTRY") || "NOT_SET"
+    set api_token = ::internal.env("AZL_API_TOKEN") || "NOT_SET"
+    
+    say "🔍 AZL_COMBINED_PATH: " + combined_path
+    say "🔍 AZL_ENTRY: " + entry_point
+    say "🔍 AZL_API_TOKEN: " + api_token
+    
+    say "✅ Environment probe completed"
+  }
+}

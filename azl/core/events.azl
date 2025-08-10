@@ -1,0 +1,81 @@
+# AZL Core Events - Event system for component communication
+# Provides emit, subscribe, and event routing functionality
+
+component ::core.events {
+  init {
+    say "📡 AZL Core Events initializing..."
+    
+    set ::listeners = {}
+    set ::event_history = []
+    set ::max_history = 1000
+    
+    say "✅ Core Events ready"
+  }
+  
+  behavior {
+    # Handle emit events
+    listen for "emit" then {
+      set event_name = ::event.data.name
+      set event_data = ::event.data.data || {}
+      
+      ::emit_event(event_name, event_data)
+    }
+    
+    # Handle subscribe events
+    listen for "subscribe" then {
+      set event_name = ::event.data.name
+      set callback = ::event.data.callback
+      
+      ::subscribe_to_event(event_name, callback)
+    }
+  }
+  
+  # Emit an event
+  ::emit_event = (event_name, event_data) => {
+    say "📡 Emitting event: " + event_name
+    
+    # Add to history
+    set ::event_history.push({
+      name: event_name,
+      data: event_data,
+      timestamp: ::azl.stdlib.time_now([])
+    })
+    
+    # Trim history if needed
+    if ::event_history.length > ::max_history {
+      set ::event_history = ::event_history.slice(-::max_history)
+    }
+    
+    # Notify listeners
+    if ::listeners[event_name] {
+      for listener in ::listeners[event_name] {
+        emit event.dispatch with {
+          name: event_name,
+          data: event_data,
+          listener: listener
+        }
+      }
+    }
+  }
+  
+  # Subscribe to an event
+  ::subscribe_to_event = (event_name, callback) => {
+    say "📡 Subscribing to event: " + event_name
+    
+    if !::listeners[event_name] {
+      set ::listeners[event_name] = []
+    }
+    
+    set ::listeners[event_name].push(callback)
+  }
+  
+  # Get event history
+  ::get_event_history = () => {
+    return ::event_history
+  }
+  
+  # Get listeners for an event
+  ::get_listeners = (event_name) => {
+    return ::listeners[event_name] || []
+  }
+}

@@ -1,0 +1,31 @@
+# Pure AZL Platform Interface
+component ::sys.platform {
+  # Return platform info or error object
+  function detect(args) {
+    set ::os = ::try_env(["AZL_OS", "OS", "OSTYPE"]) 
+    set ::arch = ::try_env(["AZL_ARCH", "PROCESSOR_ARCHITECTURE", "ARCH"]) 
+    set ::kernel = ::try_env(["KERNEL_NAME"]) 
+    set ::version = ::try_env(["KERNEL_VERSION", "AZL_VERSION"]) 
+
+    if ::os == null or ::arch == null {
+      emit log_error with { type: "platform", message: "platform detection unavailable (env missing)", context: { os: ::os, arch: ::arch } }
+      return { status: "error", code: "platform_unavailable", os: ::os, arch: ::arch }
+    }
+
+    return {
+      status: "ok",
+      os: (::os || "unknown"),
+      arch: (::arch || "unknown"),
+      kernel: (::kernel || "unknown"),
+      version: (::version || "unknown")
+    }
+  }
+
+  function try_env(keys) {
+    for ::k in ::keys {
+      set ::v = ::internal.env(::k)
+      if ::v != null and ::v != "" { return ::v }
+    }
+    return null
+  }
+}

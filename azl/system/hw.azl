@@ -1,0 +1,9 @@
+# Pure AZL Hardware Abstraction (reporting only)
+component ::sys.hw {
+  function info(args) {
+    set ::cpu = ::internal.env("AZL_CPU") || ::internal.env("CPU") || "unknown"
+    set ::mem = ::internal.env("AZL_MEM") || ::internal.env("MEM") || "unknown"
+    set ::gpu = ::internal.env("AZL_GPU") || ::internal.env("GPU") || "none"
+    return { cpu: ::cpu, mem: ::mem, gpu: ::gpu }
+  }
+}

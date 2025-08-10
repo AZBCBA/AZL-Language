@@ -1,0 +1,527 @@
+# AZL Module System - Pure AZL Implementation
+# Handles module loading, dependency resolution, and caching
+
+component ::azl.modules {
+  init {
+    set ::status = "initializing"
+    set ::module_system_version = "1.0"
+    set ::loaded_modules = {}
+    set ::module_cache = {}
+    set ::dependency_graph = {}
+    set ::module_paths = []
+    set ::resolved_dependencies = {}
+    
+    say "📦 AZL Module System initializing..."
+    
+    # Initialize module paths
+    set ::module_paths = [
+      "azl/core/",
+      "azl/runtime/",
+      "azl/stdlib/",
+      "azl/integrations/",
+      "azl/quantum/",
+      "azl/neural/",
+      "azl/consciousness/"
+    ]
+    
+    emit modules.ready with "ready"
+  }
+
+  behavior {
+    # Load module by name
+    listen for "load_module" then {
+      set ::module_name = $1
+      set ::module_path = $2 || ""
+      
+      say "📦 Loading module: ::module_name"
+      
+      # Check if module is already loaded
+      if ::loaded_modules[::module_name] {
+        say "📦 Module already loaded: ::module_name"
+        emit module.loaded with ::module_name
+        return
+      }
+      
+      # Resolve module path
+      set ::resolved_path = ::resolve_module_path(::module_name, ::module_path)
+      
+      if ::resolved_path {
+        # Async load via kernel: request file read and complete on callback
+        if not ::pending_loads { set ::pending_loads = {} }
+        set ::pending_loads[::resolved_path] = ::module_name
+        emit file.read with { path: ::resolved_path }
+        say "📥 Dispatched file.read for: ::resolved_path"
+      } else {
+        set ::error = "Module not found: ::module_name"
+        say "❌ ::error"
+        emit module.error with ::error
+      }
+    }
+
+    # Handle kernel file read completion
+    listen for "file.read.complete" then {
+      set ::path = ::event.data.path
+      set ::content = ::event.data.content
+      
+      if ::pending_loads && ::pending_loads[::path] {
+        set ::module_name = ::pending_loads[::path]
+        # Parse module dependencies
+        set ::dependencies = ::parse_module_dependencies(::content)
+        # Load dependencies first
+        emit load_dependencies with ::dependencies
+        # Store module
+        set ::loaded_modules[::module_name] = {
+          name: ::module_name,
+          path: ::path,
+          content: ::content,
+          dependencies: ::dependencies,
+          loaded_at: ::time.now()
+        }
+        # cleanup pending
+        set ::pending_loads[::path] = null
+        say "✅ Module loaded: ::module_name"
+        emit module.loaded with ::module_name
+      }
+    }
+    
+    # Load module dependencies
+    listen for "load_dependencies" then {
+      set ::dependencies = $1
+      
+      say "📦 Loading dependencies: ::dependencies.length"
+      
+      for ::dependency in ::dependencies {
+        emit load_module with ::dependency
+      }
+      
+      emit dependencies.loaded with ::dependencies
+    }
+    
+    # Resolve module dependencies
+    listen for "resolve_dependencies" then {
+      set ::module_name = $1
+      
+      say "🔍 Resolving dependencies for: ::module_name"
+      
+      if ::loaded_modules[::module_name] {
+        set ::module = ::loaded_modules[::module_name]
+        set ::dependencies = ::module.dependencies
+        
+        # Build dependency graph
+        set ::dependency_graph[::module_name] = ::dependencies
+        
+        # Check for circular dependencies
+        set ::circular = ::check_circular_dependencies(::module_name)
+        
+        if ::circular {
+          set ::error = "Circular dependency detected: ::circular"
+          say "❌ ::error"
+          emit dependency.error with ::error
+        } else {
+          say "✅ Dependencies resolved for: ::module_name"
+          emit dependency.resolved with ::module_name
+        }
+      }
+    }
+    
+    # Cache module
+    listen for "cache_module" then {
+      set ::module_name = $1
+      set ::module_data = $2
+      
+      set ::module_cache[::module_name] = {
+        data: ::module_data,
+        cached_at: ::time.now()
+      }
+      
+      say "💾 Module cached: ::module_name"
+      emit module.cached with ::module_name
+    }
+    
+    # Get cached module
+    listen for "get_cached_module" then {
+      set ::module_name = $1
+      
+      if ::module_cache[::module_name] {
+        set ::cached_module = ::module_cache[::module_name]
+        say "💾 Retrieved cached module: ::module_name"
+        emit module.retrieved with ::cached_module
+      } else {
+        say "❌ Module not in cache: ::module_name"
+        emit module.not_found with ::module_name
+      }
+    }
+    
+    # List loaded modules
+    listen for "list_modules" then {
+      set ::module_list = []
+      
+      for ::module_name in ::loaded_modules {
+        set ::module_info = {
+          name: ::module_name,
+          path: ::loaded_modules[::module_name].path,
+          dependencies: ::loaded_modules[::module_name].dependencies.length,
+          loaded_at: ::loaded_modules[::module_name].loaded_at
+        }
+        set ::module_list.push(::module_info)
+      }
+      
+      say "📦 Loaded modules: ::module_list.length"
+      emit modules.listed with ::module_list
+    }
+    
+    # Clear module cache
+    listen for "clear_cache" then {
+      set ::module_cache = {}
+      say "🗑️ Module cache cleared"
+      emit cache.cleared
+    }
+  }
+
+  # Resolve module path
+  function resolve_module_path(module_name, module_path) {
+    # If explicit path provided, use it
+    if ::module_path { return ::module_path }
+
+    # Normalize name like "::azl.vm" → "azl/vm"
+    set ::norm = ::normalize_module_name(::module_name)
+
+    # First, resolve well-known core modules
+    set ::special = ::resolve_special_core_module(::norm)
+    if ::special && ::azl.system_interface.file_exists_sync(::special) { return ::special }
+
+    # Try to find module in module paths with heuristics
+    set ::candidates = []
+    for ::base in ::module_paths {
+      set ::candidates.push(::base + ::norm + ".azl")
+      # Try last segment prefixed with azl_
+      set ::segments = ::norm.split("/")
+      if ::segments.length >= 1 {
+        set ::last = ::segments[::segments.length - 1]
+        set ::candidates.push(::base + ::norm + "/azl_" + ::last + ".azl")
+        set ::candidates.push(::base + ::last + ".azl")
+        set ::candidates.push(::base + "azl_" + ::last + ".azl")
+      }
+    }
+    for ::fp in ::candidates {
+      if ::azl.system_interface.file_exists_sync(::fp) { return ::fp }
+    }
+    return null
+  }
+
+  function normalize_module_name(name) {
+    set ::n = name || ""
+    if ::n.starts_with("::") { set ::n = ::n.substring(2, ::n.length) }
+    # Convert dotted namespaces to paths
+    set ::out = ""
+    for ::i = 0; ::i < ::n.length; ::i = ::i + 1 {
+      set ::ch = ::n[::i]
+      if ::ch == "." { set ::out = ::out + "/" } else { set ::out = ::out + ::ch }
+    }
+    return ::out
+  }
+
+  function resolve_special_core_module(norm) {
+    # Map common core names to their canonical paths
+    set ::map = {
+      "azl/vm": "azl/runtime/vm/azl_vm.azl",
+      "azl/compiler": "azl/core/compiler/azl_compiler.azl",
+      "azl/modules": "azl/core/modules/azl_module_system.azl",
+      "azl/pure_azme_runtime": "azl/runtime/bootstrap/azl_pure_azme_runtime.azl",
+      "azl/system_interface": "azl/system/azl_system_interface.azl",
+      "azl/kernel": "azl/kernel/azl_kernel.azl"
+    }
+    if ::map[norm] { return ::map[norm] }
+    return null
+  }
+  
+  # Load module from path
+  function load_module_from_path(path) {
+    # Deprecated synchronous loader; use async file.read via kernel instead
+    emit "log_error" with { type: "module_loader_sync_unsupported", message: "Synchronous module load not supported: " + path, context: { path: path } }
+    return null
+  }
+  
+  # Parse module dependencies
+  function parse_module_dependencies(content) {
+    set ::dependencies = []
+    set ::lines = ::split_lines(::content)
+    
+    for ::line in ::lines {
+      # Look for link statements
+      if ::starts_with(::line, "link") {
+        set ::link_match = ::extract_link_target(::line)
+        if ::link_match {
+          set ::dependencies.push(::link_match)
+        }
+      }
+      
+      # Look for import statements
+      if ::starts_with(::line, "import") {
+        set ::import_match = ::extract_import_target(::line)
+        if ::import_match {
+          set ::dependencies.push(::import_match)
+        }
+      }
+    }
+    
+    return ::dependencies
+  }
+  
+  # Extract link target from line
+  function extract_link_target(line) {
+    # Simple extraction for "link ::module.name"
+    if ::contains(::line, "::") {
+      set ::start = ::index_of(::line, "::")
+      set ::end = ::line.length
+      
+      # Find end of module name
+      for ::i = ::start; ::i < ::line.length; ::i = ::i + 1 {
+        if ::line[::i] == " " or ::line[::i] == "\n" or ::line[::i] == "\r" {
+          set ::end = ::i
+          break
+        }
+      }
+      
+      return ::line.substring(::start, ::end)
+    }
+    
+    return null
+  }
+  
+  # Extract import target from line
+  function extract_import_target(line) {
+    # Simple extraction for "import ::module.name"
+    if ::contains(::line, "::") {
+      set ::start = ::index_of(::line, "::")
+      set ::end = ::line.length
+      
+      # Find end of module name
+      for ::i = ::start; ::i < ::line.length; ::i = ::i + 1 {
+        if ::line[::i] == " " or ::line[::i] == "\n" or ::line[::i] == "\r" {
+          set ::end = ::i
+          break
+        }
+      }
+      
+      return ::line.substring(::start, ::end)
+    }
+    
+    return null
+  }
+  
+  # Check for circular dependencies
+  function check_circular_dependencies(module_name) {
+    set ::visited = {}
+    set ::recursion_stack = {}
+    
+    return ::dfs_check_circular(::module_name, ::visited, ::recursion_stack)
+  }
+  
+  # Depth-first search to check for circular dependencies
+  function dfs_check_circular(module_name, visited, recursion_stack) {
+    set ::visited[::module_name] = true
+    set ::recursion_stack[::module_name] = true
+    
+    if ::dependency_graph[::module_name] {
+      for ::dependency in ::dependency_graph[::module_name] {
+        if ::recursion_stack[::dependency] {
+          return ::dependency # Circular dependency found
+        }
+        
+        if not ::visited[::dependency] {
+          set ::circular = ::dfs_check_circular(::dependency, ::visited, ::recursion_stack)
+          if ::circular {
+            return ::circular
+          }
+        }
+      }
+    }
+    
+    set ::recursion_stack[::module_name] = false
+    return null
+  }
+  
+  # Split lines from content
+  function split_lines(content) {
+    set ::lines = []
+    set ::current_line = ""
+    
+    for ::char in ::content {
+      if ::char == "\n" {
+        set ::lines.push(::current_line)
+        set ::current_line = ""
+      } else {
+        set ::current_line = ::current_line + ::char
+      }
+    }
+    
+    if ::current_line {
+      set ::lines.push(::current_line)
+    }
+    
+    return ::lines
+  }
+  
+  # Check if string starts with prefix
+  function starts_with(str, prefix) {
+    if ::str.length < ::prefix.length {
+      return false
+    }
+    return ::str.substring(0, ::prefix.length) == ::prefix
+  }
+  
+  # Check if string contains substring
+  function contains(str, substr) {
+    return ::index_of(::str, ::substr) >= 0
+  }
+  
+  # Find index of substring
+  function index_of(str, substr) {
+    for ::i = 0; ::i <= ::str.length - ::substr.length; ::i = ::i + 1 {
+      set ::match = true
+      for ::j = 0; ::j < ::substr.length; ::j = ::j + 1 {
+        if ::str[::i + ::j] != ::substr[::j] {
+          set ::match = false
+          break
+        }
+      }
+      if ::match {
+        return ::i
+      }
+    }
+    return -1
+  }
+  
+  # Get substring
+  function substring(str, start, end) {
+    set ::result = ""
+    for ::i = ::start; ::i < ::end and ::i < ::str.length; ::i = ::i + 1 {
+      set ::result = ::result + ::str[::i]
+    }
+    return ::result
+  }
+
+  memory {
+    ::status = "ready"
+    ::module_system_version = "1.0"
+    ::loaded_modules = {}
+    ::module_cache = {}
+    ::dependency_graph = {}
+    ::module_paths = []
+    ::resolved_dependencies = {}
+    ::pending_loads = {}
+  }
+}
+
+# Module Loader Component
+component ::azl.module_loader {
+  init {
+    set ::status = "initializing"
+    set ::loader_version = "1.0"
+    set ::load_queue = []
+    set ::loading_modules = {}
+    
+    say "📦 AZL Module Loader initializing..."
+    emit loader.ready with "ready"
+  }
+
+  behavior {
+    # Queue module for loading
+    listen for "queue_module" then {
+      set ::module_name = $1
+      set ::priority = $2 || "normal"
+      
+      set ::load_queue.push({
+        name: ::module_name,
+        priority: ::priority,
+        queued_at: ::time.now()
+      })
+      
+      say "📦 Queued module: ::module_name (::priority)"
+      emit module.queued with ::module_name
+    }
+    
+    # Process load queue
+    listen for "process_queue" then {
+      say "📦 Processing load queue: ::load_queue.length modules"
+      
+      # Sort by priority
+      set ::sorted_queue = ::sort_by_priority(::load_queue)
+      
+      for ::item in ::sorted_queue {
+        if not ::loading_modules[::item.name] {
+          set ::loading_modules[::item.name] = true
+          emit load_module with ::item.name
+        }
+      }
+      
+      emit queue.processed
+    }
+    
+    # Handle module loaded
+    listen for "module.loaded" then {
+      set ::module_name = $1
+      
+      # Remove from loading modules
+      set ::loading_modules[::module_name] = false
+      
+      # Remove from queue
+      set ::new_queue = []
+      for ::item in ::load_queue {
+        if ::item.name != ::module_name {
+          set ::new_queue.push(::item)
+        }
+      }
+      set ::load_queue = ::new_queue
+      
+      say "✅ Module loaded and removed from queue: ::module_name"
+      emit module.completed with ::module_name
+    }
+    
+    # Handle module error
+    listen for "module.error" then {
+      set ::error = $1
+      say "❌ Module loading error: ::error"
+      emit loader.error with ::error
+    }
+  }
+
+  # Sort queue by priority
+  function sort_by_priority(queue) {
+    set ::high_priority = []
+    set ::normal_priority = []
+    set ::low_priority = []
+    
+    for ::item in ::queue {
+      if ::item.priority == "high" {
+        set ::high_priority.push(::item)
+      } else if ::item.priority == "low" {
+        set ::low_priority.push(::item)
+      } else {
+        set ::normal_priority.push(::item)
+      }
+    }
+    
+    # Combine in priority order
+    set ::result = []
+    for ::item in ::high_priority {
+      set ::result.push(::item)
+    }
+    for ::item in ::normal_priority {
+      set ::result.push(::item)
+    }
+    for ::item in ::low_priority {
+      set ::result.push(::item)
+    }
+    
+    return ::result
+  }
+
+  memory {
+    ::status = "ready"
+    ::loader_version = "1.0"
+    ::load_queue = []
+    ::loading_modules = {}
+  }
+}

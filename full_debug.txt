@@ -1,0 +1,38 @@
+🚀 AZL v2 - Pure AZL Runtime
+🚀 NO RUST DEPENDENCIES!
+🚀 ALL FUNCTIONALITY IN AZL!
+
+🚀 Running 1 AZL files with two-phase execution
+🚀 Executing multiple files with two-phase execution
+📄 Loading file: azl/nlp/nlp_orchestrator.azl
+🔍 parse_azl_component: Processing 47 lines
+📦 Found component: ::nlp.orchestrator
+🔍 Opening brace in component, count: 1
+🔍 Added line to component: init {
+🔍 Added line to component: say "🎯 NLP Orchestrator Initialized - Full AZL Mode"
+🔍 Added line to component: say "🚀 Rich orchestration with objects, branching, loops, and timers"
+🔍 Closing brace in component, count: 0
+🔍 Ending component, all braces closed
+📊 Parsed 1 components
+  - ::nlp.orchestrator: 3 lines
+  - ::nlp.orchestrator: content preview:
+    1:   init {
+    2:     say "🎯 NLP Orchestrator Initialized - Full AZL Mode"
+    3:     say "🚀 Rich orchestration with objects, branching, loops, and timers"
+📦 Processing component: ::nlp.orchestrator
+🔍 Parsing component: ::nlp.orchestrator
+🔍 Component content length: 3 lines
+🔍 Component content preview:
+  1:   init {
+  2:     say "🎯 NLP Orchestrator Initialized - Full AZL Mode"
+  3:     say "🚀 Rich orchestration with objects, branching, loops, and timers"
+🔍 Processing line: 'init {'
+🚀 Top-level statement: init {
+🔍 Processing line: 'say "🎯 NLP Orchestrator Initialized - Full AZL Mode"'
+🚀 Top-level statement: say "🎯 NLP Orchestrator Initialized - Full AZL Mode"
+🔍 Processing line: 'say "🚀 Rich orchestration with objects, branching, loops, and timers"'
+🚀 Top-level statement: say "🚀 Rich orchestration with objects, branching, loops, and timers"
+📊 Parsed 0 listeners and 3 top-level statements
+💬 🎯 NLP Orchestrator Initialized - Full AZL Mode
+💬 🚀 Rich orchestration with objects, branching, loops, and timers
+✅ All files executed successfully

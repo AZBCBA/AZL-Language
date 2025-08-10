@@ -1,0 +1,106 @@
+component ::azl.optim.peephole {
+  init { link ::error.system }
+  behavior {}
+
+  # Optimize a lowered machine program using peephole rules and constant propagation on immediates.
+  # program: array of items where each item is [op, ...args] or { label: string }
+  # target_arch: "x86_64" | "arm64"
+  # Returns { ok: true, program, stats } or { ok: false, error }
+  export fn optimize_program(program, target_arch) {
+    if program == null { emit log_error to ::error.system with { type: "optimizer", message: "null_program", context: { pass: "peephole" } } ; return { ok: false, error: "null_program" } }
+    if target_arch == null { set target_arch = "x86_64" }
+
+    set stats = { removed: 0, folded: 0, simplified_jumps: 0 }
+    set out = []
+    set i = 0
+
+    while i < program.length {
+      set cur = program[i]
+      set nxt = (i + 1 < program.length) ? program[i + 1] : null
+      set nxt2 = (i + 2 < program.length) ? program[i + 2] : null
+
+      # Keep labels verbatim
+      if cur != null && cur.label != null { out.push(cur); i = i + 1; continue }
+
+      # Normalize invalid entries
+      if cur == null || cur.length == null || cur.length == 0 { i = i + 1; continue }
+      set op = cur[0]
+
+      # 1) Remove algebraic no-ops (x86_64)
+      if target_arch == "x86_64" {
+        if (op == "add_rax_imm8" || op == "sub_rax_imm8") && (cur[1] == 0) {
+          stats.removed = stats.removed + 1
+          i = i + 1
+          continue
+        }
+        # Redundant push/pop of the same register
+        if nxt != null && nxt.length && op == "push_rax" && nxt[0] == "pop_rax" {
+          stats.removed = stats.removed + 2
+          i = i + 2
+          continue
+        }
+        # Jump to immediately next label → remove jump
+        if op == "jmp_rel32" {
+          set target = cur[1]
+          # find next non-empty is label and matches target
+          set j = i + 1
+          set found_label = false
+          while j < program.length {
+            set cand = program[j]
+            if cand == null { j = j + 1; continue }
+            if cand.label != null {
+              set found_label = true
+              if cand.label == target { stats.simplified_jumps = stats.simplified_jumps + 1; break }
+              else { break }
+            } else if cand.length { break }
+            j = j + 1
+          }
+          if found_label && program[j].label == target { i = i + 1; continue }
+        }
+        # Constant fold: mov_rax_imm64 C ; add_rax_imm8 K → mov_rax_imm64 (C+K)
+        if nxt != null && nxt.length && op == "mov_rax_imm64" && nxt[0] == "add_rax_imm8" {
+          set c = cur[1] || 0
+          set k = nxt[1] || 0
+          out.push(["mov_rax_imm64", c + k])
+          stats.folded = stats.folded + 1
+          i = i + 2
+          continue
+        }
+        # Constant fold: mov_rax_imm64 C ; sub_rax_imm8 K → mov_rax_imm64 (C-K)
+        if nxt != null && nxt.length && op == "mov_rax_imm64" && nxt[0] == "sub_rax_imm8" {
+          set c2 = cur[1] || 0
+          set k2 = nxt[1] || 0
+          out.push(["mov_rax_imm64", c2 - k2])
+          stats.folded = stats.folded + 1
+          i = i + 2
+          continue
+        }
+        # Remove consecutive identical immediates to same reg when no user in-between
+        if nxt != null && nxt.length && op == "mov_rax_imm64" && nxt[0] == "mov_rax_imm64" {
+          # Keep only the last one
+          i = i + 1
+          continue
+        }
+      }
+
+      # ARM64 simple patterns
+      if target_arch == "arm64" {
+        # movz_x0_imm16_hw0 imm ; movk_x0_imm16_hw1 0 → movz only
+        if nxt != null && nxt.length && op == "movz_x0_imm16_hw0" && nxt[0] == "movk_x0_imm16_hw1" && (nxt[1] == 0) {
+          out.push(cur)
+          stats.removed = stats.removed + 1
+          i = i + 2
+          continue
+        }
+      }
+
+      # Default: keep instruction
+      out.push(cur)
+      i = i + 1
+    }
+
+    return { ok: true, program: out, stats: stats }
+  }
+}
+
+

@@ -1,0 +1,68 @@
+# Runtime Boot - Full AZL Component
+# Deterministic boot with full payloads
+
+component ::runtime.boot {
+  init {
+    say "🚀 Runtime Boot Initialized - Full AZL Mode"
+    say "🎯 Deterministic boot with full payloads"
+    # Link system interface for platform/hardware info
+    link ::system.interface
+    # Report platform and hardware info (pure AZL)
+    set ::plat = ::platform_info([])
+    set ::hw = ::hw_info([])
+    say "🖥️  Platform: " + (::plat.os || "unknown") + "/" + (::plat.arch || "unknown")
+    say "🔧 Kernel: " + (::plat.kernel || "unknown") + " v" + (::plat.version || "unknown")
+    say "🧩 Hardware: CPU=" + (::hw.cpu || "unknown") + ", MEM=" + (::hw.mem || "unknown") + ", GPU=" + (::hw.gpu || "none")
+    # Kick a smoke request immediately (listeners for orchestrator/QBP are loaded earlier)
+    emit "generate.text.bytes" with "Hello from runtime boot"
+    emit "chat.request" with "Hello quantum AZL!"
+    # Smoke path to verify cross-component event dispatch
+    emit "stream.utf8" with "[boot] quick smoke response"
+  }
+
+  listen for "chat.response" {
+    say "FINAL: chat.response" ::event.data.req_id "→" ::event.data.text
+  }
+
+  listen for "chat.done" {
+    say "FINAL: chat.done" ::event.data.req_id
+  }
+
+  listen for "train.done" {
+    say "FINAL: train.done" ::event.data.req_id
+  }
+
+  # Accept AZME chat responses forwarded by orchestrator/chat integration
+  listen for "azme.chat.response" {
+    let text = ::event.data
+    say "FINAL: azme.chat.response → " + text
+    # Non-daemon default: exit after first response (when AZL_DAEMON is not set)
+    set ::daemon = ::internal.env("AZL_DAEMON") or "0"
+    if ::daemon == "0" or ::daemon == "false" {
+      emit "azl.exit" with { reason: "first_response" }
+    }
+  }
+
+  # Deferred start to ensure all listeners are registered. Place this file last.
+  listen for "azl.begin" {
+    say "BOOT: start smoke + training"
+    # Directly drive pipeline to guarantee first response
+    emit "generate.text.bytes" with "Hello from runtime boot"
+    emit "chat.request" with {
+      req_id: uuid(),
+      mode: "generate",
+      prompt: "Hello quantum AZL!",
+      max_bytes: 256,
+    }
+    # Boot AZME unified runtime and bootstrap
+    emit "system.boot" with { origin: "runtime_boot" }
+  }
+}
+
+# Default exit policy for non-daemon runs
+listen for "azl.exit" {
+  say "✅ DONE: exiting (" + ::event.data.reason + ")"
+}
+
+# Optional deferred trigger (kept for compatibility if interpreter batches listeners)
+emit "azl.begin" with {}

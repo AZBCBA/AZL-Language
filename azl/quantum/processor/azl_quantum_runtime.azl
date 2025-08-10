@@ -330,3 +330,61 @@ class AzlQuantumRuntime {
 }
 
 export AzlQuantumRuntime 
+ 
+# Quantum System Call Adapter: maps high-level syscalls to quantum-enhanced virtual OS ops
+component ::quantum.syscall.adapter {
+  init {
+    set ::latency_bias = 0.0
+    set ::error_rate = 0.0
+    say "🧬 Quantum Syscall Adapter ready"
+  }
+  
+  behavior {
+    listen for "quantum.syscall" then {
+      let rid = ::event.data.request_id || ("qreq-" + Date.now())
+      let t = ::event.data.type
+      let a = ::event.data.args || {}
+      
+      # quantum-enhanced routing (simulated here)
+      if (t == "read_file") {
+        # read from virtual store via system interface events
+        emit fs.read with { path: a.path, request_id: rid }
+        listen for "fs.read.response" then {
+          emit syscall.response with { request_id: rid, type: t, path: a.path, content: ::event.data.content }
+        }
+      } else if (t == "write_file") {
+        emit fs.write with { path: a.path, content: a.content, request_id: rid }
+        listen for "fs.write.response" then {
+          emit syscall.response with { request_id: rid, type: t, path: a.path, success: ::event.data.success }
+        }
+      } else if (t == "list_dir") {
+        emit fs.list with { path: a.path, request_id: rid }
+        listen for "fs.list.response" then {
+          emit syscall.response with { request_id: rid, type: t, path: a.path, entries: ::event.data.entries }
+        }
+      } else if (t == "mmap") {
+        emit mem.allocate with { size: a.size, request_id: rid }
+        listen for "mem.allocate.response" then {
+          emit syscall.response with { request_id: rid, type: t, address: ::event.data.address, size: a.size }
+        }
+      } else if (t == "munmap") {
+        emit mem.free with { address: a.address, size: a.size, request_id: rid }
+        listen for "mem.free.response" then {
+          emit syscall.response with { request_id: rid, type: t, address: a.address, success: ::event.data.success }
+        }
+      } else if (t == "socket") {
+        emit net.socket with { type: (a.type || "tcp"), request_id: rid }
+        listen for "net.socket.response" then {
+          emit syscall.response with { request_id: rid, type: t, socket: ::event.data.socket, socket_type: ::event.data.type }
+        }
+      } else if (t == "http") {
+        emit net.http with { url: a.url, method: (a.method || "GET"), headers: (a.headers || {}), body: (a.body || ""), request_id: rid }
+        listen for "net.http.response" then {
+          emit syscall.response with { request_id: rid, type: t, status: ::event.data.status, body: ::event.data.body, headers: ::event.data.headers }
+        }
+      } else {
+        emit syscall.response with { request_id: rid, type: t, error: "unsupported_syscall" }
+      }
+    }
+  }
+}

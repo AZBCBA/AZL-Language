@@ -236,8 +236,11 @@ set find_resonant_souls = (tracker, module_name, tolerance) => {
 
 // Utility functions
 set get_current_time = () => {
-    // Placeholder for time function
-    return 0
+    # Use system time if available; fallback to monotonic counter in memory
+    if ::time && ::time.now { return ::time.now() }
+    if ::_st_monotonic == null { set ::_st_monotonic = 1 }
+    set ::_st_monotonic = ::_st_monotonic + 1
+    return ::_st_monotonic
 }
 
 set keys = (obj) => {

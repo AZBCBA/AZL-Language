@@ -1,0 +1,61 @@
+# AZL Enterprise Build Daemon Launcher (Simplified)
+# Run with: scripts/azl run scripts/start-daemon.azl
+
+component ::azl.enterprise.launcher.simple {
+  init {
+    # Set environment if not already set
+    if !::internal.env("AZL_API_TOKEN") {
+      set ::api_token = ::generate_random_token()
+      say "🔑 Generated API token: " + ::api_token
+    } else {
+      set ::api_token = ::internal.env("AZL_API_TOKEN")
+      say "🔑 Using existing API token: " + ::api_token.substring(0, 8) + "..."
+    }
+    
+    # Create cache directory
+    ::create_cache_directory()
+    
+    # Load and start daemon
+    say "🏢 Starting AZL Enterprise Build Daemon..."
+    emit daemon.enterprise.start
+  }
+  
+  behavior {
+    listen for "build.daemon.enterprise.ready" then {
+      say "✅ Enterprise daemon ready on port " + ::event.data.api_port
+      say "🌐 API: http://localhost:" + ::event.data.api_port
+      say "🔑 Token: " + ::api_token
+      say "📊 Max workers: " + ::event.data.max_workers
+    }
+    
+    listen for "build.daemon.enterprise.started" then {
+      say "🎉 Enterprise daemon started successfully"
+      say "📝 Logs: .azl/daemon.log"
+      say "📊 Metrics: .azl/metrics.ndjson"
+    }
+    
+    listen for "build.daemon.enterprise.error" then {
+      say "❌ Enterprise daemon error: " + ::event.data.error
+      exit 1
+    }
+  }
+  
+  # Helper functions
+  ::generate_random_token = () => {
+    set chars = "0123456789abcdef"
+    set token = ""
+    for i in 1..64 {
+      set random_index = ::azl.stdlib.random(0, chars.length - 1)
+      token = token + chars[random_index]
+    }
+    return token
+  }
+  
+  ::create_cache_directory = () => {
+    set cache_dir = ".azl/cache"
+    if !::fs_store[cache_dir] {
+      say "📁 Creating cache directory: " + cache_dir
+      # Note: In a real implementation, this would create the directory
+    }
+  }
+}

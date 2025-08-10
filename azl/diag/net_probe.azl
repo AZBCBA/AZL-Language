@@ -1,0 +1,48 @@
+component ::diag.net_probe {
+  init {
+    say "net_probe: attempting listen on 0.0.0.0:8080"
+
+    # Try the correct syscall sequence based on the system interface
+    say "net_probe: creating TCP socket..."
+    emit syscall with { type: "net.socket", args: { type: "tcp" } }
+    
+    listen for "net.socket.response" then {
+      set socket_fd = ::event.data.socket
+      say "net_probe: socket created, fd: " + socket_fd
+      
+      say "net_probe: binding socket to 0.0.0.0:8080..."
+      emit syscall with { type: "socket.bind", args: { host: "0.0.0.0", port: 8080 } }
+      
+      listen for "socket.bind.response" then {
+        set success = ::event.data.success
+        say "net_probe: bind response -> success: " + success
+        if (success == true) {
+          set ::sock = socket_fd
+          say "net_probe: success; keeping alive"
+          loop { sleep 1000 }   # keep the process alive so we can ss/curl
+        } else {
+          say "net_probe: bind failed"
+          loop { sleep 1000 }
+        }
+      }
+    }
+  }
+}
+component ::diag.net_probe {
+  init {
+    say "🌐 Network Probe starting..."
+    
+    # Test network functionality
+    say "🌐 Testing network listen on 0.0.0.0:8080..."
+    
+    # Try to simulate network listen (without actual syscall for now)
+    set test_port = 8080
+    set test_host = "0.0.0.0"
+    
+    say "🌐 Would listen on " + test_host + ":" + test_port
+    say "🌐 Network probe simulation completed"
+    
+    # For now, just simulate success
+    say "✅ Network probe completed (simulated)"
+  }
+}

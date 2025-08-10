@@ -19,10 +19,10 @@ function load_iris_data() {
             if (parts.length == 5) {
                 // Extract features (first 4 columns)
                 let features = [
-                    parseFloat(parts[0]), // sepal_length
-                    parseFloat(parts[1]), // sepal_width  
-                    parseFloat(parts[2]), // petal_length
-                    parseFloat(parts[3])  // petal_width
+                    parse_number_safe(parts[0]), // sepal_length
+                    parse_number_safe(parts[1]), // sepal_width  
+                    parse_number_safe(parts[2]), // petal_length
+                    parse_number_safe(parts[3])  // petal_width
                 ];
                 
                 // Extract label (last column)

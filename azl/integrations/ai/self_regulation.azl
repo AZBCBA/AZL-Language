@@ -324,7 +324,7 @@ Format suggestions as:
         
         // Try to parse as number
         if (!isNaN(value_str)) {
-            return parseFloat(value_str)
+            return parse_number_safe(value_str)
         }
         
         // Try to parse as boolean

@@ -16,7 +16,7 @@ component ::quantum.ai_pipeline {
     set ::quantum_entropy = 0.0
     set ::quantum_drift = 0.0
     set ::training_epoch = 0
-    set ::total_epochs = 100
+    set ::total_epochs = 1
     
     # Quantum parameters
     set ::lattice_dimension = 512
@@ -30,7 +30,7 @@ component ::quantum.ai_pipeline {
   }
 
   behavior {
-    on quantum.ai_pipeline.start_training {
+    listen for "quantum.ai_pipeline.start_training" {
       set ::training_request = $1
       say "🧠 Starting Quantum AI Training Pipeline"
       
@@ -42,7 +42,7 @@ component ::quantum.ai_pipeline {
       }
     }
 
-    on qai.training_session_started {
+    listen for "qai.training_session_started" {
       set ::session_info = $1
       say "✅ Quantum AI training session started"
       say "🎯 Session ID: " + ::session_info.session_id
@@ -55,7 +55,7 @@ component ::quantum.ai_pipeline {
       }
     }
 
-    on qai.quantum_random_weights_initialized {
+    listen for "qai.quantum_random_weights_initialized" {
       set ::weights_info = $1
       say "🎲 Initializing quantum random weights using lattice PRNG"
       
@@ -73,7 +73,7 @@ component ::quantum.ai_pipeline {
       }
     }
 
-    on qai.input_state_encoded {
+    listen for "qai.input_state_encoded" {
       set ::encoding_info = $1
       say "🔐 Encoding input state using quantum Fourier transform"
       
@@ -91,7 +91,7 @@ component ::quantum.ai_pipeline {
       }
     }
 
-    on qai.forward_pass_executed {
+    listen for "qai.forward_pass_executed" {
       set ::forward_info = $1
       say "➡️ Executing quantum forward pass"
       
@@ -109,7 +109,7 @@ component ::quantum.ai_pipeline {
       }
     }
 
-    on qai.error_gradient_quantized {
+    listen for "qai.error_gradient_quantized" {
       set ::error_info = $1
       say "📉 Computing and quantizing error gradient"
       
@@ -134,7 +134,7 @@ component ::quantum.ai_pipeline {
       }
     }
 
-    on qai.backward_pass_executed {
+    listen for "qai.backward_pass_executed" {
       set ::backward_info = $1
       say "⬅️ Executing quantum backward pass"
       
@@ -155,7 +155,7 @@ component ::quantum.ai_pipeline {
       }
     }
 
-    on qai.weights_updated {
+    listen for "qai.weights_updated" {
       set ::update_info = $1
       say "🔄 Updating weights with lattice security"
       
@@ -178,7 +178,7 @@ component ::quantum.ai_pipeline {
       }
     }
 
-    on qai.training_metrics_collected {
+    listen for "qai.training_metrics_collected" {
       set ::metrics_info = $1
       say "📊 Collecting quantum training metrics"
       
@@ -215,7 +215,7 @@ component ::quantum.ai_pipeline {
       }
     }
 
-    on qai.training_session_complete {
+    listen for "qai.training_session_complete" {
       set ::completion_info = $1
       say "✅ Quantum AI Training Pipeline completed successfully!"
       say "🎯 Final Loss: " + ::completion_info.final_loss
@@ -233,7 +233,7 @@ component ::quantum.ai_pipeline {
     }
 
     # Quantum utility functions
-    on generate_lattice_random_tensor {
+    listen for "generate_lattice_random_tensor" {
       set ::tensor_request = $1
       say "🎲 Generating lattice random tensor"
       
@@ -251,7 +251,7 @@ component ::quantum.ai_pipeline {
       }
     }
 
-    on quantum_encode {
+    listen for "quantum_encode" {
       set ::encode_request = $1
       say "🔐 Quantum encoding input data"
       
@@ -269,7 +269,7 @@ component ::quantum.ai_pipeline {
       }
     }
 
-    on forward_pass {
+    listen for "forward_pass" {
       set ::forward_request = $1
       say "➡️ Executing quantum forward pass"
       
@@ -287,7 +287,7 @@ component ::quantum.ai_pipeline {
       }
     }
 
-    on quantize_gradient {
+    listen for "quantize_gradient" {
       set ::gradient_request = $1
       say "📉 Quantizing error gradient"
       
@@ -305,7 +305,7 @@ component ::quantum.ai_pipeline {
       }
     }
 
-    on lattice_secure_update {
+    listen for "lattice_secure_update" {
       set ::update_request = $1
       say "🔐 Performing lattice-secure weight update"
       
@@ -325,7 +325,7 @@ component ::quantum.ai_pipeline {
     }
 
     # Training monitoring
-    on quantum.ai_pipeline.monitor_training {
+    listen for "quantum.ai_pipeline.monitor_training" {
       set ::monitoring_request = $1
       say "📊 Monitoring quantum AI training progress"
       
@@ -345,7 +345,7 @@ component ::quantum.ai_pipeline {
     }
 
     # Pipeline status
-    on quantum.ai_pipeline.get_status {
+    listen for "quantum.ai_pipeline.get_status" {
       set ::status_request = $1
       
       emit quantum.ai_pipeline.status_ready with {

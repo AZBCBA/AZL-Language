@@ -32,10 +32,9 @@ component ::azme.unified_runtime {
   }
 
   behavior {
-    on system.boot {
+    listen for "system.boot" {
       say "🧱 AZME Unified Runtime Booting..."
       say "🧠 Initializing all cognitive, emotional, perceptual, and execution systems"
-      
       initialize_runtime()
     }
 
@@ -441,7 +440,7 @@ component ::azme.unified_runtime {
       }
     }
 
-    on system.shutdown {
+    listen for "system.shutdown" {
       say "🔄 AZME Unified Runtime Shutting Down..."
       
       set ::azme_runtime_status = "shutdown"
@@ -546,7 +545,7 @@ component ::azme.unified_runtime {
     }
 
     # Runtime error handling
-    on azme.runtime_error {
+    listen for "azme.runtime_error" {
       set ::error_info = $1
       
       say "❌ Runtime error detected: " + ::error_info.error
@@ -566,7 +565,7 @@ component ::azme.unified_runtime {
     }
 
     # Unified runtime monitoring
-    on azme.monitor_unified_runtime {
+    listen for "azme.monitor_unified_runtime" {
       set ::monitor_request = $1
       
       set ::runtime_metrics = {

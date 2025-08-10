@@ -1,0 +1,98 @@
+############################################
+# azl/ffi/http.azl
+############################################
+component ::ffi.http {
+
+  init {
+    say "🌐 HTTP Component Initialized"
+    set ::http_stats = {
+      get_requests: 0,
+      post_requests: 0,
+      put_requests: 0,
+      delete_requests: 0,
+      total_requests: 0
+    }
+    set ::http_store = {}
+  }
+
+  # FFI function implementations
+  function ffi_http_get(url) {
+    increment ::http_stats.get_requests
+    increment ::http_stats.total_requests
+    
+    # Return cached/known response when present; otherwise empty body
+    if ::http_store[url] exists {
+      return { ok: true, data: ::http_store[url] }
+    }
+    
+    # No cached response available in pure AZL mode
+    return { ok: true, data: "" }
+  }
+
+  function ffi_http_post(url, data) {
+    increment ::http_stats.post_requests
+    increment ::http_stats.total_requests
+    
+    # Store the POST data
+    set ::http_store[url] = data
+    
+    return { ok: true, data: "POST request processed successfully" }
+  }
+
+  function ffi_http_put(url, data) {
+    increment ::http_stats.put_requests
+    increment ::http_stats.total_requests
+    
+    # Store the PUT data
+    set ::http_store[url] = data
+    
+    return { ok: true, data: "PUT request processed successfully" }
+  }
+
+  function ffi_http_delete(url) {
+    increment ::http_stats.delete_requests
+    increment ::http_stats.total_requests
+    
+    # Remove the stored data
+    set ::http_store[url] = null
+    
+    return { ok: true, data: "DELETE request processed successfully" }
+  }
+
+  # HTTP request handler
+  listen for "http_request" {
+    set ::method = $1
+    set ::url = $2
+    set ::data = $3
+    
+    say "🌐 HTTP Request: "
+    say ::method
+    say " "
+    say ::url
+    
+    if ::method == "GET" {
+      set ::result = ::ffi_http_get(::url)
+    } else if ::method == "POST" {
+      set ::result = ::ffi_http_post(::url, ::data)
+    } else if ::method == "PUT" {
+      set ::result = ::ffi_http_put(::url, ::data)
+    } else if ::method == "DELETE" {
+      set ::result = ::ffi_http_delete(::url)
+    } else {
+      set ::result = { ok: false, error: "Unsupported HTTP method: " + ::method }
+    }
+    
+    emit "http_response" with ::url ::result
+  }
+
+  # Get HTTP statistics
+  listen for "get_http_stats" {
+    emit "http_stats" with ::http_stats
+  }
+
+  # Clear HTTP store
+  listen for "clear_http_store" {
+    set ::http_store = {}
+    emit "http_store_cleared" with "HTTP store cleared successfully"
+  }
+}

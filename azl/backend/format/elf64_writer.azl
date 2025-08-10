@@ -1,0 +1,109 @@
+component ::azl.backend.format.elf64_writer {
+  init {}
+  behavior {}
+
+  export fn write_exec(entry_vaddr, text_bytes, base_vaddr) {
+    return ::write_exec([[entry_vaddr, text_bytes, base_vaddr]])
+  }
+
+  # Write a minimal ELF64 executable for Linux with single PT_LOAD
+  # entry: virtual entry address
+  # text: array of bytes
+  # base_vaddr: virtual load address (default 0x400000)
+  # returns { ok: true, bytes } or { ok: false, error }
+  function write_exec(args) {
+    set ::entry = args[0]
+    set ::text = args[1] || []
+    set ::base = args[2]
+    if ::base == null { set ::base = 0x400000 }
+
+    # Layout:
+    # ELF header (64)
+    # Program header (56)
+    # .text at file offset 0x1000 (for simplicity), vaddr base+0x1000
+
+    set ::ehdr_size = 64
+    set ::phdr_size = 56
+    set ::file_off_text = 0x1000
+    set ::vaddr_text = ::base + ::file_off_text
+
+    # e_ident numeric bytes: 0x7F,'E','L','F', class=2(64), data=1(LE), version=1
+    set ::e_ident = [0x7F, 0x45, 0x4C, 0x46, 0x02, 0x01, 0x01, 0x00,
+                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+
+    # ELF header fields
+    set ::e_type = 2            # ET_EXEC
+    set ::e_machine = 62        # x86_64; for aarch64 use 183
+    set ::e_version = 1
+    set ::e_entry = ::entry
+    set ::e_phoff = ::ehdr_size
+    set ::e_shoff = 0
+    set ::e_flags = 0
+    set ::e_ehsize = ::ehdr_size
+    set ::e_phentsize = ::phdr_size
+    set ::e_phnum = 1
+    set ::e_shentsize = 0
+    set ::e_shnum = 0
+    set ::e_shstrndx = 0
+
+    set ::ehdr = []
+    set ::ehdr = ::ehdr.concat(::e_ident)
+    set ::ehdr = ::ehdr.concat(::u16le(::e_type))
+    set ::ehdr = ::ehdr.concat(::u16le(::e_machine))
+    set ::ehdr = ::ehdr.concat(::u32le(::e_version))
+    set ::ehdr = ::ehdr.concat(::u64le(::e_entry))
+    set ::ehdr = ::ehdr.concat(::u64le(::e_phoff))
+    set ::ehdr = ::ehdr.concat(::u64le(::e_shoff))
+    set ::ehdr = ::ehdr.concat(::u32le(::e_flags))
+    set ::ehdr = ::ehdr.concat(::u16le(::e_ehsize))
+    set ::ehdr = ::ehdr.concat(::u16le(::e_phentsize))
+    set ::ehdr = ::ehdr.concat(::u16le(::e_phnum))
+    set ::ehdr = ::ehdr.concat(::u16le(::e_shentsize))
+    set ::ehdr = ::ehdr.concat(::u16le(::e_shnum))
+    set ::ehdr = ::ehdr.concat(::u16le(::e_shstrndx))
+
+    # Program header
+    set ::p_type = 1            # PT_LOAD
+    set ::p_flags = 5           # R+X
+    set ::p_offset = ::file_off_text
+    set ::p_vaddr = ::vaddr_text
+    set ::p_paddr = ::vaddr_text
+    set ::p_filesz = ::text.length
+    set ::p_memsz = ::text.length
+    set ::p_align = 0x1000
+
+    set ::phdr = []
+    set ::phdr = ::phdr.concat(::u32le(::p_type))
+    set ::phdr = ::phdr.concat(::u32le(::p_flags))
+    set ::phdr = ::phdr.concat(::u64le(::p_offset))
+    set ::phdr = ::phdr.concat(::u64le(::p_vaddr))
+    set ::phdr = ::phdr.concat(::u64le(::p_paddr))
+    set ::phdr = ::phdr.concat(::u64le(::p_filesz))
+    set ::phdr = ::phdr.concat(::u64le(::p_memsz))
+    set ::phdr = ::phdr.concat(::u64le(::p_align))
+
+    # Padding to text offset
+    set ::hdr_total = ::ehdr_size + ::phdr_size
+    set ::pad = ::file_off_text - ::hdr_total
+    if ::pad < 0 { return { ok: false, error: "Layout error" } }
+    set ::padding = []
+    set ::i = 0
+    while ::i < ::pad { set ::padding.push(0); set ::i = ::i + 1 }
+
+    set ::file_bytes = []
+    set ::file_bytes = ::file_bytes.concat(::ehdr)
+    set ::file_bytes = ::file_bytes.concat(::phdr)
+    set ::file_bytes = ::file_bytes.concat(::padding)
+    set ::file_bytes = ::file_bytes.concat(::text)
+
+    return { ok: true, bytes: ::file_bytes }
+  }
+
+  function u16le(v) { return [ (v & 0xFF), ((v >> 8) & 0xFF) ] }
+  function u32le(v) { return [ (v & 0xFF), ((v >> 8) & 0xFF), ((v >> 16) & 0xFF), ((v >> 24) & 0xFF) ] }
+  function u64le(v) {
+    set ::lo = v & 0xFFFFFFFF
+    set ::hi = (v >> 32) & 0xFFFFFFFF
+    return ::u32le(::lo).concat(::u32le(::hi))
+  }
+}

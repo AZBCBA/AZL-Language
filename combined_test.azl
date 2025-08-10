@@ -1,0 +1,26 @@
+# COMBINED TEST
+# Test both components in a single file
+
+component ::nlp.quantum_byte_processor
+
+listen for "generate_text_bytes"
+  say "processor: heard generate_text_bytes"
+  emit "stream_utf8" with "OK_FROM_PROCESSOR"
+end
+
+component ::nlp.orchestrator
+
+link ::nlp.quantum_byte_processor
+
+listen for "stream_utf8"
+  say "orchestrator: got stream_utf8"
+end
+
+listen for "start_smoke"
+  say "orchestrator: start_smoke received"
+  emit "generate_text_bytes"
+end
+
+# Test the smoke
+say "SMOKE: emitting start_smoke"
+emit "start_smoke"

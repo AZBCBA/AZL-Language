@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# AZL Enterprise Build Daemon Launcher
+# Usage: scripts/azl-buildd [--config config/prod.azl.json] [--daemon]
+
+CONFIG_FILE="${1:-config/prod.azl.json}"
+DAEMON_MODE="${2:-}"
+
+# Validate config file exists
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "❌ Config file not found: $CONFIG_FILE" >&2
+    echo "Usage: scripts/azl-buildd [config_file] [--daemon]" >&2
+    exit 1
+fi
+
+# Set environment variables
+export AZL_BUILD_CONFIG="$CONFIG_FILE"
+export AZL_BUILD_API_ENABLED="true"
+export AZL_BUILD_API_PORT="8080"
+export AZL_BUILD_MAX_CONCURRENT="8"
+export AZL_BUILD_MAX_MEMORY="8589934592"  # 8GB
+export AZL_BUILD_MAX_CPU="80"
+export AZL_BUILD_WATCH_INTERVAL="1000"
+
+# Generate API token if not set
+if [ -z "${AZL_API_TOKEN:-}" ]; then
+    export AZL_API_TOKEN="$(openssl rand -hex 32)"
+    echo "🔑 Generated API token: $AZL_API_TOKEN"
+fi
+
+# Create cache directory
+mkdir -p .azl/cache
+
+# Create combined daemon file
+DAEMON_FILE="/tmp/azl_build_daemon_$$.azl"
+COMBINED="/tmp/azl_build_combined_$$.azl"
+
+# Bootstrap component for enterprise daemon
+cat > "$DAEMON_FILE" <<AZL
+component ::azl.enterprise.launcher {
+  init {
+    link ::build.daemon.enterprise
+    link ::build.orchestrator
+    link ::build.worker_pool
+    link ::build.cache_manager
+    link ::azl.system_interface
+    link ::azl.stdlib
+    link ::error.system
+    
+    say "🚀 AZL Enterprise Build Daemon Launcher ready"
+    emit daemon.enterprise.start
+  }
+  
+  behavior {
+    listen for "build.daemon.enterprise.ready" then {
+      say "✅ Enterprise daemon ready on port " + ::event.data.api_port
+      say "🔑 API Token: " + ::internal.env("AZL_API_TOKEN")
+    }
+    
+    listen for "build.daemon.enterprise.started" then {
+      say "🎉 Enterprise daemon started successfully"
+    }
+    
+    listen for "build.daemon.enterprise.error" then {
+      say "❌ Enterprise daemon error: " + ::event.data.error
+      exit 1
+    }
+  }
+}
+AZL
+
+# Bundle core modules + daemon
+CORE=(
+  "azl/stdlib/core/azl_stdlib.azl"
+  "azl/system/azl_system_interface.azl"
+  "azl/system/platform.azl"
+  "azl/system/process.azl"
+  "azl/system/hw.azl"
+  "azl/core/error_system.azl"
+  "azl/runtime/interpreter/azl_interpreter.azl"
+  "azl/build/build_daemon_enterprise.azl"
+  "azl/build/build_orchestrator.azl"
+  "azl/build/worker_pool.azl"
+  "azl/build/cache_manager.azl"
+)
+
+> "$COMBINED"
+echo -e "# ===== FILE: ::bootstrap =====\n" >> "$COMBINED"
+cat "$DAEMON_FILE" >> "$COMBINED"
+
+for f in "${CORE[@]}"; do
+  if [ -f "$f" ]; then
+    echo -e "\n\n# ===== FILE: $f =====\n" >> "$COMBINED"
+    cat "$f" >> "$COMBINED"
+  else
+    echo "⚠️  Warning: Core file not found: $f" >&2
+  fi
+done
+
+echo "🏢 Starting AZL Enterprise Build Daemon..."
+echo "📁 Config: $CONFIG_FILE"
+echo "🌐 API: http://localhost:8080"
+echo "🔑 Token: $AZL_API_TOKEN"
+
+# Run the daemon
+if [ "$DAEMON_MODE" = "--daemon" ]; then
+    echo "🔄 Running in daemon mode..."
+    nohup scripts/azl run "$COMBINED" > .azl/daemon.log 2>&1 &
+    DAEMON_PID=$!
+    echo $DAEMON_PID > .azl/daemon.pid
+    echo "✅ Daemon started with PID: $DAEMON_PID"
+    echo "📝 Logs: .azl/daemon.log"
+else
+    echo "🔄 Running in foreground mode..."
+    scripts/azl run "$COMBINED"
+fi
+
+# Cleanup
+rm -f "$DAEMON_FILE" "$COMBINED"

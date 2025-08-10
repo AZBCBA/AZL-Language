@@ -42,7 +42,7 @@ component ::quantum.teleportation {
   }
 
   behavior {
-    on quantum.teleportation.register {
+    listen for "quantum.teleportation.register" { 
       set ::registration_info = $1
       say "🔄 Quantum teleportation subsystem registering with core"
       
@@ -54,7 +54,7 @@ component ::quantum.teleportation {
       }
     }
 
-    on quantum.teleportation.execute {
+    listen for "quantum.teleportation.execute" { 
       set ::teleportation_request = $1
       say "🚀 Executing quantum teleportation protocol"
       
@@ -66,7 +66,7 @@ component ::quantum.teleportation {
       }
     }
 
-    on quantum.teleportation.prepare_state {
+    listen for "quantum.teleportation.prepare_state" { 
       set ::preparation_info = $1
       say "✅ Preparing quantum state for teleportation"
       
@@ -88,7 +88,7 @@ component ::quantum.teleportation {
       }
     }
 
-    on quantum.teleportation.bell_measurement {
+    listen for "quantum.teleportation.bell_measurement" { 
       set ::measurement_info = $1
       say "📊 Performing Bell measurement on qubits 1 and 2"
       
@@ -104,7 +104,7 @@ component ::quantum.teleportation {
       }
     }
 
-    on quantum.teleportation.correction {
+    listen for "quantum.teleportation.correction" { 
       set ::correction_info = $1
       say "🔧 Applying correction gates based on Bell measurement"
       
@@ -129,7 +129,7 @@ component ::quantum.teleportation {
       }
     }
 
-    on quantum.teleportation.verify {
+    listen for "quantum.teleportation.verify" { 
       set ::verification_info = $1
       say "✅ Verifying teleportation fidelity"
       
@@ -146,7 +146,7 @@ component ::quantum.teleportation {
       }
     }
 
-    on quantum.teleportation.complete {
+    listen for "quantum.teleportation.complete" { 
       set ::completion_info = $1
       say "✅ Quantum teleportation completed successfully!"
       say "📊 Fidelity: " + ::completion_info.fidelity
@@ -160,7 +160,7 @@ component ::quantum.teleportation {
     }
 
     # Bell state creation
-    on quantum.teleportation.create_bell_state {
+    listen for "quantum.teleportation.create_bell_state" { 
       set ::bell_request = $1
       say "🔗 Creating Bell state for teleportation"
       
@@ -171,7 +171,7 @@ component ::quantum.teleportation {
     }
 
     # Fidelity measurement
-    on quantum.teleportation.measure_fidelity {
+    listen for "quantum.teleportation.measure_fidelity" { 
       set ::fidelity_request = $1
       say "📈 Measuring teleportation fidelity"
       
@@ -183,7 +183,7 @@ component ::quantum.teleportation {
     }
 
     # Protocol status
-    on quantum.teleportation.get_status {
+    listen for "quantum.teleportation.get_status" { 
       set ::status_request = $1
       
       emit quantum.teleportation.status_ready with {

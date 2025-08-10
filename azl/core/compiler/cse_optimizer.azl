@@ -1,0 +1,46 @@
+component ::azl.optim.cse {
+  init { link ::error.system }
+  behavior {}
+
+  # Common Subexpression Elimination at a simple three-address IR over lowered statements
+  # Expects AST-like block with statements; best-effort on native lowered pseudo-IR is limited.
+  # For the current pipeline we provide a function that operates on a lowered program (array of ops)
+  # and removes redundant recomputations of immediate moves to the same register without intervening uses.
+  export fn eliminate_on_program(program, target_arch) {
+    if program == null { emit log_error to ::error.system with { type: "optimizer", message: "null_program", context: { pass: "cse" } } ; return { ok: false, error: "null_program" } }
+    set stats = { eliminated: 0 }
+    set out = []
+    set last_value = {}
+    set i = 0
+    while i < program.length {
+      set ins = program[i]
+      if ins == null { i = i + 1; continue }
+      if ins.label != null { out.push(ins); i = i + 1; continue }
+      set op = ins[0]
+
+      if target_arch == "x86_64" {
+        # Track mov_rax_imm64 redundancies
+        if op == "mov_rax_imm64" {
+          set v = ins[1] || 0
+          if last_value["rax"] == v {
+            stats.eliminated = stats.eliminated + 1
+            i = i + 1
+            continue
+          }
+          set last_value["rax"] = v
+        } else {
+          # On any op that changes rax, invalidate
+          if op.starts_with("mov_") || op.starts_with("add_") || op.starts_with("sub_") || op == "syscall" {
+            set last_value["rax"] = null
+          }
+        }
+      }
+
+      out.push(ins)
+      i = i + 1
+    }
+    return { ok: true, program: out, stats: stats }
+  }
+}
+
+

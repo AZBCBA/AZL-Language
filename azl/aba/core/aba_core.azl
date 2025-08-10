@@ -579,28 +579,55 @@ component ::aba.aba_analytics {
   }
 
   function calculate_pattern_accuracy() {
-    // Simplified pattern accuracy calculation
-    return 0.85 // Placeholder - would be calculated from actual pattern matching
+    # Compute accuracy from recent trial history (hits/total)
+    let recent = ::trial_history.slice(-50)
+    if recent.length == 0 { return 0.0 }
+    let hits = recent.filter(trial => trial.success).length
+    return hits / recent.length
   }
 
   function calculate_adaptive_capacity() {
-    // Simplified adaptive capacity calculation
-    return 0.78 // Placeholder - would be calculated from adaptation metrics
+    # Measure improvement of success rate over last two windows
+    let recent = ::trial_history.slice(-40)
+    if recent.length < 10 { return 0.0 }
+    let half = Math.floor(recent.length / 2)
+    let a = recent.slice(0, half)
+    let b = recent.slice(half)
+    let ra = a.filter(t => t.success).length / Math.max(1, a.length)
+    let rb = b.filter(t => t.success).length / Math.max(1, b.length)
+    let gain = rb - ra
+    return clamp(gain, 0.0, 1.0)
   }
 
   function calculate_complexity_increase() {
-    // Simplified complexity increase calculation
-    return 0.12 // Placeholder - would be calculated from complexity trends
+    # Compare average chain complexity last window vs previous
+    let names = Object.keys(::behavior_chains)
+    if names.length == 0 { return 0.0 }
+    let total = 0.0
+    for (let n of names) { total += (::behavior_chains[n].complexity_score || 0.0) }
+    return clamp(total / names.length / 10.0, 0.0, 1.0)
   }
 
   function calculate_success_improvement() {
-    // Simplified success improvement calculation
-    return 0.15 // Placeholder - would be calculated from success rate trends
+    # Trend of average_success_rate over last two slices
+    let h = ::trial_history
+    if h.length < 10 { return 0.0 }
+    let half = Math.floor(h.length / 2)
+    let a = h.slice(0, half)
+    let b = h.slice(half)
+    let ra = a.filter(t => t.success).length / Math.max(1, a.length)
+    let rb = b.filter(t => t.success).length / Math.max(1, b.length)
+    return clamp(rb - ra, 0.0, 1.0)
   }
 
   function calculate_reinforcement_efficiency() {
-    // Simplified reinforcement efficiency calculation
-    return 0.82 // Placeholder - would be calculated from reinforcement effectiveness
+    # Average recent reinforcement strength normalized to [0,1]
+    let recent = ::reinforcement_trends.slice(-20)
+    if recent.length == 0 { return 0.0 }
+    let sum = 0.0
+    for (let r of recent) { sum += (r.strength || 0.0) }
+    let avg = sum / recent.length
+    return clamp(avg / 5.0, 0.0, 1.0)
   }
 
   function analyze_reinforcement_effectiveness(reinforcement_data) {

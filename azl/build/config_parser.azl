@@ -1,0 +1,31 @@
+# AZL Configuration Parser (pure AZL)
+# - Reads azl.build.json and exposes project build options and entry files
+
+component ::build.config_parser {
+  init {
+    set ::config_path = "azl.build.json"
+    set ::config = {}
+    emit build.config_parser.ready with "ready"
+  }
+
+  behavior {}
+
+  memory {
+    ::read_text = (path) => { return (::azl.system_interface.read_file_host_sync(path) || ::azl.system_interface.read_file_sync(path) || "") }
+  }
+
+  interface {
+    export fn load(path) {
+      set p = path || ::config_path
+      set txt = ::read_text(p)
+      set J = import("azl/stdlib/core/json.azl")
+      set parsed = J.parse(txt)
+      if !parsed.ok { emit log_error with { type: "config", message: ("Failed to parse config: " + p), context: { path: p } } ; return { ok: false, error: "parse" } }
+      set ::config = parsed.value || {}
+      return { ok: true, config: ::config }
+    }
+    export fn get() { return ::config }
+  }
+}
+
+

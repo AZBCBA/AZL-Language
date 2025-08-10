@@ -48,7 +48,7 @@ component ::quantum.qca {
   }
 
   behavior {
-    on quantum.qca.register {
+    listen for "quantum.qca.register" { 
       set ::registration_info = $1
       say "🔄 Quantum Certificate Authority subsystem registering with core"
       
@@ -60,7 +60,7 @@ component ::quantum.qca {
       }
     }
 
-    on quantum.qca.execute {
+    listen for "quantum.qca.execute" { 
       set ::qca_request = $1
       say "🏛️ Executing Quantum Certificate Authority operations"
       
@@ -73,7 +73,7 @@ component ::quantum.qca {
       }
     }
 
-    on quantum.qca.issue_certificate {
+    listen for "quantum.qca.issue_certificate" { 
       set ::issue_info = $1
       say "📜 Issuing quantum certificate for: " + ::issue_info.subject
       
@@ -100,7 +100,7 @@ component ::quantum.qca {
       }
     }
 
-    on quantum.qca.verify_certificate {
+    listen for "quantum.qca.verify_certificate" { 
       set ::verification_info = $1
       say "🔍 Verifying quantum certificate"
       
@@ -121,7 +121,7 @@ component ::quantum.qca {
       }
     }
 
-    on quantum.qca.manage_chain {
+    listen for "quantum.qca.manage_chain" { 
       set ::chain_info = $1
       say "🔗 Managing certificate chain"
       
@@ -142,7 +142,7 @@ component ::quantum.qca {
       }
     }
 
-    on quantum.qca.complete {
+    listen for "quantum.qca.complete" { 
       set ::completion_info = $1
       say "✅ Quantum Certificate Authority operations completed successfully!"
       say "📜 Certificates issued: " + ::completion_info.certificates_issued
@@ -155,7 +155,7 @@ component ::quantum.qca {
     }
 
     # Certificate issuance
-    on quantum.qca.issue_root_certificate {
+    listen for "quantum.qca.issue_root_certificate" { 
       set ::root_request = $1
       say "🏛️ Issuing quantum root certificate"
       
@@ -165,7 +165,7 @@ component ::quantum.qca {
       }
     }
 
-    on quantum.qca.issue_intermediate_certificate {
+    listen for "quantum.qca.issue_intermediate_certificate" { 
       set ::intermediate_request = $1
       say "🏛️ Issuing quantum intermediate certificate"
       
@@ -175,7 +175,7 @@ component ::quantum.qca {
       }
     }
 
-    on quantum.qca.issue_end_entity_certificate {
+    listen for "quantum.qca.issue_end_entity_certificate" { 
       set ::end_entity_request = $1
       say "🏛️ Issuing quantum end entity certificate"
       
@@ -186,7 +186,7 @@ component ::quantum.qca {
     }
 
     # Certificate revocation
-    on quantum.qca.revoke_certificate {
+    listen for "quantum.qca.revoke_certificate" { 
       set ::revocation_request = $1
       say "❌ Revoking quantum certificate"
       
@@ -207,7 +207,7 @@ component ::quantum.qca {
     }
 
     # Certificate validation
-    on quantum.qca.validate_certificate {
+    listen for "quantum.qca.validate_certificate" { 
       set ::validation_request = $1
       say "🔍 Validating quantum certificate"
       
@@ -228,7 +228,7 @@ component ::quantum.qca {
     }
 
     # Chain verification
-    on quantum.qca.verify_chain {
+    listen for "quantum.qca.verify_chain" { 
       set ::chain_request = $1
       say "🔗 Verifying certificate chain"
       
@@ -243,7 +243,7 @@ component ::quantum.qca {
     }
 
     # Protocol status
-    on quantum.qca.get_status {
+    listen for "quantum.qca.get_status" { 
       set ::status_request = $1
       
       emit quantum.qca.status_ready with {

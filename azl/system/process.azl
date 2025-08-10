@@ -1,0 +1,14 @@
+# Pure AZL Process Interface (deferred spawn; logs error in pure runtime)
+component ::sys.process {
+  function spawn(args) {
+    set ::cmd = args[0] || ""
+    set ::argv = args[1] || []
+    emit log_error with { type: "ffi_disabled", message: "spawn unavailable in pure AZL runtime", context: { cmd: ::cmd } }
+    return { status: "error", code: "spawn_unavailable", cmd: ::cmd, argv: ::argv }
+  }
+  function exit(args) {
+    set ::code = args[0] || 0
+    emit "azl.exit" with { code: ::code }
+    return true
+  }
+}

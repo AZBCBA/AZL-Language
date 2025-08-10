@@ -1,0 +1,176 @@
+# Build Dependency Graph (pure AZL)
+# - Canonical path resolution
+# - Graph construction
+# - Topological order + cycle detection
+
+component ::build.dep_graph {
+  init {
+    set ::status = "ready"
+  }
+
+  interface {
+    export fn build(files) {
+      # files: [ { path, source } ]
+      set ctx = {
+        files: files || [],
+        set_paths: {},
+        graph: {},
+        order: []
+      }
+
+      # Index paths for resolution
+      for f in ctx.files { set ctx.set_paths[f.path] = true }
+
+      # Build edges
+      for rec in ctx.files {
+        set owner = rec.path
+        set deps = ::extract_deps(rec.source)
+        set resolved = []
+        for d in deps {
+          set r = ::resolve_dep(owner, d, ctx.set_paths)
+          if r && ctx.set_paths[r] { set resolved.push(r) }
+        }
+        set ctx.graph[owner] = resolved
+      }
+
+      # Topological order (deps first)
+      set topo = ::topo_sort(ctx.graph)
+      if !topo.ok { return { ok: false, error: topo.error, node: topo.node } }
+      return { ok: true, graph: ctx.graph, order: topo.order }
+    }
+  }
+
+  memory {
+    ::dirname = (path) => {
+      set slash = -1
+      set i = 0
+      while i < path.length { if path[i] == '/' { set slash = i } ; set i = i + 1 }
+      if slash < 0 { return "" }
+      return path.substring(0, slash)
+    }
+
+    ::join = (a, b) => {
+      if a.length == 0 { return b }
+      if a.ends_with('/') { return a + b }
+      return a + "/" + b
+    }
+
+    ::normalize = (path) => {
+      # collapse /./ and ../ segments
+      set parts = []
+      set cur = ""
+      for i = 0; i < path.length; i = i + 1 {
+        set c = path[i]
+        if c == '/' { set parts.push(cur); set cur = "" } else { set cur = cur + c }
+      }
+      set parts.push(cur)
+      set stack = []
+      for j = 0; j < parts.length; j = j + 1 {
+        set p = parts[j]
+        if p == "" || p == "." { continue }
+        if p == ".." { if stack.length > 0 { set stack = stack.slice(0, stack.length - 1) } } else { set stack.push(p) }
+      }
+      # rejoin
+      set out = ""
+      for k = 0; k < stack.length; k = k + 1 { if k > 0 { set out = out + "/" } ; set out = out + stack[k] }
+      return out
+    }
+
+    ::ensure_ext_azl = (p) => {
+      if p.length >= 4 && p.substring(p.length - 4, p.length) == ".azl" { return p }
+      return p + ".azl"
+    }
+
+    ::resolve_dep = (owner_path, dep, path_set) => {
+      if !dep || dep.length == 0 { return null }
+      # Ignore component-style names like ::azl.compiler
+      if dep.length > 1 && dep[0] == ':' && dep[1] == ':' { return null }
+
+      # Absolute-like (rooted) path as-is
+      if dep[0] == '/' { set cand = ::normalize(dep) ; if path_set[cand] { return cand } ; return null }
+
+      # Try owner-relative
+      set base = ::dirname(owner_path)
+      set rel = ::normalize(::join(base, dep))
+      if path_set[rel] { return rel }
+      set relz = ::ensure_ext_azl(rel)
+      if path_set[relz] { return relz }
+
+      # Try direct dep as-is in set (for already rooted project paths)
+      if path_set[dep] { return dep }
+      set depz = ::ensure_ext_azl(dep)
+      if path_set[depz] { return depz }
+
+      return null
+    }
+
+    ::extract_deps = (source) => {
+      set deps = []
+      if !source { return deps }
+      set i = 0
+      while i < source.length {
+        # import "path"
+        if source.substring(i, i+6) == "import" {
+          set j = i + 6
+          while j < source.length && (source[j] == ' ' || source[j] == '\t') { set j = j + 1 }
+          if j < source.length && (source[j] == '"' || source[j] == '\'') {
+            set q = source[j]
+            set j = j + 1
+            set k = j
+            while k < source.length && source[k] != q { set k = k + 1 }
+            if k < source.length { set deps.push(source.substring(j, k)); set i = k + 1 ; continue }
+          } else {
+            # import bare_token
+            set k2 = j
+            while k2 < source.length && source[k2] != ' ' && source[k2] != '\n' && source[k2] != '\t' { set k2 = k2 + 1 }
+            if k2 > j { set deps.push(source.substring(j, k2)) }
+            set i = k2 + 1
+            continue
+          }
+        }
+        # link X
+        if source.substring(i, i+4) == "link" {
+          set j3 = i + 4
+          while j3 < source.length && (source[j3] == ' ' || source[j3] == '\t') { set j3 = j3 + 1 }
+          set k3 = j3
+          while k3 < source.length && source[k3] != '\n' && source[k3] != ' ' && source[k3] != '\t' && source[k3] != '{' { set k3 = k3 + 1 }
+          if k3 > j3 { set deps.push(source.substring(j3, k3)) }
+          set i = k3 + 1
+          continue
+        }
+        set i = i + 1
+      }
+      return deps
+    }
+
+    ::topo_sort = (graph) => {
+      # Kahn's algorithm on owner->deps
+      set nodes = []
+      for k in graph { set nodes.push(k) }
+      set indeg = {}
+      for n in nodes { set indeg[n] = 0 }
+      for a in graph { set arr = graph[a] || [] ; for b in arr { if indeg[b] == null { set indeg[b] = 0 } ; set indeg[b] = indeg[b] + 1 } }
+      set queue = []
+      for n2 in indeg { if indeg[n2] == 0 { set queue.push(n2) } }
+      set order = []
+      while queue.length > 0 {
+        set u = queue.shift()
+        set order.push(u)
+        set out = graph[u] || []
+        for v in out {
+          set indeg[v] = indeg[v] - 1
+          if indeg[v] == 0 { set queue.push(v) }
+        }
+      }
+      if order.length < nodes.length {
+        # find a node with indeg > 0
+        set culprit = null
+        for x in indeg { if indeg[x] > 0 { set culprit = x ; break } }
+        return { ok: false, error: "cycle_detected", node: culprit }
+      }
+      return { ok: true, order: order }
+    }
+  }
+}
+
+

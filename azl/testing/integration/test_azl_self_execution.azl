@@ -1,3 +1,27 @@
+component ::testing.self_execution {
+  init {
+    say "🧪 Testing pure AZL self-execution pipeline"
+    link ::azl.compiler
+    link ::azl.vm
+    link ::azl.modules
+
+    # Minimal component source
+    set ::src = "component ::test.min { init { say \"hello\" } }"
+
+    # Compile → Execute
+    emit compile with { source_code: ::src, component_name: "::test.min" }
+    listen for "compilation_complete" then {
+      set ::bc = ::event.data.bytecode
+      say "✅ Compilation complete: bytecode size = " + ::bc.length
+      emit execute_bytecode with { bytecode: ::bc, component_name: "::test.min" }
+    }
+
+    listen for "vm_execution_complete" then {
+      say "🎉 VM execution complete"
+      emit test.complete with "success"
+    }
+  }
+}
 component ::test.azl_self_execution {
   init {
     set ::test_name = "AZL Self-Execution Engine Test"

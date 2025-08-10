@@ -1,7 +1,7 @@
-# Simple AZL v2 Standard Library Demo
+# Simple AZL Standard Library Demo
 
 # File operations
-let message = "Hello from AZL v2 Standard Library!"
+let message = "Hello from AZL Standard Library!"
 write_file("demo_output.txt", message)
 let read_message = read_file("demo_output.txt")
 say "File content:"
@@ -104,4 +104,4 @@ say typeof(42)
 say "typeof array:"
 say typeof([1, 2, 3])
 
-say "AZL v2 Standard Library Demo Complete!" 
+say "AZL Standard Library Demo Complete!" 

@@ -351,8 +351,10 @@ set exp = (x) => {
 }
 
 set get_current_time = () => {
-    // Placeholder for time function
-    return 0
+    if ::time && ::time.now { return ::time.now() }
+    if ::_coll_monotonic == null { set ::_coll_monotonic = 1 }
+    set ::_coll_monotonic = ::_coll_monotonic + 1
+    return ::_coll_monotonic
 }
 
 // Main collection interfaces

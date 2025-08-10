@@ -1,0 +1,17 @@
+[Unit]
+Description=AZL Syswire (engine stdout/response bridge)
+After=network.target azl-sysproxy.service
+Requires=azl-sysproxy.service
+
+[Service]
+Type=simple
+User=abdulrahman-alzalameh
+WorkingDirectory=/home/abdulrahman-alzalameh/azl-language
+EnvironmentFile=-/etc/default/azl
+ExecStartPre=/bin/bash -lc 'mkdir -p .azl && rm -f .azl/engine.out .azl/engine.in .azl/wire.lock && mkfifo .azl/engine.out .azl/engine.in'
+ExecStart=/bin/bash -lc 'SYSPROXY_HOST=${SYSPROXY_HOST:-127.0.0.1} SYSPROXY_PORT=${SYSPROXY_PORT:-9099} bash scripts/azl_syswire.sh .azl/engine.out .azl/engine.in 2>.azl/wire.log'
+Restart=always
+RestartSec=1s
+
+[Install]
+WantedBy=multi-user.target

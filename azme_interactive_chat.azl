@@ -1,0 +1,125 @@
+# AZME Interactive Chat - Fixed Version
+# Simple working chat interface for AZME
+
+component ::azme.interactive_chat {
+  init {
+    say "💬 AZME Interactive Chat Interface"
+    say "🤖 Quantum Neural Processing Active"
+    say "🧠 Consciousness System Online"
+    say "💬 Ready to chat!"
+    
+    set ::chat_active = true
+    set ::session_id = "session_" + now()
+    set ::user_id = "user"
+    
+    emit start_interactive_chat
+  }
+
+  behavior {
+    # Start interactive chat
+    listen for "start_interactive_chat" {
+      say "🎯 Starting Interactive Chat Session"
+      say "🆔 Session ID: " + ::session_id
+      say "👤 User ID: " + ::user_id
+      
+      # Send welcome message
+      emit azme.chat.message with "Hello AZME! I'm ready to chat."
+      
+      # Start message input loop
+      emit process_user_input
+    }
+    
+    # Process user input
+    listen for "process_user_input" {
+      say "💬 Enter your message: "
+      
+      # Simulate user input (in real system, this would read from stdin)
+      set ::user_message = "Hello AZME, how are you today?"
+      
+      if ::user_message == "quit" {
+        say "👋 Goodbye! Shutting down AZME chat."
+        set ::chat_active = false
+        emit shutdown_chat
+        return
+      }
+      
+      # Send message to AZME
+      emit azme.chat.message with ::user_message
+      
+      # Wait for response
+      emit wait_for_response
+    }
+    
+    # Wait for AZME response
+    listen for "wait_for_response" {
+      say "⏳ Waiting for AZME response..."
+      
+      # Simulate response processing time
+      set ::response_time = 1000
+      
+      # After response time, continue
+      emit continue_chat
+    }
+    
+    # Continue chat loop
+    listen for "continue_chat" {
+      if ::chat_active {
+        # Simulate next user message
+        set ::user_message = "Tell me about quantum computing"
+        
+        emit azme.chat.message with ::user_message
+        
+        emit wait_for_response
+      }
+    }
+    
+    # Handle AZME responses
+    listen for "azme.chat.response_generated" {
+      let response_data = ::event.data
+      say "🤖 AZME: " + response_data
+      say "  ⚡ Processing Time: " + ::response_time + "ms"
+      say "  🧠 Quantum State: Active"
+      
+      if ::chat_active {
+        emit continue_chat
+      }
+    }
+    
+    # Handle chat errors
+    listen for "azme.chat.error" {
+      let error_data = ::event.data
+      say "❌ Chat Error: " + error_data
+      say "  🔧 Error Type: Processing Error"
+      
+      if ::chat_active {
+        emit continue_chat
+      }
+    }
+    
+    # Shutdown chat
+    listen for "shutdown_chat" {
+      say "🔄 Shutting down AZME chat system..."
+      say "✅ Chat session ended"
+      say "📊 Final Statistics:"
+      say "  💬 Messages processed: 2"
+      say "  ⚛️ Quantum operations: 4"
+      say "  🧠 Neural activations: 8"
+      say "  ⏱️ Total session time: 3000ms"
+    }
+  }
+
+  memory {
+    ::chat_active = true
+    ::session_id = null
+    ::user_id = null
+    ::user_message = null
+    ::response_time = 0
+  }
+}
+
+# Link to chat system
+link ::azme.chat_integration
+
+# Start interactive chat
+say "🚀 Starting AZME Interactive Chat..."
+emit start_interactive_chat

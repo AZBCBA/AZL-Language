@@ -1,0 +1,32 @@
+# AZL Chat Console - Interactive AZME chat over pure AZL event bus
+
+component ::ui.chat_console {
+  init {
+    say "🧠 AZME Chat Console"
+    say "Type your message and press Enter. Type /exit to quit."
+    emit "console.read"
+  }
+
+  listen for "console.read" {
+    say "> "
+    readline into ::user_input
+    # Normalize
+    set ::msg = ::user_input
+    # Exit command
+    if ::msg == "/exit" {
+      say "👋 Bye"
+      emit "azl.exit" with { reason: "user_exit" }
+    } else {
+      emit "azme.chat.message" with ::msg
+      # Continue reading after response
+      emit "console.read"
+    }
+  }
+
+  listen for "azme.chat.response" {
+    let text = ::event.data
+    say "AZME: " + text
+  }
+}
+
+

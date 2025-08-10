@@ -1,0 +1,830 @@
+# AZL Standard Library - Pure AZL Implementation
+# Provides all essential functions for AZL programs
+
+component ::azl.stdlib {
+  init {
+    set ::status = "initializing"
+    set ::stdlib_version = "1.0"
+    set ::functions = {}
+    set ::loaded_modules = {}
+    
+    say "📚 AZL Standard Library initializing..."
+    
+    # Register all standard functions
+    emit register_math_functions
+    emit register_string_functions
+    emit register_array_functions
+    emit register_object_functions
+    emit register_file_functions
+    emit register_network_functions
+    emit register_time_functions
+    emit register_math_functions
+    
+    emit stdlib.ready with "ready"
+  }
+
+  behavior {
+    # Register math functions
+    listen for "register_math_functions" then {
+      set ::functions.math = {
+        add: ::math_add,
+        subtract: ::math_subtract,
+        multiply: ::math_multiply,
+        divide: ::math_divide,
+        power: ::math_power,
+        sqrt: ::math_sqrt,
+        abs: ::math_abs,
+        floor: ::math_floor,
+        ceil: ::math_ceil,
+        round: ::math_round,
+        random: ::math_random,
+        min: ::math_min,
+        max: ::math_max
+      }
+      say "📊 Math functions registered"
+    }
+    
+    # Register string functions
+    listen for "register_string_functions" then {
+      set ::functions.string = {
+        length: ::string_length,
+        split: ::string_split,
+        join: ::string_join,
+        replace: ::string_replace,
+        substring: ::string_substring,
+        to_upper: ::string_to_upper,
+        to_lower: ::string_to_lower,
+        trim: ::string_trim,
+        starts_with: ::string_starts_with,
+        ends_with: ::string_ends_with,
+        contains: ::string_contains
+      }
+      say "📝 String functions registered"
+    }
+    
+    # Register array functions
+    listen for "register_array_functions" then {
+      set ::functions.array = {
+        length: ::array_length,
+        push: ::array_push,
+        pop: ::array_pop,
+        shift: ::array_shift,
+        unshift: ::array_unshift,
+        slice: ::array_slice,
+        concat: ::array_concat,
+        index_of: ::array_index_of,
+        includes: ::array_includes,
+        map: ::array_map,
+        filter: ::array_filter,
+        reduce: ::array_reduce,
+        sort: ::array_sort,
+        reverse: ::array_reverse
+      }
+      say "📦 Array functions registered"
+    }
+    
+    # Register object functions
+    listen for "register_object_functions" then {
+      set ::functions.object = {
+        keys: ::object_keys,
+        values: ::object_values,
+        entries: ::object_entries,
+        has: ::object_has,
+        get: ::object_get,
+        set: ::object_set,
+        delete: ::object_delete,
+        merge: ::object_merge,
+        clone: ::object_clone,
+        size: ::object_size
+      }
+      say "📋 Object functions registered"
+    }
+    
+    # Register file functions
+    listen for "register_file_functions" then {
+      set ::functions.file = {
+        read: ::file_read,
+        write: ::file_write,
+        append: ::file_append,
+        exists: ::file_exists,
+        delete: ::file_delete,
+        list: ::file_list,
+        size: ::file_size,
+        modified: ::file_modified
+      }
+      say "📁 File functions registered"
+    }
+    
+    # Register network functions
+    listen for "register_network_functions" then {
+      set ::functions.network = {
+        http_get: ::http_get,
+        http_post: ::http_post,
+        http_put: ::http_put,
+        http_delete: ::http_delete,
+        websocket_connect: ::websocket_connect,
+        websocket_send: ::websocket_send,
+        websocket_close: ::websocket_close
+      }
+      say "🌐 Network functions registered"
+    }
+    
+    # Register time functions
+    listen for "register_time_functions" then {
+      set ::functions.time = {
+        now: ::time_now,
+        timestamp: ::time_timestamp,
+        format: ::time_format,
+        parse: ::time_parse,
+        add: ::time_add,
+        subtract: ::time_subtract,
+        diff: ::time_diff
+      }
+      say "⏰ Time functions registered"
+    }
+    
+    # Function call handler
+    listen for "call_function" then {
+      set ::module = $1
+      set ::function = $2
+      set ::args = $3
+      
+      if ::functions[::module] and ::functions[::module][::function] {
+        set ::result = ::functions[::module][::function](::args)
+        emit function.result with ::result
+      } else {
+        set ::error = "Function not found: ::module.::function"
+        emit function.error with ::error
+      }
+    }
+  }
+
+  # Math Functions
+  function random_seed(args) {
+    set ::rng_seed = args[0] || 123456789
+    return ::rng_seed
+  }
+
+  function random(args) {
+    # Linear Congruential Generator (Numerical Recipes parameters)
+    set ::seed = (::rng_seed || 2463534242)
+    set ::seed = (1664525 * ::seed + 1013904223) % 4294967296
+    set ::rng_seed = ::seed
+    return ::seed / 4294967296
+  }
+  function math_add(args) {
+    set ::a = args[0] || 0
+    set ::b = args[1] || 0
+    return ::a + ::b
+  }
+  
+  function math_subtract(args) {
+    set ::a = args[0] || 0
+    set ::b = args[1] || 0
+    return ::a - ::b
+  }
+  
+  function math_multiply(args) {
+    set ::a = args[0] || 0
+    set ::b = args[1] || 0
+    return ::a * ::b
+  }
+  
+  function math_divide(args) {
+    set ::a = args[0] || 0
+    set ::b = args[1] || 1
+    if ::b == 0 { emit log_error with { type: "division_by_zero", message: "division by zero", context: { a: ::a, b: ::b, origin: "stdlib.math_divide" } }; return null }
+    return ::a / ::b
+  }
+  
+  function math_power(args) {
+    set ::a = args[0] || 0
+    set ::b = args[1] || 1
+    return ::a ^ ::b
+  }
+  
+  function math_sqrt(args) {
+    set ::a = args[0] || 0
+    return ::a ^ 0.5
+  }
+  
+  function math_abs(args) {
+    set ::a = args[0] || 0
+    if ::a < 0 {
+      return -::a
+    }
+    return ::a
+  }
+  
+  function math_floor(args) {
+    set ::a = args[0] || 0
+    return ::a - (::a % 1)
+  }
+  
+  function math_ceil(args) {
+    set ::a = args[0] || 0
+    if ::a % 1 == 0 {
+      return ::a
+    }
+    return ::a + (1 - (::a % 1))
+  }
+  
+  function math_round(args) {
+    set ::a = args[0] || 0
+    return ::math_floor([::a + 0.5])
+  }
+  
+  function math_random(args) {
+    set ::min = args[0] || 0
+    set ::max = args[1] || 1
+    set ::range = ::max - ::min
+    return ::min + (::range * ::random([]))
+  }
+  
+  function math_min(args) {
+    set ::min = args[0]
+    for ::value in ::args {
+      if ::value < ::min {
+        set ::min = ::value
+      }
+    }
+    return ::min
+  }
+  
+  function math_max(args) {
+    set ::max = args[0]
+    for ::value in ::args {
+      if ::value > ::max {
+        set ::max = ::value
+      }
+    }
+    return ::max
+  }
+
+  # String Functions
+  function string_length(args) {
+    set ::str = args[0] || ""
+    return ::str.length
+  }
+  
+  function string_split(args) {
+    set ::str = args[0] || ""
+    set ::delimiter = args[1] || " "
+    set ::result = []
+    set ::current = ""
+    
+    for ::char in ::str {
+      if ::char == ::delimiter {
+        set ::result.push(::current)
+        set ::current = ""
+      } else {
+        set ::current = ::current + ::char
+      }
+    }
+    set ::result.push(::current)
+    return ::result
+  }
+  
+  function string_join(args) {
+    set ::array = args[0] || []
+    set ::delimiter = args[1] || ""
+    set ::result = ""
+    
+    for ::i in ::array {
+      if ::i > 0 {
+        set ::result = ::result + ::delimiter
+      }
+      set ::result = ::result + ::array[::i]
+    }
+    return ::result
+  }
+  
+  function string_replace(args) {
+    set ::str = args[0] || ""
+    set ::old = args[1] || ""
+    set ::new = args[2] || ""
+    set ::result = ""
+    set ::i = 0
+    
+    while ::i < ::str.length {
+      if ::i + ::old.length <= ::str.length {
+        set ::substring = ::str.substring(::i, ::i + ::old.length)
+        if ::substring == ::old {
+          set ::result = ::result + ::new
+          set ::i = ::i + ::old.length
+        } else {
+          set ::result = ::result + ::str[::i]
+          set ::i = ::i + 1
+        }
+      } else {
+        set ::result = ::result + ::str[::i]
+        set ::i = ::i + 1
+      }
+    }
+    return ::result
+  }
+  
+  function string_substring(args) {
+    set ::str = args[0] || ""
+    set ::start = args[1] || 0
+    set ::end = args[2] || ::str.length
+    return ::str.substring(::start, ::end)
+  }
+  
+  function string_to_upper(args) {
+    set ::str = args[0] || ""
+    set ::result = ""
+    for ::char in ::str {
+      if ::char >= "a" and ::char <= "z" {
+        set ::result = ::result + ::char.to_upper()
+      } else {
+        set ::result = ::result + ::char
+      }
+    }
+    return ::result
+  }
+  
+  function string_to_lower(args) {
+    set ::str = args[0] || ""
+    set ::result = ""
+    for ::char in ::str {
+      if ::char >= "A" and ::char <= "Z" {
+        set ::result = ::result + ::char.to_lower()
+      } else {
+        set ::result = ::result + ::char
+      }
+    }
+    return ::result
+  }
+  
+  function string_trim(args) {
+    set ::str = args[0] || ""
+    set ::start = 0
+    set ::end = ::str.length
+    
+    # Trim start
+    while ::start < ::str.length and ::str[::start] == " " {
+      set ::start = ::start + 1
+    }
+    
+    # Trim end
+    while ::end > ::start and ::str[::end - 1] == " " {
+      set ::end = ::end - 1
+    }
+    
+    return ::str.substring(::start, ::end)
+  }
+  
+  function string_starts_with(args) {
+    set ::str = args[0] || ""
+    set ::prefix = args[1] || ""
+    if ::str.length < ::prefix.length {
+      return false
+    }
+    return ::str.substring(0, ::prefix.length) == ::prefix
+  }
+  
+  function string_ends_with(args) {
+    set ::str = args[0] || ""
+    set ::suffix = args[1] || ""
+    if ::str.length < ::suffix.length {
+      return false
+    }
+    return ::str.substring(::str.length - ::suffix.length) == ::suffix
+  }
+  
+  function string_contains(args) {
+    set ::str = args[0] || ""
+    set ::substr = args[1] || ""
+    return ::string_index_of([::str, ::substr]) >= 0
+  }
+
+  # Array Functions
+  function array_length(args) {
+    set ::array = args[0] || []
+    return ::array.length
+  }
+  
+  function array_push(args) {
+    set ::array = args[0] || []
+    set ::value = args[1]
+    set ::array.push(::value)
+    return ::array
+  }
+  
+  function array_pop(args) {
+    set ::array = args[0] || []
+    if ::array.length > 0 {
+      set ::value = ::array[::array.length - 1]
+      set ::array = ::array.slice(0, ::array.length - 1)
+      return ::value
+    }
+    return null
+  }
+  
+  function array_shift(args) {
+    set ::array = args[0] || []
+    if ::array.length > 0 {
+      set ::value = ::array[0]
+      set ::array = ::array.slice(1)
+      return ::value
+    }
+    return null
+  }
+  
+  function array_unshift(args) {
+    set ::array = args[0] || []
+    set ::value = args[1]
+    set ::new_array = [::value]
+    set ::new_array = ::new_array.concat(::array)
+    return ::new_array
+  }
+  
+  function array_slice(args) {
+    set ::array = args[0] || []
+    set ::start = args[1] || 0
+    set ::end = args[2] || ::array.length
+    set ::result = []
+    
+    for ::i = ::start; ::i < ::end and ::i < ::array.length; ::i = ::i + 1 {
+      set ::result.push(::array[::i])
+    }
+    return ::result
+  }
+  
+  function array_concat(args) {
+    set ::array1 = args[0] || []
+    set ::array2 = args[1] || []
+    set ::result = []
+    
+    for ::item in ::array1 {
+      set ::result.push(::item)
+    }
+    for ::item in ::array2 {
+      set ::result.push(::item)
+    }
+    return ::result
+  }
+  
+  function array_index_of(args) {
+    set ::array = args[0] || []
+    set ::value = args[1]
+    
+    for ::i = 0; ::i < ::array.length; ::i = ::i + 1 {
+      if ::array[::i] == ::value {
+        return ::i
+      }
+    }
+    return -1
+  }
+  
+  function array_includes(args) {
+    set ::array = args[0] || []
+    set ::value = args[1]
+    return ::array_index_of([::array, ::value]) >= 0
+  }
+  
+  function array_map(args) {
+    set ::array = args[0] || []
+    set ::function = args[1]
+    set ::result = []
+    
+    for ::item in ::array {
+      set ::mapped = ::function(::item)
+      set ::result.push(::mapped)
+    }
+    return ::result
+  }
+  
+  function array_filter(args) {
+    set ::array = args[0] || []
+    set ::function = args[1]
+    set ::result = []
+    
+    for ::item in ::array {
+      if ::function(::item) {
+        set ::result.push(::item)
+      }
+    }
+    return ::result
+  }
+  
+  function array_reduce(args) {
+    set ::array = args[0] || []
+    set ::function = args[1]
+    set ::initial = args[2] || 0
+    set ::result = ::initial
+    
+    for ::item in ::array {
+      set ::result = ::function(::result, ::item)
+    }
+    return ::result
+  }
+  
+  function array_sort(args) {
+    set ::array = args[0] || []
+    set ::comparator = args[1]
+    set ::result = []
+    
+    # Copy array
+    for ::item in ::array {
+      set ::result.push(::item)
+    }
+    
+    # Simple bubble sort
+    for ::i = 0; ::i < ::result.length; ::i = ::i + 1 {
+      for ::j = 0; ::j < ::result.length - ::i - 1; ::j = ::j + 1 {
+        if ::comparator(::result[::j], ::result[::j + 1]) > 0 {
+          set ::temp = ::result[::j]
+          set ::result[::j] = ::result[::j + 1]
+          set ::result[::j + 1] = ::temp
+        }
+      }
+    }
+    return ::result
+  }
+  
+  function array_reverse(args) {
+    set ::array = args[0] || []
+    set ::result = []
+    
+    for ::i = ::array.length - 1; ::i >= 0; ::i = ::i - 1 {
+      set ::result.push(::array[::i])
+    }
+    return ::result
+  }
+
+  # Object Functions
+  function object_keys(args) {
+    set ::obj = args[0] || {}
+    set ::keys = []
+    
+    for ::key in ::obj {
+      set ::keys.push(::key)
+    }
+    return ::keys
+  }
+  
+  function object_values(args) {
+    set ::obj = args[0] || {}
+    set ::values = []
+    
+    for ::key in ::obj {
+      set ::values.push(::obj[::key])
+    }
+    return ::values
+  }
+  
+  function object_entries(args) {
+    set ::obj = args[0] || {}
+    set ::entries = []
+    
+    for ::key in ::obj {
+      set ::entries.push([::key, ::obj[::key]])
+    }
+    return ::entries
+  }
+  
+  function object_has(args) {
+    set ::obj = args[0] || {}
+    set ::key = args[1]
+    return ::obj.hasOwnProperty(::key)
+  }
+  
+  function object_get(args) {
+    set ::obj = args[0] || {}
+    set ::key = args[1]
+    return ::obj[::key]
+  }
+  
+  function object_set(args) {
+    set ::obj = args[0] || {}
+    set ::key = args[1]
+    set ::value = args[2]
+    set ::obj[::key] = ::value
+    return ::obj
+  }
+  
+  function object_delete(args) {
+    set ::obj = args[0] || {}
+    set ::key = args[1]
+    set ::deleted = ::obj[::key]
+    set ::obj[::key] = null
+    return ::deleted
+  }
+  
+  function object_merge(args) {
+    set ::obj1 = args[0] || {}
+    set ::obj2 = args[1] || {}
+    set ::result = {}
+    
+    # Copy obj1
+    for ::key in ::obj1 {
+      set ::result[::key] = ::obj1[::key]
+    }
+    
+    # Merge obj2
+    for ::key in ::obj2 {
+      set ::result[::key] = ::obj2[::key]
+    }
+    return ::result
+  }
+  
+  function object_clone(args) {
+    set ::obj = args[0] || {}
+    return ::object_merge([{}, ::obj])
+  }
+  
+  function object_size(args) {
+    set ::obj = args[0] || {}
+    set ::count = 0
+    
+    for ::key in ::obj {
+      set ::count = ::count + 1
+    }
+    return ::count
+  }
+
+  # File Functions (Pure AZL in-memory FS)
+  function file_read(args) {
+    set ::path = args[0] || ""
+    set ::content = ::fs_store[::path]
+    if ::content == null { return "" }
+    return ::content
+  }
+  
+  function file_write(args) {
+    set ::path = args[0] || ""
+    set ::content = args[1] || ""
+    set ::fs_store[::path] = ::content
+    set ::fs_meta[::path] = { size: ::content.length, modified: ::time_now([]) }
+    return true
+  }
+  
+  function file_append(args) {
+    set ::path = args[0] || ""
+    set ::content = args[1] || ""
+    set ::existing = ::fs_store[::path]
+    if ::existing == null { set ::existing = "" }
+    set ::new_content = ::existing + ::content
+    set ::fs_store[::path] = ::new_content
+    set ::fs_meta[::path] = { size: ::new_content.length, modified: ::time_now([]) }
+    return true
+  }
+  
+  function file_exists(args) {
+    set ::path = args[0] || ""
+    set ::exists = false
+    for ::k in ::fs_store {
+      if ::k == ::path { set ::exists = true }
+    }
+    return ::exists
+  }
+  
+  function file_delete(args) {
+    set ::path = args[0] || ""
+    set ::fs_store[::path] = null
+    set ::fs_meta[::path] = null
+    return true
+  }
+  
+  function file_list(args) {
+    set ::path = args[0] || ""
+    set ::entries = []
+    for ::k in ::fs_store {
+      if ::k.length >= ::path.length {
+        if ::k.substring(0, ::path.length) == ::path {
+          if ::fs_store[::k] != null { set ::entries.push(::k) }
+        }
+      }
+    }
+    return ::entries
+  }
+  
+  function file_size(args) {
+    set ::path = args[0] || ""
+    set ::meta = ::fs_meta[::path]
+    if ::meta == null { return 0 }
+    return ::meta.size || 0
+  }
+  
+  function file_modified(args) {
+    set ::path = args[0] || ""
+    set ::meta = ::fs_meta[::path]
+    if ::meta == null { return 0 }
+    return ::meta.modified || 0
+  }
+
+  # Network Functions (deterministic pure-AZL)
+  function http_get(args) {
+    set ::url = args[0] || ""
+    set ::body = ::http_store[::url]
+    if ::body == null {
+      if ::url.substring(0, 16) == "http://localhost" { return "OK: " + ::url }
+      return "NOT_FOUND"
+    }
+    return ::body
+  }
+  
+  function http_post(args) {
+    set ::url = args[0] || ""
+    set ::data = args[1] || ""
+    set ::http_store[::url] = ::data
+    return "OK"
+  }
+  
+  function http_put(args) {
+    set ::url = args[0] || ""
+    set ::data = args[1] || ""
+    set ::http_store[::url] = ::data
+    return "OK"
+  }
+  
+  function http_delete(args) {
+    set ::url = args[0] || ""
+    set ::http_store[::url] = null
+    return "OK"
+  }
+  
+  function websocket_connect(args) {
+    set ::url = args[0] || ""
+    emit log_error with { type: "ffi_disabled", message: "websocket_connect unavailable in pure AZL runtime", context: { url: ::url } }
+    return null
+  }
+  
+  function websocket_send(args) {
+    set ::connection = args[0] || ""
+    set ::message = args[1] || ""
+    emit log_error with { type: "ffi_disabled", message: "websocket_send unavailable in pure AZL runtime", context: { conn: ::connection } }
+    return false
+  }
+  
+  function websocket_close(args) {
+    set ::connection = args[0] || ""
+    emit log_error with { type: "ffi_disabled", message: "websocket_close unavailable in pure AZL runtime", context: { conn: ::connection } }
+    return false
+  }
+
+  # Time Functions
+  function time_now(args) {
+    set ::time_ticks = (::time_ticks || 0) + 1
+    return ::time_ticks
+  }
+
+  function time_timestamp(args) {
+    return ::time_now([])
+  }
+  
+  function time_format(args) {
+    set ::timestamp = args[0] || ::time_now([])
+    # Pure AZL deterministic format: T<ticks>
+    return "T" + ::timestamp
+  }
+  
+  function time_parse(args) {
+    set ::date_string = args[0] || ""
+    if ::date_string.length > 1 and ::date_string[0] == "T" {
+      return ::date_string.substring(1)
+    }
+    return ::time_now([])
+  }
+  
+  function time_add(args) {
+    set ::timestamp = args[0] || ::time_now([])
+    set ::amount = args[1] || 0
+    set ::unit = args[2] || "seconds"
+    return ::timestamp + ::amount
+  }
+  
+  function time_subtract(args) {
+    set ::timestamp = args[0] || ::time_now([])
+    set ::amount = args[1] || 0
+    set ::unit = args[2] || "seconds"
+    return ::timestamp - ::amount
+  }
+  
+  function time_diff(args) {
+    set ::timestamp1 = args[0] || ::time_now([])
+    set ::timestamp2 = args[1] || ::time_now([])
+    return ::timestamp2 - ::timestamp1
+  }
+  
+  # Helper not required in pure AZL; kept as alias
+  function get_current_time() {
+    return ::time_now([])
+  }
+
+  memory {
+    ::status = "ready"
+    ::stdlib_version = "1.0"
+    ::functions = {}
+    ::loaded_modules = {}
+    ::rng_seed = 2463534242
+    ::time_ticks = 0
+    ::fs_store = {}
+    ::fs_meta = {}
+    ::http_store = {}
+  }
+}
+
+# Pure AZL stdlib does not depend on external sys wrappers

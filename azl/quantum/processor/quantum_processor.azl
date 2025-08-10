@@ -66,7 +66,7 @@ component ::quantum.processor {
   }
 
   behavior {
-    on quantum.processor.start {
+    listen for "quantum.processor.start" {
       say "🚀 Starting Quantum Processor with modular architecture"
       say "📁 16 subsystems loaded and ready"
       say "🔐 Quantum-enhanced security active"
@@ -79,7 +79,7 @@ component ::quantum.processor {
       }
     }
 
-    on quantum.processor.ready {
+    listen for "quantum.processor.ready" {
       set ::ready_info = $1
       say "✅ Quantum Processor ready!"
       say "🎯 Subsystems: " + ::ready_info.subsystems_count

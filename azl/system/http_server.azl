@@ -1,0 +1,297 @@
+# AZL Pure HTTP Server Component
+# Uses the system interface to handle HTTP requests without any external dependencies
+
+component ::net.http.server {
+  init {
+    set ::port = 8080
+    set ::routes = {}
+    set ::running = false
+    set ::request_count = 0
+    
+    say "🌐 AZL Pure HTTP Server Component Ready"
+    say "⚡ NO EXTERNAL DEPENDENCIES!"
+  }
+  
+  behavior {
+    listen for "http.server.start" then {
+      set ::port = ::event.data.port || 8080
+      set ::host = ::event.data.host || "0.0.0.0"
+      set ::handler = ::event.data.handler
+      say "🌐 HTTP server starting on " + ::host + ":" + ::port
+      ::start_server()
+    }
+    
+    listen for "http.server.stop" then {
+      ::stop_server()
+    }
+    
+    listen for "http.server.add_route" then {
+      set route = ::event.data
+      set ::routes[route.path] = route
+      say "📡 Added route: " + route.method + " " + route.path
+    }
+    
+    listen for "http.server.handle_request" then {
+      set request = ::event.data
+      set response = ::handle_request(request)
+      emit http.server.response with response
+    }
+  }
+  
+  # Start the HTTP server
+  ::start_server = () => {
+    say "http: start " + ::host + ":" + ::port.toString()
+
+    emit syscall with { type: "net.socket", args: { type: "tcp" } }
+            listen for "syscall.response" then {
+      say "http: net.socket -> ok=" + (::event.data.ok || false).toString() + " fd=" + (::event.data.socket || -1).toString()
+      if (::event.data.ok != true) { say "http: socket fail"; return false }
+      set sock = ::event.data.socket
+
+      emit syscall with { type: "socket.bind", args: { host: ::host, port: ::port } }
+              listen for "syscall.response" then {
+        say "http: socket.bind -> ok=" + (::event.data.ok || false).toString()
+        if (::event.data.ok != true) { say "http: bind fail"; return false }
+
+        emit syscall with { type: "socket.listen", args: { socket: sock, backlog: 128 } }
+        listen for "syscall.response" then {
+          say "http: socket.listen -> ok=" + (::event.data.ok || false).toString()
+          if (::event.data.ok != true) { say "http: listen fail"; return false }
+          say "http: listening on " + ::host + ":" + ::port.toString()
+          set ::running = true
+          emit http.server.started with { host: ::host, port: ::port }
+
+          loop {
+            emit syscall with { type: "net.accept", args: { socket: sock } }
+            listen for "syscall.response" then {
+              if (::event.data.ok != true) { sleep 5; continue }
+              set conn = ::event.data.conn
+
+              emit syscall with { type: "net.read", args: { conn: conn, max: 65536 } }
+              listen for "syscall.response" then {
+                set req = ::parse_request(::event.data.bytes)
+                set res = ::handler(req)
+                emit syscall with { type: "net.write", args: { conn: conn, bytes: ::encode_response(res) } }
+                listen for "syscall.response" then { }
+                emit syscall with { type: "net.close", args: { conn: conn } }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  # Stop the HTTP server
+  ::stop_server = () => {
+    if !::running {
+      say "⚠️  HTTP server not running"
+      return
+    }
+    
+    set ::running = false
+    say "🌐 HTTP Server stopped"
+    
+    emit http.server.stopped
+  }
+  
+  # Add default routes
+  ::add_default_routes = () => {
+    # Health check endpoint
+    set ::routes["/healthz"] = {
+      method: "GET",
+      handler: ::health_check
+    }
+    
+    # Ready check endpoint
+    set ::routes["/readyz"] = {
+      method: "GET", 
+      handler: ::ready_check
+    }
+    
+    # Status endpoint
+    set ::routes["/status"] = {
+      method: "GET",
+      handler: ::status_check
+    }
+    
+    # Build endpoint
+    set ::routes["/build"] = {
+      method: "POST",
+      handler: ::handle_build
+    }
+    
+    # Analytics endpoint
+    set ::routes["/analytics"] = {
+      method: "GET",
+      handler: ::get_analytics
+    }
+    
+    say "📡 Default routes configured"
+  }
+  
+  # Handle incoming HTTP request
+  ::handle_request = (request) => {
+    set ::request_count = ::request_count + 1
+    
+    set path = request.path || "/"
+    set method = request.method || "GET"
+    set headers = request.headers || {}
+    set body = request.body || ""
+    
+    say "📥 Request " + ::request_count + ": " + method + " " + path
+    
+    # Check authentication
+    if !::authenticate_request(headers) {
+      return {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+        body: '{"error": "Unauthorized"}'
+      }
+    }
+    
+    # Find matching route
+    set route = ::routes[path]
+    if !route {
+      return {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+        body: '{"error": "Not found"}'
+      }
+    }
+    
+    if route.method != method {
+      return {
+        status: 405,
+        headers: { "Content-Type": "application/json" },
+        body: '{"error": "Method not allowed"}'
+      }
+    }
+    
+    # Execute route handler
+    set result = route.handler(request)
+    
+    say "📤 Response " + ::request_count + ": " + result.status
+    
+    return result
+  }
+  
+  # Authenticate request using API token
+  ::authenticate_request = (headers) => {
+    set auth_header = headers["Authorization"] || ""
+    set expected_token = ::internal.env("AZL_API_TOKEN")
+    
+    if !expected_token {
+      return true  # No token required
+    }
+    
+    if !auth_header.starts_with("Bearer ") {
+      return false
+    }
+    
+    set provided_token = auth_header.substring(7)
+    return provided_token == expected_token
+  }
+  
+  # Route handlers
+  ::health_check = (request) => {
+    return {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+      body: '{"status": "healthy", "timestamp": "' + ::azl.stdlib.time_now([]) + '"}'
+    }
+  }
+  
+  ::ready_check = (request) => {
+    return {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+      body: '{"status": "ready", "daemon": "running"}'
+    }
+  }
+  
+  ::status_check = (request) => {
+    # This will be connected to the enterprise daemon
+    emit get.daemon.status
+    return {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+      body: '{"status": "ok", "daemon": "running", "request_count": ' + ::request_count + '}'
+    }
+  }
+  
+  ::handle_build = (request) => {
+    set build_data = ::parse_json(request.body)
+    emit daemon.enterprise.build with { 
+      files: build_data.files || [],
+      options: build_data.options || {}
+    }
+    
+    return {
+      status: 202,
+      headers: { "Content-Type": "application/json" },
+      body: '{"status": "accepted", "message": "Build submitted"}'
+    }
+  }
+  
+  ::get_analytics = (request) => {
+    # This will be connected to the enterprise daemon
+    emit get.daemon.analytics
+    return {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+      body: '{"analytics": "available", "request_count": ' + ::request_count + '}'
+    }
+  }
+  
+  # Helper function to parse JSON
+  ::parse_json = (json_string) => {
+    # Simple JSON parser for basic objects
+    set result = {}
+    set json = json_string.trim()
+    
+    if json.starts_with("{") && json.ends_with("}") {
+      set content = json.substring(1, json.length - 1)
+      set pairs = content.split(",")
+      
+      for pair in pairs {
+        set parts = pair.split(":")
+        if parts.length == 2 {
+          set key = parts[0].trim().replace('"', "")
+          set value = parts[1].trim().replace('"', "")
+          set result[key] = value
+        }
+      }
+    }
+    
+    return result
+  }
+  
+  interface {
+    export fn start(port) {
+      emit http.server.start with { port: port || 8080 }
+    }
+    
+    export fn stop() {
+      emit http.server.stop
+    }
+    
+    export fn add_route(path, method, handler) {
+      emit http.server.add_route with { path: path, method: method, handler: handler }
+    }
+    
+    export fn get_status() {
+      return {
+        running: ::running,
+        port: ::port,
+        request_count: ::request_count,
+        routes: ::routes
+      }
+    }
+  }
+  
+  # Output events
+  output event: http.server.started
+  output event: http.server.stopped
+  output event: http.server.response
+}

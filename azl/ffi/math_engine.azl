@@ -1,0 +1,166 @@
+# Pure Math Engine - Pure AZL Implementations
+# Replaces external bridges; no Python/Rust dependencies
+
+component ::ffi.math_engine {
+  init {
+    say "🔢 Pure Math Engine - REAL MATHEMATICS (PURE AZL)"
+    set ::math_operations = {}
+    initialize_math_operations()
+    say "✅ Pure Math Engine initialized"
+  }
+
+  behavior {
+    # Initialize math operations
+    listen for "initialize_math_operations" {
+      say "🔧 Initializing math operations..."
+      
+      # Register matrix operations
+      set ::math_operations.matmul = "matrix_multiplication"
+      set ::math_operations.add = "matrix_addition"
+      set ::math_operations.subtract = "matrix_subtraction"
+      set ::math_operations.relu = "relu_activation"
+      set ::math_operations.softmax = "softmax_activation"
+      set ::math_operations.gradient = "gradient_calculation"
+      
+      # Register quantum operations
+      set ::math_operations.quantum_gate = "quantum_gate_application"
+      set ::math_operations.quantum_measure = "quantum_measurement"
+      set ::math_operations.quantum_state = "quantum_state_manipulation"
+      
+      say "✅ Math operations registered"
+    }
+    
+    # Matrix multiplication
+    listen for "matmul" {
+      let operation_data = ::event.data
+      let A = operation_data.matrix_a
+      let B = operation_data.matrix_b
+      say "🔢 Matrix multiplication (pure): " + len(A) + "x" + len(A[0]) + " * " + len(B) + "x" + len(B[0])
+      let C = matrix_multiply_pure(A, B)
+      emit "matmul_done" with { result: C, operation: "matrix_multiplication", success: true }
+    }
+    
+    # Matrix addition
+    listen for "matrix_add" {
+      let d = ::event.data
+      let C = matrix_add_pure(d.matrix_a, d.matrix_b)
+      emit "matrix_add_done" with { result: C, operation: "matrix_addition", success: true }
+    }
+    
+    # ReLU activation
+    listen for "relu_activation" {
+      let v = ::event.data.input_vector
+      let out = []
+      for x in v { out.push(x > 0 ? x : 0) }
+      emit "relu_done" with { result: out, operation: "relu_activation", success: true }
+    }
+    
+    # Softmax activation
+    listen for "softmax_activation" {
+      let v = ::event.data.input_vector
+      let out = softmax_pure(v)
+      emit "softmax_done" with { result: out, operation: "softmax_activation", success: true }
+    }
+    
+    # Gradient calculation
+    listen for "gradient_calculation" {
+      # Compute dL/dy for MSE: y_pred - y_true
+      let y_pred = ::event.data.y_pred
+      let y_true = ::event.data.y_true
+      let grad = []
+      let n = len(y_pred)
+      let i = 0
+      while (i < n) { grad.push(y_pred[i] - y_true[i]); i = i + 1 }
+      emit "gradient_done" with { result: grad, operation: "gradient_calculation", success: true }
+    }
+    
+    # Quantum gate application
+    listen for "quantum_gate" {
+      let d = ::event.data
+      let gate = d.gate  # 2x2 matrix
+      let state = d.quantum_state  # 2-vector [a,b]
+      let out = [ gate[0][0]*state[0] + gate[0][1]*state[1], gate[1][0]*state[0] + gate[1][1]*state[1] ]
+      emit "quantum_gate_done" with { result: out, operation: "quantum_gate_application", success: true }
+    }
+    
+    # Quantum measurement
+    listen for "quantum_measure" {
+      let state = ::event.data.quantum_state
+      # Return probabilities (squared magnitude) for 1-qubit state
+      let p0 = state[0]*state[0]
+      let p1 = state[1]*state[1]
+      let norm = p0 + p1
+      if (norm > 0) { p0 = p0 / norm; p1 = p1 / norm }
+      emit "quantum_measure_done" with { probabilities: [p0, p1], operation: "quantum_measurement", success: true }
+    }
+
+  memory {
+    ::math_operations = {}
+  }
+
+  # Pure implementations
+  fn matrix_multiply_pure(A, B) {
+    let a_rows = len(A); let a_cols = len(A[0]); let b_rows = len(B); let b_cols = len(B[0])
+    if (a_cols != b_rows) { return { error: "dim_mismatch" } }
+    let C = []
+    let i = 0
+    while (i < a_rows) {
+      let row = []
+      let j = 0
+      while (j < b_cols) {
+        let sum = 0
+        let k = 0
+        while (k < a_cols) { sum = sum + A[i][k] * B[k][j]; k = k + 1 }
+        row.push(sum)
+        j = j + 1
+      }
+      C.push(row)
+      i = i + 1
+    }
+    return C
+  }
+
+  fn matrix_add_pure(A, B) {
+    let r = len(A); let c = len(A[0])
+    let C = []
+    let i = 0
+    while (i < r) {
+      let row = []
+      let j = 0
+      while (j < c) { row.push(A[i][j] + B[i][j]); j = j + 1 }
+      C.push(row)
+      i = i + 1
+    }
+    return C
+  }
+
+  fn exp_approx(x) {
+    # 8-term Taylor for exp
+    let term = 1
+    let sum = 1
+    let k = 1
+    while (k < 10) { term = term * x / k; sum = sum + term; k = k + 1 }
+    return sum
+  }
+
+  fn softmax_pure(v) {
+    # Stabilize by subtracting max
+    let maxv = v[0]
+    let i = 1
+    while (i < len(v)) { if (v[i] > maxv) { maxv = v[i] }; i = i + 1 }
+    let exps = []
+    let sum = 0
+    i = 0
+    while (i < len(v)) { let e = exp_approx(v[i] - maxv); exps.push(e); sum = sum + e; i = i + 1 }
+    let out = []
+    i = 0
+    while (i < len(exps)) { out.push(exps[i] / sum); i = i + 1 }
+    return out
+  }
+}
+
+# Initialize FFI Math Engine
+say "🔢 FFI Math Engine Ready"
+
+# Initialize math operations
+emit initialize_math_operations with "start_math_init"

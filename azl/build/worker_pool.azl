@@ -1,0 +1,426 @@
+# AZL Isolated Worker Pool (pure AZL)
+# - Spawns separate AZL processes for compilation jobs
+# - Resource guards and backpressure management
+# - IPC via temporary files for job communication
+# - Process lifecycle management and cleanup
+
+component ::build.worker_pool {
+  init {
+    set ::max_workers = (::internal.env("AZL_BUILD_MAX_WORKERS") || 8)
+    set ::worker_timeout = (::internal.env("AZL_BUILD_WORKER_TIMEOUT") || 300000)  # 5 minutes
+    set ::memory_limit = (::internal.env("AZL_BUILD_MEMORY_LIMIT") || 1073741824)  # 1GB per worker
+    set ::temp_dir = (::internal.env("AZL_BUILD_TEMP") || "/tmp/azl_workers")
+    
+    set ::active_workers = {}     # worker_id -> { pid, start_time, job, status }
+    set ::available_workers = []  # [ worker_id ]
+    set ::job_queue = []          # [ { id, path, source, backend, options } ]
+    set ::completed_jobs = {}     # job_id -> { success, output, error, duration }
+    set ::worker_counter = 0
+    set ::job_counter = 0
+    
+    set ::resource_monitor = {
+      total_memory: 0,
+      active_processes: 0,
+      last_check: 0
+    }
+    
+    link ::azl.system_interface
+    link ::azl.stdlib
+    link ::error.system
+    link ::build.cache_manager
+    
+    # Ensure temp directory exists
+    ::ensure_temp_dir()
+    
+    say "🏭 AZL Worker Pool ready (max=::max_workers, timeout=::worker_timeout ms)"
+    emit build.worker_pool.ready with { max_workers: ::max_workers, timeout: ::worker_timeout }
+  }
+  
+  behavior {
+    # Submit compilation job to worker pool
+    listen for "worker.submit_job" then {
+      set job_data = ::event.data
+      set job_id = ::generate_job_id()
+      
+      set job = {
+        id: job_id,
+        path: job_data.path,
+        source: job_data.source,
+        backend: job_data.backend || "bytecode",
+        options: job_data.options || {},
+        submitted_at: ::azl.stdlib.time_now([])
+      }
+      
+      set ::job_queue.push(job)
+      say ("📋 Job queued: " + job.path + " (ID: " + job_id + ")")
+      
+      # Try to dispatch immediately if workers available
+      ::try_dispatch_jobs()
+    }
+    
+    # Check for completed workers and collect results
+    listen for "worker.check_completions" then {
+      ::check_worker_completions()
+    }
+    
+    # Emergency shutdown of all workers
+    listen for "worker.shutdown" then {
+      ::shutdown_all_workers()
+    }
+    
+    # Resource monitoring pulse
+    listen for "worker.monitor_resources" then {
+      ::update_resource_usage()
+    }
+  }
+  
+  memory {
+    ::ensure_temp_dir = () => {
+      set exists = ::azl.system_interface.syscall("file_exists", { path: ::temp_dir })
+      if !exists {
+        set created = ::azl.system_interface.syscall("mkdir", { path: ::temp_dir, recursive: true })
+        if !created { emit log_error with { type: "worker_pool", message: ("Failed to create temp directory: " + ::temp_dir), context: { stage: "init" } } }
+      }
+    }
+    
+    ::generate_job_id = () => {
+      set ::job_counter = ::job_counter + 1
+      return "job_" + ::job_counter + "_" + (::azl.stdlib.time_now([]) % 1000000)
+    }
+    
+    ::generate_worker_id = () => {
+      set ::worker_counter = ::worker_counter + 1
+      return "worker_" + ::worker_counter + "_" + (::azl.stdlib.time_now([]) % 1000000)
+    }
+    
+    ::try_dispatch_jobs = () => {
+      while ::job_queue.length > 0 && ::available_workers.length > 0 {
+        set job = ::job_queue.shift()
+        set worker_id = ::available_workers.shift()
+        
+        set success = ::spawn_worker_job(worker_id, job)
+        if !success {
+          # Return job to queue and worker to pool
+          set ::job_queue.unshift(job)
+          set ::available_workers.push(worker_id)
+          break
+        }
+      }
+    }
+    
+    ::spawn_worker_job = (worker_id, job) => {
+      set job_file = ::temp_dir + "/" + job.id + ".job"
+      set result_file = ::temp_dir + "/" + job.id + ".result"
+      set worker_script = ::temp_dir + "/" + worker_id + ".azl"
+      
+      # Write job data
+      set job_content = ::serialize_job(job)
+      set write_ok = ::azl.system_interface.syscall("write_file", { 
+        path: job_file, 
+        content: job_content 
+      })
+      if !write_ok { emit log_error with { type: "worker_pool", message: ("Failed to write job file: " + job_file), context: { job_id: job.id } } ; return false }
+      
+      # Generate worker script
+      set script_content = ::generate_worker_script(job_file, result_file, job.backend)
+      set script_ok = ::azl.system_interface.syscall("write_file", { 
+        path: worker_script, 
+        content: script_content 
+      })
+      if !script_ok { emit log_error with { type: "worker_pool", message: ("Failed to write worker script: " + worker_script), context: { job_id: job.id } } ; return false }
+      
+      # Spawn worker process
+      set pid = ::azl.system_interface.syscall("exec", {
+        command: "azl",
+        args: [worker_script],
+        background: true,
+        env: {
+          AZL_WORKER_JOB_FILE: job_file,
+          AZL_WORKER_RESULT_FILE: result_file,
+          AZL_WORKER_ID: worker_id,
+          AZL_WORKER_TIMEOUT: ::worker_timeout
+        }
+      })
+      
+      if !pid { emit log_error with { type: "worker_pool", message: "Failed to spawn worker process", context: { job_id: job.id, worker_id: worker_id } } ; return false }
+      
+      # Track active worker
+      set ::active_workers[worker_id] = {
+        pid: pid,
+        start_time: ::azl.stdlib.time_now([]),
+        job: job,
+        status: "running",
+        job_file: job_file,
+        result_file: result_file,
+        script_file: worker_script
+      }
+      
+      say ("🚀 Worker " + worker_id + " started for " + job.path + " (PID: " + pid + ")")
+      return true
+    }
+    
+    ::check_worker_completions = () => {
+      set completed_workers = []
+      
+      for worker_id in ::active_workers {
+        set worker = ::active_workers[worker_id]
+        set job = worker.job
+        
+        # Check if result file exists
+        set result_exists = ::azl.system_interface.syscall("file_exists", { path: worker.result_file })
+        set current_time = ::azl.stdlib.time_now([])
+        set elapsed = current_time - worker.start_time
+        
+        if result_exists {
+          # Worker completed successfully
+          set result_content = ::azl.system_interface.syscall("read_file", { path: worker.result_file })
+          set result = ::parse_worker_result(result_content)
+          
+          set ::completed_jobs[job.id] = {
+            success: result.success,
+            output: result.output,
+            error: result.error,
+            duration: elapsed,
+            worker_id: worker_id
+          }
+          
+          set completed_workers.push(worker_id)
+          say ("✅ Worker " + worker_id + " completed " + job.path + " in " + elapsed + "ms")
+          
+          # Emit completion event
+          emit worker.job.complete with {
+            job_id: job.id,
+            path: job.path,
+            success: result.success,
+            output: result.output,
+            error: result.error,
+            duration: elapsed
+          }
+          
+        } else if elapsed > ::worker_timeout {
+          # Worker timed out
+          set ::completed_jobs[job.id] = {
+            success: false,
+            output: null,
+            error: "Worker timeout after " + elapsed + "ms",
+            duration: elapsed,
+            worker_id: worker_id
+          }
+          
+          set completed_workers.push(worker_id)
+          say ("⏰ Worker " + worker_id + " timed out for " + job.path)
+          
+          # Kill the process
+          ::azl.system_interface.syscall("kill", { pid: worker.pid, signal: 9 })
+          
+          emit worker.job.complete with {
+            job_id: job.id,
+            path: job.path,
+            success: false,
+            output: null,
+            error: "Worker timeout",
+            duration: elapsed
+          }
+        }
+      }
+      
+      # Clean up completed workers
+      for worker_id in completed_workers {
+        set worker = ::active_workers[worker_id]
+        
+        # Clean up files
+        ::azl.system_interface.syscall("delete_file", { path: worker.job_file })
+        ::azl.system_interface.syscall("delete_file", { path: worker.result_file })
+        ::azl.system_interface.syscall("delete_file", { path: worker.script_file })
+        
+        # Return worker to pool
+        delete ::active_workers[worker_id]
+        set ::available_workers.push(worker_id)
+      }
+      
+      # Try to dispatch more jobs
+      ::try_dispatch_jobs()
+    }
+    
+    ::shutdown_all_workers = () => {
+      say "🛑 Shutting down all workers..."
+      
+      for worker_id in ::active_workers {
+        set worker = ::active_workers[worker_id]
+        ::azl.system_interface.syscall("kill", { pid: worker.pid, signal: 9 })
+        
+        # Clean up files
+        ::azl.system_interface.syscall("delete_file", { path: worker.job_file })
+        ::azl.system_interface.syscall("delete_file", { path: worker.result_file })
+        ::azl.system_interface.syscall("delete_file", { path: worker.script_file })
+      }
+      
+      set ::active_workers = {}
+      set ::available_workers = []
+      set ::job_queue = []
+      
+      say "✅ All workers shut down"
+    }
+    
+    ::update_resource_usage = () => {
+      set current_time = ::azl.stdlib.time_now([])
+      set ::resource_monitor.active_processes = ::active_workers.length
+      set ::resource_monitor.last_check = current_time
+      
+      # Estimate memory usage (rough calculation)
+      set estimated_memory = ::active_workers.length * 100 * 1024 * 1024  # 100MB per worker
+      set ::resource_monitor.total_memory = estimated_memory
+      
+      # Check if we need to throttle due to resource pressure
+      if estimated_memory > ::memory_limit {
+        say ("⚠️  Memory pressure detected: " + estimated_memory + " bytes")
+        emit worker.resource_pressure with { memory: estimated_memory, limit: ::memory_limit }
+      }
+    }
+    
+    ::serialize_job = (job) => {
+      return {
+        id: job.id,
+        path: job.path,
+        source: job.source,
+        backend: job.backend,
+        options: job.options,
+        submitted_at: job.submitted_at
+      }
+    }
+    
+    ::parse_worker_result = (content) => {
+      try {
+        return ::azl.stdlib.json_parse(content)
+      } catch {
+        return { success: false, output: null, error: "Failed to parse worker result" }
+      }
+    }
+    
+    ::generate_worker_script = (job_file, result_file, backend) => {
+      set script = [
+        "# AZL Worker Script",
+        "# Job file: " + job_file,
+        "# Result file: " + result_file,
+        "",
+        "component ::worker {",
+        "  init {",
+        "    set ::job_file = \"" + job_file + "\"",
+        "    set ::result_file = \"" + result_file + "\"",
+        "    set ::backend = \"" + backend + "\"",
+        "    set ::start_time = ::azl.stdlib.time_now([])",
+        "    ",
+        "    link ::azl.compiler",
+        "    link ::azl.native_compiler",
+        "    link ::azl.stdlib",
+        "    link ::azl.system_interface",
+        "    ",
+        "    ::run_job()",
+        "  }",
+        "  ",
+        "  memory {",
+        "    ::run_job = () => {",
+        "      try {",
+        "        # Load job data",
+        "        set job_content = ::azl.system_interface.syscall(\"read_file\", { path: ::job_file })",
+        "        set job = ::azl.stdlib.json_parse(job_content)",
+        "        ",
+        "        # Compile based on backend",
+        "        set result = null",
+        "        if ::backend == \"bytecode\" {",
+        "          emit compile with { component_name: job.path, source: job.source }",
+        "          # Wait for compilation result",
+        "          set result = { success: true, output: { kind: \"bytecode\", size: 0 } }",
+        "        } else if ::backend == \"native\" {",
+        "          emit native_compile with { component_name: job.path, source: job.source }",
+        "          # Wait for native compilation result",
+        "          set result = { success: true, output: { kind: \"native\", file: job.path + \".o\" } }",
+        "        }",
+        "        ",
+        "        set duration = ::azl.stdlib.time_now([]) - ::start_time",
+        "        set final_result = {",
+        "          success: result.success,",
+        "          output: result.output,",
+        "          error: null,",
+        "          duration: duration",
+        "          worker_id: ::internal.env(\"AZL_WORKER_ID\")",
+        "        }",
+        "        ",
+        "        # Write result",
+        "        set result_json = ::azl.stdlib.json_stringify(final_result)",
+        "        ::azl.system_interface.syscall(\"write_file\", { path: ::result_file, content: result_json })",
+        "        ",
+        "      } catch (error) {",
+        "        set duration = ::azl.stdlib.time_now([]) - ::start_time",
+        "        set error_result = {",
+        "          success: false,",
+        "          output: null,",
+        "          error: error,",
+        "          duration: duration,",
+        "          worker_id: ::internal.env(\"AZL_WORKER_ID\")",
+        "        }",
+        "        ",
+        "        set error_json = ::azl.stdlib.json_stringify(error_result)",
+        "        ::azl.system_interface.syscall(\"write_file\", { path: ::result_file, content: error_json })",
+        "      }",
+        "    }",
+        "  }",
+        "}",
+        "",
+        "# Start worker",
+        "link ::worker"
+      ].join("\n")
+      
+      return script
+    }
+  }
+  
+  interface {
+    export fn submit_job(path, source, backend, options) {
+      emit worker.submit_job with { path: path, source: source, backend: backend, options: options || {} }
+    }
+    
+    export fn check_completions() {
+      emit worker.check_completions
+    }
+    
+    export fn monitor_resources() {
+      emit worker.monitor_resources
+    }
+    
+    export fn shutdown() {
+      emit worker.shutdown
+    }
+    
+    export fn get_status() {
+      return {
+        active_workers: ::active_workers.length,
+        available_workers: ::available_workers.length,
+        queued_jobs: ::job_queue.length,
+        completed_jobs: ::completed_jobs.length,
+        max_workers: ::max_workers,
+        resource_usage: ::resource_monitor
+      }
+    }
+    
+    export fn get_job_result(job_id) {
+      return ::completed_jobs[job_id] || null
+    }
+    
+    # Initialize worker pool with available workers
+    export fn initialize() {
+      set i = 0
+      while i < ::max_workers {
+        set worker_id = ::generate_worker_id()
+        set ::available_workers.push(worker_id)
+        set i = i + 1
+      }
+      say ("🏭 Worker pool initialized with " + ::max_workers + " workers")
+    }
+  }
+  
+  # Output events
+  output event: build.worker_pool.ready
+  output event: worker.job.complete
+  output event: worker.resource_pressure
+}

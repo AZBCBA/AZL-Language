@@ -1,0 +1,17 @@
+# azl/orchestrator/launcher.azl
+component ::nlp.comprehensive_launcher {
+  init {
+    say "🚀 LAUNCHING FULL REAL TRAINING"
+    say "📊 Multi-Dataset Training Pipeline"
+    say "⚡ FFI Bridge to LibTorch/CUDA"
+    say "🎯 Production-Ready Training"
+    emit "start_training" with "begin"
+  }
+
+  behavior {
+    listen for "start_training" {
+      say "🚀 Starting training pipeline..."
+      emit "get_dataset" to ::tbl.datasets with 0
+    }
+  }
+}

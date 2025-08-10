@@ -1,0 +1,36 @@
+# Event Interning Registry (string -> small integer ID)
+
+component ::core.event_bus_registry {
+  init {
+    set ::next_id = 1
+    set ::map = {}
+    set ::rev = {}
+  }
+
+  behavior {
+    listen for "event.intern" {
+      let name = ::event.data
+      if ::map[name] {
+        emit "event.interned" with ::map[name]
+      } else {
+        let id = ::next_id
+        set ::next_id = ::next_id + 1
+        set ::map[name] = id
+        set ::rev[id] = name
+        emit "event.interned" with id
+      }
+    }
+
+    listen for "event.lookup" {
+      let id = ::event.data
+      emit "event.name" with ::rev[id]
+    }
+  }
+
+  memory {
+    next_id
+    map
+    rev
+  }
+}
+

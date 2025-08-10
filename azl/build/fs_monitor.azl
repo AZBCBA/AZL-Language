@@ -1,0 +1,68 @@
+# AZL File System Monitor (pure AZL, polling)
+# - Polls a set of paths via system interface metadata
+# - Emits fs.changed when hashes differ
+
+component ::build.fs_monitor {
+  init {
+    set ::interval_ticks = 1000
+    set ::watched = {}      # path -> last_hash
+    set ::running = false
+    link ::azl.system_interface
+    emit build.fs_monitor.ready with "ready"
+  }
+
+  behavior {
+    listen for "watch.start" then {
+      set ::interval_ticks = ::event.data.interval || ::interval_ticks
+      set ::running = true
+      emit watch.tick with {}
+    }
+
+    listen for "watch.stop" then { set ::running = false }
+
+    listen for "watch.add" then {
+      set p = ::event.data.path
+      set h = ::hash_fnv1a32(::read_text(p))
+      set ::watched[p] = h
+    }
+
+    listen for "watch.tick" then {
+      if !::running { return }
+      for p in ::watched {
+        if p != null {
+          set cur = ::hash_fnv1a32(::read_text(p))
+          if cur != ::watched[p] {
+            set ::watched[p] = cur
+            emit fs.changed with { path: p }
+          }
+        }
+      }
+      # re-schedule next tick (conceptually; in pure AZL we emit again)
+      emit watch.tick with {}
+    }
+  }
+
+  memory {
+    ::read_text = (path) => { return (::azl.system_interface.read_file_sync && ::azl.system_interface.read_file_sync(path)) || "" }
+    ::hash_fnv1a32 = (text) => {
+      set hash = 2166136261
+      set i = 0
+      while i < text.length {
+        set code = text[i].charCodeAt(0) & 0xFF
+        set hash = hash ^ code
+        set hash = (hash * 16777619) % 4294967296
+        set i = i + 1
+      }
+      return hash
+    }
+  }
+
+  interface {
+    export fn add(path) { emit watch.add with { path: path } }
+    export fn start(interval) { emit watch.start with { interval: interval } }
+    export fn stop() { emit watch.stop with {} }
+    output event: fs.changed
+  }
+}
+
+

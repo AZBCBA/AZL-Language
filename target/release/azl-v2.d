@@ -1,1 +1,0 @@
-/home/abdulrahman-alzalameh/azl-language/target/release/azl-v2: /home/abdulrahman-alzalameh/azl-language/src/azl_v2_compiler.rs /home/abdulrahman-alzalameh/azl-language/src/azl_vm.rs /home/abdulrahman-alzalameh/azl-language/src/main.rs

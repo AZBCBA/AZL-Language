@@ -1,0 +1,32 @@
+component ::azl.backend.asm.examples {
+  init {}
+  behavior {}
+
+  function build_linux_x86_64_exit_zero(args) {
+    set assembler = import("azl/backend/asm/assembler.azl")
+    set elf = import("azl/backend/format/elf64_writer.azl")
+
+    set program = assembler.program_exit_linux_x86_64(0)
+    set res = assembler.assemble_x86_64(program)
+    if res.ok == false { return res }
+
+    set base = 0x400000
+    set entry = base + 0x1000
+    set bin = elf.write_exec(entry, res.bytes, base)
+    return bin
+  }
+
+  function build_linux_arm64_exit_zero(args) {
+    set assembler = import("azl/backend/asm/assembler.azl")
+    set elf = import("azl/backend/format/elf64_writer.azl")
+
+    set program = assembler.program_exit_linux_arm64(0)
+    set res = assembler.assemble_arm64(program)
+    if res.ok == false { return res }
+
+    set base = 0x400000
+    set entry = base + 0x1000
+    set bin = elf.write_exec(entry, res.bytes, base)
+    return bin
+  }
+}

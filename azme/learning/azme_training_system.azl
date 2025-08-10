@@ -411,7 +411,7 @@ function optimize_hyperparameters(model_name, dataset_name, param_grid) {
                     };
                 }
                 
-                // Clean up temporary model
+                // Clean up model variant
                 delete training_system.models[temp_model_name];
             }
         }

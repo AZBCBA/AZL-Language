@@ -1,0 +1,169 @@
+# AZL API Endpoints - HTTP endpoints for the enterprise daemon
+# Provides health, readiness, build, and status endpoints
+
+component ::api.endpoints {
+  init {
+    say "🌐 AZL API Endpoints initializing..."
+    
+    set ::ready = false
+    set ::start_time = ::azl.stdlib.time_now([])
+    set ::request_count = 0
+    
+    # Link to HTTP server
+    link ::net.http.server
+    
+    say "✅ API Endpoints ready"
+  }
+  
+  behavior {
+    listen for "net.http.server.started" then {
+      say "🌐 HTTP server started, setting up endpoints..."
+      ::setup_endpoints()
+    }
+    
+    listen for "daemon.enterprise.ready" then {
+      say "✅ Daemon ready, enabling endpoints"
+      set ::ready = true
+    }
+  }
+  
+  # Setup API endpoints
+  ::setup_endpoints = () => {
+    say "📡 Setting up API endpoints..."
+    
+    # Health check endpoint
+    ::net.http.server.add_route("/healthz", "GET", ::health_check)
+    
+    # Readiness check endpoint
+    ::net.http.server.add_route("/readyz", "GET", ::ready_check)
+    
+    # Status endpoint
+    ::net.http.server.add_route("/status", "GET", ::status_check)
+    
+    # Build endpoint
+    ::net.http.server.add_route("/build", "POST", ::handle_build)
+    
+    # Analytics endpoint
+    ::net.http.server.add_route("/analytics", "GET", ::get_analytics)
+    
+    say "✅ API endpoints configured"
+  }
+  
+  # Health check handler
+  ::health_check = (request) => {
+    set ::request_count = ::request_count + 1
+    
+    return {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+      body: '{"status":"healthy","timestamp":"' + ::azl.stdlib.time_now([]) + '","uptime":' + (::azl.stdlib.time_now([]) - ::start_time) + '}'
+    }
+  }
+  
+  # Readiness check handler
+  ::ready_check = (request) => {
+    set ::request_count = ::request_count + 1
+    
+    if ::ready {
+      return {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+        body: '{"status":"ready","daemon":"running"}'
+      }
+    } else {
+      return {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+        body: '{"status":"not_ready","daemon":"starting"}'
+      }
+    }
+  }
+  
+  # Status check handler
+  ::status_check = (request) => {
+    set ::request_count = ::request_count + 1
+    
+    return {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+      body: '{"status":"ok","daemon":"running","request_count":' + ::request_count + ',"uptime":' + (::azl.stdlib.time_now([]) - ::start_time) + '}'
+    }
+  }
+  
+  # Build handler
+  ::handle_build = (request) => {
+    set ::request_count = ::request_count + 1
+    
+    # Parse build request
+    set build_data = ::parse_json(request.body)
+    
+    # Emit build event
+    emit daemon.enterprise.build with {
+      files: build_data.files || [],
+      options: build_data.options || {}
+    }
+    
+    return {
+      status: 202,
+      headers: { "Content-Type": "application/json" },
+      body: '{"status":"accepted","message":"Build submitted"}'
+    }
+  }
+  
+  # Analytics handler
+  ::get_analytics = (request) => {
+    set ::request_count = ::request_count + 1
+    
+    return {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+      body: '{"analytics":"available","request_count":' + ::request_count + ',"uptime":' + (::azl.stdlib.time_now([]) - ::start_time) + '}'
+    }
+  }
+  
+  # Router function for HTTP server
+  ::router = (request) => {
+    set path = request.path
+    set method = request.method
+    
+    if path == "/healthz" && method == "GET" {
+      return ::health_check(request)
+    } else if path == "/readyz" && method == "GET" {
+      return ::ready_check(request)
+    } else if path == "/status" && method == "GET" {
+      return ::status_check(request)
+    } else if path == "/build" && method == "POST" {
+      return ::handle_build(request)
+    } else if path == "/analytics" && method == "GET" {
+      return ::get_analytics(request)
+    } else {
+      return {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+        body: '{"error":"not_found","path":"' + path + '"}'
+      }
+    }
+  }
+  
+  # Helper function to parse JSON
+  ::parse_json = (json_string) => {
+    set result = {}
+    set json = json_string.trim()
+    
+    if json.starts_with("{") && json.ends_with("}") {
+      set content = json.substring(1, json.length - 1)
+      set pairs = content.split(",")
+      
+      for pair in pairs {
+        set parts = pair.split(":")
+        if parts.length == 2 {
+          set key = parts[0].trim().replace('"', "")
+          set value = parts[1].trim().replace('"', "")
+          set result[key] = value
+        }
+      }
+    }
+    
+    return result
+  }
+}

@@ -1,0 +1,28 @@
+############################################
+# azl/ffi/python.azl
+############################################
+component ::ffi.python {
+
+  init {
+    say "🐍 Python Component Initialized"
+  }
+
+  listen for "execute_python" {
+    set ::script_path = $1
+    
+    say "🐍 Executing Python script: "
+    say ::script_path
+    
+    emit log_error with { type: "ffi_disabled", message: "python execution unavailable in pure AZL runtime", context: { path: ::script_path } }
+    emit "python.error" with ::script_path
+  }
+
+  listen for "plot_loss" {
+    set ::script_path = "python_helpers/plot_loss.py"
+    
+    say "📊 Executing loss plotting script"
+    
+    emit log_error with { type: "ffi_disabled", message: "plot_loss unavailable in pure AZL runtime", context: { path: ::script_path } }
+    emit "plot.error" with ::script_path
+  }
+}

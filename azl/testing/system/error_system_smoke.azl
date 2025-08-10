@@ -1,0 +1,14 @@
+component ::smoke.error_system {
+  init {
+    say "Starting error system smoke"
+    emit "log_error"
+  }
+
+  behavior {
+    listen for "error.logged" then {
+      say "SMOKE_ERROR_LOGGED"
+    }
+  }
+}
+
+

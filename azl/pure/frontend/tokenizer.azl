@@ -1,0 +1,122 @@
+# AZL Pure Tokenizer - production-ready
+# Produces a flat token stream with kind, value, line, col
+
+component ::azl.pure.frontend.tokenizer {
+  set ::WHITESPACE = [" ", "\t", "\r"]
+  set ::DIGITS = "0123456789"
+  set ::IDENT_START = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+  set ::IDENT_CONT = ::IDENT_START + "0123456789"
+
+  set ::make_token = (kind, value, line, col) => {
+    return { kind: kind, value: value, line: line, col: col }
+  }
+
+  set ::tokenize = (source) => {
+    set ::tokens = []
+    set ::i = 0
+    set ::line = 1
+    set ::col = 1
+    set ::len = source.length
+
+    set ::push = (kind, value, l, c) => { set ::tokens = ::tokens + [::make_token(kind, value, l, c)] }
+
+    while (::i < ::len) {
+      set ::ch = source[::i]
+
+      if (::ch == "\n") {
+        set ::i = ::i + 1
+        set ::line = ::line + 1
+        set ::col = 1
+        continue
+      }
+
+      if (::WHITESPACE.indexOf(::ch) != -1) {
+        set ::i = ::i + 1
+        set ::col = ::col + 1
+        continue
+      }
+
+      # Comments: // until end of line
+      if (::ch == "/" && ::i + 1 < ::len && source[::i + 1] == "/") {
+        while (::i < ::len && source[::i] != "\n") { set ::i = ::i + 1; set ::col = ::col + 1 }
+        continue
+      }
+
+      # Strings: "..." with simple escapes \" and \\
+      if (::ch == '"') {
+        set ::start_line = ::line
+        set ::start_col = ::col
+        set ::i = ::i + 1
+        set ::col = ::col + 1
+        set ::buf = ""
+        set ::closed = false
+        while (::i < ::len) {
+          set ::c = source[::i]
+          if (::c == '"') { set ::i = ::i + 1; set ::col = ::col + 1; set ::closed = true; break }
+          if (::c == "\\") {
+            if (::i + 1 < ::len) {
+              set ::n = source[::i + 1]
+              if (::n == '"' || ::n == "\\") {
+                set ::buf = ::buf + ::n
+                set ::i = ::i + 2
+                set ::col = ::col + 2
+                continue
+              }
+            }
+          }
+          set ::buf = ::buf + ::c
+          set ::i = ::i + 1
+          set ::col = ::col + 1
+        }
+        if (!::closed) { return { error: "Unterminated string", line: ::start_line, col: ::start_col } }
+        ::push("STRING", ::buf, ::start_line, ::start_col)
+        continue
+      }
+
+      # Numbers: [0-9]+(\.[0-9]+)?
+      if (::DIGITS.indexOf(::ch) != -1) {
+        set ::start = ::i
+        set ::start_col = ::col
+        while (::i < ::len && ::DIGITS.indexOf(source[::i]) != -1) { set ::i = ::i + 1; set ::col = ::col + 1 }
+        if (::i < ::len && source[::i] == ".") {
+          set ::i = ::i + 1; set ::col = ::col + 1
+          while (::i < ::len && ::DIGITS.indexOf(source[::i]) != -1) { set ::i = ::i + 1; set ::col = ::col + 1 }
+        }
+        set ::value = source.slice(::start, ::i)
+        ::push("NUMBER", ::value, ::line, ::start_col)
+        continue
+      }
+
+      # Identifiers
+      if (::IDENT_START.indexOf(::ch) != -1) {
+        set ::start = ::i
+        set ::start_col = ::col
+        set ::i = ::i + 1; set ::col = ::col + 1
+        while (::i < ::len && (::IDENT_CONT.indexOf(source[::i]) != -1 || source[::i] == "." || source[::i] == ":")) {
+          set ::i = ::i + 1; set ::col = ::col + 1
+        }
+        set ::value = source.slice(::start, ::i)
+        ::push("IDENT", ::value, ::line, ::start_col)
+        continue
+      }
+
+      # Symbols
+      set ::symbols = ["{","}","(",")",",","=",":","[","]"]
+      if (::symbols.indexOf(::ch) != -1) {
+        ::push(::ch, ::ch, ::line, ::col)
+        set ::i = ::i + 1
+        set ::col = ::col + 1
+        continue
+      }
+
+      # Fallback: single-char token
+      ::push("CHAR", ::ch, ::line, ::col)
+      set ::i = ::i + 1
+      set ::col = ::col + 1
+    }
+
+    return { tokens: ::tokens }
+  }
+}
+
+

@@ -1,0 +1,807 @@
+# AZL Pure Compiler
+# This is the complete AZL compiler implemented entirely in AZL
+# It can parse, analyze, optimize, and generate bytecode without any Rust dependencies
+
+component ::azl.compiler {
+  init {
+    set ::tokens = []
+    set ::ast = {}
+    set ::symbol_table = {}
+    set ::bytecode = []
+    set ::optimizations = []
+    set ::errors = []
+    set ::warnings = []
+    set ::compilation_phase = "initialized"
+    set ::optimization_level = 3  # 0=none, 1=basic, 2=aggressive, 3=maximum
+    
+    say "🔧 Pure AZL Compiler Initialized"
+    say "🚀 NO RUST DEPENDENCIES!"
+    say "🚀 FULL AZL SELF-HOSTING!"
+    say "⚡ Advanced Optimizations: Level ::optimization_level"
+  }
+
+  behavior {
+    # Main compilation pipeline
+    listen for "compile" then {
+      set ::source_code = ::event.data.source_code
+      set ::component_name = ::event.data.component_name
+      set ::optimization_level = ::event.data.optimization_level || 3
+      
+      say "🔧 Compiling component: ::component_name (Optimization Level: ::optimization_level)"
+      set ::compilation_phase = "tokenizing"
+      
+      # Step 1: Tokenize
+      emit tokenize with { source_code: ::source_code }
+      
+      # Step 2: Parse
+      listen for "tokenize_complete" then {
+        set ::tokens = ::event.data.tokens
+        set ::compilation_phase = "parsing"
+        emit parse with { tokens: ::tokens }
+      }
+      
+      # Step 3: Analyze
+      listen for "parse_complete" then {
+        set ::ast = ::event.data.ast
+        set ::compilation_phase = "analyzing"
+        emit analyze with { ast: ::ast }
+      }
+      
+      # Step 4: Advanced Optimization (NEW)
+      listen for "analyze_complete" then {
+        set ::ast = ::event.data.ast
+        set ::compilation_phase = "advanced_optimizing"
+        
+        if ::optimization_level > 0 {
+          emit optimize_advanced with { 
+            ast: ::ast, 
+            optimization_level: ::optimization_level 
+          }
+        } else {
+          # Skip advanced optimization
+          emit advanced_optimization_complete with { ast: ::ast }
+        }
+      }
+      
+      # Step 5: Basic Optimization (Legacy)
+      listen for "advanced_optimization_complete" then {
+        set ::ast = ::event.data.ast
+        set ::compilation_phase = "optimizing"
+        emit optimize with { ast: ::ast }
+      }
+      
+      # Step 6: Generate bytecode
+      listen for "optimize_complete" then {
+        set ::ast = ::event.data.ast
+        set ::compilation_phase = "generating"
+        emit generate_bytecode with { ast: ::ast }
+      }
+      
+      # Step 7: Report completion
+      listen for "generate_complete" then {
+        set ::bytecode = ::event.data.bytecode
+        set ::compilation_phase = "complete"
+        
+        # Get optimization summary if available
+        set ::optimization_summary = ::event.data.optimization_summary || {}
+        
+        say "✅ Compilation complete: ::bytecode.length instructions"
+        if ::optimization_summary.total_optimizations {
+          say "⚡ Applied ::optimization_summary.total_optimizations optimizations"
+        }
+        
+        emit compilation_complete with { 
+          component_name: ::component_name,
+          bytecode: ::bytecode,
+          errors: ::errors,
+          warnings: ::warnings,
+          optimization_summary: ::optimization_summary
+        }
+      }
+    }
+    
+    # Tokenization phase
+    listen for "tokenize" then {
+      set ::source_code = ::event.data.source_code
+      set ::tokens = ::tokenize_source(::source_code)
+      
+      say "🔤 Tokenization complete: ::tokens.length tokens"
+      emit tokenize_complete with { tokens: ::tokens }
+    }
+    
+    # Parsing phase
+    listen for "parse" then {
+      set ::tokens = ::event.data.tokens
+      set ::ast = ::parse_tokens(::tokens)
+      
+      say "🌳 Parsing complete: ::ast.nodes.length nodes"
+      emit parse_complete with { ast: ::ast }
+    }
+    
+    # Analysis phase
+    listen for "analyze" then {
+      set ::ast = ::event.data.ast
+      set ::ast = ::analyze_ast(::ast)
+      
+      say "🔍 Analysis complete: ::symbol_table.size symbols"
+      emit analyze_complete with { ast: ::ast }
+    }
+    
+    # Advanced optimization phase (NEW)
+    listen for "optimize_advanced" then {
+      set ::ast = ::event.data.ast
+      set ::optimization_level = ::event.data.optimization_level || 3
+      
+      say "⚡ Starting advanced optimization pipeline (Level ::optimization_level)"
+      
+      # Delegate to advanced optimizer
+      emit advanced_optimizer_optimize with { 
+        ast: ::ast, 
+        optimization_level: ::optimization_level 
+      }
+    }
+    
+    # Listen for advanced optimization completion
+    listen for "advanced_optimization_complete" then {
+      set ::ast = ::event.data.ast
+      set ::optimization_summary = ::event.data.optimizations_applied || {}
+      
+      say "⚡ Advanced optimization complete"
+      say "🔗 LTO: ::optimization_summary.lto_functions_analyzed functions"
+      say "🗑️ Dead Code: ::optimization_summary.dead_code_blocks_removed blocks"
+      say "📦 Inlining: ::optimization_summary.functions_inlined functions"
+      say "🔧 Registers: ::optimization_summary.registers_allocated variables"
+      say "📊 Stack: ::optimization_summary.stack_frames_optimized frames"
+      
+      emit advanced_optimization_complete with { 
+        ast: ::ast,
+        optimization_summary: ::optimization_summary
+      }
+    }
+    
+    # Basic optimization phase (Legacy)
+    listen for "optimize" then {
+      set ::ast = ::event.data.ast
+      set ::ast = ::optimize_ast(::ast)
+      
+      say "⚡ Basic optimization complete: ::optimizations.length optimizations"
+      emit optimize_complete with { ast: ::ast }
+    }
+    
+    # Code generation phase
+    listen for "generate_bytecode" then {
+      set ::ast = ::event.data.ast
+      set ::bytecode = ::generate_bytecode(::ast)
+      
+      say "📦 Code generation complete: ::bytecode.length instructions"
+      emit generate_complete with { bytecode: ::bytecode }
+    }
+  }
+
+  memory {
+    # Safe number parser used by constant folding
+    ::parse_number_safe = (text) => {
+      set s = text.toString().trim()
+      if s.length == 0 { return null }
+      set i = 0
+      set sign = 1
+      if s[0] == '-' { set sign = -1; set i = 1 }
+      set hasDigit = false
+      set hasDot = false
+      set intVal = 0
+      set fracVal = 0.0
+      set pow = 1.0
+      while i < s.length {
+        set ch = s[i]
+        if ch >= '0' && ch <= '9' {
+          set hasDigit = true
+          if !hasDot { set intVal = intVal * 10 + (ch.charCodeAt(0) - 48) }
+          else { set fracVal = fracVal * 10 + (ch.charCodeAt(0) - 48); set pow = pow * 10.0 }
+        } else if ch == '.' && !hasDot { set hasDot = true }
+        else { break }
+        set i = i + 1
+      }
+      if !hasDigit { return null }
+      return sign * (intVal + (fracVal / pow))
+    }
+    # Tokenize source code
+    ::tokenize_source = (source_code) => {
+      set ::tokens = []
+      set ::lines = ::source_code.split("\n")
+      set ::line_number = 1
+      
+      for ::line in ::lines {
+        set ::line_tokens = ::tokenize_line(::line, ::line_number)
+        set ::tokens = ::tokens.concat(::line_tokens)
+        set ::line_number = ::line_number + 1
+      }
+      
+      return ::tokens
+    }
+    
+    # Tokenize a single line
+    ::tokenize_line = (line, line_number) => {
+      set ::tokens = []
+      set ::current = ""
+      set ::in_string = false
+      set ::string_delimiter = ""
+      set ::column = 1
+      
+      for ::char in ::line {
+        if ::in_string {
+          if ::char == ::string_delimiter {
+            set ::in_string = false
+            set ::tokens.push({
+              type: "string",
+              value: ::current,
+              line: ::line_number,
+              column: ::column - ::current.length
+            })
+            set ::current = ""
+          } else {
+            set ::current = ::current + ::char
+          }
+        } else {
+          if ::char == '"' || ::char == "'" {
+            if ::current.length > 0 {
+              set ::tokens.push({
+                type: "identifier",
+                value: ::current,
+                line: ::line_number,
+                column: ::column - ::current.length
+              })
+              set ::current = ""
+            }
+            set ::in_string = true
+            set ::string_delimiter = ::char
+          } else if ::char == " " || ::char == "\t" {
+            if ::current.length > 0 {
+              set ::tokens.push({
+                type: "identifier",
+                value: ::current,
+                line: ::line_number,
+                column: ::column - ::current.length
+              })
+              set ::current = ""
+            }
+          } else if ::char == "{" || ::char == "}" {
+            if ::current.length > 0 {
+              set ::tokens.push({
+                type: "identifier",
+                value: ::current,
+                line: ::line_number,
+                column: ::column - ::current.length
+              })
+              set ::current = ""
+            }
+            set ::tokens.push({
+              type: "brace",
+              value: ::char,
+              line: ::line_number,
+              column: ::column
+            })
+          } else if ::char == "=" {
+            if ::current.length > 0 {
+              set ::tokens.push({
+                type: "identifier",
+                value: ::current,
+                line: ::line_number,
+                column: ::column - ::current.length
+              })
+              set ::current = ""
+            }
+            set ::tokens.push({
+              type: "operator",
+              value: "=",
+              line: ::line_number,
+              column: ::column
+            })
+          } else {
+            set ::current = ::current + ::char
+          }
+        }
+        set ::column = ::column + 1
+      }
+      
+      if ::current.length > 0 {
+        set ::tokens.push({
+          type: "identifier",
+          value: ::current,
+          line: ::line_number,
+          column: ::column - ::current.length
+        })
+      }
+      
+      return ::tokens
+    }
+    
+    # Parse tokens into AST
+    ::parse_tokens = (tokens) => {
+      set ::ast = {
+        type: "program",
+        nodes: []
+      }
+      set ::current_pos = 0
+      
+      while ::current_pos < ::tokens.length {
+        set ::token = ::tokens[::current_pos]
+        
+        if ::token.value == "component" {
+          set ::component_node = ::parse_component(::tokens)
+          set ::ast.nodes.push(::component_node)
+        } else if ::token.value == "say" {
+          set ::say_node = ::parse_say_statement(::tokens)
+          set ::ast.nodes.push(::say_node)
+        } else if ::token.value == "set" {
+          set ::set_node = ::parse_set_statement(::tokens)
+          set ::ast.nodes.push(::set_node)
+        } else if ::token.value == "emit" {
+          set ::emit_node = ::parse_emit_statement(::tokens)
+          set ::ast.nodes.push(::emit_node)
+        } else if ::token.value == "link" {
+          set ::link_node = ::parse_link_statement(::tokens)
+          set ::ast.nodes.push(::link_node)
+        } else if ::token.value == "listen" {
+          set ::listen_node = ::parse_listen_statement(::tokens)
+          set ::ast.nodes.push(::listen_node)
+        } else {
+          set ::current_pos = ::current_pos + 1
+        }
+      }
+      
+      return ::ast
+    }
+    
+    # Parse component definition
+    ::parse_component = (tokens) => {
+      set ::component = {
+        type: "component",
+        name: "",
+        sections: {}
+      }
+      
+      # Skip "component" keyword
+      set ::current_pos = ::current_pos + 1
+      
+      # Get component name
+      if ::current_pos < ::tokens.length {
+        set ::name_token = ::tokens[::current_pos]
+        set ::component.name = ::name_token.value
+        set ::current_pos = ::current_pos + 1
+      }
+      
+      # Parse sections
+      while ::current_pos < ::tokens.length {
+        set ::token = ::tokens[::current_pos]
+        
+        if ::token.value == "init" {
+          set ::init_section = ::parse_section(::tokens, "init")
+          set ::component.sections.init = ::init_section
+        } else if ::token.value == "behavior" {
+          set ::behavior_section = ::parse_section(::tokens, "behavior")
+          set ::component.sections.behavior = ::behavior_section
+        } else if ::token.value == "memory" {
+          set ::memory_section = ::parse_section(::tokens, "memory")
+          set ::component.sections.memory = ::memory_section
+        } else {
+          break
+        }
+      }
+      
+      return ::component
+    }
+    
+    # Parse section (init, behavior, memory)
+    ::parse_section = (tokens, section_type) => {
+      set ::section = {
+        type: ::section_type,
+        statements: []
+      }
+      
+      # Skip section keyword
+      set ::current_pos = ::current_pos + 1
+      
+      # Parse section content
+      while ::current_pos < ::tokens.length {
+        set ::token = ::tokens[::current_pos]
+        
+        if ::token.value == "init" || ::token.value == "behavior" || ::token.value == "memory" {
+          break
+        }
+        
+        if ::token.value == "say" {
+          set ::say_node = ::parse_say_statement(::tokens)
+          set ::section.statements.push(::say_node)
+        } else if ::token.value == "set" {
+          set ::set_node = ::parse_set_statement(::tokens)
+          set ::section.statements.push(::set_node)
+        } else if ::token.value == "emit" {
+          set ::emit_node = ::parse_emit_statement(::tokens)
+          set ::section.statements.push(::emit_node)
+        } else if ::token.value == "listen" {
+          set ::listen_node = ::parse_listen_statement(::tokens)
+          set ::section.statements.push(::listen_node)
+        } else {
+          set ::current_pos = ::current_pos + 1
+        }
+      }
+      
+      return ::section
+    }
+    
+    # Parse say statement
+    ::parse_say_statement = (tokens) => {
+      set ::statement = {
+        type: "say",
+        message: ""
+      }
+      
+      # Skip "say" keyword
+      set ::current_pos = ::current_pos + 1
+      
+      # Get message
+      if ::current_pos < ::tokens.length {
+        set ::message_token = ::tokens[::current_pos]
+        set ::statement.message = ::message_token.value
+        set ::current_pos = ::current_pos + 1
+      }
+      
+      return ::statement
+    }
+    
+    # Parse set statement
+    ::parse_set_statement = (tokens) => {
+      set ::statement = {
+        type: "set",
+        variable: "",
+        value: ""
+      }
+      
+      # Skip "set" keyword
+      set ::current_pos = ::current_pos + 1
+      
+      # Get variable name
+      if ::current_pos < ::tokens.length {
+        set ::var_token = ::tokens[::current_pos]
+        set ::statement.variable = ::var_token.value
+        set ::current_pos = ::current_pos + 1
+      }
+      
+      # Get value
+      if ::current_pos < ::tokens.length {
+        set ::value_token = ::tokens[::current_pos]
+        set ::statement.value = ::value_token.value
+        set ::current_pos = ::current_pos + 1
+      }
+      
+      return ::statement
+    }
+    
+    # Parse emit statement
+    ::parse_emit_statement = (tokens) => {
+      set ::statement = {
+        type: "emit",
+        target: "",
+        data: {}
+      }
+      
+      # Skip "emit" keyword
+      set ::current_pos = ::current_pos + 1
+      
+      # Get target
+      if ::current_pos < ::tokens.length {
+        set ::target_token = ::tokens[::current_pos]
+        set ::statement.target = ::target_token.value
+        set ::current_pos = ::current_pos + 1
+      }
+      
+      # Get data (if any)
+      if ::current_pos < ::tokens.length {
+        set ::data_token = ::tokens[::current_pos]
+        if ::data_token.value == "with" {
+          set ::current_pos = ::current_pos + 1
+          set ::data = ::parse_data_object(::tokens)
+          set ::statement.data = ::data
+        }
+      }
+      
+      return ::statement
+    }
+    
+    # Parse listen statement
+    ::parse_listen_statement = (tokens) => {
+      set ::statement = {
+        type: "listen",
+        event: "",
+        handler: []
+      }
+      
+      # Skip "listen" keyword
+      set ::current_pos = ::current_pos + 1
+      
+      # Get event
+      if ::current_pos < ::tokens.length {
+        set ::event_token = ::tokens[::current_pos]
+        set ::statement.event = ::event_token.value
+        set ::current_pos = ::current_pos + 1
+      }
+      
+      # Get handler
+      if ::current_pos < ::tokens.length {
+        set ::handler_token = ::tokens[::current_pos]
+        if ::handler_token.value == "then" {
+          set ::current_pos = ::current_pos + 1
+          set ::handler = ::parse_handler_block(::tokens)
+          set ::statement.handler = ::handler
+        }
+      }
+      
+      return ::statement
+    }
+    
+    # Parse data object
+    ::parse_data_object = (tokens) => {
+      set ::data = {}
+      
+      while ::current_pos < ::tokens.length {
+        set ::token = ::tokens[::current_pos]
+        
+        if ::token.value == "}" {
+          set ::current_pos = ::current_pos + 1
+          break
+        }
+        
+        if ::token.type == "identifier" {
+          set ::key = ::token.value
+          set ::current_pos = ::current_pos + 1
+          
+          if ::current_pos < ::tokens.length {
+            set ::value_token = ::tokens[::current_pos]
+            set ::data[::key] = ::value_token.value
+            set ::current_pos = ::current_pos + 1
+          }
+        } else {
+          set ::current_pos = ::current_pos + 1
+        }
+      }
+      
+      return ::data
+    }
+    
+    # Parse handler block
+    ::parse_handler_block = (tokens) => {
+      set ::handler = []
+      
+      while ::current_pos < ::tokens.length {
+        set ::token = ::tokens[::current_pos]
+        
+        if ::token.value == "}" {
+          set ::current_pos = ::current_pos + 1
+          break
+        }
+        
+        if ::token.value == "say" {
+          set ::say_node = ::parse_say_statement(::tokens)
+          set ::handler.push(::say_node)
+        } else if ::token.value == "set" {
+          set ::set_node = ::parse_set_statement(::tokens)
+          set ::handler.push(::set_node)
+        } else if ::token.value == "emit" {
+          set ::emit_node = ::parse_emit_statement(::tokens)
+          set ::handler.push(::emit_node)
+        } else {
+          set ::current_pos = ::current_pos + 1
+        }
+      }
+      
+      return ::handler
+    }
+    
+    # Parse link statement
+    ::parse_link_statement = (tokens) => {
+      set ::statement = {
+        type: "link",
+        source: "",
+        target: ""
+      }
+      
+      # Skip "link" keyword
+      set ::current_pos = ::current_pos + 1
+      
+      # Get source
+      if ::current_pos < ::tokens.length {
+        set ::source_token = ::tokens[::current_pos]
+        set ::statement.source = ::source_token.value
+        set ::current_pos = ::current_pos + 1
+      }
+      
+      # Get target
+      if ::current_pos < ::tokens.length {
+        set ::target_token = ::tokens[::current_pos]
+        set ::statement.target = ::target_token.value
+        set ::current_pos = ::current_pos + 1
+      }
+      
+      return ::statement
+    }
+    
+    # Analyze AST
+    ::analyze_ast = (ast) => {
+      set ::symbol_table = {}
+      
+      for ::node in ::ast.nodes {
+        if ::node.type == "component" {
+          set ::symbol_table[::node.name] = {
+            type: "component",
+            node: ::node
+          }
+        }
+      }
+      
+      return ::ast
+    }
+    
+    # Basic optimization (Legacy)
+    ::optimize_ast = (ast) => {
+      set ::optimizations = []
+      
+      # Simple constant folding
+      set ::ast = ::constant_folding(::ast)
+      
+      # Simple dead code elimination
+      set ::ast = ::simple_dead_code_elimination(::ast)
+      
+      return ::ast
+    }
+    
+    # Constant folding
+    ::constant_folding = (ast) => {
+      for ::node in ::ast.nodes {
+        if ::node.type == "component" {
+          if ::node.sections.behavior {
+            for ::statement in ::node.sections.behavior.statements {
+              if ::statement.type == "set" {
+                set ::statement = ::fold_constant_expression(::statement)
+              }
+            }
+          }
+        }
+      }
+      
+      return ::ast
+    }
+    
+    # Fold constant expression
+    ::fold_constant_expression = (statement) => {
+      if ::statement.value && ::statement.value.includes("+") {
+        set ::parts = ::statement.value.split("+")
+        if ::parts.length == 2 {
+          set ::left = ::parse_number_safe(::parts[0])
+          set ::right = ::parse_number_safe(::parts[1])
+          if ::left != null && ::right != null {
+            set ::statement.value = ::left + ::right
+            set ::optimizations.push("constant_folding")
+          }
+        }
+      }
+      
+      return ::statement
+    }
+    
+    # Simple dead code elimination
+    ::simple_dead_code_elimination = (ast) => {
+      set ::removed = 0
+      
+      for ::node in ::ast.nodes {
+        if ::node.type == "component" {
+          if ::node.sections.behavior {
+            set ::new_statements = []
+            for ::statement in ::node.sections.behavior.statements {
+              if ::statement.type != "say" || ::statement.message.includes("error") {
+                set ::new_statements.push(::statement)
+              } else {
+                set ::removed = ::removed + 1
+              }
+            }
+            set ::node.sections.behavior.statements = ::new_statements
+          }
+        }
+      }
+      
+      if ::removed > 0 {
+        set ::optimizations.push("dead_code_elimination")
+      }
+      
+      return ::ast
+    }
+    
+    # Generate bytecode
+    ::generate_bytecode = (ast) => {
+      set ::bytecode = []
+      
+      for ::node in ::ast.nodes {
+        if ::node.type == "component" {
+          set ::component_bytecode = ::generate_component_bytecode(::node)
+          set ::bytecode = ::bytecode.concat(::component_bytecode)
+        }
+      }
+      
+      return ::bytecode
+    }
+    
+    # Generate component bytecode
+    ::generate_component_bytecode = (component) => {
+      set ::bytecode = []
+      
+      # Component header
+      set ::bytecode.push({
+        opcode: "COMPONENT",
+        operand: ::component.name
+      })
+      
+      # Init section
+      if ::component.sections.init {
+        for ::statement in ::component.sections.init.statements {
+          set ::statement_bytecode = ::generate_statement_bytecode(::statement)
+          set ::bytecode = ::bytecode.concat(::statement_bytecode)
+        }
+      }
+      
+      # Behavior section
+      if ::component.sections.behavior {
+        for ::statement in ::component.sections.behavior.statements {
+          set ::statement_bytecode = ::generate_statement_bytecode(::statement)
+          set ::bytecode = ::bytecode.concat(::statement_bytecode)
+        }
+      }
+      
+      # Memory section
+      if ::component.sections.memory {
+        for ::statement in ::component.sections.memory.statements {
+          set ::statement_bytecode = ::generate_statement_bytecode(::statement)
+          set ::bytecode = ::bytecode.concat(::statement_bytecode)
+        }
+      }
+      
+      return ::bytecode
+    }
+    
+    # Generate statement bytecode
+    ::generate_statement_bytecode = (statement) => {
+      set ::bytecode = []
+      
+      if ::statement.type == "say" {
+        set ::bytecode.push({
+          opcode: "SAY",
+          operand: ::statement.message
+        })
+      } else if ::statement.type == "set" {
+        set ::bytecode.push({
+          opcode: "SET",
+          operand: {
+            variable: ::statement.variable,
+            value: ::statement.value
+          }
+        })
+      } else if ::statement.type == "emit" {
+        set ::bytecode.push({
+          opcode: "EMIT",
+          operand: {
+            target: ::statement.target,
+            data: ::statement.data
+          }
+        })
+      } else if ::statement.type == "listen" {
+        set ::bytecode.push({
+          opcode: "LISTEN",
+          operand: {
+            event: ::statement.event,
+            handler: ::statement.handler
+          }
+        })
+      }
+      
+      return ::bytecode
+    }
+  }
+}

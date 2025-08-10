@@ -1,94 +1,46 @@
-name: CI
+name: AZL CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
 
 jobs:
-  build-test:
+  build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix: 
-        toolchain: [stable, beta]
-        include:
-          - toolchain: stable
-            rustup: stable
-          - toolchain: beta
-            rustup: beta
-    
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
-        
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rustup }}
-          profile: minimal
-          components: clippy,rustfmt
-          
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-        
-      - name: Run clippy
-        run: cargo clippy --all-targets -- -D warnings
-        
-      - name: Run tests (debug)
-        run: cargo test --all -- --nocapture
-        
-      - name: Run tests (release)
-        run: cargo test --release --all -- --nocapture
-        
-      - name: Run property tests
-        run: cargo test --test property_tests -- --nocapture
-        
-      - name: Build release
-        run: cargo build --release
-        
-      - name: Test VM demo
-        run: cargo run --release -- vm
-        
-      - name: Test VM demo with tracing
-        run: cargo run --release -- vm --trace
 
-  fuzz:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          
-      - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz
-        
-      - name: Run fuzz tests
+      - name: Install tools
         run: |
-          cd fuzz
-          cargo fuzz run parse -- -runs=1000
-          cargo fuzz run fuzz_target_1 -- -runs=1000
+          sudo apt-get update -y
+          sudo apt-get install -y ripgrep python3
 
-  nightly-checks:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Install nightly Rust
-        uses: actions-rs/toolchain@v1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          toolchain: nightly
-          profile: minimal
-          components: miri
-          
-      - name: Run Miri (memory safety)
+          node-version: '20'
+
+      - name: Gate - No placeholders/TODO/FIXME in .azl
         run: |
-          cargo miri test --test tests
-        env:
-          MIRIFLAGS: -Zmiri-disable-isolation 
+          ! rg -n -i -E 'placeholder|TODO|FIXME' -- '*.azl' || (echo 'Placeholder/TODO/FIXME found in .azl files' && rg -n -i -E 'placeholder|TODO|FIXME' -- '*.azl' && exit 1)
+
+      - name: Gate - No stale v2 references
+        run: |
+          ! rg -n -i -E '::parser\.v2|azl_v2_(interpreter|runner|parser)\.azl|AZL v2' || (echo 'Stale v2 references found' && rg -n -i -E '::parser\.v2|azl_v2_(interpreter|runner|parser)\.azl|AZL v2' && exit 1)
+
+      - name: Prepare combined run script
+        run: bash scripts/run_full.sh
+
+      - name: Audit live paths
+        run: bash scripts/audit_live_path.sh
+
+      - name: Runtime smoke - JS
+        run: node scripts/azl_runtime.js test_core.azl ::test.core
+
+      - name: Runtime smoke - Python
+        run: python3 azl_runner.py test_integration_final.azl
+
+

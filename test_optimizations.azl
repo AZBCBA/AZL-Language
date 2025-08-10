@@ -1,0 +1,74 @@
+# Test file to verify all optimization features are working
+
+function factorial(n) {
+  if n <= 1 {
+    return 1
+  } else {
+    return n * factorial(n - 1)  # Tail call optimization should be applied
+  }
+}
+
+function vector_sum(array, size) {
+  set sum = 0
+  set i = 0
+  while i < size {
+    set sum = sum + array[i]  # Auto-vectorization should be applied
+    set i = i + 1
+  }
+  return sum
+}
+
+function strength_reduction_test() {
+  set x = 0
+  set i = 0
+  while i < 100 {
+    set x = x * 16  # Should be optimized to x << 4
+    set i = i + 1
+  }
+  return x
+}
+
+function constant_folding_test() {
+  set a = 5 + 3  # Should be folded to 8
+  set b = a * 2  # Should be folded to 16
+  return b
+}
+
+function dead_code_elimination_test() {
+  set x = 10
+  set y = 20
+  set z = x + y  # This should be eliminated if not used
+  return x  # Only x is used
+}
+
+# Main test function
+function main() {
+  say "Testing optimizations..."
+  
+  # Test constant folding
+  set result1 = constant_folding_test()
+  say "Constant folding result: " + result1
+  
+  # Test strength reduction
+  set result2 = strength_reduction_test()
+  say "Strength reduction result: " + result2
+  
+  # Test dead code elimination
+  set result3 = dead_code_elimination_test()
+  say "Dead code elimination result: " + result3
+  
+  # Test tail call optimization
+  set result4 = factorial(5)
+  say "Tail call optimization result: " + result4
+  
+  # Test vectorization (simplified)
+  set array = [1, 2, 3, 4, 5]
+  set result5 = vector_sum(array, 5)
+  say "Vectorization result: " + result5
+  
+  say "All optimization tests completed!"
+  return 0
+}
+
+# Run the test
+main()

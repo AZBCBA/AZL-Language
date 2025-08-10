@@ -656,7 +656,7 @@ function parse_simple_expression(tokens, position) {
         return {
             node: {
                 type: "literal",
-                value: parseFloat(token.value),
+                value: parse_number_safe(token.value),
                 line: token.line
             },
             next_position: position + 1

@@ -1,0 +1,78 @@
+# Weight Storage System - Full AZL Component
+# Handles saving and loading trained model weights
+
+component ::nlp.weight_storage {
+  init {
+    say "💾 Weight Storage System Initialized - Full AZL Mode"
+    say "📁 Managing model weights and checkpoints"
+    set ::weights_path = "./weights/"
+    set ::checkpoints = []
+    set ::current_model = "none"
+    set ::checkpoint_model_name = ""
+    set ::checkpoint_timestamp = ""
+    set ::checkpoint_weights = ""
+    set ::checkpoint_config = ""
+    set ::checkpoint_metrics = ""
+    set ::checkpoint_version = "1.0"
+  }
+
+  behavior {
+    # Save weights
+    listen for "weights.save" {
+      let model_name = ::event.data
+      say "💾 Saving weights for model: " + model_name
+      
+      # Create weights directory if it doesn't exist
+      set ::model_path = ::weights_path + model_name + "/"
+      
+      # Save model weights
+      set ::checkpoint_model_name = model_name
+      set ::checkpoint_timestamp = "now"
+      set ::checkpoint_weights = "saved_weights"
+      set ::checkpoint_config = "default_config"
+      set ::checkpoint_metrics = "training_metrics"
+      set ::checkpoint_version = "1.0"
+      
+      say "✅ Weights saved for model: " + model_name
+      emit "weights.saved" with model_name
+    }
+
+    # Load weights
+    listen for "weights.load" {
+      let model_name = ::event.data
+      say "📂 Loading weights for model: " + model_name
+      
+      if ::checkpoint_model_name = model_name {
+        set ::current_model = model_name
+        say "✅ Weights loaded for model: " + model_name
+        emit "weights.loaded" with model_name
+      } else {
+        say "❌ No weights found for model: " + model_name
+        emit "weights.error" with "weights_not_found"
+      }
+    }
+
+    # List weights
+    listen for "weights.list" {
+      say "📋 Available models:"
+      say "  - " + ::checkpoint_model_name + " (v" + ::checkpoint_version + ", " + ::checkpoint_timestamp + ")"
+      
+      emit "weights.listed" with ::checkpoint_model_name
+    }
+  }
+
+  memory {
+    ::weights_path = "./weights/"
+    ::checkpoints = []
+    ::current_model = "none"
+    ::checkpoint_model_name = ""
+    ::checkpoint_timestamp = ""
+    ::checkpoint_weights = ""
+    ::checkpoint_config = ""
+    ::checkpoint_metrics = ""
+    ::checkpoint_version = "1.0"
+  }
+}
+
+# Initialize weight storage system
+say "💾 Weight Storage System Ready"

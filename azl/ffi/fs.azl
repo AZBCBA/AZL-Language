@@ -1,0 +1,119 @@
+############################################
+# azl/ffi/fs.azl
+############################################
+component ::ffi.fs {
+
+  init {
+    say "📁 File System Component Initialized"
+    set ::fs_stats = {
+      read_operations: 0,
+      write_operations: 0,
+      delete_operations: 0,
+      list_operations: 0
+    }
+  }
+
+  # FFI function implementations
+  function ffi_fs_write_file(path, content) {
+    increment ::fs_stats.write_operations
+    set ::result = ::azl.system_interface.direct_write_file(path, content)
+    if ::result {
+      return { ok: true, data: "File written successfully" }
+    } else {
+      return { ok: false, error: "Failed to write file" }
+    }
+  }
+
+  function ffi_fs_exists(path) {
+    set ::result = ::azl.system_interface.file_exists(path)
+    return { ok: true, data: ::result }
+  }
+
+  function ffi_fs_delete_file(path) {
+    increment ::fs_stats.delete_operations
+    set ::result = ::azl.system_interface.direct_delete_file(path)
+    if ::result {
+      return { ok: true, data: "File deleted successfully" }
+    } else {
+      return { ok: false, error: "Failed to delete file" }
+    }
+  }
+
+  function ffi_fs_delete_directory(path) {
+    increment ::fs_stats.delete_operations
+    set ::result = ::azl.system_interface.direct_delete_directory(path)
+    if ::result {
+      return { ok: true, data: "Directory deleted successfully" }
+    } else {
+      return { ok: false, error: "Failed to delete directory" }
+    }
+  }
+
+  function ffi_fs_list_directory(path) {
+    increment ::fs_stats.list_operations
+    set ::result = ::azl.system_interface.direct_list_directory(path)
+    if ::result {
+      return { ok: true, data: ::result }
+    } else {
+      return { ok: false, error: "Failed to list directory" }
+    }
+  }
+
+  function ffi_fs_file_size(path) {
+    set ::result = ::azl.system_interface.direct_file_size(path)
+    if ::result != null {
+      return { ok: true, data: ::result }
+    } else {
+      return { ok: false, error: "Failed to get file size" }
+    }
+  }
+
+  function ffi_fs_modified_time(path) {
+    set ::result = ::azl.system_interface.direct_modified_time(path)
+    if ::result != null {
+      return { ok: true, data: ::result }
+    } else {
+      return { ok: false, error: "Failed to get modification time" }
+    }
+  }
+
+  listen for "create_directory" {
+    set ::path = $1
+    say "📁 Creating directory: "
+    say ::path
+    emit fs.create with { path: ::path, mode: "0755" }
+    listen for "fs.create.response" then {
+      say "✅ Directory operation result: "
+      say ::event.data.success
+      emit "directory_created" with ::path ::event.data.success
+    }
+  }
+
+  listen for "append_file" {
+    set ::path = $1
+    set ::content = $2
+    
+    say "📝 Appending to file: "
+    say ::path
+    set ::existing = ::azl.system_interface.direct_read_file(::path) || ""
+    set ::ok = ::azl.system_interface.direct_write_file(::path, ::existing + ::content)
+    say "✅ File operation result: "
+    say ::ok
+    emit "file_appended" with ::path ::ok
+  }
+
+  listen for "read_file" {
+    set ::path = $1
+    
+    say "📖 Reading file: "
+    say ::path
+    set ::content = ::azl.system_interface.direct_read_file(::path)
+    say "✅ File content loaded"
+    emit "file_read" with ::path ::content
+  }
+
+  # Get FFI statistics
+  listen for "get_ffi_stats" {
+    emit "ffi_stats" with ::fs_stats
+  }
+}

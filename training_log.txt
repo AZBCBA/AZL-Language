@@ -1,0 +1,118 @@
+🚀 AZL v2 - Pure AZL Runtime
+🚀 NO RUST DEPENDENCIES!
+🚀 ALL FUNCTIONALITY IN AZL!
+
+🚀 Running 2 AZL files with two-phase execution
+🚀 Executing multiple files with two-phase execution
+📄 Loading file: azl/nlp/comprehensive_training_system.azl
+📦 Found component: ::nlp.comprehensive_training
+📦 Found component: ::nlp.speed_measurement
+📦 Found component: ::nlp.performance_monitoring
+📦 Found component: ::nlp.system_resource_monitor
+📊 Parsed 4 components
+  - ::nlp.comprehensive_training: 31 lines
+  - ::nlp.speed_measurement: 10 lines
+  - ::nlp.performance_monitoring: 11 lines
+  - ::nlp.system_resource_monitor: 8 lines
+📦 Processing component: ::nlp.comprehensive_training
+🔍 Parsing component: ::nlp.comprehensive_training
+🚀 Top-level statement: init {
+🚀 Top-level statement: set ::status = "initializing"
+🚀 Top-level statement: set ::training_config = {
+🚀 Top-level statement: parallel_training: true,
+🚀 Top-level statement: speed_measurement: true,
+🚀 Top-level statement: performance_monitoring: true,
+🚀 Top-level statement: real_time_metrics: true,
+🚀 Top-level statement: learning_rate: 0.0001,
+🚀 Top-level statement: batch_size: 128,
+🚀 Top-level statement: epochs: 1000,
+🚀 Top-level statement: validation_split: 0.2,
+🚀 Top-level statement: early_stopping_patience: 50,
+🚀 Top-level statement: gradient_clipping: 1.0,
+🚀 Top-level statement: weight_decay: 0.0001,
+🚀 Top-level statement: measure_training_speed: true,
+🚀 Top-level statement: measure_inference_speed: true,
+🚀 Top-level statement: measure_quantum_speed: true,
+🚀 Top-level statement: measure_memory_usage: true,
+🚀 Top-level statement: monitor_gpu_usage: true,
+🚀 Top-level statement: monitor_memory_usage: true,
+🚀 Top-level statement: monitor_training_loss: true,
+🚀 Top-level statement: monitor_validation_loss: true,
+🚀 Top-level statement: monitor_accuracy: true,
+🚀 Top-level statement: monitor_quantum_efficiency: true
+📊 Parsed 0 listeners and 24 top-level statements
+📦 Processing component: ::nlp.speed_measurement
+🔍 Parsing component: ::nlp.speed_measurement
+🚀 Top-level statement: init {
+🚀 Top-level statement: set ::status = "ready"
+🚀 Top-level statement: set ::speed_metrics = {
+🚀 Top-level statement: training_speed: 0.0,
+🚀 Top-level statement: inference_speed: 0.0,
+🚀 Top-level statement: quantum_speed: 0.0,
+🚀 Top-level statement: memory_usage: 0.0,
+🚀 Top-level statement: gpu_usage: 0.0,
+🚀 Top-level statement: cpu_usage: 0.0,
+🚀 Top-level statement: throughput: 0.0
+📊 Parsed 0 listeners and 10 top-level statements
+📦 Processing component: ::nlp.performance_monitoring
+🔍 Parsing component: ::nlp.performance_monitoring
+🚀 Top-level statement: init {
+🚀 Top-level statement: set ::status = "ready"
+🚀 Top-level statement: set ::performance_metrics = {
+🚀 Top-level statement: learning_rate: 0.001,
+🚀 Top-level statement: accuracy: 0.0,
+🚀 Top-level statement: quantum_efficiency: 0.0,
+🚀 Top-level statement: neural_convergence: 0.0,
+🚀 Top-level statement: perplexity: 0.0,
+🚀 Top-level statement: training_loss: 0.0,
+🚀 Top-level statement: validation_loss: 0.0,
+🚀 Top-level statement: convergence_rate: 0.0
+📊 Parsed 0 listeners and 11 top-level statements
+📦 Processing component: ::nlp.system_resource_monitor
+🔍 Parsing component: ::nlp.system_resource_monitor
+🚀 Top-level statement: init {
+🚀 Top-level statement: set ::status = "ready"
+🚀 Top-level statement: set ::resource_metrics = {
+🚀 Top-level statement: memory_usage: 0.0,
+🚀 Top-level statement: gpu_usage: 0.0,
+🚀 Top-level statement: cpu_usage: 0.0,
+🚀 Top-level statement: disk_usage: 0.0,
+🚀 Top-level statement: network_usage: 0.0
+📊 Parsed 0 listeners and 8 top-level statements
+📄 Loading file: run_comprehensive_training.azl
+📦 Found component: ::nlp.comprehensive_launcher
+📦 Found component: ::nlp.quick_comprehensive_launcher
+📊 Parsed 2 components
+  - ::nlp.quick_comprehensive_launcher: 3 lines
+  - ::nlp.comprehensive_launcher: 9 lines
+📦 Processing component: ::nlp.quick_comprehensive_launcher
+🔍 Parsing component: ::nlp.quick_comprehensive_launcher
+🚀 Top-level statement: init {
+🚀 Top-level statement: say "⚡ Quick Comprehensive Training Launcher - FULL TRAINING MODE"
+🚀 Top-level statement: say "🚀 One-click comprehensive training with all FULL datasets"
+📊 Parsed 0 listeners and 3 top-level statements
+📦 Processing component: ::nlp.comprehensive_launcher
+🔍 Parsing component: ::nlp.comprehensive_launcher
+🚀 Top-level statement: init {
+🚀 Top-level statement: set ::status = "ready"
+🚀 Top-level statement: set ::training_status = {
+🚀 Top-level statement: active_datasets: [],
+🚀 Top-level statement: completed_datasets: [],
+🚀 Top-level statement: failed_datasets: [],
+🚀 Top-level statement: overall_progress: 0.0,
+🚀 Top-level statement: start_time: 0,
+🚀 Top-level statement: end_time: 0
+📊 Parsed 0 listeners and 9 top-level statements
+💾 Set ::status = "initializing"
+💾 Set ::training_config = {
+💾 Set ::status = "ready"
+💾 Set ::speed_metrics = {
+💾 Set ::status = "ready"
+💾 Set ::performance_metrics = {
+💾 Set ::status = "ready"
+💾 Set ::resource_metrics = {
+💬 ⚡ Quick Comprehensive Training Launcher - FULL TRAINING MODE
+💬 🚀 One-click comprehensive training with all FULL datasets
+💾 Set ::status = "ready"
+💾 Set ::training_status = {
+✅ All files executed successfully

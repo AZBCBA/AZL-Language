@@ -36,7 +36,7 @@ component ::quantum.messaging {
   }
 
   behavior {
-    on quantum.messaging.register {
+    listen for "quantum.messaging.register" { 
       set ::registration_info = $1
       say "🔄 Quantum Messaging subsystem registering with core"
       
@@ -48,7 +48,7 @@ component ::quantum.messaging {
       }
     }
 
-    on quantum.messaging.execute {
+    listen for "quantum.messaging.execute" { 
       set ::messaging_request = $1
       say "📨 Executing Quantum Messaging protocol"
       
@@ -61,7 +61,7 @@ component ::quantum.messaging {
       }
     }
 
-    on quantum.messaging.send_message {
+    listen for "quantum.messaging.send_message" { 
       set ::send_info = $1
       say "📤 Sending quantum-enhanced message"
       
@@ -85,7 +85,7 @@ component ::quantum.messaging {
       }
     }
 
-    on quantum.messaging.establish_tunnel {
+    listen for "quantum.messaging.establish_tunnel" { 
       set ::tunnel_info = $1
       say "🔗 Establishing quantum messaging tunnel"
       
@@ -104,7 +104,7 @@ component ::quantum.messaging {
       }
     }
 
-    on quantum.messaging.transmit_message {
+    listen for "quantum.messaging.transmit_message" { 
       set ::transmission_info = $1
       say "📡 Transmitting quantum message through tunnel"
       
@@ -122,7 +122,7 @@ component ::quantum.messaging {
       }
     }
 
-    on quantum.messaging.receive_message {
+    listen for "quantum.messaging.receive_message" { 
       set ::receive_info = $1
       say "📥 Receiving quantum message"
       
@@ -145,7 +145,7 @@ component ::quantum.messaging {
       }
     }
 
-    on quantum.messaging.verify_authentication {
+    listen for "quantum.messaging.verify_authentication" { 
       set ::auth_info = $1
       say "🔍 Verifying quantum message authentication"
       
@@ -167,7 +167,7 @@ component ::quantum.messaging {
       }
     }
 
-    on quantum.messaging.complete {
+    listen for "quantum.messaging.complete" { 
       set ::completion_info = $1
       say "✅ Quantum Messaging completed successfully!"
       say "📨 Message authentic: " + ::completion_info.message_authentic
@@ -180,7 +180,7 @@ component ::quantum.messaging {
     }
 
     # Message encryption
-    on quantum.messaging.encrypt_message {
+    listen for "quantum.messaging.encrypt_message" { 
       set ::encryption_request = $1
       say "🔐 Encrypting message with quantum-enhanced encryption"
       
@@ -199,7 +199,7 @@ component ::quantum.messaging {
     }
 
     # Message decryption
-    on quantum.messaging.decrypt_message {
+    listen for "quantum.messaging.decrypt_message" { 
       set ::decryption_request = $1
       say "🔓 Decrypting message with quantum-enhanced decryption"
       
@@ -217,7 +217,7 @@ component ::quantum.messaging {
     }
 
     # Tunnel management
-    on quantum.messaging.manage_tunnel {
+    listen for "quantum.messaging.manage_tunnel" { 
       set ::management_request = $1
       say "🔧 Managing quantum messaging tunnel"
       
@@ -237,7 +237,7 @@ component ::quantum.messaging {
     }
 
     # Message authentication
-    on quantum.messaging.authenticate_message {
+    listen for "quantum.messaging.authenticate_message" { 
       set ::auth_request = $1
       say "🔍 Authenticating quantum message"
       
@@ -255,7 +255,7 @@ component ::quantum.messaging {
     }
 
     # Protocol status
-    on quantum.messaging.get_status {
+    listen for "quantum.messaging.get_status" { 
       set ::status_request = $1
       
       emit quantum.messaging.status_ready with {

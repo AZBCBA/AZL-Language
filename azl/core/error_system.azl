@@ -1,0 +1,127 @@
+############################################
+# Error System Component
+# Always add Error System as per user rules
+############################################
+
+component ::error.system {
+  init {
+    # Quiet mode by default in production
+    set ::log_level = (::internal.env("AZL_LOG_LEVEL") or "quiet")
+    if ::log_level != "quiet" { say "🛡️ Error System Initialized" }
+    set ::error_log = []
+    set ::error_handlers = {}
+    set ::function_registry = {}
+    set ::strict_mode = ((::internal.env("AZL_STRICT") or "1") == "1")
+
+    # Preload integrations that error handlers may route to
+    emit "load_component" with "azl/core/arithmetic/math_engine.azl"
+    emit "load_component" with "azl/ffi/math_engine.azl"
+    emit "load_component" with "modules/math.azl"
+
+    # Registry of common functions for routing
+    set ::function_registry["matmul"] = "matrix_multiplication"
+    set ::function_registry["matrix_add"] = "matrix_addition"
+    set ::function_registry["relu_activation"] = "relu_activation"
+    set ::function_registry["softmax_activation"] = "softmax_activation"
+    set ::function_registry["gradient_calculation"] = "gradient_calculation"
+    set ::function_registry["quantum_gate"] = "quantum_gate_application"
+    set ::function_registry["quantum_measure"] = "quantum_measurement"
+    set ::function_registry["sin"] = "sine_function"
+    set ::function_registry["cos"] = "cosine_function"
+
+    say "🔧 Integrated with existing math infrastructure"
+  }
+
+  behavior {
+    # Standard logging interface: payload is a single object
+    listen for "log_error" then {
+      set ::e = ::event.data
+      # Back-compat: allow legacy triplet (type, message, context) via $1..$3
+      set _type = ( (::e != null && ::e.type != null) ? ::e.type : $1 )
+      set _msg  = ( (::e != null && ::e.message != null) ? ::e.message : $2 )
+      set _ctx  = ( (::e != null && ::e.context != null) ? ::e.context : ($3 || {}) )
+      set ::entry = {
+        type: (_type or "unknown"),
+        message: (_msg or ""),
+        context: (_ctx or {}),
+        timestamp: ::now()
+      }
+      set ::error_log.push(::entry)
+      if ::log_level == "debug" { say "❌ " + ::entry.type + ": " + ::entry.message }
+      emit error.logged with ::entry
+      # Strict policy: halt interpreter on fatal categories
+      if ::strict_mode {
+        set ::fatal_types = ["division_by_zero", "runtime", "timeout", "cycle"]
+        if ::fatal_types.includes(::entry.type) {
+          emit halt_execution with {
+            source: "error.system",
+            kind: ::entry.type,
+            message: ::entry.message,
+            context: ::entry.context
+          }
+        }
+      }
+    }
+
+    listen for "handle_unknown_function" then {
+      set ::fn = (::event.data && ::event.data.name) || $1
+      set ::args = (::event.data && ::event.data.args) || $2 || []
+      say "🔧 Unknown function: " + (::fn || "<null>")
+
+      emit log_error with { type: "unknown_function", message: "Function not found: " + (::fn || "<null>"), context: { args: ::args } }
+
+      if ::function_registry[::fn] {
+        say "💡 Routed via registry: " + ::fn + " → " + ::function_registry[::fn]
+        if ::fn == "matmul" or ::fn == "matrix_add" or ::fn == "relu_activation" or ::fn == "softmax_activation" or ::fn == "gradient_calculation" {
+          emit ::fn to ::ffi.math_engine with ::args
+        } else if ::fn == "quantum_gate" or ::fn == "quantum_measure" {
+          emit ::fn to ::ffi.math_engine with ::args
+        } else if ::fn == "sin" or ::fn == "cos" {
+          emit ::fn to ::math with ::args
+        }
+        return
+      }
+      say "💡 Available functions: " + ::function_registry.keys
+    }
+
+    # Division by zero handler
+    listen for "handle_division_by_zero" then {
+      set ::ctx = (::event.data || $1)
+      say "🚫 Division by zero"
+      emit log_error with { type: "division_by_zero", message: "Division by zero", context: (::ctx || {}) }
+      emit math.error with { type: "division_by_zero", context: (::ctx || {}) }
+    }
+
+    # Model not found handler
+    listen for "handle_model_not_found" then {
+      set ::model = (::event.data && ::event.data.model) || $1
+      say "❌ Model not found: " + (::model || "<null>")
+      emit log_error with { type: "model_not_found", message: "Model not found: " + (::model || "<null>"), context: {} }
+    }
+
+    # Registry validation
+    listen for "validate_model_registry" then {
+      set ::model = (::event.data && ::event.data.model) || $1
+      if ::model_registry && ::model_registry[::model] {
+        emit model_validated with { model: ::model }
+      } else {
+        emit handle_model_not_found with { model: ::model }
+      }
+    }
+
+    # Registration API
+    listen for "register_function" then {
+      set ::fn = (::event.data && ::event.data.name) || $1
+      set ::typ = (::event.data && ::event.data.kind) || $2
+      set ::function_registry[::fn] = ::typ
+      say "🔧 Registered function: " + ::fn + " type=" + ::typ
+    }
+
+    # Summary
+    listen for "get_error_summary" then {
+      say "📊 Error Summary (" + ::error_log.length.toString() + ")"
+      for ::err in ::error_log { say "  - " + ::err.type + ": " + ::err.message }
+      emit error.summary with { total: ::error_log.length }
+    }
+  }
+}

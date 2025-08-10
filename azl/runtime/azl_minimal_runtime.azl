@@ -1,0 +1,334 @@
+# AZL Minimal Runtime Engine
+# A simple but functional runtime for executing AZL code
+
+component ::azl.minimal.runtime {
+  init {
+    set ::components = {}
+    set ::variables = {}
+    set ::functions = {}
+    set ::listeners = {}
+    set ::event_queue = []
+    set ::running = false
+    
+    say "🚀 AZL Minimal Runtime initialized"
+    say "🔧 Ready to execute AZL components"
+  }
+
+  behavior {
+    # Load and execute a component
+    listen for "load_component" then {
+      set ::component_code = ::event.data.code
+      set ::component_name = ::event.data.name
+      
+      say "📦 Loading component: ::component_name"
+      set result = ::load_component(::component_code, ::component_name)
+      
+      if result {
+        emit component.loaded with { name: ::component_name, status: "success" }
+      } else {
+        emit component.loaded with { name: ::component_name, status: "failed" }
+      }
+    }
+    
+    # Execute a component
+    listen for "execute_component" then {
+      set ::component_name = ::event.data.name
+      
+      if ::components[::component_name] exists {
+        say "🚀 Executing component: ::component_name"
+        ::execute_component(::component_name)
+      } else {
+        say "❌ Component not found: ::component_name"
+        emit component.error with { name: ::component_name, error: "not_found" }
+      }
+    }
+    
+    # Handle events
+    listen for "emit" then {
+      set ::event_name = ::event.data.name
+      set ::event_data = ::event.data.data || {}
+      
+      say "📡 Emitting event: ::event_name"
+      ::queue_event(::event_name, ::event_data)
+    }
+    
+    # Start the runtime
+    listen for "start_runtime" then {
+      say "🚀 Starting AZL runtime..."
+      ::start_runtime()
+    }
+    
+    # Stop the runtime
+    listen for "stop_runtime" then {
+      say "🛑 Stopping AZL runtime..."
+      ::stop_runtime()
+    }
+  }
+
+  # Load a component into the runtime
+  fn load_component(code, name) {
+    try {
+      # Parse the component code (simplified)
+      set parsed = ::parse_component(code)
+      
+      if parsed {
+        set ::components[name] = parsed
+        say "✅ Component loaded: ::name"
+        return true
+      } else {
+        say "❌ Failed to parse component: ::name"
+        return false
+      }
+    } catch error {
+      say "❌ Error loading component ::name: ::error"
+      return false
+    }
+  }
+
+  # Parse component code (simplified parser)
+  fn parse_component(code) {
+    # This is a very simplified parser - in a real implementation,
+    # you'd want to use the scanner and parser components
+    
+    set lines = code.split("\n")
+    set component = {
+      name: "",
+      init: [],
+      behavior: [],
+      functions: []
+    }
+    
+    set current_section = ""
+    
+    for line in lines {
+      set trimmed = line.trim()
+      
+      if trimmed.startsWith("component") {
+        set component.name = trimmed.split(" ")[1]
+      } else if trimmed == "init {" {
+        set current_section = "init"
+      } else if trimmed == "behavior {" {
+        set current_section = "behavior"
+      } else if trimmed.startsWith("fn ") {
+        set current_section = "functions"
+        set func_name = trimmed.split(" ")[1].split("(")[0]
+        set component.functions.push(func_name)
+      } else if trimmed == "}" {
+        set current_section = ""
+      } else if current_section != "" && trimmed != "" {
+        set component[current_section].push(trimmed)
+      }
+    }
+    
+    return component
+  }
+
+  # Execute a component
+  fn execute_component(name) {
+    set component = ::components[name]
+    
+    if !component {
+      say "❌ Component not found: ::name"
+      return false
+    }
+    
+    say "🚀 Executing component: ::name"
+    
+    # Execute init block
+    if component.init.length > 0 {
+      say "🔧 Running init block..."
+      ::execute_block(component.init, name)
+    }
+    
+    # Execute behavior block
+    if component.behavior.length > 0 {
+      say "🎭 Setting up behavior..."
+      ::setup_behavior(component.behavior, name)
+    }
+    
+    say "✅ Component executed: ::name"
+    emit component.executed with { name: name, status: "success" }
+    return true
+  }
+
+  # Execute a block of code
+  fn execute_block(statements, context) {
+    for statement in statements {
+      ::execute_statement(statement, context)
+    }
+  }
+
+  # Execute a single statement
+  fn execute_statement(statement, context) {
+    set trimmed = statement.trim()
+    
+    if trimmed.startsWith("say ") {
+      set message = trimmed.substring(4).trim()
+      say "[" + context + "] " + message
+    } else if trimmed.startsWith("set ") {
+      ::execute_set_statement(trimmed, context)
+    } else if trimmed.startsWith("emit ") {
+      ::execute_emit_statement(trimmed, context)
+    } else if trimmed.startsWith("link ") {
+      ::execute_link_statement(trimmed, context)
+    }
+  }
+
+  # Execute a set statement
+  fn execute_set_statement(statement, context) {
+    # Parse: set ::var = value
+    set parts = statement.split("=")
+    if parts.length == 2 {
+      set var_name = parts[0].trim().substring(4).trim()  # Remove "set ::"
+      set value = parts[1].trim()
+      
+      # Evaluate the value (simplified)
+      if value.startsWith("\"") && value.endsWith("\"") {
+        set ::variables[var_name] = value.substring(1, value.length - 1)
+      } else if value == "true" || value == "false" {
+        set ::variables[var_name] = value == "true"
+      } else if ::is_number(value) {
+        set ::variables[var_name] = parseFloat(value)
+      } else {
+        set ::variables[var_name] = value
+      }
+      
+      say "🔧 Set variable: ::var_name = " + ::variables[var_name]
+    }
+  }
+
+  # Execute an emit statement
+  fn execute_emit_statement(statement, context) {
+    # Parse: emit event_name with data
+    if statement.includes(" with ") {
+      set parts = statement.split(" with ")
+      set event_name = parts[0].substring(5).trim()
+      set event_data = parts[1].trim()
+      
+      say "📡 Emitting event: ::event_name with ::event_data"
+      ::queue_event(event_name, event_data)
+    } else {
+      set event_name = statement.substring(5).trim()
+      say "📡 Emitting event: ::event_name"
+      ::queue_event(event_name, {})
+    }
+  }
+
+  # Execute a link statement
+  fn execute_link_statement(statement, context) {
+    set component_name = statement.substring(5).trim()
+    say "🔗 Linking to component: ::component_name"
+    
+    # In a real implementation, this would establish component communication
+    if ::components[component_name] exists {
+      say "✅ Component linked: ::component_name"
+    } else {
+      say "⚠️  Component not found for linking: ::component_name"
+    }
+  }
+
+  # Setup behavior (event listeners)
+  fn setup_behavior(statements, context) {
+    for statement in statements {
+      if statement.includes("listen for ") {
+        ::setup_listener(statement, context)
+      }
+    }
+  }
+
+  # Setup an event listener
+  fn setup_listener(statement, context) {
+    # Parse: listen for "event_name" then { ... }
+    if statement.includes("listen for ") && statement.includes(" then ") {
+      set parts = statement.split(" then ")
+      set event_part = parts[0]
+      set action_part = parts[1]
+      
+      # Extract event name
+      set event_name = ""
+      if event_part.includes("\"") {
+        set start = event_part.indexOf("\"") + 1
+        set end = event_part.indexOf("\"", start)
+        set event_name = event_part.substring(start, end)
+      }
+      
+      if event_name != "" {
+        set ::listeners[event_name] = {
+          context: context,
+          action: action_part
+        }
+        say "👂 Listener set up for event: ::event_name"
+      }
+    }
+  }
+
+  # Queue an event for processing
+  fn queue_event(name, data) {
+    set event = {
+      name: name,
+      data: data,
+      timestamp: ::now()
+    }
+    
+    ::event_queue.push(event)
+    say "📥 Event queued: ::name"
+    
+    # Process events immediately for now
+    ::process_events()
+  }
+
+  # Process queued events
+  fn process_events() {
+    while ::event_queue.length > 0 {
+      set event = ::event_queue.shift()
+      ::dispatch_event(event)
+    }
+  }
+
+  # Dispatch an event to listeners
+  fn dispatch_event(event) {
+    set event_name = event.name
+    
+    if ::listeners[event_name] exists {
+      set listener = ::listeners[event_name]
+      set context = listener.context
+      set action = listener.action
+      
+      say "📡 Dispatching event ::event_name to ::context"
+      
+      # Execute the action (simplified)
+      if action.includes("say ") {
+        set message = action.substring(4).trim()
+        say "[" + context + "] " + message
+      }
+      
+      emit event.dispatched with { event: event_name, context: context }
+    } else {
+      say "📡 No listeners for event: ::event_name"
+    }
+  }
+
+  # Start the runtime
+  fn start_runtime() {
+    set ::running = true
+    say "🚀 Runtime started"
+    emit runtime.started with { status: "running" }
+  }
+
+  # Stop the runtime
+  fn stop_runtime() {
+    set ::running = false
+    say "🛑 Runtime stopped"
+    emit runtime.stopped with { status: "stopped" }
+  }
+
+  # Utility functions
+  fn is_number(str) {
+    return !isNaN(str) && !isNaN(parseFloat(str))
+  }
+  
+  fn now() {
+    return Date.now()
+  }
+}
+

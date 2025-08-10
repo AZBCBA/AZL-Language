@@ -1,0 +1,8 @@
+component ::smoke.division_by_zero {
+  init {
+    say "Starting division-by-zero smoke"
+    emit log_error with { type: "division_by_zero", message: "test", context: { a: 1, b: 0 } }
+  }
+}
+
+

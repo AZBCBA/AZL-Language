@@ -1,0 +1,46 @@
+component ::tests.virtual_os_and_compiler {
+  init {
+    set ::passed = 0
+    set ::failed = 0
+
+    fn assert_eq(name, a, b) {
+      if (a == b) { set ::passed = ::passed + 1; say "✅ " + name }
+      else { set ::failed = ::failed + 1; say "❌ " + name + " expected=" + b.toString() + " got=" + a.toString() }
+    }
+
+    # Files: write/read/list/exists/delete
+    emit syscall with { type: "write_file", args: { path: "/tmp/x.txt", content: "hello" } }
+    emit syscall with { type: "read_file", args: { path: "/tmp/x.txt" } }
+    listen for "syscall.response" then { assert_eq("fs.read content", ::event.data.content, "hello") }
+
+    emit syscall with { type: "file_exists", args: { path: "/tmp/x.txt" } }
+    listen for "syscall.response" then { assert_eq("fs.exists true", ::event.data.exists, true) }
+
+    emit syscall with { type: "list_dir", args: { path: "/tmp" } }
+    listen for "syscall.response" then {
+      set entries_ok = (::event.data.entries && ::event.data.entries.length >= 1)
+      assert_eq("fs.list non-empty", entries_ok, true)
+    }
+
+    emit syscall with { type: "delete_file", args: { path: "/tmp/x.txt" } }
+    emit syscall with { type: "file_exists", args: { path: "/tmp/x.txt" } }
+    listen for "syscall.response" then { assert_eq("fs.exists false", ::event.data.exists, false) }
+
+    # Binary read/write
+    emit syscall with { type: "write_binary_file", args: { path: "/tmp/bin.dat", data: [1,2,3,4], mode: "0644" } }
+    emit syscall with { type: "read_binary_file", args: { path: "/tmp/bin.dat" } }
+    listen for "syscall.response" then {
+      set ok = (::event.data.binary_data && ::event.data.binary_data.length == 4)
+      assert_eq("fs.read_binary len", ok, true)
+    }
+
+    # HTTP store
+    emit syscall with { type: "http", args: { url: "http://azl.local/api", method: "POST", body: "payload" } }
+    emit syscall with { type: "http", args: { url: "http://azl.local/api", method: "GET" } }
+    listen for "syscall.response" then { assert_eq("http echo", ::event.data.body, "payload") }
+
+    # Summary
+    say "📊 Virtual OS tests: " + ::passed + " passed, " + ::failed + " failed"
+    emit tests.complete with { passed: ::passed, failed: ::failed }
+  }
+}

@@ -1,0 +1,37 @@
+// stdlib/io.azl
+// Input/Output utility functions
+
+export fn read_file(path) {
+    emit fs.read with { path: path }
+    return ::azl.system_interface.direct_read_file(path);
+}
+
+export fn write_file(path, content) {
+    return ::azl.system_interface.direct_write_file(path, content);
+}
+
+export fn append_file(path, content) {
+    set existing = ::azl.system_interface.direct_read_file(path) || "";
+    return ::azl.system_interface.direct_write_file(path, existing + content);
+}
+
+export fn file_exists(path) {
+    return ::azl.system_interface.file_exists(path);
+}
+
+export fn delete_file(path) {
+    return ::azl.system_interface.direct_delete_file(path);
+}
+
+export fn list_directory(path) {
+    return ::azl.system_interface.direct_list_directory(path);
+}
+
+export fn create_directory(path) {
+    # Virtual directory creation via system interface helper
+    return ::azl.system_interface.create_directory_sync(path);
+}
+
+export fn delete_directory(path) {
+    return ::azl.system_interface.direct_delete_directory(path);
+}

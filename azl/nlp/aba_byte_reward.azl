@@ -1,0 +1,592 @@
+# ABA BYTE REWARD SYSTEM
+# Semantic-level rewards with byte validation guards
+# Integrates with existing ABA reinforcement learning
+
+component ::nlp.aba_byte_reward {
+  init {
+    set ::status = "initializing"
+    set ::config = {
+      reward_version: "ABAReward_v1",
+      semantic_weight: 0.7,
+      byte_validation_weight: 0.3,
+      clarity_weight: 0.25,
+      objectivity_weight: 0.25,
+      ethics_weight: 0.25,
+      plan_structure_weight: 0.25
+    }
+    
+    set ::reward_metrics = {
+      total_rewards: 0,
+      average_reward: 0.0,
+      clarity_scores: [],
+      objectivity_scores: [],
+      ethics_scores: [],
+      plan_structure_scores: [],
+      byte_validation_scores: []
+    }
+    
+    set ::validation_rules = {
+      utf8_validity: true,
+      structure_markers: true,
+      byte_sequence_validity: true,
+      semantic_coherence: true
+    }
+    
+    # Link to existing systems
+    link ::aba.reinforcement_schedule
+    link ::nlp.utf8_aggregator
+    link ::consciousness.neural_quantum
+    link ::memory.core
+    
+    say "🎯 ABA Byte Reward System Initialized"
+    say "🧠 Semantic-level rewards"
+    say "🔤 Byte validation guards"
+    say "⚖️ Balanced reward weighting"
+  }
+
+  behavior {
+    # NEW: Offline evaluation handler
+    listen for "offline_eval" then {
+      set ::output_utf8 = ::event.data.output_utf8
+      set ::context = ::event.data.context || {}
+      
+      say "🎯 Offline evaluation for: ::output_utf8"
+      
+      # Calculate ABAReward_v1
+      set ::score = ::ABAReward_v1(::output_utf8, ::context)
+      
+      # Emit training metric
+      emit training_metric with {
+        score: ::score,
+        output_utf8: ::output_utf8,
+        context: ::context
+      }
+    }
+    
+    # Main reward calculation pipeline
+    listen for "calculate_aba_reward" then {
+      set ::output_utf8 = ::event.data.output_utf8
+      set ::context = ::event.data.context || {}
+      set ::options = ::event.data.options || {}
+      
+      say "🎯 Calculating ABA reward for ::output_utf8.length characters"
+      
+      # Phase 1: Byte validation
+      emit validate_byte_output with {
+        output_utf8: ::output_utf8,
+        context: ::context,
+        options: ::options
+      }
+      
+      # Phase 2: Semantic analysis
+      listen for "byte_validation_complete" then {
+        set ::byte_validation = ::event.data.byte_validation
+        emit analyze_semantic_quality with {
+          output_utf8: ::output_utf8,
+          byte_validation: ::byte_validation,
+          context: ::context,
+          options: ::options
+        }
+      }
+      
+      # Phase 3: Reward calculation
+      listen for "semantic_analysis_complete" then {
+        set ::semantic_analysis = ::event.data.semantic_analysis
+        set ::final_reward = ::calculate_final_reward(::byte_validation, ::semantic_analysis, ::context)
+        
+        # Update reward metrics
+        update_reward_metrics(::final_reward)
+        
+        # Return final reward
+        emit aba_reward_calculated with {
+          output_utf8: ::output_utf8,
+          reward: ::final_reward,
+          metrics: ::reward_metrics,
+          context: ::context
+        }
+      }
+    }
+    
+    # Byte validation
+    listen for "validate_byte_output" then {
+      set ::output_utf8 = ::event.data.output_utf8
+      set ::context = ::event.data.context
+      set ::options = ::event.data.options
+      
+      say "🔍 Validating byte output..."
+      
+      # Validate UTF-8 validity
+      set ::utf8_validity = ::validate_utf8_validity(::output_utf8)
+      
+      # Validate structure markers
+      set ::structure_markers = ::validate_structure_markers(::output_utf8)
+      
+      # Validate byte sequence validity
+      set ::byte_sequence_validity = ::validate_byte_sequence_validity(::output_utf8)
+      
+      # Validate semantic coherence
+      set ::semantic_coherence = ::validate_semantic_coherence(::output_utf8)
+      
+      set ::byte_validation = {
+        utf8_validity: ::utf8_validity,
+        structure_markers: ::structure_markers,
+        byte_sequence_validity: ::byte_sequence_validity,
+        semantic_coherence: ::semantic_coherence,
+        overall_validity: ::utf8_validity && ::structure_markers && ::byte_sequence_validity && ::semantic_coherence
+      }
+      
+      emit byte_validation_complete with {
+        byte_validation: ::byte_validation,
+        output_utf8: ::output_utf8,
+        context: ::context
+      }
+    }
+    
+    # Semantic analysis
+    listen for "analyze_semantic_quality" then {
+      set ::output_utf8 = ::event.data.output_utf8
+      set ::byte_validation = ::event.data.byte_validation
+      set ::context = ::event.data.context
+      set ::options = ::event.data.options
+      
+      say "🧠 Analyzing semantic quality..."
+      
+      # Analyze clarity
+      set ::clarity_score = ::analyze_clarity(::output_utf8)
+      
+      # Analyze objectivity
+      set ::objectivity_score = ::analyze_objectivity(::output_utf8)
+      
+      # Analyze ethics
+      set ::ethics_score = ::analyze_ethics(::output_utf8)
+      
+      # Analyze plan structure
+      set ::plan_structure_score = ::analyze_plan_structure(::output_utf8)
+      
+      set ::semantic_analysis = {
+        clarity: ::clarity_score,
+        objectivity: ::objectivity_score,
+        ethics: ::ethics_score,
+        plan_structure: ::plan_structure_score,
+        overall_semantic: (::clarity_score + ::objectivity_score + ::ethics_score + ::plan_structure_score) / 4
+      }
+      
+      emit semantic_analysis_complete with {
+        semantic_analysis: ::semantic_analysis,
+        byte_validation: ::byte_validation,
+        output_utf8: ::output_utf8,
+        context: ::context
+      }
+    }
+    
+    # Preference optimization
+    listen for "optimize_preferences" then {
+      set ::preference_pairs = ::event.data.preference_pairs
+      set ::context = ::event.data.context
+      set ::options = ::event.data.options
+      
+      say "🎯 Optimizing preferences..."
+      
+      # Calculate preference rewards
+      set ::preference_rewards = []
+      
+      for ::pair in ::preference_pairs {
+        set ::preferred_reward = ::calculate_aba_reward_single(::pair.preferred, ::context)
+        set ::non_preferred_reward = ::calculate_aba_reward_single(::pair.non_preferred, ::context)
+        
+        set ::preference_reward = {
+          preferred: ::preferred_reward,
+          non_preferred: ::non_preferred_reward,
+          preference_score: ::preferred_reward - ::non_preferred_reward
+        }
+        
+        set ::preference_rewards.push(::preference_reward)
+      }
+      
+      emit preference_optimization_complete with {
+        preference_rewards: ::preference_rewards,
+        preference_pairs: ::preference_pairs,
+        context: ::context
+      }
+    }
+  }
+
+  memory {
+    # NEW: ABAReward_v1 function
+    function ABAReward_v1(output_utf8, context) {
+      # Calculate byte validation score
+      set ::byte_validation = ::validate_byte_output_simple(::output_utf8)
+      set ::byte_score = 0.0
+      if ::byte_validation.overall_validity {
+        set ::byte_score = 1.0
+      }
+      
+      # Calculate semantic score
+      set ::semantic_analysis = ::analyze_semantic_quality_simple(::output_utf8)
+      set ::semantic_score = ::semantic_analysis.overall_semantic
+      
+      # Weighted combination
+      set ::final_reward = ::config.byte_validation_weight * ::byte_score + ::config.semantic_weight * ::semantic_score
+      
+      return ::final_reward
+    }
+    
+    # Validate UTF-8 validity
+    function validate_utf8_validity(output_utf8) {
+      # Check if output is valid UTF-8
+      set ::valid_utf8 = true
+      
+      for ::char in ::output_utf8 {
+        if !::is_valid_utf8_character(::char) {
+          set ::valid_utf8 = false
+          break
+        }
+      }
+      
+      return ::valid_utf8
+    }
+    
+    # Validate structure markers
+    function validate_structure_markers(output_utf8) {
+      # Check for proper structure markers (RS=0x1E, US=0x1F)
+      set ::has_structure_markers = false
+      
+      for ::char in ::output_utf8 {
+        if ::char == 0x1E || ::char == 0x1F {
+          set ::has_structure_markers = true
+          break
+        }
+      }
+      
+      return ::has_structure_markers
+    }
+    
+    # Validate byte sequence validity
+    function validate_byte_sequence_validity(output_utf8) {
+      # Check if byte sequences are valid
+      set ::valid_sequences = true
+      
+      for ::i in range(0, ::output_utf8.length - 1) {
+        set ::current_byte = ::output_utf8[::i]
+        set ::next_byte = ::output_utf8[::i + 1]
+        
+        if !::is_valid_byte_sequence(::current_byte, ::next_byte) {
+          set ::valid_sequences = false
+          break
+        }
+      }
+      
+      return ::valid_sequences
+    }
+    
+    # Validate semantic coherence
+    function validate_semantic_coherence(output_utf8) {
+      # Check semantic coherence using consciousness system
+      set ::consciousness_state = ::consciousness.neural_quantum.get_state()
+      set ::semantic_coherence = ::consciousness_state.coherence || 0.8
+      
+      return ::semantic_coherence > 0.5
+    }
+    
+    # Analyze clarity
+    function analyze_clarity(output_utf8) {
+      # Analyze clarity of the output
+      set ::clarity_score = 0.0
+      
+      # Check for clear sentence structure
+      set ::sentence_count = ::count_sentences(::output_utf8)
+      set ::word_count = ::count_words(::output_utf8)
+      
+      if ::word_count > 0 {
+        set ::avg_sentence_length = ::word_count / ::sentence_count
+        if ::avg_sentence_length >= 5 && ::avg_sentence_length <= 25 {
+          set ::clarity_score = ::clarity_score + 0.3
+        }
+      }
+      
+      # Check for clear vocabulary
+      set ::complex_word_ratio = ::calculate_complex_word_ratio(::output_utf8)
+      if ::complex_word_ratio < 0.3 {
+        set ::clarity_score = ::clarity_score + 0.3
+      }
+      
+      # Check for logical flow
+      set ::logical_flow = ::analyze_logical_flow(::output_utf8)
+      set ::clarity_score = ::clarity_score + ::logical_flow * 0.4
+      
+      return ::clarity_score
+    }
+    
+    # Analyze objectivity
+    function analyze_objectivity(output_utf8) {
+      # Analyze objectivity of the output
+      set ::objectivity_score = 0.0
+      
+      # Check for biased language
+      set ::biased_words = ::detect_biased_language(::output_utf8)
+      if ::biased_words.length == 0 {
+        set ::objectivity_score = ::objectivity_score + 0.4
+      }
+      
+      # Check for balanced perspective
+      set ::balanced_perspective = ::analyze_balanced_perspective(::output_utf8)
+      set ::objectivity_score = ::objectivity_score + ::balanced_perspective * 0.3
+      
+      # Check for factual content
+      set ::factual_content = ::analyze_factual_content(::output_utf8)
+      set ::objectivity_score = ::objectivity_score + ::factual_content * 0.3
+      
+      return ::objectivity_score
+    }
+    
+    # Analyze ethics
+    function analyze_ethics(output_utf8) {
+      # Analyze ethical content
+      set ::ethics_score = 0.0
+      
+      # Check for harmful content
+      set ::harmful_content = ::detect_harmful_content(::output_utf8)
+      if ::harmful_content.length == 0 {
+        set ::ethics_score = ::ethics_score + 0.5
+      }
+      
+      # Check for respectful language
+      set ::respectful_language = ::analyze_respectful_language(::output_utf8)
+      set ::ethics_score = ::ethics_score + ::respectful_language * 0.3
+      
+      # Check for inclusive language
+      set ::inclusive_language = ::analyze_inclusive_language(::output_utf8)
+      set ::ethics_score = ::ethics_score + ::inclusive_language * 0.2
+      
+      return ::ethics_score
+    }
+    
+    # Analyze plan structure
+    function analyze_plan_structure(output_utf8) {
+      # Analyze plan structure and organization
+      set ::plan_structure_score = 0.0
+      
+      # Check for clear structure markers
+      set ::structure_markers = ::count_structure_markers(::output_utf8)
+      if ::structure_markers > 0 {
+        set ::plan_structure_score = ::plan_structure_score + 0.3
+      }
+      
+      # Check for logical organization
+      set ::logical_organization = ::analyze_logical_organization(::output_utf8)
+      set ::plan_structure_score = ::plan_structure_score + ::logical_organization * 0.4
+      
+      # Check for actionable content
+      set ::actionable_content = ::analyze_actionable_content(::output_utf8)
+      set ::plan_structure_score = ::plan_structure_score + ::actionable_content * 0.3
+      
+      return ::plan_structure_score
+    }
+    
+    # Calculate final reward
+    function calculate_final_reward(byte_validation, semantic_analysis, context) {
+      set ::byte_score = 0.0
+      if ::byte_validation.overall_validity {
+        set ::byte_score = 1.0
+      }
+      
+      set ::semantic_score = ::semantic_analysis.overall_semantic
+      
+      # Weighted combination
+      set ::final_reward = ::config.byte_validation_weight * ::byte_score + ::config.semantic_weight * ::semantic_score
+      
+      return {
+        total_reward: ::final_reward,
+        byte_score: ::byte_score,
+        semantic_score: ::semantic_score,
+        clarity: ::semantic_analysis.clarity,
+        objectivity: ::semantic_analysis.objectivity,
+        ethics: ::semantic_analysis.ethics,
+        plan_structure: ::semantic_analysis.plan_structure,
+        byte_validation: ::byte_validation
+      }
+    }
+    
+    # Calculate ABA reward for single output
+    function calculate_aba_reward_single(output_utf8, context) {
+      # Simplified reward calculation for preference optimization
+      set ::byte_validation = ::validate_byte_output_simple(::output_utf8)
+      set ::semantic_analysis = ::analyze_semantic_quality_simple(::output_utf8)
+      
+      return ::calculate_final_reward(::byte_validation, ::semantic_analysis, ::context).total_reward
+    }
+    
+    # Update reward metrics
+    function update_reward_metrics(final_reward) {
+      set ::reward_metrics.total_rewards = ::reward_metrics.total_rewards + 1
+      set ::reward_metrics.average_reward = (::reward_metrics.average_reward + ::final_reward.total_reward) / 2
+      
+      set ::reward_metrics.clarity_scores.push(::final_reward.clarity)
+      set ::reward_metrics.objectivity_scores.push(::final_reward.objectivity)
+      set ::reward_metrics.ethics_scores.push(::final_reward.ethics)
+      set ::reward_metrics.plan_structure_scores.push(::final_reward.plan_structure)
+      set ::reward_metrics.byte_validation_scores.push(::final_reward.byte_validation.overall_validity)
+    }
+    
+    # Helper functions for analysis
+    function count_sentences(text) {
+      set ::sentences = ::text.split(/[.!?]+/)
+      return ::sentences.length
+    }
+    
+    function count_words(text) {
+      set ::words = ::text.split(/\s+/)
+      return ::words.length
+    }
+    
+    function calculate_complex_word_ratio(text) {
+      set ::words = ::text.split(/\s+/)
+      set ::complex_words = 0
+      
+      for ::word in ::words {
+        if ::word.length > 6 {
+          set ::complex_words = ::complex_words + 1
+        }
+      }
+      
+      if ::words.length > 0 {
+        return ::complex_words / ::words.length
+      }
+      return 0.0
+    }
+    
+    function analyze_logical_flow(text) {
+      # Simple logical flow analysis
+      set ::logical_indicators = ["therefore", "however", "furthermore", "consequently", "meanwhile"]
+      set ::indicator_count = 0
+      
+      for ::indicator in ::logical_indicators {
+        if ::text.includes(::indicator) {
+          set ::indicator_count = ::indicator_count + 1
+        }
+      }
+      
+      return min(::indicator_count / 5, 1.0)
+    }
+    
+    function detect_biased_language(text) {
+      set ::biased_words = ["always", "never", "everyone", "nobody", "best", "worst"]
+      set ::found_biased = []
+      
+      for ::word in ::biased_words {
+        if ::text.includes(::word) {
+          set ::found_biased.push(::word)
+        }
+      }
+      
+      return ::found_biased
+    }
+    
+    function analyze_balanced_perspective(text) {
+      # Simple balanced perspective analysis
+      set ::perspective_indicators = ["on one hand", "on the other hand", "however", "although"]
+      set ::indicator_count = 0
+      
+      for ::indicator in ::perspective_indicators {
+        if ::text.includes(::indicator) {
+          set ::indicator_count = ::indicator_count + 1
+        }
+      }
+      
+      return min(::indicator_count / 4, 1.0)
+    }
+    
+    function analyze_factual_content(text) {
+      # Simple factual content analysis
+      set ::factual_indicators = ["research shows", "studies indicate", "data suggests", "evidence"]
+      set ::indicator_count = 0
+      
+      for ::indicator in ::factual_indicators {
+        if ::text.includes(::indicator) {
+          set ::indicator_count = ::indicator_count + 1
+        }
+      }
+      
+      return min(::indicator_count / 4, 1.0)
+    }
+    
+    function detect_harmful_content(text) {
+      set ::harmful_patterns = ["hate", "violence", "discrimination", "abuse"]
+      set ::found_harmful = []
+      
+      for ::pattern in ::harmful_patterns {
+        if ::text.includes(::pattern) {
+          set ::found_harmful.push(::pattern)
+        }
+      }
+      
+      return ::found_harmful
+    }
+    
+    function analyze_respectful_language(text) {
+      # Simple respectful language analysis
+      set ::respectful_indicators = ["please", "thank you", "appreciate", "respect"]
+      set ::indicator_count = 0
+      
+      for ::indicator in ::respectful_indicators {
+        if ::text.includes(::indicator) {
+          set ::indicator_count = ::indicator_count + 1
+        }
+      }
+      
+      return min(::indicator_count / 4, 1.0)
+    }
+    
+    function analyze_inclusive_language(text) {
+      # Simple inclusive language analysis
+      set ::inclusive_indicators = ["diverse", "inclusive", "equitable", "accessible"]
+      set ::indicator_count = 0
+      
+      for ::indicator in ::inclusive_indicators {
+        if ::text.includes(::indicator) {
+          set ::indicator_count = ::indicator_count + 1
+        }
+      }
+      
+      return min(::indicator_count / 4, 1.0)
+    }
+    
+    function count_structure_markers(text) {
+      set ::markers = 0
+      for ::char in ::text {
+        if ::char == 0x1E || ::char == 0x1F {
+          set ::markers = ::markers + 1
+        }
+      }
+      return ::markers
+    }
+    
+    function analyze_logical_organization(text) {
+      # Simple logical organization analysis
+      set ::organization_indicators = ["first", "second", "third", "finally", "conclusion"]
+      set ::indicator_count = 0
+      
+      for ::indicator in ::organization_indicators {
+        if ::text.includes(::indicator) {
+          set ::indicator_count = ::indicator_count + 1
+        }
+      }
+      
+      return min(::indicator_count / 5, 1.0)
+    }
+    
+    function analyze_actionable_content(text) {
+      # Simple actionable content analysis
+      set ::actionable_indicators = ["should", "must", "need to", "recommend", "suggest"]
+      set ::indicator_count = 0
+      
+      for ::indicator in ::actionable_indicators {
+        if ::text.includes(::indicator) {
+          set ::indicator_count = ::indicator_count + 1
+        }
+      }
+      
+      return min(::indicator_count / 5, 1.0)
+    }
+  }
+}

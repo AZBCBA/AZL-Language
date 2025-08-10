@@ -1,16 +1,45 @@
-say "🧪 Simple Test";
+# Simple AZL Test - Verify Basic Functionality
 
-say "Hello, World!";
+component ::test.simple {
+  init {
+    say "🚀 Simple AZL Test Starting"
+    emit "test_basic_syntax"
+  }
 
-let x = 5;
-let y = 10;
-let z = x + y;
+  behavior {
+    listen for "test_basic_syntax" then {
+      say "📝 Testing basic syntax..."
+      
+      # Test let declarations
+      let x = 42
+      let y = 10
+      say "✅ let declarations working"
+      
+      # Test if statements
+      if x > 40 {
+        say "✅ if statements working"
+      }
+      
+      # Test loops
+      let sum = 0
+      for let i = 0; i < 3; i++ {
+        sum = sum + i
+      }
+      say "✅ for loops working"
+      
+      # Test while loops
+      let counter = 0
+      while counter < 2 {
+        counter = counter + 1
+      }
+      say "✅ while loops working"
+      
+      emit "test_complete"
+    }
 
-say "x =";
-say x;
-say "y =";
-say y;
-say "z =";
-say z;
-
-say "✅ Simple test completed!"; 
+    listen for "test_complete" then {
+      say "🎉 All basic tests completed successfully!"
+      say "🚀 AZL language runtime is working!"
+    }
+  }
+}

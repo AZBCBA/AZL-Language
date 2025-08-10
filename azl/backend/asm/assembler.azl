@@ -1,0 +1,449 @@
+component ::azl.backend.asm.assembler {
+  init {}
+  behavior {}
+
+  # Public API (exported wrappers)
+  export fn assemble_x86_64(program) {
+    return ::assemble_x86_64([program])
+  }
+  export fn assemble_arm64(program) {
+    return ::assemble_arm64([program])
+  }
+  export fn program_exit_linux_x86_64(code) {
+    return ::program_exit_linux_x86_64([code])
+  }
+  export fn program_exit_linux_arm64(code) {
+    return ::program_exit_linux_arm64([code])
+  }
+  export fn assemble_x86_64_with_context(program, base_vaddr, file_off_text) {
+    return ::assemble_x86_64([program, { base: base_vaddr, text_off: file_off_text }])
+  }
+
+  # Internal API expects single `args` array per AZL style
+
+  function assemble_x86_64(args) {
+    set ::program = args[0] || []
+    set ::context = args[1] || {}
+    set ::labels = {}
+    set ::offset = 0
+
+    # Pass 1: compute label offsets
+    for ::item in ::program {
+      if ::is_label(::item) {
+        set ::labels[::item.label] = ::offset
+        continue
+      }
+      set ::offset = ::offset + ::x86_64_sizeof(::item)
+    }
+
+    # Pass 2: encode with label resolution
+    set ::bytes = []
+    set ::pc = 0
+    for ::item in ::program {
+      if ::is_label(::item) { continue }
+      set ::enc = ::x86_64_encode(::item, ::pc, ::labels, ::context)
+      if ::enc.ok == false { return ::enc }
+      set ::bytes = ::bytes.concat(::enc.bytes)
+      set ::pc = ::pc + ::enc.bytes.length
+    }
+    return { ok: true, bytes: ::bytes, labels: ::labels }
+  }
+
+  function assemble_arm64(args) {
+    set ::program = args[0] || []
+    set ::labels = {}
+    set ::offset = 0
+
+    # Pass 1
+    for ::item in ::program {
+      if ::is_label(::item) {
+        set ::labels[::item.label] = ::offset
+        continue
+      }
+      set ::offset = ::offset + ::arm64_sizeof(::item)
+    }
+
+    # Pass 2
+    set ::bytes = []
+    set ::pc = 0
+    for ::item in ::program {
+      if ::is_label(::item) { continue }
+      set ::enc = ::arm64_encode(::item, ::pc, ::labels)
+      if ::enc.ok == false { return ::enc }
+      set ::bytes = ::bytes.concat(::enc.bytes)
+      set ::pc = ::pc + ::enc.bytes.length
+    }
+    return { ok: true, bytes: ::bytes, labels: ::labels }
+  }
+
+  function program_exit_linux_x86_64(args) {
+    set ::code = args[0] || 0
+    return [
+      ["mov_rax_imm64", 60],
+      ["mov_rdi_imm64", ::code],
+      ["syscall"],
+      ["ret"]
+    ]
+  }
+
+  function program_exit_linux_arm64(args) {
+    set ::code = args[0] || 0
+    # AArch64 Linux exit: x8 = 93, x0 = code, svc #0, ret
+    return [
+      ["movz_x8_imm16_hw0", 93],
+      ["movz_x0_imm16_hw0", ::code & 0xFFFF],
+      ["svc_0"],
+      ["ret"]
+    ]
+  }
+
+  # ---------------------
+  # Helpers
+  # ---------------------
+
+  function is_label(item) { return item != null && item.label != null }
+
+  function u8(v) { return (v & 0xFF) }
+  function u16le(v) { return [ (v & 0xFF), ((v >> 8) & 0xFF) ] }
+  function u32le(v) { return [ (v & 0xFF), ((v >> 8) & 0xFF), ((v >> 16) & 0xFF), ((v >> 24) & 0xFF) ] }
+  function u32le_signed(v) {
+    set ::x = v
+    if ::x < 0 { set ::x = (0x100000000 + ::x) }
+    return ::u32le(::x)
+  }
+  function s8(v) {
+    set ::x = v
+    if ::x < 0 { set ::x = 0x100 + ::x }
+    return ::x & 0xFF
+  }
+  function u64le(v) {
+    set ::lo = v & 0xFFFFFFFF
+    set ::hi = (v >> 32) & 0xFFFFFFFF
+    return ::u32le(::lo).concat(::u32le(::hi))
+  }
+
+  function reg_code(name) {
+    if name == "rax" { return 0 }
+    if name == "rcx" { return 1 }
+    if name == "rdx" { return 2 }
+    if name == "rbx" { return 3 }
+    if name == "rsp" { return 4 }
+    if name == "rbp" { return 5 }
+    if name == "rsi" { return 6 }
+    if name == "rdi" { return 7 }
+    return -1
+  }
+
+  # ---------------------
+  # x86_64 encoder
+  # ---------------------
+
+  function x86_64_sizeof(item) {
+    set ::op = item[0] || ""
+    if ::op == "syscall" { return 2 }
+    if ::op == "ret" { return 1 }
+    if ::op == "push_rbp" { return 1 }
+    if ::op == "push_rax" { return 1 }
+    if ::op == "pop_rbp" { return 1 }
+    if ::op == "pop_rcx" { return 1 }
+    if ::op == "mov_rbp_rsp" { return 3 }
+    if ::op == "mov_rsp_rbp" { return 3 }
+    if ::op == "sub_rsp_imm8" { return 4 }
+    if ::op == "sub_rsp_imm32" { return 7 }
+    if ::op == "add_rsp_imm8" { return 4 }
+    if ::op == "add_rsp_imm32" { return 7 }
+    if ::op == "xor_rax_rax" { return 3 }
+    if ::op == "xor_rdx_rdx" { return 3 }
+    if ::op == "add_rax_rcx" { return 3 }
+    if ::op == "sub_rax_rcx" { return 3 }
+    if ::op == "imul_rax_rcx" { return 4 }
+    if ::op == "cqo" { return 2 }
+    if ::op == "idiv_rcx" { return 3 }
+    if ::op == "cmp_rax_rcx" { return 3 }
+    if ::op == "cmp_rcx_rax" { return 3 }
+    if ::op == "cmp_rax_imm32" { return 6 }
+
+    if ::op == "mov_rax_imm64" { return 10 }
+    if ::op == "mov_rdi_imm64" { return 10 }
+    if ::op == "mov_rsi_imm64" { return 10 }
+    if ::op == "mov_rdx_imm64" { return 10 }
+    if ::op == "mov_rax_imm32" { return 7 }
+    if ::op == "mov_rdi_imm32" { return 7 }
+    if ::op == "add_rax_imm8" { return 4 }
+    if ::op == "sub_rax_imm8" { return 4 }
+    if ::op == "jmp_rel32" { return 5 }
+    if ::op == "call_rel32" { return 5 }
+    if ::op == "je_rel32" { return 6 }
+    if ::op == "jne_rel32" { return 6 }
+    if ::op == "jg_rel32" { return 6 }
+    if ::op == "jge_rel32" { return 6 }
+    if ::op == "jl_rel32" { return 6 }
+    if ::op == "jle_rel32" { return 6 }
+    if ::op == "mov_rsi_label64" { return 10 }
+    if ::op == "mov_rax_mem_rbp" { return (item[1] >= -128 && item[1] <= 127) ? 4 : 7 }
+    if ::op == "mov_mem_rbp_rax" { return (item[1] >= -128 && item[1] <= 127) ? 4 : 7 }
+    if ::op == "mov_r64_r64" { return 3 }
+    if ::op == "db" { return 1 }
+    if ::op == "db_bytes" { return item[1].length }
+    
+    # SIMD instructions
+    if ::op == "vmovdqu_ymm0_mem" { return 6 }
+    if ::op == "vmovdqu_mem_ymm0" { return 6 }
+    if ::op == "vpaddd_ymm0_ymm1" { return 5 }
+    if ::op == "vpsubd_ymm0_ymm1" { return 5 }
+    if ::op == "vpmulld_ymm0_ymm1" { return 6 }
+    if ::op == "vpcmpgtd_ymm0_ymm1" { return 6 }
+    if ::op == "vpshufd_ymm0_ymm1_imm8" { return 6 }
+    if ::op == "vperm2i128_ymm0_ymm1_imm8" { return 6 }
+    if ::op == "vzeroupper" { return 3 }
+    
+    return 0
+  }
+
+  function x86_64_encode(item, pc, labels, context) {
+    set ::op = item[0] || ""
+    # Fixed encodings
+    if ::op == "syscall" { return { ok: true, bytes: [0x0F, 0x05] } }
+    if ::op == "ret" { return { ok: true, bytes: [0xC3] } }
+    if ::op == "push_rbp" { return { ok: true, bytes: [0x55] } }
+    if ::op == "push_rax" { return { ok: true, bytes: [0x50] } }
+    if ::op == "pop_rbp" { return { ok: true, bytes: [0x5D] } }
+    if ::op == "pop_rcx" { return { ok: true, bytes: [0x59] } }
+    if ::op == "mov_rbp_rsp" { return { ok: true, bytes: [0x48, 0x89, 0xE5] } }
+    if ::op == "mov_rsp_rbp" { return { ok: true, bytes: [0x48, 0x89, 0xEC] } }
+    if ::op == "sub_rsp_imm8" { return { ok: true, bytes: [0x48, 0x83, 0xEC, ::u8(item[1])] } }
+    if ::op == "sub_rsp_imm32" { return { ok: true, bytes: [0x48, 0x81, 0xEC].concat(::u32le(item[1])) } }
+    if ::op == "add_rsp_imm8" { return { ok: true, bytes: [0x48, 0x83, 0xC4, ::u8(item[1])] } }
+    if ::op == "add_rsp_imm32" { return { ok: true, bytes: [0x48, 0x81, 0xC4].concat(::u32le(item[1])) } }
+    if ::op == "xor_rax_rax" { return { ok: true, bytes: [0x48, 0x31, 0xC0] } }
+    if ::op == "xor_rdx_rdx" { return { ok: true, bytes: [0x48, 0x31, 0xD2] } }
+    if ::op == "add_rax_rcx" { return { ok: true, bytes: [0x48, 0x01, 0xC8] } }
+    if ::op == "sub_rax_rcx" { return { ok: true, bytes: [0x48, 0x29, 0xC8] } }
+    if ::op == "imul_rax_rcx" { return { ok: true, bytes: [0x48, 0x0F, 0xAF, 0xC1] } }
+    if ::op == "cqo" { return { ok: true, bytes: [0x48, 0x99] } }
+    if ::op == "idiv_rcx" { return { ok: true, bytes: [0x48, 0xF7, 0xF9] } }
+    if ::op == "cmp_rax_rcx" { return { ok: true, bytes: [0x48, 0x39, 0xC8] } }
+    if ::op == "cmp_rcx_rax" { return { ok: true, bytes: [0x48, 0x39, 0xC1] } }
+    if ::op == "cmp_rax_imm32" { return { ok: true, bytes: [0x48, 0x3D].concat(::u32le(item[1] || 0)) } }
+    if ::op == "mov_r64_r64" {
+      # Only support mov rax, rcx for now as used by lowerer
+      set ::dst = (item[1] || "").to_lower()
+      set ::src = (item[2] || "").to_lower()
+      if ::dst == "rax" && ::src == "rcx" { return { ok: true, bytes: [0x48, 0x89, 0xC8] } }
+      return { ok: false, error: "Unsupported mov_r64_r64 variant: " + ::dst + "," + ::src }
+    }
+
+    if ::op == "mov_rax_imm64" { return { ok: true, bytes: [0x48, 0xB8].concat(::u64le(item[1])) } }
+    if ::op == "mov_rdi_imm64" { return { ok: true, bytes: [0x48, 0xBF].concat(::u64le(item[1])) } }
+    if ::op == "mov_rsi_imm64" { return { ok: true, bytes: [0x48, 0xBE].concat(::u64le(item[1])) } }
+    if ::op == "mov_rdx_imm64" { return { ok: true, bytes: [0x48, 0xBA].concat(::u64le(item[1])) } }
+    if ::op == "mov_rax_imm32" { return { ok: true, bytes: [0x48, 0xC7, 0xC0].concat(::u32le(item[1])) } }
+    if ::op == "mov_rdi_imm32" { return { ok: true, bytes: [0x48, 0xC7, 0xC7].concat(::u32le(item[1])) } }
+    if ::op == "add_rax_imm8" { return { ok: true, bytes: [0x48, 0x83, 0xC0, ::u8(item[1])] } }
+    if ::op == "sub_rax_imm8" { return { ok: true, bytes: [0x48, 0x83, 0xE8, ::u8(item[1])] } }
+
+    if ::op == "jmp_rel32" {
+      set ::label = item[1]
+      if ::labels[::label] == null { return { ok: false, error: "Unknown label: " + ::label } }
+      set ::target = ::labels[::label]
+      set ::rel = (::target - (pc + 5))
+      return { ok: true, bytes: [0xE9].concat(::u32le(::rel)) }
+    }
+
+    if ::op == "call_rel32" {
+      set ::label2 = item[1]
+      if ::labels[::label2] == null { return { ok: false, error: "Unknown label: " + ::label2 } }
+      set ::target2 = ::labels[::label2]
+      set ::rel2 = (::target2 - (pc + 5))
+      return { ok: true, bytes: [0xE8].concat(::u32le(::rel2)) }
+    }
+
+    if ::op == "je_rel32" {
+      set ::label3 = item[1]
+      if ::labels[::label3] == null { return { ok: false, error: "Unknown label: " + ::label3 } }
+      set ::target3 = ::labels[::label3]
+      set ::rel3 = (::target3 - (pc + 6))
+      return { ok: true, bytes: [0x0F, 0x84].concat(::u32le(::rel3)) }
+    }
+
+    if ::op == "jne_rel32" {
+      set ::label4 = item[1]
+      if ::labels[::label4] == null { return { ok: false, error: "Unknown label: " + ::label4 } }
+      set ::target4 = ::labels[::label4]
+      set ::rel4 = (::target4 - (pc + 6))
+      return { ok: true, bytes: [0x0F, 0x85].concat(::u32le(::rel4)) }
+    }
+
+    if ::op == "jg_rel32" {
+      set ::lab = item[1]
+      if ::labels[::lab] == null { return { ok: false, error: "Unknown label: " + ::lab } }
+      set ::tar = ::labels[::lab]
+      set ::rel = (::tar - (pc + 6))
+      return { ok: true, bytes: [0x0F, 0x8F].concat(::u32le(::rel)) }
+    }
+    if ::op == "jge_rel32" {
+      set ::lab2 = item[1]
+      if ::labels[::lab2] == null { return { ok: false, error: "Unknown label: " + ::lab2 } }
+      set ::tar2 = ::labels[::lab2]
+      set ::rel2 = (::tar2 - (pc + 6))
+      return { ok: true, bytes: [0x0F, 0x8D].concat(::u32le(::rel2)) }
+    }
+    if ::op == "jl_rel32" {
+      set ::lab3 = item[1]
+      if ::labels[::lab3] == null { return { ok: false, error: "Unknown label: " + ::lab3 } }
+      set ::tar3 = ::labels[::lab3]
+      set ::rel3 = (::tar3 - (pc + 6))
+      return { ok: true, bytes: [0x0F, 0x8C].concat(::u32le(::rel3)) }
+    }
+    if ::op == "jle_rel32" {
+      set ::lab4 = item[1]
+      if ::labels[::lab4] == null { return { ok: false, error: "Unknown label: " + ::lab4 } }
+      set ::tar4 = ::labels[::lab4]
+      set ::rel4 = (::tar4 - (pc + 6))
+      return { ok: true, bytes: [0x0F, 0x8E].concat(::u32le(::rel4)) }
+    }
+
+    if ::op == "mov_rsi_label64" {
+      set ::label5 = item[1]
+      if ::labels[::label5] == null { return { ok: false, error: "Unknown label: " + ::label5 } }
+      if context == null || context.base == null || context.text_off == null { return { ok: false, error: "Missing context for label absolute address" } }
+      set ::abs = context.base + context.text_off + ::labels[::label5]
+      return { ok: true, bytes: [0x48, 0xBE].concat(::u64le(::abs)) }
+    }
+
+    if ::op == "mov_rax_mem_rbp" {
+      set ::disp = item[1] || 0
+      if ::disp >= -128 && ::disp <= 127 { return { ok: true, bytes: [0x48, 0x8B, 0x45, ::s8(::disp)] } }
+      else { return { ok: true, bytes: [0x48, 0x8B, 0x85].concat(::u32le_signed(::disp)) } }
+    }
+
+    if ::op == "mov_mem_rbp_rax" {
+      set ::disp2 = item[1] || 0
+      if ::disp2 >= -128 && ::disp2 <= 127 { return { ok: true, bytes: [0x48, 0x89, 0x45, ::s8(::disp2)] } }
+      else { return { ok: true, bytes: [0x48, 0x89, 0x85].concat(::u32le_signed(::disp2)) } }
+    }
+
+    if ::op == "db" { return { ok: true, bytes: [ item[1] & 0xFF ] } }
+    if ::op == "db_bytes" { return { ok: true, bytes: item[1] } }
+    
+    # SIMD instruction encodings
+    if ::op == "vmovdqu_ymm0_mem" {
+      set ::disp = item[1] || 0
+      if ::disp >= -128 && ::disp <= 127 {
+        return { ok: true, bytes: [0xC5, 0xFE, 0x6F, 0x45, ::s8(::disp)] }
+      } else {
+        return { ok: true, bytes: [0xC5, 0xFE, 0x6F, 0x85].concat(::u32le_signed(::disp)) }
+      }
+    }
+    
+    if ::op == "vmovdqu_mem_ymm0" {
+      set ::disp = item[1] || 0
+      if ::disp >= -128 && ::disp <= 127 {
+        return { ok: true, bytes: [0xC5, 0xFE, 0x7F, 0x45, ::s8(::disp)] }
+      } else {
+        return { ok: true, bytes: [0xC5, 0xFE, 0x7F, 0x85].concat(::u32le_signed(::disp)) }
+      }
+    }
+    
+    if ::op == "vpaddd_ymm0_ymm1" { return { ok: true, bytes: [0xC5, 0xFD, 0xFE, 0xC1] } }
+    if ::op == "vpsubd_ymm0_ymm1" { return { ok: true, bytes: [0xC5, 0xFD, 0xFA, 0xC1] } }
+    if ::op == "vpmulld_ymm0_ymm1" { return { ok: true, bytes: [0xC4, 0xE2, 0x7D, 0x40, 0xC1] } }
+    if ::op == "vpcmpgtd_ymm0_ymm1" { return { ok: true, bytes: [0xC5, 0xFD, 0x66, 0xC1] } }
+    if ::op == "vpshufd_ymm0_ymm1_imm8" { return { ok: true, bytes: [0xC5, 0xFD, 0x70, 0xC1, ::u8(item[1] || 0)] } }
+    if ::op == "vperm2i128_ymm0_ymm1_imm8" { return { ok: true, bytes: [0xC4, 0xE3, 0x7D, 0x46, 0xC1, ::u8(item[1] || 0)] } }
+    if ::op == "vzeroupper" { return { ok: true, bytes: [0xC5, 0xF8, 0x77] } }
+
+    return { ok: false, error: "Unsupported x86_64 op: " + ::op }
+  }
+
+  # ---------------------
+  # ARM64 (AArch64) encoder
+  # ---------------------
+
+  function arm64_sizeof(item) {
+    set ::op = item[0] || ""
+    if ::op == "ret" { return 4 }
+    if ::op == "svc_0" { return 4 }
+    if ::op == "movz_x0_imm16_hw0" { return 4 }
+    if ::op == "movz_x8_imm16_hw0" { return 4 }
+    if ::op == "movk_x0_imm16_hw1" { return 4 }
+    if ::op == "movz_x1_imm16_hw0" { return 4 }
+    if ::op == "movk_x1_imm16_hw1" { return 4 }
+    if ::op == "movz_x2_imm16_hw0" { return 4 }
+    if ::op == "movk_x2_imm16_hw1" { return 4 }
+    if ::op == "mov_x1_label64" { return 8 } # movz+movk
+    if ::op == "b_rel26" { return 4 }
+    return 0
+  }
+
+  function arm64_encode(item, pc, labels) {
+    set ::op = item[0] || ""
+    if ::op == "ret" { return { ok: true, bytes: ::u32le(0xD65F03C0) } }
+    if ::op == "svc_0" { return { ok: true, bytes: ::u32le(0xD4000001) } }
+
+    if ::op == "movz_x0_imm16_hw0" {
+      set ::imm16 = item[1] & 0xFFFF
+      set ::instr = 0xD2800000 | (::imm16 << 5) | 0
+      return { ok: true, bytes: ::u32le(::instr) }
+    }
+    if ::op == "movz_x8_imm16_hw0" {
+      set ::imm16b = item[1] & 0xFFFF
+      set ::instrb = 0xD2800000 | (::imm16b << 5) | 8
+      return { ok: true, bytes: ::u32le(::instrb) }
+    }
+    if ::op == "movk_x0_imm16_hw1" {
+      set ::imm16c = item[1] & 0xFFFF
+      set ::instrc = 0xF2808000 | (::imm16c << 5) | 0
+      return { ok: true, bytes: ::u32le(::instrc) }
+    }
+
+    if ::op == "movz_x1_imm16_hw0" {
+      set ::imm16d = item[1] & 0xFFFF
+      set ::instrd = 0xD2800000 | (::imm16d << 5) | 1
+      return { ok: true, bytes: ::u32le(::instrd) }
+    }
+    if ::op == "movk_x1_imm16_hw1" {
+      set ::imm16e = item[1] & 0xFFFF
+      set ::instre = 0xF2808000 | (::imm16e << 5) | 1
+      return { ok: true, bytes: ::u32le(::instre) }
+    }
+    if ::op == "movz_x2_imm16_hw0" {
+      set ::imm16f = item[1] & 0xFFFF
+      set ::instrf = 0xD2800000 | (::imm16f << 5) | 2
+      return { ok: true, bytes: ::u32le(::instrf) }
+    }
+    if ::op == "movk_x2_imm16_hw1" {
+      set ::imm16g = item[1] & 0xFFFF
+      set ::instrg = 0xF2808000 | (::imm16g << 5) | 2
+      return { ok: true, bytes: ::u32le(::instrg) }
+    }
+    if ::op == "mov_x1_label64" {
+      set ::label = item[1]
+      if ::labels[::label] == null { return { ok: false, error: "Unknown label: " + ::label } }
+      if labels == null { return { ok: false, error: "Missing labels for arm64 label load" } }
+      # Absolute address using context-like base/text is not available in ARM64 encoder; use program counter relative approximation via external context
+      # For now, compute absolute by assuming labels map to byte offset from start of program and base/text offsets provided via context in higher layer
+      # Since arm64_encode doesn't receive context, we encode as zero; this function is called only via x86 path.
+      # To maintain correctness within assembler usage, we allow higher-level lowering to precompute the absolute and pass as immediate in item[2]
+      set ::abs = item[2]
+      if ::abs == null { return { ok: false, error: "mov_x1_label64 requires absolute address in item[2]" } }
+      set ::lo = ::abs & 0xFFFF
+      set ::hi = (item[2] >> 16) & 0xFFFF
+      set ::i1 = 0xD2800000 | (::lo << 5) | 1
+      set ::i2 = 0xF2808000 | (::hi << 5) | 1
+      return { ok: true, bytes: ::u32le(::i1).concat(::u32le(::i2)) }
+    }
+
+    if ::op == "b_rel26" {
+      set ::label = item[1]
+      if ::labels[::label] == null { return { ok: false, error: "Unknown label: " + ::label } }
+      set ::target = ::labels[::label]
+      set ::rel_bytes = (::target - pc)
+      set ::imm26 = (::rel_bytes >> 2) & 0x03FFFFFF
+      set ::instrd = 0x14000000 | ::imm26
+      return { ok: true, bytes: ::u32le(::instrd) }
+    }
+
+    return { ok: false, error: "Unsupported arm64 op: " + ::op }
+  }
+}

@@ -1,0 +1,126 @@
+component ::azl.build.config {
+  init {
+    # Defaults
+    set ::config = {
+      build_mode: "release",         # debug | release | profile | test
+      optimization_level: 2,          # 0..3
+      debug_symbols: false,
+      strip_symbols: true,
+      target_arch: "x86_64",         # x86_64 | arm64 | x86 | riscv64
+      target_os: "linux",            # linux | windows | macos
+      output_dir: "build/out",
+      output_name: "azl.out",
+      optimize_for_size: false,
+      enable_lto: false
+    }
+
+    # Apply build mode from env first (affects defaults)
+    set mode_env = ::internal.env("AZL_BUILD_MODE")
+    if mode_env != null && mode_env != "" {
+      ::apply_mode(mode_env.to_lower())
+    }
+
+    # Overlay other env overrides
+    set opt_env = ::internal.env("AZL_OPT_LEVEL")
+    if opt_env == "0" { set ::config.optimization_level = 0 }
+    if opt_env == "1" { set ::config.optimization_level = 1 }
+    if opt_env == "2" { set ::config.optimization_level = 2 }
+    if opt_env == "3" { set ::config.optimization_level = 3 }
+
+    set dbg_env = (::internal.env("AZL_DEBUG_SYMBOLS") || "")
+    set dbg_l = dbg_env.to_lower()
+    if (dbg_l == "1" or dbg_l == "true" or dbg_l == "yes" or dbg_l == "on") {
+      set ::config.debug_symbols = true
+      set ::config.strip_symbols = false
+    }
+
+    set strip_env = (::internal.env("AZL_STRIP_SYMBOLS") || "")
+    set strip_l = strip_env.to_lower()
+    if (strip_l == "1" or strip_l == "true" or strip_l == "yes" or strip_l == "on") {
+      set ::config.strip_symbols = true
+    } else if (strip_l == "0" or strip_l == "false" or strip_l == "no" or strip_l == "off") {
+      set ::config.strip_symbols = false
+    }
+
+    set arch_env = (::internal.env("AZL_TARGET_ARCH") || "")
+    if arch_env != "" { set ::config.target_arch = arch_env.to_lower() }
+
+    set os_env = (::internal.env("AZL_TARGET_OS") || "")
+    if os_env != "" { set ::config.target_os = os_env.to_lower() }
+
+    set out_dir = (::internal.env("AZL_OUTPUT_DIR") || "")
+    if out_dir != "" { set ::config.output_dir = out_dir }
+
+    set out_name = (::internal.env("AZL_OUTPUT_NAME") || "")
+    if out_name != "" { set ::config.output_name = out_name }
+  }
+
+  behavior {}
+
+  # Apply a named build mode profile
+  export fn apply_mode(mode) {
+    set m = (mode || "").to_lower()
+    if m == "debug" {
+      set ::config.build_mode = "debug"
+      set ::config.optimization_level = 0
+      set ::config.debug_symbols = true
+      set ::config.strip_symbols = false
+      set ::config.optimize_for_size = false
+      set ::config.enable_lto = false
+      return ::config
+    }
+    if m == "release" {
+      set ::config.build_mode = "release"
+      set ::config.optimization_level = 2
+      set ::config.debug_symbols = false
+      set ::config.strip_symbols = true
+      set ::config.optimize_for_size = false
+      set ::config.enable_lto = false
+      return ::config
+    }
+    if m == "profile" {
+      set ::config.build_mode = "profile"
+      set ::config.optimization_level = 1
+      set ::config.debug_symbols = true
+      set ::config.strip_symbols = false
+      set ::config.optimize_for_size = false
+      set ::config.enable_lto = false
+      return ::config
+    }
+    if m == "test" {
+      set ::config.build_mode = "test"
+      set ::config.optimization_level = 0
+      set ::config.debug_symbols = true
+      set ::config.strip_symbols = false
+      set ::config.optimize_for_size = false
+      set ::config.enable_lto = false
+      return ::config
+    }
+    # Unknown mode → keep current
+    return ::config
+  }
+
+  # Merge overrides (object with any known keys)
+  export fn merge(overrides) {
+    if overrides == null { return ::config }
+    for k in overrides {
+      if overrides[k] != null { set ::config[k] = overrides[k] }
+    }
+    return ::config
+  }
+
+  export fn get_config() { return ::config }
+
+  # Derive options suitable to pass into native compiler event
+  export fn to_compile_options() {
+    return {
+      target_arch: ::config.target_arch,
+      target_os: ::config.target_os,
+      debug_symbols: ::config.debug_symbols,
+      optimization_level: ::config.optimization_level,
+      strip_symbols: ::config.strip_symbols
+    }
+  }
+}
+
+

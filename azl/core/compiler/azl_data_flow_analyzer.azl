@@ -1,0 +1,870 @@
+component ::azl.data_flow_analyzer {
+  init {
+    link ::error.system
+    set ::analysis_types = ["reaching_definitions", "available_expressions", "live_variables"]
+    set ::worklist_algorithm = true
+    set ::iterative_limit = 100
+  }
+
+  behavior {
+    listen for "analyze_data_flow" then {
+      set ::ast = $1
+      set ::analysis_type = $2 || "all"
+      set ::target_platform = $3 || "x86_64"
+      
+      say "🔍 Starting comprehensive data flow analysis..."
+      
+      if ::analysis_type == "all" {
+        set ::results = ::perform_comprehensive_analysis(::ast, ::target_platform)
+      } else {
+        set ::results = ::perform_single_analysis(::ast, ::analysis_type, ::target_platform)
+      }
+      
+      emit "data_flow_analysis_complete" with ::results
+      say "✅ Data flow analysis completed successfully"
+    }
+
+    listen for "get_reaching_definitions" then {
+      set ::ast = $1
+      set ::variable = $2
+      set ::position = $3
+      
+      set ::definitions = ::compute_reaching_definitions(::ast, ::variable, ::position)
+      emit "reaching_definitions_result" with ::definitions
+    }
+
+    listen for "get_available_expressions" then {
+      set ::ast = $1
+      set ::position = $2
+      
+      set ::expressions = ::compute_available_expressions(::ast, ::position)
+      emit "available_expressions_result" with ::expressions
+    }
+
+    listen for "get_live_variables" then {
+      set ::ast = $1
+      set ::position = $2
+      
+      set ::variables = ::compute_live_variables(::ast, ::position)
+      emit "live_variables_result" with ::variables
+    }
+  }
+
+  memory {
+    ::perform_comprehensive_analysis = (ast, target_platform) => {
+      set ::results = {
+        reaching_definitions: {},
+        available_expressions: {},
+        live_variables: {},
+        analysis_metadata: {
+          target_platform: ::target_platform,
+          timestamp: ::get_current_timestamp(),
+          iterations: 0,
+          convergence: true
+        }
+      }
+
+      # Build control flow graph
+      set ::cfg = ::build_control_flow_graph(::ast)
+      
+      # Perform reaching definitions analysis
+      set ::rd_result = ::analyze_reaching_definitions(::ast, ::cfg)
+      set ::results.reaching_definitions = ::rd_result
+      
+      # Perform available expressions analysis
+      set ::ae_result = ::analyze_available_expressions(::ast, ::cfg)
+      set ::results.available_expressions = ::ae_result
+      
+      # Perform live variables analysis
+      set ::lv_result = ::analyze_live_variables(::ast, ::cfg)
+      set ::results.live_variables = ::lv_result
+      
+      return ::results
+    }
+
+    ::perform_single_analysis = (ast, analysis_type, target_platform) => {
+      set ::cfg = ::build_control_flow_graph(::ast)
+      
+      if ::analysis_type == "reaching_definitions" {
+        return ::analyze_reaching_definitions(::ast, ::cfg)
+      } else if ::analysis_type == "available_expressions" {
+        return ::analyze_available_expressions(::ast, ::cfg)
+      } else if ::analysis_type == "live_variables" {
+        return ::analyze_live_variables(::ast, ::cfg)
+      } else {
+        emit log_error to ::error.system with { type: "data_flow_analyzer", message: "unknown_analysis_type", context: { analysis_type: ::analysis_type } }
+        return { error: "Unknown analysis type: " + ::analysis_type }
+      }
+    }
+
+    ::build_control_flow_graph = (ast) => {
+      set ::cfg = {
+        nodes: [],
+        edges: [],
+        entry: null,
+        exit: null,
+        basic_blocks: []
+      }
+
+      # Extract basic blocks from AST
+      set ::blocks = ::extract_basic_blocks(::ast)
+      set ::cfg.basic_blocks = ::blocks
+      
+      # Build nodes
+      set ::i = 0
+      while ::i < ::blocks.length {
+        set ::block = ::blocks[::i]
+        set ::node = {
+          id: ::i,
+          type: "basic_block",
+          statements: ::block.statements,
+          entry: ::block.entry,
+          exit: ::block.exit,
+          predecessors: [],
+          successors: []
+        }
+        set ::cfg.nodes.push(::node)
+        set ::i = ::i + 1
+      }
+
+      # Build edges
+      set ::i = 0
+      while ::i < ::blocks.length {
+        set ::block = ::blocks[::i]
+        set ::successors = ::find_block_successors(::block, ::blocks)
+        
+        for ::succ in ::successors {
+          set ::edge = {
+            from: ::i,
+            to: ::succ,
+            type: "fallthrough"
+          }
+          set ::cfg.edges.push(::edge)
+          set ::cfg.nodes[::i].successors.push(::succ)
+          set ::cfg.nodes[::succ].predecessors.push(::i)
+        }
+        set ::i = ::i + 1
+      }
+
+      return ::cfg
+    }
+
+    ::extract_basic_blocks = (ast) => {
+      set ::blocks = []
+      set ::current_block = {
+        statements: [],
+        entry: null,
+        exit: null
+      }
+
+      # Process main body
+      if ::ast.body {
+        set ::i = 0
+        while ::i < ::ast.body.length {
+          set ::stmt = ::ast.body[::i]
+          
+          if ::is_block_leader(::stmt, ::i) {
+            # Start new block
+            if ::current_block.statements.length > 0 {
+              set ::current_block.exit = ::i - 1
+              set ::blocks.push(::current_block)
+            }
+            set ::current_block = {
+              statements: [::stmt],
+              entry: ::i,
+              exit: null
+            }
+          } else {
+            set ::current_block.statements.push(::stmt)
+          }
+          set ::i = ::i + 1
+        }
+        
+        # Add final block
+        if ::current_block.statements.length > 0 {
+          set ::current_block.exit = ::ast.body.length - 1
+          set ::blocks.push(::current_block)
+        }
+      }
+
+      # Process functions
+      if ::ast.functions {
+        for ::func in ::ast.functions {
+          if ::func.body {
+            set ::func_blocks = ::extract_basic_blocks({ body: ::func.body })
+            for ::block in ::func_blocks {
+              set ::block.function = ::func.name
+              set ::blocks.push(::block)
+            }
+          }
+        }
+      }
+
+      return ::blocks
+    }
+
+    ::is_block_leader = (stmt, position) => {
+      if ::position == 0 { return true }
+      if ::stmt.type == "IF" || ::stmt.type == "WHILE" || ::stmt.type == "FOR" { return true }
+      if ::stmt.type == "CALL" || ::stmt.type == "RETURN" { return true }
+      if ::stmt.label { return true }
+      return false
+    }
+
+    ::find_block_successors = (block, blocks) => {
+      set ::successors = []
+      set ::last_stmt = ::block.statements[::block.statements.length - 1]
+      
+      if ::last_stmt.type == "IF" {
+        # Add both true and false branches
+        set ::successors.push(::block.id + 1)  # Fallthrough
+        # Find target of conditional jump
+        set ::target = ::find_conditional_target(::last_stmt, ::blocks)
+        if ::target >= 0 { set ::successors.push(::target) }
+      } else if ::last_stmt.type == "WHILE" {
+        # Add loop body and exit
+        set ::successors.push(::block.id + 1)  # Loop body
+        set ::exit_target = ::find_loop_exit(::last_stmt, ::blocks)
+        if ::exit_target >= 0 { set ::successors.push(::exit_target) }
+      } else if ::last_stmt.type == "RETURN" {
+        # No successors for return
+      } else {
+        # Fallthrough to next block
+        set ::successors.push(::block.id + 1)
+      }
+      
+      return ::successors
+    }
+
+    ::analyze_reaching_definitions = (ast, cfg) => {
+      set ::result = {
+        definitions: {},
+        reaching_sets: {},
+        gen_sets: {},
+        kill_sets: {},
+        in_sets: {},
+        out_sets: {}
+      }
+
+      # Collect all definitions
+      set ::all_definitions = ::collect_definitions(::ast)
+      set ::result.definitions = ::all_definitions
+
+      # Initialize gen and kill sets for each block
+      set ::i = 0
+      while ::i < ::cfg.nodes.length {
+        set ::block = ::cfg.nodes[::i]
+        set ::gen_kill = ::compute_gen_kill_sets(::block, ::all_definitions)
+        set ::result.gen_sets[::i] = ::gen_kill.gen
+        set ::result.kill_sets[::i] = ::gen_kill.kill
+        set ::i = ::i + 1
+      }
+
+      # Iterative algorithm for reaching definitions
+      set ::converged = false
+      set ::iteration = 0
+      
+      while !::converged && ::iteration < ::iterative_limit {
+        set ::converged = true
+        set ::iteration = ::iteration + 1
+        
+        set ::i = 0
+        while ::i < ::cfg.nodes.length {
+          set ::block = ::cfg.nodes[::i]
+          set ::old_out = ::result.out_sets[::i] || {}
+          
+          # IN[B] = ∪ OUT[P] for all predecessors P of B
+          set ::in_set = {}
+          for ::pred in ::block.predecessors {
+            set ::pred_out = ::result.out_sets[::pred] || {}
+            for ::def in ::pred_out {
+              set ::in_set[::def] = true
+            }
+          }
+          set ::result.in_sets[::i] = ::in_set
+          
+          # OUT[B] = GEN[B] ∪ (IN[B] - KILL[B])
+          set ::out_set = {}
+          set ::gen = ::result.gen_sets[::i] || {}
+          set ::kill = ::result.kill_sets[::i] || {}
+          
+          # Add GEN[B]
+          for ::def in ::gen {
+            set ::out_set[::def] = true
+          }
+          
+          # Add IN[B] - KILL[B]
+          for ::def in ::in_set {
+            if !::kill[::def] {
+              set ::out_set[::def] = true
+            }
+          }
+          
+          set ::result.out_sets[::i] = ::out_set
+          
+          # Check convergence
+          if ::sets_different(::old_out, ::out_set) {
+            set ::converged = false
+          }
+          
+          set ::i = ::i + 1
+        }
+      }
+
+      set ::result.analysis_metadata = {
+        iterations: ::iteration,
+        converged: ::converged,
+        algorithm: "iterative_worklist"
+      }
+
+      return ::result
+    }
+
+    ::analyze_available_expressions = (ast, cfg) => {
+      set ::result = {
+        expressions: {},
+        available_sets: {},
+        gen_sets: {},
+        kill_sets: {},
+        in_sets: {},
+        out_sets: {}
+      }
+
+      # Collect all expressions
+      set ::all_expressions = ::collect_expressions(::ast)
+      set ::result.expressions = ::all_expressions
+
+      # Initialize gen and kill sets for each block
+      set ::i = 0
+      while ::i < ::cfg.nodes.length {
+        set ::block = ::cfg.nodes[::i]
+        set ::gen_kill = ::compute_expression_gen_kill(::block, ::all_expressions)
+        set ::result.gen_sets[::i] = ::gen_kill.gen
+        set ::result.kill_sets[::i] = ::gen_kill.kill
+        set ::i = ::i + 1
+      }
+
+      # Iterative algorithm for available expressions
+      set ::converged = false
+      set ::iteration = 0
+      
+      while !::converged && ::iteration < ::iterative_limit {
+        set ::converged = true
+        set ::iteration = ::iteration + 1
+        
+        set ::i = 0
+        while ::i < ::cfg.nodes.length {
+          set ::block = ::cfg.nodes[::i]
+          set ::old_out = ::result.out_sets[::i] || {}
+          
+          # IN[B] = ∩ OUT[P] for all predecessors P of B
+          set ::in_set = ::all_expressions  # Start with all expressions
+          for ::pred in ::block.predecessors {
+            set ::pred_out = ::result.out_sets[::pred] || {}
+            set ::in_set = ::set_intersection(::in_set, ::pred_out)
+          }
+          set ::result.in_sets[::i] = ::in_set
+          
+          # OUT[B] = GEN[B] ∪ (IN[B] - KILL[B])
+          set ::out_set = {}
+          set ::gen = ::result.gen_sets[::i] || {}
+          set ::kill = ::result.kill_sets[::i] || {}
+          
+          # Add GEN[B]
+          for ::expr in ::gen {
+            set ::out_set[::expr] = true
+          }
+          
+          # Add IN[B] - KILL[B]
+          for ::expr in ::in_set {
+            if !::kill[::expr] {
+              set ::out_set[::expr] = true
+            }
+          }
+          
+          set ::result.out_sets[::i] = ::out_set
+          
+          # Check convergence
+          if ::sets_different(::old_out, ::out_set) {
+            set ::converged = false
+          }
+          
+          set ::i = ::i + 1
+        }
+      }
+
+      set ::result.analysis_metadata = {
+        iterations: ::iteration,
+        converged: ::converged,
+        algorithm: "iterative_worklist"
+      }
+
+      return ::result
+    }
+
+    ::analyze_live_variables = (ast, cfg) => {
+      set ::result = {
+        variables: {},
+        live_sets: {},
+        def_sets: {},
+        use_sets: {},
+        in_sets: {},
+        out_sets: {}
+      }
+
+      # Collect all variables
+      set ::all_variables = ::collect_variables(::ast)
+      set ::result.variables = ::all_variables
+
+      # Initialize def and use sets for each block
+      set ::i = 0
+      while ::i < ::cfg.nodes.length {
+        set ::block = ::cfg.nodes[::i]
+        set ::def_use = ::compute_def_use_sets(::block, ::all_variables)
+        set ::result.def_sets[::i] = ::def_use.def
+        set ::result.use_sets[::i] = ::def_use.use
+        set ::i = ::i + 1
+      }
+
+      # Iterative algorithm for live variables (backward analysis)
+      set ::converged = false
+      set ::iteration = 0
+      
+      while !::converged && ::iteration < ::iterative_limit {
+        set ::converged = true
+        set ::iteration = ::iteration + 1
+        
+        set ::i = ::cfg.nodes.length - 1
+        while ::i >= 0 {
+          set ::block = ::cfg.nodes[::i]
+          set ::old_in = ::result.in_sets[::i] || {}
+          
+          # OUT[B] = ∪ IN[S] for all successors S of B
+          set ::out_set = {}
+          for ::succ in ::block.successors {
+            set ::succ_in = ::result.in_sets[::succ] || {}
+            for ::var in ::succ_in {
+              set ::out_set[::var] = true
+            }
+          }
+          set ::result.out_sets[::i] = ::out_set
+          
+          # IN[B] = USE[B] ∪ (OUT[B] - DEF[B])
+          set ::in_set = {}
+          set ::use = ::result.use_sets[::i] || {}
+          set ::def = ::result.def_sets[::i] || {}
+          
+          # Add USE[B]
+          for ::var in ::use {
+            set ::in_set[::var] = true
+          }
+          
+          # Add OUT[B] - DEF[B]
+          for ::var in ::out_set {
+            if !::def[::var] {
+              set ::in_set[::var] = true
+            }
+          }
+          
+          set ::result.in_sets[::i] = ::in_set
+          
+          # Check convergence
+          if ::sets_different(::old_in, ::in_set) {
+            set ::converged = false
+          }
+          
+          set ::i = ::i - 1
+        }
+      }
+
+      set ::result.analysis_metadata = {
+        iterations: ::iteration,
+        converged: ::converged,
+        algorithm: "iterative_worklist_backward"
+      }
+
+      return ::result
+    }
+
+    ::collect_definitions = (ast) => {
+      set ::definitions = {}
+      set ::def_id = 0
+      
+      # Process main body
+      if ::ast.body {
+        set ::i = 0
+        while ::i < ::ast.body.length {
+          set ::stmt = ::ast.body[::i]
+          if ::stmt.type == "SET" || ::stmt.type == "set" {
+            set ::var = ::stmt.variable || ::stmt.name
+            if ::var {
+              set ::def_id = ::def_id + 1
+              set ::def_key = ::var + "_" + ::def_id
+              set ::definitions[::def_key] = {
+                variable: ::var,
+                position: ::i,
+                statement: ::stmt,
+                id: ::def_id
+              }
+            }
+          }
+          set ::i = ::i + 1
+        }
+      }
+
+      # Process functions
+      if ::ast.functions {
+        for ::func in ::ast.functions {
+          if ::func.body {
+            set ::i = 0
+            while ::i < ::func.body.length {
+              set ::stmt = ::func.body[::i]
+              if ::stmt.type == "SET" || ::stmt.type == "set" {
+                set ::var = ::stmt.variable || ::stmt.name
+                if ::var {
+                  set ::def_id = ::def_id + 1
+                  set ::def_key = ::var + "_" + ::def_id
+                  set ::definitions[::def_key] = {
+                    variable: ::var,
+                    position: ::i,
+                    statement: ::stmt,
+                    function: ::func.name,
+                    id: ::def_id
+                  }
+                }
+              }
+              set ::i = ::i + 1
+            }
+          }
+        }
+      }
+
+      return ::definitions
+    }
+
+    ::collect_expressions = (ast) => {
+      set ::expressions = {}
+      
+      # Process main body
+      if ::ast.body {
+        set ::i = 0
+        while ::i < ::ast.body.length {
+          set ::stmt = ::ast.body[::i]
+          if ::stmt.value {
+            set ::expr = ::extract_expressions(::stmt.value)
+            for ::e in ::expr {
+              set ::expressions[::e] = true
+            }
+          }
+          set ::i = ::i + 1
+        }
+      }
+
+      # Process functions
+      if ::ast.functions {
+        for ::func in ::ast.functions {
+          if ::func.body {
+            set ::i = 0
+            while ::i < ::func.body.length {
+              set ::stmt = ::func.body[::i]
+              if ::stmt.value {
+                set ::expr = ::extract_expressions(::stmt.value)
+                for ::e in ::expr {
+                  set ::expressions[::e] = true
+                }
+              }
+              set ::i = ::i + 1
+            }
+          }
+        }
+      }
+
+      return ::expressions
+    }
+
+    ::collect_variables = (ast) => {
+      set ::variables = {}
+      
+      # Process main body
+      if ::ast.body {
+        set ::i = 0
+        while ::i < ::ast.body.length {
+          set ::stmt = ::ast.body[::i]
+          if ::stmt.variable || ::stmt.name {
+            set ::var = ::stmt.variable || ::stmt.name
+            set ::variables[::var] = true
+          }
+          if ::stmt.value {
+            set ::vars = ::extract_variables(::stmt.value)
+            for ::v in ::vars {
+              set ::variables[::v] = true
+            }
+          }
+          set ::i = ::i + 1
+        }
+      }
+
+      # Process functions
+      if ::ast.functions {
+        for ::func in ::ast.functions {
+          if ::func.body {
+            set ::i = 0
+            while ::i < ::func.body.length {
+              set ::stmt = ::func.body[::i]
+              if ::stmt.variable || ::stmt.name {
+                set ::var = ::stmt.variable || ::stmt.name
+                set ::variables[::var] = true
+              }
+              if ::stmt.value {
+                set ::vars = ::extract_variables(::stmt.value)
+                for ::v in ::vars {
+                  set ::variables[::v] = true
+                }
+              }
+              set ::i = ::i + 1
+            }
+          }
+        }
+      }
+
+      return ::variables
+    }
+
+    ::compute_gen_kill_sets = (block, definitions) => {
+      set ::gen = {}
+      set ::kill = {}
+      
+      for ::stmt in ::block.statements {
+        if ::stmt.type == "SET" || ::stmt.type == "set" {
+          set ::var = ::stmt.variable || ::stmt.name
+          if ::var {
+            # Kill all previous definitions of this variable
+            for ::def_key in ::definitions {
+              set ::def = ::definitions[::def_key]
+              if ::def.variable == ::var {
+                set ::kill[::def_key] = true
+              }
+            }
+            
+            # Generate new definition
+            set ::def_id = ::gen.length + 1
+            set ::def_key = ::var + "_" + ::def_id
+            set ::gen[::def_key] = true
+          }
+        }
+      }
+      
+      return { gen: ::gen, kill: ::kill }
+    }
+
+    ::compute_expression_gen_kill = (block, expressions) => {
+      set ::gen = {}
+      set ::kill = {}
+      
+      for ::stmt in ::block.statements {
+        if ::stmt.value {
+          set ::expr = ::extract_expressions(::stmt.value)
+          for ::e in ::expr {
+            set ::gen[::e] = true
+          }
+        }
+        
+        # Kill expressions that use variables being defined
+        if ::stmt.type == "SET" || ::stmt.type == "set" {
+          set ::var = ::stmt.variable || ::stmt.name
+          if ::var {
+            for ::expr in ::expressions {
+              if ::expr.includes(::var) {
+                set ::kill[::expr] = true
+              }
+            }
+          }
+        }
+      }
+      
+      return { gen: ::gen, kill: ::kill }
+    }
+
+    ::compute_def_use_sets = (block, variables) => {
+      set ::def = {}
+      set ::use = {}
+      
+      for ::stmt in ::block.statements {
+        if ::stmt.type == "SET" || ::stmt.type == "set" {
+          set ::var = ::stmt.variable || ::stmt.name
+          if ::var {
+            set ::def[::var] = true
+          }
+          
+          if ::stmt.value {
+            set ::vars = ::extract_variables(::stmt.value)
+            for ::v in ::vars {
+              if !::def[::v] {
+                set ::use[::v] = true
+              }
+            }
+          }
+        }
+      }
+      
+      return { def: ::def, use: ::use }
+    }
+
+    ::extract_expressions = (value) => {
+      set ::expressions = []
+      
+      # Simple expression extraction
+      if ::value.includes("+") {
+        set ::parts = ::value.split("+")
+        for ::part in ::parts {
+          set ::part = ::part.trim()
+          if ::part.length > 0 {
+            set ::expressions.push(::part)
+          }
+        }
+        set ::expressions.push(::value)
+      } else if ::value.includes("-") {
+        set ::parts = ::value.split("-")
+        for ::part in ::parts {
+          set ::part = ::part.trim()
+          if ::part.length > 0 {
+            set ::expressions.push(::part)
+          }
+        }
+        set ::expressions.push(::value)
+      } else if ::value.includes("*") {
+        set ::parts = ::value.split("*")
+        for ::part in ::parts {
+          set ::part = ::part.trim()
+          if ::part.length > 0 {
+            set ::expressions.push(::part)
+          }
+        }
+        set ::expressions.push(::value)
+      } else {
+        set ::expressions.push(::value)
+      }
+      
+      return ::expressions
+    }
+
+    ::extract_variables = (value) => {
+      set ::variables = []
+      
+      # Simple variable extraction (alphanumeric sequences)
+      set ::words = ::value.split(/[^a-zA-Z0-9_]/)
+      for ::word in ::words {
+        if ::word.length > 0 && ::word.match(/^[a-zA-Z_][a-zA-Z0-9_]*$/) {
+          set ::variables.push(::word)
+        }
+      }
+      
+      return ::variables
+    }
+
+    ::sets_different = (set1, set2) => {
+      if ::set1.length != ::set2.length { return true }
+      
+      for ::key in ::set1 {
+        if !::set2[::key] { return true }
+      }
+      
+      for ::key in ::set2 {
+        if !::set1[::key] { return true }
+      }
+      
+      return false
+    }
+
+    ::set_intersection = (set1, set2) => {
+      set ::result = {}
+      
+      for ::key in ::set1 {
+        if ::set2[::key] {
+          set ::result[::key] = true
+        }
+      }
+      
+      return ::result
+    }
+
+    ::find_conditional_target = (stmt, blocks) => {
+      # Simple heuristic to find conditional jump target
+      # In a real implementation, this would parse the condition and find the target
+      return -1
+    }
+
+    ::find_loop_exit = (stmt, blocks) => {
+      # Simple heuristic to find loop exit
+      # In a real implementation, this would parse the loop condition
+      return -1
+    }
+
+    ::get_current_timestamp = () => {
+      return Date.now()
+    }
+
+    ::compute_reaching_definitions = (ast, variable, position) => {
+      set ::cfg = ::build_control_flow_graph(::ast)
+      set ::rd_analysis = ::analyze_reaching_definitions(::ast, ::cfg)
+      
+      # Find definitions that reach the given position
+      set ::reaching = []
+      
+      for ::block_id in ::rd_analysis.out_sets {
+        set ::block = ::cfg.nodes[::block_id]
+        if ::block.entry <= ::position && ::position <= ::block.exit {
+          set ::out_set = ::rd_analysis.out_sets[::block_id] || {}
+          for ::def_key in ::out_set {
+            set ::def = ::rd_analysis.definitions[::def_key]
+            if ::def && ::def.variable == ::variable {
+              set ::reaching.push(::def)
+            }
+          }
+        }
+      }
+      
+      return ::reaching
+    }
+
+    ::compute_available_expressions = (ast, position) => {
+      set ::cfg = ::build_control_flow_graph(::ast)
+      set ::ae_analysis = ::analyze_available_expressions(::ast, ::cfg)
+      
+      # Find expressions available at the given position
+      set ::available = []
+      
+      for ::block_id in ::ae_analysis.out_sets {
+        set ::block = ::cfg.nodes[::block_id]
+        if ::block.entry <= ::position && ::position <= ::block.exit {
+          set ::out_set = ::ae_analysis.out_sets[::block_id] || {}
+          for ::expr in ::out_set {
+            set ::available.push(::expr)
+          }
+        }
+      }
+      
+      return ::available
+    }
+
+    ::compute_live_variables = (ast, position) => {
+      set ::cfg = ::build_control_flow_graph(::ast)
+      set ::lv_analysis = ::analyze_live_variables(::ast, ::cfg)
+      
+      # Find variables live at the given position
+      set ::live = []
+      
+      for ::block_id in ::lv_analysis.in_sets {
+        set ::block = ::cfg.nodes[::block_id]
+        if ::block.entry <= ::position && ::position <= ::block.exit {
+          set ::in_set = ::lv_analysis.in_sets[::block_id] || {}
+          for ::var in ::in_set {
+            set ::live.push(::var)
+          }
+        }
+      }
+      
+      return ::live
+    }
+  }
+}

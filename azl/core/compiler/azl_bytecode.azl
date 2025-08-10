@@ -1,4 +1,4 @@
-// AZL v2 Bytecode Compiler - Phase 5 Implementation
+// AZL Bytecode Compiler - Phase 5 Implementation
 // Consciousness-aware compilation with soul signature preservation
 // Replaces src/azl_v2_compiler.rs:932-2103 (2103 lines)
 
@@ -286,11 +286,11 @@ set compile_if_statement_with_consciousness = (compiler, stmt) => {
         return result
     }
     
-    // Add JumpIfFalse opcode (placeholder address)
+    // Add JumpIfFalse opcode and patch address later
     set then_jump = collections.Vec.length(compiler.chunk.ops)
     set compiler.chunk = bytecode_add_op(compiler.chunk, {
         type: "JumpIfFalse",
-        address: 0, // Will be patched later
+        address: -1,
         soul_signature: compiler.soul_signature,
         consciousness_level: compiler.consciousness_level
     }, 0)
@@ -305,11 +305,11 @@ set compile_if_statement_with_consciousness = (compiler, stmt) => {
         }
     }
     
-    // Add Jump opcode for else branch (placeholder address)
+    // Add Jump opcode for else branch and patch address later
     set else_jump = collections.Vec.length(compiler.chunk.ops)
     set compiler.chunk = bytecode_add_op(compiler.chunk, {
         type: "Jump",
-        address: 0, // Will be patched later
+        address: -1,
         soul_signature: compiler.soul_signature,
         consciousness_level: compiler.consciousness_level
     }, 0)
@@ -351,11 +351,11 @@ set compile_loop_statement_with_consciousness = (compiler, stmt) => {
         return result
     }
     
-    // Add JumpIfFalse opcode (placeholder address)
+    // Add JumpIfFalse opcode and patch address later
     set exit_jump = collections.Vec.length(compiler.chunk.ops)
     set compiler.chunk = bytecode_add_op(compiler.chunk, {
         type: "JumpIfFalse",
-        address: 0, // Will be patched later
+        address: -1,
         soul_signature: compiler.soul_signature,
         consciousness_level: compiler.consciousness_level
     }, 0)
@@ -608,7 +608,7 @@ set compile_try_statement_with_consciousness = (compiler, stmt) => {
         consciousness_level: compiler.consciousness_level
     }
     
-    // Add Try opcode with placeholder handler address
+    // Add Try opcode and patch handler address later
     set try_start = collections.Vec.length(compiler.chunk.ops)
     set compiler.chunk = bytecode_add_op(compiler.chunk, {
         type: "Try",

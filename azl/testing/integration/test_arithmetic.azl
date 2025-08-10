@@ -5,7 +5,10 @@ component ::test.arithmetic {
     set ::c = 2
     set ::result = 0
     
-    emit "test.arithmetic.initialized" with { a: ::a, b: ::b, c: ::c }
+    emit "test_basic_math"
+    emit "test_variable_substitution"
+    emit "test_error_handling"
+    emit "test_math_functions"
   }
 
   behavior {
@@ -62,7 +65,7 @@ component ::test.arithmetic {
       // Test division by zero
       set ::zero = 0
       set ::result = ::a / ::zero
-      say "Division by zero: ::a / ::zero = ::result"
+      say "Division by zero should halt before this message"
       
       // Test invalid expression
       set ::result = ::a + "invalid"

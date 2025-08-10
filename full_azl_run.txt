@@ -1,0 +1,69 @@
+🚀 AZL v2 - Pure AZL Runtime
+🚀 NO RUST DEPENDENCIES!
+🚀 ALL FUNCTIONALITY IN AZL!
+
+🚀 Running 5 AZL files with two-phase execution
+🚀 Executing multiple files with two-phase execution
+📄 Loading file: azl/nlp/nlp_orchestrator.azl
+📦 Found component: ::nlp.orchestrator
+📊 Parsed 1 components
+  - ::nlp.orchestrator: 3 lines
+📦 Processing component: ::nlp.orchestrator
+🔍 Parsing component: ::nlp.orchestrator
+🚀 Top-level statement: init {
+🚀 Top-level statement: say "🎯 NLP Orchestrator Initialized - Full AZL Mode"
+🚀 Top-level statement: say "🚀 Rich orchestration with objects, branching, loops, and timers"
+📊 Parsed 0 listeners and 3 top-level statements
+📄 Loading file: azl/nlp/quantum_byte_processor.azl
+📦 Found component: ::nlp.quantum_byte_processor
+📊 Parsed 1 components
+  - ::nlp.quantum_byte_processor: 3 lines
+📦 Processing component: ::nlp.quantum_byte_processor
+🔍 Parsing component: ::nlp.quantum_byte_processor
+🚀 Top-level statement: init {
+🚀 Top-level statement: say "🔬 Quantum Byte Processor Initialized - Full AZL Mode"
+🚀 Top-level statement: say "⚡ Rich quantum processing with objects, methods, guard, and utf8"
+📊 Parsed 0 listeners and 3 top-level statements
+📄 Loading file: azl/nlp/utf8_aggregator.azl
+📦 Found component: ::codec.utf8_aggregator
+📊 Parsed 1 components
+  - ::codec.utf8_aggregator: 4 lines
+📦 Processing component: ::codec.utf8_aggregator
+🔍 Parsing component: ::codec.utf8_aggregator
+🚀 Top-level statement: init {
+🚀 Top-level statement: say "🔤 UTF-8 Aggregator Initialized - Full AZL Mode"
+🚀 Top-level statement: say "📊 Dedicated component for UTF-8 handling and aggregation"
+🚀 Top-level statement: set ::buffers = {}
+📊 Parsed 0 listeners and 4 top-level statements
+📄 Loading file: azl/nlp/working_training_system.azl
+📦 Found component: ::nlp.training
+📊 Parsed 1 components
+  - ::nlp.training: 3 lines
+📦 Processing component: ::nlp.training
+🔍 Parsing component: ::nlp.training
+🚀 Top-level statement: init {
+🚀 Top-level statement: say "🎓 Full Training System Initialized - Full AZL Mode"
+🚀 Top-level statement: say "🚀 Rich training with arrays, loops, metrics, and ABA hooks"
+📊 Parsed 0 listeners and 3 top-level statements
+📄 Loading file: runtime_boot.azl
+📦 Found component: ::runtime.boot
+📊 Parsed 1 components
+  - ::runtime.boot: 3 lines
+📦 Processing component: ::runtime.boot
+🔍 Parsing component: ::runtime.boot
+🚀 Top-level statement: init {
+🚀 Top-level statement: say "🚀 Runtime Boot Initialized - Full AZL Mode"
+🚀 Top-level statement: say "🎯 Deterministic boot with full payloads"
+📊 Parsed 0 listeners and 3 top-level statements
+💬 🎯 NLP Orchestrator Initialized - Full AZL Mode
+💬 🚀 Rich orchestration with objects, branching, loops, and timers
+💬 🔬 Quantum Byte Processor Initialized - Full AZL Mode
+💬 ⚡ Rich quantum processing with objects, methods, guard, and utf8
+💬 🔤 UTF-8 Aggregator Initialized - Full AZL Mode
+💬 📊 Dedicated component for UTF-8 handling and aggregation
+💾 Set ::buffers = {}
+💬 🎓 Full Training System Initialized - Full AZL Mode
+💬 🚀 Rich training with arrays, loops, metrics, and ABA hooks
+💬 🚀 Runtime Boot Initialized - Full AZL Mode
+💬 🎯 Deterministic boot with full payloads
+✅ All files executed successfully

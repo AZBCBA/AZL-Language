@@ -30,19 +30,25 @@ component ::azme.cognitive_loop {
 
   # Main cognitive cycle with ABA integration
   behavior {
-    listen for "cognitive_cycle.start" then {
+    # Kick off a cycle when AZME runtime is ready
+    listen for "azme.runtime_ready" {
+      say "🧠 Runtime ready → starting cognitive cycle"
+      emit "cognitive_cycle.start" with { reason: "runtime_ready" }
+    }
+
+    listen for "cognitive_cycle.start" {
       start_cognitive_cycle()
     }
     
-    listen for "action.completed" then {
+    listen for "action.completed" {
       process_action_outcome($1)
     }
     
-    listen for "goal.attempted" then {
+    listen for "goal.attempted" {
       log_goal_attempt($1)
     }
     
-    listen for "insight.generated" then {
+    listen for "insight.generated" {
       reinforce_insight($1)
     }
   }

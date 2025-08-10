@@ -1,0 +1,47 @@
+# azl/orchestrator/metrics.azl
+component ::metrics.training {
+  init {
+    set ::metrics.total_steps = 0
+    set ::metrics.total_loss = 0.0
+    set ::metrics.peak_memory = 0.0
+    set ::metrics.avg_throughput = 0.0
+    say "📊 Training Metrics System Initialized"
+  }
+
+  listen for "training_metric" {
+    set ::metrics.total_steps = ::metrics.total_steps + 1
+    set ::metrics.total_loss = ::metrics.total_loss + $1.loss
+    set ::metrics.avg_loss = ::metrics.total_loss / ::metrics.total_steps
+    
+    say "📈 Step ::metrics.total_steps - Loss: $1.loss - Avg Loss: ::metrics.avg_loss"
+    
+    if ::metrics.total_steps % 100 == 0 {
+      say "📊 Metrics Summary:"
+      say "  - Total Steps: ::metrics.total_steps"
+      say "  - Average Loss: ::metrics.avg_loss"
+      say "  - Peak Memory: ::metrics.peak_memory GB"
+      say "  - Avg Throughput: ::metrics.avg_throughput samples/sec"
+    }
+  }
+
+  listen for "aba_reward" {
+    set ::reward = $1.reward
+    set ::action = $1.action
+    say "🎯 ABA Reward: ::reward for action: ::action"
+    
+    if ::reward > 0.8 {
+      say "🌟 High reward detected - optimizing strategy"
+    }
+  }
+
+  listen for "memory_usage" {
+    set ::current_memory = $1.usage_gb
+    if ::current_memory > ::metrics.peak_memory {
+      set ::metrics.peak_memory = ::current_memory
+    }
+  }
+
+  listen for "throughput_update" {
+    set ::metrics.avg_throughput = $1.samples_per_sec
+  }
+}
