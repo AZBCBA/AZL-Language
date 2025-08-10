@@ -362,7 +362,10 @@ component ::azl.system_interface {
 
     listen for "net.read" then {
       set buf = direct_read(::event.data.conn, (::event.data.max || 65536))
-      emit net.read.response with { ok: (buf.len >= 0), bytes: buf }
+      # buf may be a raw {ptr,len} or a string, normalize ok flag conservatively
+      set is_ok = true
+      if (buf == null) { set is_ok = false }
+      emit net.read.response with { ok: is_ok, bytes: buf }
     }
 
     listen for "net.write" then {
@@ -1176,8 +1179,13 @@ component ::azl.system_interface {
 
   fn direct_read(fd, max) {
     set r = sysproxy_call("read", { fd: fd, max: max })
-    if (r.ok == true) { return { ptr: r.ptr, len: r.len } }   # or however your runtime hands bytes up
-    return { ptr:0, len:0 }
+    if (r.ok == true) {
+      # Prefer textual payload if sysproxy provides it
+      if (r.text != null) { return r.text }
+      # Fallback to raw buffer descriptor
+      return { ptr: r.ptr, len: r.len }
+    }
+    return null
   }
 
   fn direct_write(fd, data) {

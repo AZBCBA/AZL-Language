@@ -36,22 +36,17 @@ component ::azl.interpreter {
       
       say "🧠 Interpreting component: ::component_name"
       
-      # Tokenize the code
-      emit tokenize with { code: ::code }
-      
-      # Parse into AST
+      # Register downstream listeners BEFORE first emit to avoid missed events
       listen for "tokenize_complete" then {
         set ::tokens = ::event.data.tokens
         emit parse with { tokens: ::tokens }
       }
       
-      # Execute the AST
       listen for "parse_complete" then {
         set ::ast = ::event.data.ast
         emit execute with { ast: ::ast, scope: ::component_name }
       }
       
-      # Report completion
       listen for "execute_complete" then {
         set ::result = ::event.data.result
         say "✅ Interpretation complete: ::result"
@@ -60,6 +55,9 @@ component ::azl.interpreter {
           result: ::result 
         }
       }
+
+      # Tokenize the code (after listeners are registered)
+      emit tokenize with { code: ::code }
     }
     
     # Tokenization

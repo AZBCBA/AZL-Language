@@ -7,6 +7,10 @@ component ::net.http.server {
     set ::routes = {}
     set ::running = false
     set ::request_count = 0
+    set ::max_request_size = 1048576  # 1 MB
+    set ::rate_window_ms = 1000
+    set ::max_requests_per_window = 100
+    set ::request_timestamps = []
     
     say "🌐 AZL Pure HTTP Server Component Ready"
     say "⚡ NO EXTERNAL DEPENDENCIES!"
@@ -67,7 +71,7 @@ component ::net.http.server {
               if (::event.data.ok != true) { sleep 5; continue }
               set conn = ::event.data.conn
 
-              emit syscall with { type: "net.read", args: { conn: conn, max: 65536 } }
+              emit syscall with { type: "net.read", args: { conn: conn, max: ::max_request_size } }
               listen for "syscall.response" then {
                 set req = ::parse_request(::event.data.bytes)
                 set res = ::handler(req)
@@ -133,6 +137,12 @@ component ::net.http.server {
   # Handle incoming HTTP request
   ::handle_request = (request) => {
     set ::request_count = ::request_count + 1
+    # Basic rate limiting: sliding window in memory
+    ::evict_old_requests()
+    if (::request_timestamps.length >= ::max_requests_per_window) {
+      return { status: 429, headers: { "Retry-After": "1", "Content-Type": "application/json" }, body: '{"error":"rate_limited"}' }
+    }
+    ::request_timestamps.push(::azl.stdlib.time_now([]))
     
     set path = request.path || "/"
     set method = request.method || "GET"
@@ -174,6 +184,15 @@ component ::net.http.server {
     say "📤 Response " + ::request_count + ": " + result.status
     
     return result
+  }
+
+  # Evict old timestamps beyond rate window
+  ::evict_old_requests = () => {
+    set now = ::azl.stdlib.time_now([])
+    set window_start = now - ::rate_window_ms
+    set new_arr = []
+    for t in ::request_timestamps { if (t >= window_start) { new_arr.push(t) } }
+    set ::request_timestamps = new_arr
   }
   
   # Authenticate request using API token
@@ -244,27 +263,53 @@ component ::net.http.server {
     }
   }
   
-  # Helper function to parse JSON
+  # Helper function to parse JSON (delegate to stdlib minimal parser)
   ::parse_json = (json_string) => {
-    # Simple JSON parser for basic objects
-    set result = {}
-    set json = json_string.trim()
-    
-    if json.starts_with("{") && json.ends_with("}") {
-      set content = json.substring(1, json.length - 1)
-      set pairs = content.split(",")
-      
-      for pair in pairs {
-        set parts = pair.split(":")
-        if parts.length == 2 {
-          set key = parts[0].trim().replace('"', "")
-          set value = parts[1].trim().replace('"', "")
-          set result[key] = value
-        }
+    return ::azl.stdlib.json_parse(json_string || "")
+  }
+
+  # Decode raw request bytes to structured request
+  ::parse_request = (raw_bytes) => {
+    # raw_bytes may be a string or {ptr,len}; assume string for now
+    set data = raw_bytes
+    if (data == null) { return { method: "GET", path: "/", headers: {}, body: "" } }
+    # Very simple HTTP parsing: METHOD PATH HTTP/1.1\r\n...\r\n\r\nBODY
+    set s = (data.charAt != null) ? data : ("" + data)
+    set header_end = s.index_of("\r\n\r\n")
+    set head = (header_end >= 0) ? s.substring(0, header_end) : s
+    set body = (header_end >= 0) ? s.substring(header_end + 4, s.length) : ""
+    set lines = head.split("\r\n")
+    set request_line = lines[0] || "GET / HTTP/1.1"
+    set parts = request_line.split(" ")
+    set method = parts[0] || "GET"
+    set path = parts[1] || "/"
+    set headers = {}
+    set i = 1
+    while (i < lines.length) {
+      set line = lines[i]
+      set idx = line.index_of(":")
+      if (idx > 0) {
+        set k = line.substring(0, idx).trim()
+        set v = line.substring(idx + 1, line.length).trim()
+        set headers[k] = v
       }
+      set i = i + 1
     }
-    
-    return result
+    return { method: method, path: path, headers: headers, body: body }
+  }
+
+  # Build HTTP response text from object
+  ::encode_response = (res) => {
+    set status = res.status || 200
+    set body = res.body || ""
+    set headers = res.headers || { "Content-Type": "text/plain" }
+    set status_text = (status == 200) ? "OK" : (status == 202 ? "Accepted" : (status == 401 ? "Unauthorized" : (status == 404 ? "Not Found" : (status == 405 ? "Method Not Allowed" : (status == 429 ? "Too Many Requests" : "OK")))))
+    set resp = "HTTP/1.1 " + status + " " + status_text + "\r\n"
+    set headers2 = headers
+    headers2["Content-Length"] = (body.length || 0)
+    for k in headers2 { resp = resp + k + ": " + headers2[k] + "\r\n" }
+    resp = resp + "\r\n" + body
+    return resp
   }
   
   interface {

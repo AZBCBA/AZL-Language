@@ -52,20 +52,26 @@ function openFifos() {
   return { out };
 }
 
-function sendSysproxy(out, op, args = {}) {
+function sendSysproxy(out, op, args = {}, timeoutMs) {
   const id = nextId++;
   const payload = { id, op, ...args };
   const line = `@sysproxy ${JSON.stringify(payload)}\n`;
   log(`send ${line.trim()}`);
   return new Promise((resolve, reject) => {
-    const to = setTimeout(() => {
-      if (pending.has(id)) {
-        pending.delete(id);
-        reject(new Error(`sysproxy timeout for op=${op} id=${id}`));
-      }
-    }, 1500);
-    pending.set(id, { resolve: (val) => { clearTimeout(to); resolve(val); }, reject, ts: Date.now(), op });
-    try { out.write(line); } catch (e) { pending.delete(id); reject(e); }
+    const effectiveTimeout = (timeoutMs !== undefined)
+      ? timeoutMs
+      : (op === 'accept' ? 0 : (op === 'read' ? 5000 : 2000));
+    let to = null;
+    if (effectiveTimeout > 0) {
+      to = setTimeout(() => {
+        if (pending.has(id)) {
+          pending.delete(id);
+          reject(new Error(`sysproxy timeout for op=${op} id=${id}`));
+        }
+      }, effectiveTimeout);
+    }
+    pending.set(id, { resolve: (val) => { if (to) clearTimeout(to); resolve(val); }, reject, ts: Date.now(), op });
+    try { out.write(line); } catch (e) { if (to) clearTimeout(to); pending.delete(id); reject(e); }
   });
 }
 
@@ -78,11 +84,11 @@ async function run() {
 
   const { out } = openFifos();
 
-  try { const r = await sendSysproxy(out, 'keepalive', {}); log(`keepalive ok pid=${r && r.pid}`); } catch {}
+  try { const r = await sendSysproxy(out, 'keepalive', {}, 2000); log(`keepalive ok pid=${r && r.pid}`); } catch {}
 
   let listenFd = null;
   try {
-    const listenResp = await sendSysproxy(out, 'listen', { host: '0.0.0.0', port: PORT, backlog: 128 });
+    const listenResp = await sendSysproxy(out, 'listen', { host: '0.0.0.0', port: PORT, backlog: 128 }, 3000);
     log(`listenResp raw: ${JSON.stringify(listenResp)}`);
     if (listenResp && listenResp.ok) { listenFd = listenResp.fd || listenResp.socket || listenResp.listenfd; log(`listening on :${PORT} fd=${listenFd}`); }
   } catch {}
@@ -90,16 +96,16 @@ async function run() {
 
   async function acceptLoop(loopId) {
     try {
-      const acc = await sendSysproxy(out, 'accept', { socket: listenFd });
+      const acc = await sendSysproxy(out, 'accept', { socket: listenFd }, 0);
       if (acc && acc.ok && acc.conn != null) {
         const conn = acc.conn;
         log(`accepted conn=${conn} (loop=${loopId})`);
         // Read once to consume request
-        try { await sendSysproxy(out, 'read', { fd: conn, max: 8192 }); } catch {}
+        try { await sendSysproxy(out, 'read', { fd: conn, max: 8192 }, 5000); } catch {}
         const body = 'OK';
         const resp = [ 'HTTP/1.1 200 OK', 'Content-Type: text/plain', `Content-Length: ${body.length}`, 'Connection: close', '', body ].join('\r\n');
-        await sendSysproxy(out, 'write', { fd: conn, data: resp });
-        await sendSysproxy(out, 'close', { fd: conn });
+        await sendSysproxy(out, 'write', { fd: conn, data: resp }, 3000);
+        await sendSysproxy(out, 'close', { fd: conn }, 2000);
         log(`responded 200 and closed conn=${conn} (loop=${loopId})`);
         setImmediate(() => acceptLoop(loopId));
       } else {
@@ -111,7 +117,7 @@ async function run() {
     }
   }
 
-  for (let i = 0; i < 4; i++) acceptLoop(i+1);
+  acceptLoop(1);
 }
 
 run().catch(e => { err(`fatal: ${e.message}`); process.exit(1); });

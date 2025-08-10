@@ -19,7 +19,10 @@ jobs:
           python-version: '3.11'
 
       - name: Make test scripts executable
-        run: chmod +x scripts/run_all_tests.sh scripts/run_pure_tests.sh || true
+        run: chmod +x scripts/run_all_tests.sh scripts/run_pure_tests.sh scripts/check_no_placeholders.sh || true
+
+      - name: Check no placeholders
+        run: ./scripts/check_no_placeholders.sh
 
       - name: Run all AZL tests (strict)
         run: |
