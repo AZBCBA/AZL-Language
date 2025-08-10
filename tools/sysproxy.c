@@ -91,6 +91,7 @@ static void process_requests(void) {
     }
   }
 
+  static int current_listen_fd = -1; // single active listen socket to avoid REUSEPORT fan-out
   char line[131072];
   for (;;) {
     if (!fgets(line, sizeof(line), stdin)) {
@@ -124,6 +125,12 @@ static void process_requests(void) {
         jget_string(line,"host",host,sizeof(host));
         long port=jget_long(line,"port",0);
         long backlog=jget_long(line,"backlog",128);
+
+        // Close previous listen socket if any
+        if (current_listen_fd >= 0) {
+          close(current_listen_fd);
+          current_listen_fd = -1;
+        }
 
         int fd=socket(AF_INET,SOCK_STREAM,0);
         if(fd<0){ respond_err(id,"socket"); continue; }
@@ -160,13 +167,30 @@ static void process_requests(void) {
           fprintf(stderr,"[sysproxy] LISTEN fd=%d (getsockname failed: %s)\n", fd, strerror(errno));
         }
 
+        current_listen_fd = fd;
         fprintf(stdout,"{\"id\":%ld,\"ok\":true,\"fd\":%d}\n",id,fd);
       }
       else if(strcmp(op,"accept")==0){
         long sfd=jget_long(line,"socket",-1);
+        if (sfd < 0 && current_listen_fd >= 0) {
+          sfd = current_listen_fd;
+        }
+        if (sfd < 0) { respond_err(id, "no_listen_fd"); continue; }
+
+        // Make the listen socket non-blocking to avoid stalling the control pipe
+        int flags = fcntl((int)sfd, F_GETFL, 0);
+        if (flags >= 0) fcntl((int)sfd, F_SETFL, flags | O_NONBLOCK);
+
         struct sockaddr_in ca; socklen_t calen=sizeof(ca);
         int cfd=accept((int)sfd,(struct sockaddr*)&ca,&calen);
-        if(cfd<0){ respond_err(id,"accept"); continue; }
+        if(cfd<0){
+          if (errno==EAGAIN || errno==EWOULDBLOCK) {
+            // no pending connection yet; respond quickly
+            fprintf(stdout,"{\"id\":%ld,\"ok\":false,\"again\":true}\n", id);
+            continue;
+          }
+          respond_err(id,"accept"); continue;
+        }
         char addr[64]; inet_ntop(AF_INET,&ca.sin_addr,addr,sizeof(addr));
         fprintf(stderr,"[sysproxy] ACCEPT sfd=%ld -> cfd=%d from %s:%u\n",
                 sfd, cfd, addr, (unsigned)ntohs(ca.sin_port));

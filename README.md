@@ -1,27 +1,21 @@
-# AZL Programming Language
+# AZL Language
 
-A modern, functional programming language designed for clarity, performance, and developer productivity.
+Unified, component-based, event-driven programming language running in pure AZL.
 
-## 🚀 Features (Pure AZL Runtime)
+## Getting Started
+- JS dev harness:
+  - `node scripts/azl_runtime.js test_core.azl ::test.core`
+- Python event harness:
+  - `python3 azl_runner.py test_integration_final.azl`
+- Sysproxy + daemon (host bridge):
+  - `gcc -O2 -Wall -o .azl/sysproxy tools/sysproxy.c`
+  - `bash scripts/test_sysproxy_setup.sh`
 
-- **Pure AZL interpreter**: components, init/behavior/memory, say/set/emit, listener registry, payloads, recursion/cycle guard.
-- **Virtual OS (pure AZL)**: unified syscalls for fs/http/console/proc using in-memory stores.
-- **Stdlib (pure AZL)**: arrays, strings, math, deterministic RNG/time, in-memory fs/http helpers.
-- No Rust runtime required for core execution.
+See OPERATIONS.md for the full runbook.
 
-## 📦 Getting Started (Pure AZL)
-
-Load the interpreter `::azl.interpreter`, the virtual OS `::azl.system_interface`, and stdlib `::azl.stdlib` into your runner, then dispatch your components. See `build_azl.azl` for a pure-AZL build flow.
-
-### Tooling Integration
-
-- IDE: VSCode tasks are provided under `.vscode/`:
-  - "AZL: Check File" runs `azl check <file>` and prints JSON diagnostics.
-  - "AZL: Build (Native)" runs `azl build --backend=native`.
-- Debugger/Profiler artifacts (native builds):
-  - `<output>.azlmap.json`: address-to-statement map for symbolization.
-  - `<output>.profile.json`: compile-time metrics (instruction count, sizes).
-- CI: GitHub Actions workflow `.github/workflows/ci.yml` validates sources and runs repo scripts.
+## CI
+- `ci.yml`: placeholder/v2 guards, smoke tests, perf smoke
+- `nightly.yml`: sysproxy E2E with logs
 
 ## 🎯 Quick Start
 

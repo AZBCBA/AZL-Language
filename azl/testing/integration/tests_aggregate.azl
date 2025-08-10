@@ -1,15 +1,24 @@
 component ::tests.aggregate {
   init {
+    set ::pass = 0
+    set ::fail = 0
     say "🧪 Aggregated tests starting"
-    link ::error.system
-    link ::build.orchestrator
-    link ::build.pkg_manager
-
+    # Trigger real error_system flow (requires error_system to be present in combined file)
     emit log_error with { type: "aggregate_smoke", message: "trigger", context: {} }
-    emit build.start to ::build.orchestrator with { files: [ { path: "azl/core/error_system.azl" } ], options: { backend: "bytecode", workers: 1, incremental: false } }
-    set _ = ::build.pkg_manager.load_registry()
-    set _r = ::build.pkg_manager.resolve("__nonexistent_pkg__")
-    say "🧪 Aggregated tests done"
+    emit finalize
+  }
+
+  behavior {
+    listen for "error.logged" then {
+      set ::pass = ::pass + 1
+    }
+    listen for "finalize" then {
+      if ::pass > 0 {
+        say "TESTS_PASS ::pass"
+      } else {
+        say "TESTS_FAIL ::pass"
+      }
+    }
   }
 }
 

@@ -43,4 +43,7 @@ jobs:
       - name: Runtime smoke - Python
         run: python3 azl_runner.py test_integration_final.azl
 
+      - name: Perf smoke
+        run: bash scripts/perf_smoke.sh
+
 
