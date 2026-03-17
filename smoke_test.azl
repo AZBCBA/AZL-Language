@@ -1,0 +1,18 @@
+# Smoke test: run with python3 azl_runner.py smoke_test.azl
+component ::smoke.test {
+  init {
+    say "AZL smoke test starting"
+    set ::ok = 1
+    say "Set ::ok = ::ok"
+    emit smoke.step1
+  }
+  behavior {
+    listen for smoke.step1 then {
+      say "Event smoke.step1 received"
+      emit smoke.done
+    }
+    listen for smoke.done then {
+      say "Smoke test passed."
+    }
+  }
+}

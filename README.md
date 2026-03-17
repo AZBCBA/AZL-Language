@@ -47,6 +47,14 @@ Or run the CLI: `./scripts/azl run path/to/your.azl`. Optional: Node for the JS 
 
 **Contributing:** Fork the repo, make changes on a branch, then open a [Pull Request](https://github.com/AZBCBA/AZL-Language/pulls). See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
+## Run tests
+
+```bash
+./scripts/run_tests.sh
+```
+
+Or run a single file: `python3 azl_runner.py smoke_test.azl` or `python3 azl_runner.py azl/testing/integration/test_hello.azl`.
+
 ## CI
 - `ci.yml`: placeholder/v2 guards, smoke tests, perf smoke, full tests
 - `nightly.yml`: sysproxy E2E with logs

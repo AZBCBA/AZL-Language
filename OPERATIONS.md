@@ -15,10 +15,11 @@ This runbook documents how to run the enterprise daemon and validate host integr
   - `tail -f .azl/daemon.out | grep '@sysproxy'`
 
 ## JS/Python Smoke Tests
-- JS runtime (dev harness):
-  - `node scripts/azl_runtime.js test_core.azl ::test.core`
-- Python runner (event engine harness):
-  - `python3 azl_runner.py test_integration_final.azl`
+- Python runner (recommended):
+  - `python3 azl_runner.py smoke_test.azl`
+  - `./scripts/run_tests.sh` — runs smoke + test_hello + test_arithmetic
+- Single integration test:
+  - `python3 azl_runner.py azl/testing/integration/test_hello.azl`
 
 ## CI
 - Main CI (`.github/workflows/ci.yml`):
