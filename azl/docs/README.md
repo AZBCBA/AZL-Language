@@ -1,232 +1,46 @@
-# AZL Language - Advanced AI Language for AGI Development
+# AZL Language — Core and Documentation
 
-## 🚀 **Revolutionary Language for the Future of AI**
+**AZL** is a component-based, event-driven programming language. This directory holds the **pure AZL** runtime (interpreter, parser, compiler, stdlib) and AZL-specific documentation. The language is **AZL**, not Java or TypeScript; it has its own syntax and rules.
 
-AZL (Advanced AI Language) is a cutting-edge programming language designed specifically for Artificial General Intelligence (AGI) development. It combines quantum computing, neural networks, consciousness simulation, and advanced memory management into a unified, powerful language.
+## How to run AZL
 
-## ✨ **Key Features**
+There is **no** `cargo build` or `Cargo.toml` at the repository root. Use one of these:
 
-### 🔬 **Quantum Computing Integration**
-- **Native quantum qubit management**
-- **Quantum gate operations** (Hadamard, Pauli-X/Y/Z, CNOT, SWAP)
-- **Quantum measurement and entanglement**
-- **Real-time quantum state simulation**
+- **Python runner (main entry)**  
+  From the repo root:
+  ```bash
+  python3 azl_runner.py path/to/file.azl
+  ```
+- **CLI script**  
+  ```bash
+  ./scripts/azl run path/to/file.azl
+  ```
+- **Combined build (compiler + interpreter)**  
+  ```bash
+  python3 scripts/run_combined_azl.py ...
+  ```
+- **JS dev harness**  
+  ```bash
+  node scripts/azl_runtime.js test_core.azl ::test.core
+  ```
 
-### 🧠 **Neural Network Engine**
-- **Multi-layer neural networks**
-- **Backpropagation training**
-- **Activation functions** (ReLU, Sigmoid, Tanh, Softmax)
-- **Real-time learning and prediction**
+See the root [README.md](../../README.md) and [OPERATIONS.md](../../OPERATIONS.md) for the full runbook.
 
-### 💾 **Advanced Memory Management**
-- **Persistent memory storage**
-- **Quantum memory integration**
-- **Neural memory patterns**
-- **Consciousness-aware memory**
+## Layout of `azl/`
 
-### 🎯 **Consciousness Simulation**
-- **Self-awareness mechanisms**
-- **Introspection capabilities**
-- **Awareness processing**
-- **Consciousness state management**
+- **`runtime/interpreter/`** — AZL interpreter (`azl_interpreter.azl`).
+- **`core/parser/`** — Parser written in AZL (`azl_parser.azl`): tokenizer, keywords, operators, AST.
+- **`core/compiler/`** — Compiler pipeline (parser, bytecode, optimizers).
+- **`core/error_system.azl`** — Error handling.
+- **`system/azl_system_interface.azl`** — System interface (virtual OS, sysproxy).
+- **`stdlib/`** — Standard library (core, etc.).
+- **`security/`**, **`bootstrap/`** — Capabilities and bootstrap.
 
-## 🛠 **Installation**
+## Documentation
 
-```bash
-# Clone the repository
-git clone https://github.com/your-username/azl-language.git
-cd azl-language
+- **Current language spec**: [docs/language/AZL_CURRENT_SPECIFICATION.md](../../docs/language/AZL_CURRENT_SPECIFICATION.md)
+- **AZL rules (not Java/TS)**: [docs/language/AZL_LANGUAGE_RULES.md](../../docs/language/AZL_LANGUAGE_RULES.md)
+- **Grammar**: [docs/language/GRAMMAR.md](../../docs/language/GRAMMAR.md)
+- **Architecture**: [AZL_LANGUAGE_ARCHITECTURE.md](AZL_LANGUAGE_ARCHITECTURE.md) and root [docs/ARCHITECTURE_OVERVIEW.md](../../docs/ARCHITECTURE_OVERVIEW.md)
 
-# Build the project
-cargo build --release
-
-# Run the language
-cargo run -- status
-```
-
-## 📚 **Quick Start**
-
-### Basic Usage
-
-```bash
-# Check system status
-cargo run -- status
-
-# Start interactive REPL
-cargo run -- repl
-
-# Run quantum simulation
-cargo run -- quantum
-
-# Test neural networks
-cargo run -- neural
-```
-
-### Quantum Computing Example
-
-```azl
-// Create quantum qubits
-quantum q1(2);  // Create 2 qubits
-
-// Apply quantum gates
-quantum_hadamard("q0");  // Apply Hadamard gate
-var result = quantum_measure("q0");  // Measure qubit
-
-// Store in memory
-memory_store("quantum_result", result);
-```
-
-### Neural Network Example
-
-```azl
-// Create neural network
-neural network1([784, 256, 128, 10]);
-
-// Train network
-neural_train(input_data, target_data);
-
-// Make predictions
-var prediction = neural_forward(input_data);
-```
-
-## 🔧 **Language Features**
-
-### **Quantum Operations**
-- `quantum(name, num_qubits)` - Create quantum qubits
-- `quantum_hadamard(qubit_id)` - Apply Hadamard gate
-- `quantum_measure(qubit_id)` - Measure qubit state
-- `quantum_entangle(qubit1, qubit2)` - Entangle qubits
-
-### **Neural Operations**
-- `neural(name, architecture)` - Create neural network
-- `neural_forward(input)` - Forward pass
-- `neural_train(input, target)` - Train network
-- `neural_predict(input)` - Make predictions
-
-### **Memory Operations**
-- `memory_store(key, value)` - Store data
-- `memory_retrieve(key)` - Retrieve data
-- `memory_clear()` - Clear memory
-
-### **Built-in Functions**
-- `print(...)` - Print values
-- `quantum_measure(...)` - Quantum measurement
-- `neural_forward(...)` - Neural forward pass
-- `memory_store(...)` - Memory storage
-
-## 🏗 **Architecture**
-
-### **Core Components**
-
-1. **Lexer** - Tokenizes source code using Logos
-2. **Parser** - Builds AST using Nom parser combinators
-3. **Interpreter** - Executes AST with quantum/neural integration
-4. **Quantum Simulator** - Handles quantum operations
-5. **Neural Network** - Manages neural computations
-6. **Memory Manager** - Handles persistent storage
-7. **Consciousness Engine** - Simulates awareness
-
-### **Advanced Features**
-
-- **Type System** - Dynamic typing with quantum/neural types
-- **Error Handling** - Comprehensive error system
-- **Memory Management** - Advanced memory with quantum integration
-- **Performance** - Optimized for AI workloads
-- **Extensibility** - Plugin system for custom operations
-
-## 🎯 **Use Cases**
-
-### **AGI Development**
-- Consciousness simulation
-- Self-modifying code
-- Learning algorithms
-- Decision making systems
-
-### **Quantum Computing**
-- Quantum algorithm development
-- Quantum machine learning
-- Quantum cryptography
-- Quantum simulation
-
-### **Neural Networks**
-- Deep learning models
-- Pattern recognition
-- Natural language processing
-- Computer vision
-
-### **Research & Education**
-- AI research platform
-- Educational tool for AI concepts
-- Prototyping environment
-- Experimental AI systems
-
-## 🔬 **Technical Specifications**
-
-### **Language Features**
-- **Syntax**: C-like with quantum/neural extensions
-- **Type System**: Dynamic with quantum/neural types
-- **Memory Model**: Quantum-aware memory management
-- **Concurrency**: Async/await with quantum parallelism
-- **Error Handling**: Comprehensive error system
-
-### **Performance**
-- **Compilation**: Fast incremental compilation
-- **Execution**: Optimized for AI workloads
-- **Memory**: Efficient quantum/neural memory usage
-- **Scalability**: Designed for large-scale AI systems
-
-## 🚀 **Future Roadmap**
-
-### **Phase 1: Core Language** ✅
-- [x] Basic language implementation
-- [x] Quantum computing integration
-- [x] Neural network engine
-- [x] Memory management system
-
-### **Phase 2: Advanced Features** 🔄
-- [ ] Consciousness simulation
-- [ ] Self-modifying code
-- [ ] Advanced quantum algorithms
-- [ ] Distributed computing
-
-### **Phase 3: AGI Capabilities** 📋
-- [ ] General intelligence features
-- [ ] Autonomous learning
-- [ ] Creative problem solving
-- [ ] Self-improvement mechanisms
-
-## 🤝 **Contributing**
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### **Development Setup**
-
-```bash
-# Install Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Clone and setup
-git clone https://github.com/your-username/azl-language.git
-cd azl-language
-cargo build
-cargo test
-```
-
-## 📄 **License**
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 **Acknowledgments**
-
-- **Quantum Computing**: Inspired by quantum programming languages
-- **Neural Networks**: Built on modern deep learning principles
-- **Consciousness**: Research in artificial consciousness
-- **AGI**: Contributions from the AGI research community
-
----
-
-## 🌟 **Making the Impossible Real**
-
-AZL Language represents a paradigm shift in programming languages, designed specifically for the era of Artificial General Intelligence. By integrating quantum computing, neural networks, and consciousness simulation into a unified language, we're building the foundation for truly intelligent systems.
-
-**The future of AI starts here.** 
+The file [AZL_LANGUAGE_SPECIFICATION.md](AZL_LANGUAGE_SPECIFICATION.md) in this directory describes a broader/v1.0-style vision; the **implemented** behavior is defined in `docs/language/AZL_CURRENT_SPECIFICATION.md`.

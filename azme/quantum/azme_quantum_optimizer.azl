@@ -1,0 +1,42 @@
+# AZME Quantum Optimizer Wrapper (feature-flagged)
+component ::azme.quantum_optimizer {
+  init {
+    set ::enabled = ((::internal.env("AZME_QUANTUM_ENABLED") || "0") == "1")
+    set ::budget_ms = ((::internal.env("AZME_QOPT_BUDGET_MS") || "250").toInt())
+    set ::max_qubits = ((::internal.env("AZME_QOPT_MAX_QUBITS") || "64").toInt())
+    set ::last_metrics = {}
+    emit azme.quantum.optimizer.ready with { enabled: ::enabled }
+  }
+
+  behavior {
+    on configure_quantum_optimizer {
+      set ::cfg = $1
+      if ::cfg.enabled != null { set ::enabled = ::cfg.enabled }
+      if ::cfg.budget_ms != null { set ::budget_ms = ::cfg.budget_ms }
+      if ::cfg.max_qubits != null { set ::max_qubits = ::cfg.max_qubits }
+      emit azme.quantum.optimizer.configured with { enabled: ::enabled, budget_ms: ::budget_ms, max_qubits: ::max_qubits }
+    }
+
+    on optimize_state_budgeted {
+      if ::enabled != true { emit azme.quantum.optimizer.skipped with { reason: "disabled" }; return }
+      set ::req = $1
+      set ::state = ::req.state
+      set ::target_fidelity = (::req.target_fidelity || 0.99)
+      set ::deadline = ::internal.now() + ::budget_ms
+      set ::rounds = 0
+      set ::best = ::state
+      set ::best_metrics = { fidelity_improvement: 0.0, resource_savings: 0.0 }
+      loop {
+        if ::internal.now() >= ::deadline { break }
+        emit optimize_quantum_resources to ::quantum.ai_optimizer with { quantum_state: ::best, target_fidelity: ::target_fidelity, mode: "budgeted" }
+        # In this runtime, we assume synchronous response via events is captured by subscribers; fetch latest metrics if available
+        set ::rounds = ::rounds + 1
+        if ::rounds > 3 { break }  # safety cap
+      }
+      set ::last_metrics = { rounds: ::rounds }
+      emit azme.quantum.optimizer.completed with { rounds: ::rounds }
+    }
+  }
+}
+
+

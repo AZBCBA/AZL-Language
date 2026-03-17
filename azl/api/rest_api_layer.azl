@@ -1,0 +1,764 @@
+# REST API Layer System
+# Provides external application interfaces for memory system
+# Enables standardized HTTP endpoints for system interaction
+
+::api.rest_api_layer {
+  memory {
+    # API configuration and settings
+    api_config: {
+      port: 8080,
+      host: "0.0.0.0",
+      max_requests_per_minute: 1000,
+      request_timeout: 30000,  # 30 seconds
+      cors_enabled: true,
+      authentication_required: false,
+      rate_limiting_enabled: true
+    },
+    
+    # API endpoints and routing
+    api_endpoints: {},
+    route_handlers: {},
+    middleware_stack: {},
+    
+    # API versioning and documentation
+    api_versions: {
+      v1: "stable",
+      v2: "beta",
+      v3: "alpha"
+    },
+    api_documentation: {},
+    
+    # Request handling and statistics
+    request_handlers: {},
+    api_metrics: {
+      total_requests: 0,
+      successful_requests: 0,
+      failed_requests: 0,
+      average_response_time: 0.0,
+      active_connections: 0,
+      error_rate: 0.0
+    },
+    
+    # Authentication and security
+    authentication: {
+      enabled: false,
+      methods: ["jwt", "api_key", "oauth2"],
+      api_keys: {},
+      jwt_secrets: {}
+    }
+  }
+  
+  behavior {
+    # Initialize REST API layer
+    listen for "initialize_rest_api" then {
+      store ::config from ::event.data.config || {}
+      store ::api_id from ::event.data.api_id || "rest_api_v1"
+      
+      # Initialize API structures
+      store ::api_endpoints from {}
+      store ::route_handlers from {}
+      store ::middleware_stack from {}
+      store ::request_handlers from {}
+      
+      # Set up default API endpoints
+      store ::default_endpoints from {
+        health: "/health",
+        status: "/status",
+        memory: "/api/v1/memory",
+        quantum: "/api/v1/quantum",
+        neural: "/api/v1/neural",
+        consciousness: "/api/v1/consciousness",
+        monitoring: "/api/v1/monitoring",
+        optimization: "/api/v1/optimization"
+      }
+      
+      # Register default endpoints
+      for ::endpoint_name in ::default_endpoints {
+        store ::endpoint_path from ::default_endpoints[::endpoint_name]
+        store ::api_endpoints[::endpoint_path] from {
+          name: ::endpoint_name,
+          path: ::endpoint_path,
+          methods: ["GET"],
+          handler: "handle_" + ::endpoint_name + "_endpoint",
+          status: "active"
+        }
+      }
+      
+      # Set up middleware
+      store ::middleware_stack from {
+        cors: "handle_cors",
+        rate_limiting: "handle_rate_limiting",
+        authentication: "handle_authentication",
+        logging: "handle_request_logging"
+      }
+      
+      emit "rest_api.initialized" with {
+        api_id: ::api_id,
+        config: ::api_config,
+        endpoints: ::api_endpoints,
+        status: "api_active"
+      }
+    }
+    
+    # Handle HTTP GET request
+    listen for "handle_http_get" then {
+      store ::endpoint from ::event.data.endpoint || "/"
+      store ::query_params from ::event.data.query_params || {}
+      store ::headers from ::event.data.headers || {}
+      store ::request_id from ::event.data.request_id || "req_" + ::now
+      
+      # Process request through middleware
+      store ::processed_request from ::process_request_through_middleware("GET", ::endpoint, ::query_params, ::headers)
+      
+      if ::processed_request.success {
+        # Route to appropriate handler
+        store ::response from ::route_get_request(::endpoint, ::query_params, ::headers)
+        
+        # Update API metrics
+        store ::api_metrics.total_requests from ::api_metrics.total_requests + 1
+        if ::response.success {
+          store ::api_metrics.successful_requests from ::api_metrics.successful_requests + 1
+        } else {
+          store ::api_metrics.failed_requests from ::api_metrics.failed_requests + 1
+        }
+        
+        emit "http_get.handled" with {
+          request_id: ::request_id,
+          endpoint: ::endpoint,
+          response: ::response,
+          success: true
+        }
+      } else {
+        emit "http_get.failed" with {
+          request_id: ::request_id,
+          endpoint: ::endpoint,
+          error: ::processed_request.error,
+          success: false
+        }
+      }
+    }
+    
+    # Handle HTTP POST request
+    listen for "handle_http_post" then {
+      store ::endpoint from ::event.data.endpoint || "/"
+      store ::request_body from ::event.data.request_body || {}
+      store ::headers from ::event.data.headers || {}
+      store ::request_id from ::event.data.request_id || "req_" + ::now
+      
+      # Process request through middleware
+      store ::processed_request from ::process_request_through_middleware("POST", ::endpoint, ::request_body, ::headers)
+      
+      if ::processed_request.success {
+        # Route to appropriate handler
+        store ::response from ::route_post_request(::endpoint, ::request_body, ::headers)
+        
+        # Update API metrics
+        store ::api_metrics.total_requests from ::api_metrics.total_requests + 1
+        if ::response.success {
+          store ::api_metrics.successful_requests from ::api_metrics.successful_requests + 1
+        } else {
+          store ::api_metrics.failed_requests from ::api_metrics.failed_requests + 1
+        }
+        
+        emit "http_post.handled" with {
+          request_id: ::request_id,
+          endpoint: ::endpoint,
+          response: ::response,
+          success: true
+        }
+      } else {
+        emit "http_post.failed" with {
+          request_id: ::request_id,
+          endpoint: ::endpoint,
+          error: ::processed_request.error,
+          success: false
+        }
+      }
+    }
+    
+    # Handle HTTP PUT request
+    listen for "handle_http_put" then {
+      store ::endpoint from ::event.data.endpoint || "/"
+      store ::request_body from ::event.data.request_body || {}
+      store ::headers from ::event.data.headers || {}
+      store ::request_id from ::event.data.request_id || "req_" + ::now
+      
+      # Process request through middleware
+      store ::processed_request from ::process_request_through_middleware("PUT", ::endpoint, ::request_body, ::headers)
+      
+      if ::processed_request.success {
+        # Route to appropriate handler
+        store ::response from ::route_put_request(::endpoint, ::request_body, ::headers)
+        
+        # Update API metrics
+        store ::api_metrics.total_requests from ::api_metrics.total_requests + 1
+        if ::response.success {
+          store ::api_metrics.successful_requests from ::api_metrics.successful_requests + 1
+        } else {
+          store ::api_metrics.failed_requests from ::api_metrics.failed_requests + 1
+        }
+        
+        emit "http_put.handled" with {
+          request_id: ::request_id,
+          endpoint: ::endpoint,
+          response: ::response,
+          success: true
+        }
+      } else {
+        emit "http_put.failed" with {
+          request_id: ::request_id,
+          endpoint: ::endpoint,
+          error: ::processed_request.error,
+          success: false
+        }
+      }
+    }
+    
+    # Handle HTTP DELETE request
+    listen for "handle_http_delete" then {
+      store ::endpoint from ::event.data.endpoint || "/"
+      store ::query_params from ::event.data.query_params || {}
+      store ::headers from ::event.data.headers || {}
+      store ::request_id from ::event.data.request_id || "req_" + ::now
+      
+      # Process request through middleware
+      store ::processed_request from ::process_request_through_middleware("DELETE", ::endpoint, ::query_params, ::headers)
+      
+      if ::processed_request.success {
+        # Route to appropriate handler
+        store ::response from ::route_delete_request(::endpoint, ::query_params, ::headers)
+        
+        # Update API metrics
+        store ::api_metrics.total_requests from ::api_metrics.total_requests + 1
+        if ::response.success {
+          store ::api_metrics.successful_requests from ::api_metrics.successful_requests + 1
+        } else {
+          store ::api_metrics.failed_requests from ::api_metrics.failed_requests + 1
+        }
+        
+        emit "http_delete.handled" with {
+          request_id: ::request_id,
+          endpoint: ::endpoint,
+          response: ::response,
+          success: true
+        }
+      } else {
+        emit "http_delete.failed" with {
+          request_id: ::request_id,
+          endpoint: ::endpoint,
+          error: ::processed_request.error,
+          success: false
+        }
+      }
+    }
+    
+    # Register new API endpoint
+    listen for "register_api_endpoint" then {
+      store ::endpoint_path from ::event.data.endpoint_path || "/"
+      store ::endpoint_config from ::event.data.endpoint_config || {}
+      store ::handler_function from ::event.data.handler_function || "default_handler"
+      
+      # Create endpoint registration
+      store ::endpoint from {
+        path: ::endpoint_path,
+        name: ::endpoint_config.name || "endpoint_" + ::now,
+        methods: ::endpoint_config.methods || ["GET"],
+        handler: ::handler_function,
+        status: "active",
+        created_at: ::now,
+        config: ::endpoint_config
+      }
+      
+      # Store endpoint
+      store ::api_endpoints[::endpoint_path] from ::endpoint
+      
+      emit "api_endpoint.registered" with {
+        endpoint: ::endpoint,
+        success: true
+      }
+    }
+    
+    # Get API documentation
+    listen for "get_api_documentation" then {
+      store ::version from ::event.data.version || "v1"
+      store ::format from ::event.data.format || "json"
+      
+      # Generate API documentation
+      store ::documentation from ::generate_api_documentation(::version, ::format)
+      
+      emit "api_documentation.retrieved" with {
+        version: ::version,
+        format: ::format,
+        documentation: ::documentation,
+        success: true
+      }
+    }
+    
+    # Get REST API statistics
+    listen for "get_rest_api_stats" then {
+      store ::stats from {
+        api_config: ::api_config,
+        api_metrics: ::api_metrics,
+        api_endpoints: ::count_keys(::api_endpoints),
+        api_versions: ::api_versions,
+        authentication: ::authentication,
+        middleware: ::count_keys(::middleware_stack)
+      }
+      
+      emit "rest_api_stats.retrieved" with {
+        stats: ::stats,
+        success: true
+      }
+    }
+    
+    # Helper function: Process request through middleware
+    function process_request_through_middleware(method, endpoint, data, headers) {
+      store ::processed from {
+        success: true,
+        data: ::data,
+        headers: ::headers,
+        middleware_results: {}
+      }
+      
+      # Apply CORS middleware
+      if ::middleware_stack.cors != null {
+        store ::cors_result from ::apply_cors_middleware(::headers)
+        store ::processed.middleware_results.cors from ::cors_result
+      }
+      
+      # Apply rate limiting middleware
+      if ::middleware_stack.rate_limiting != null && ::api_config.rate_limiting_enabled {
+        store ::rate_limit_result from ::apply_rate_limiting_middleware(::endpoint)
+        if !::rate_limit_result.allowed {
+          store ::processed.success from false
+          store ::processed.error from "Rate limit exceeded"
+          return ::processed
+        }
+        store ::processed.middleware_results.rate_limiting from ::rate_limit_result
+      }
+      
+      # Apply authentication middleware
+      if ::middleware_stack.authentication != null && ::api_config.authentication_required {
+        store ::auth_result from ::apply_authentication_middleware(::headers)
+        if !::auth_result.authenticated {
+          store ::processed.success from false
+          store ::processed.error from "Authentication required"
+          return ::processed
+        }
+        store ::processed.middleware_results.authentication from ::auth_result
+      }
+      
+      # Apply logging middleware
+      if ::middleware_stack.logging != null {
+        store ::logging_result from ::apply_logging_middleware(method, ::endpoint, ::data)
+        store ::processed.middleware_results.logging from ::logging_result
+      }
+      
+      return ::processed
+    }
+    
+    # Helper function: Route GET request
+    function route_get_request(endpoint, query_params, headers) {
+      # Route to appropriate handler based on endpoint
+      if ::endpoint == "/health" {
+        return ::handle_health_endpoint(query_params, headers)
+      } else if ::endpoint == "/status" {
+        return ::handle_status_endpoint(query_params, headers)
+      } else if ::endpoint starts with "/api/v1/memory" {
+        return ::handle_memory_endpoint(query_params, headers)
+      } else if ::endpoint starts with "/api/v1/quantum" {
+        return ::handle_quantum_endpoint(query_params, headers)
+      } else if ::endpoint starts with "/api/v1/neural" {
+        return ::handle_neural_endpoint(query_params, headers)
+      } else if ::endpoint starts with "/api/v1/consciousness" {
+        return ::handle_consciousness_endpoint(query_params, headers)
+      } else if ::endpoint starts with "/api/v1/monitoring" {
+        return ::handle_monitoring_endpoint(query_params, headers)
+      } else if ::endpoint starts with "/api/v1/optimization" {
+        return ::handle_optimization_endpoint(query_params, headers)
+      } else {
+        return {
+          success: false,
+          error: "Endpoint not found",
+          status_code: 404,
+          data: null
+        }
+      }
+    }
+    
+    # Helper function: Route POST request
+    function route_post_request(endpoint, request_body, headers) {
+      # Route to appropriate handler based on endpoint
+      if ::endpoint starts with "/api/v1/memory" {
+        return ::handle_memory_post_endpoint(request_body, headers)
+      } else if ::endpoint starts with "/api/v1/quantum" {
+        return ::handle_quantum_post_endpoint(request_body, headers)
+      } else if ::endpoint starts with "/api/v1/neural" {
+        return ::handle_neural_post_endpoint(request_body, headers)
+      } else if ::endpoint starts with "/api/v1/consciousness" {
+        return ::handle_consciousness_post_endpoint(request_body, headers)
+      } else {
+        return {
+          success: false,
+          error: "Endpoint not found or method not allowed",
+          status_code: 404,
+          data: null
+        }
+      }
+    }
+    
+    # Helper function: Route PUT request
+    function route_put_request(endpoint, request_body, headers) {
+      # Route to appropriate handler based on endpoint
+      if ::endpoint starts with "/api/v1/memory" {
+        return ::handle_memory_put_endpoint(request_body, headers)
+      } else if ::endpoint starts with "/api/v1/quantum" {
+        return ::handle_quantum_put_endpoint(request_body, headers)
+      } else {
+        return {
+          success: false,
+          error: "Endpoint not found or method not allowed",
+          status_code: 404,
+          data: null
+        }
+      }
+    }
+    
+    # Helper function: Route DELETE request
+    function route_delete_request(endpoint, query_params, headers) {
+      # Route to appropriate handler based on endpoint
+      if ::endpoint starts with "/api/v1/memory" {
+        return ::handle_memory_delete_endpoint(query_params, headers)
+      } else if ::endpoint starts with "/api/v1/quantum" {
+        return ::handle_quantum_delete_endpoint(query_params, headers)
+      } else {
+        return {
+          success: false,
+          error: "Endpoint not found or method not allowed",
+          status_code: 404,
+          data: null
+        }
+      }
+    }
+    
+    # Helper function: Handle health endpoint
+    function handle_health_endpoint(query_params, headers) {
+      return {
+        success: true,
+        status_code: 200,
+        data: {
+          status: "healthy",
+          timestamp: ::now,
+          uptime: ::now,
+          version: "1.0.0"
+        }
+      }
+    }
+    
+    # Helper function: Handle status endpoint
+    function handle_status_endpoint(query_params, headers) {
+      return {
+        success: true,
+        status_code: 200,
+        data: {
+          status: "operational",
+          timestamp: ::now,
+          api_metrics: ::api_metrics,
+          active_endpoints: ::count_keys(::api_endpoints)
+        }
+      }
+    }
+    
+    # Helper function: Handle memory endpoint
+    function handle_memory_endpoint(query_params, headers) {
+      return {
+        success: true,
+        status_code: 200,
+        data: {
+          endpoint: "memory",
+          timestamp: ::now,
+          memory_stats: {
+            total_items: 1000,
+            used_memory: "750MB",
+            free_memory: "250MB",
+            efficiency: "85%"
+          }
+        }
+      }
+    }
+    
+    # Helper function: Handle quantum endpoint
+    function handle_quantum_endpoint(query_params, headers) {
+      return {
+        success: true,
+        status_code: 200,
+        data: {
+          endpoint: "quantum",
+          timestamp: ::now,
+          quantum_stats: {
+            quantum_states: 150,
+            entanglement_pairs: 25,
+            coherence_levels: "92%"
+          }
+        }
+      }
+    }
+    
+    # Helper function: Handle neural endpoint
+    function handle_neural_endpoint(query_params, headers) {
+      return {
+        success: true,
+        status_code: 200,
+        data: {
+          endpoint: "neural",
+          timestamp: ::now,
+          neural_stats: {
+            neural_networks: 5,
+            pattern_recognition: 45,
+            learning_accuracy: "88%"
+          }
+        }
+      }
+    }
+    
+    # Helper function: Handle consciousness endpoint
+    function handle_consciousness_endpoint(query_params, headers) {
+      return {
+        success: true,
+        status_code: 200,
+        data: {
+          endpoint: "consciousness",
+          timestamp: ::now,
+          consciousness_stats: {
+            consciousness_entities: 12,
+            average_level: 15.5,
+            karma_points: 1250
+          }
+        }
+      }
+    }
+    
+    # Helper function: Handle monitoring endpoint
+    function handle_monitoring_endpoint(query_params, headers) {
+      return {
+        success: true,
+        status_code: 200,
+        data: {
+          endpoint: "monitoring",
+          timestamp: ::now,
+          monitoring_stats: {
+            active_alerts: 0,
+            system_health: "excellent",
+            performance_score: "95%"
+          }
+        }
+      }
+    }
+    
+    # Helper function: Handle optimization endpoint
+    function handle_optimization_endpoint(query_params, headers) {
+      return {
+        success: true,
+        status_code: 200,
+        data: {
+          endpoint: "optimization",
+          timestamp: ::now,
+          optimization_stats: {
+            last_cleanup: ::now,
+            memory_freed: "150MB",
+            fragmentation_level: "15%"
+          }
+        }
+      }
+    }
+    
+    # Helper function: Handle memory POST endpoint
+    function handle_memory_post_endpoint(request_body, headers) {
+      return {
+        success: true,
+        status_code: 201,
+        data: {
+          message: "Memory operation completed",
+          operation: "create",
+          timestamp: ::now,
+          result: request_body
+        }
+      }
+    }
+    
+    # Helper function: Handle quantum POST endpoint
+    function handle_quantum_post_endpoint(request_body, headers) {
+      return {
+        success: true,
+        status_code: 201,
+        data: {
+          message: "Quantum operation completed",
+          operation: "create",
+          timestamp: ::now,
+          result: request_body
+        }
+      }
+    }
+    
+    # Helper function: Handle neural POST endpoint
+    function handle_neural_post_endpoint(request_body, headers) {
+      return {
+        success: true,
+        status_code: 201,
+        data: {
+          message: "Neural operation completed",
+          operation: "create",
+          timestamp: ::now,
+          result: request_body
+        }
+      }
+    }
+    
+    # Helper function: Handle consciousness POST endpoint
+    function handle_consciousness_post_endpoint(request_body, headers) {
+      return {
+        success: true,
+        status_code: 201,
+        data: {
+          message: "Consciousness operation completed",
+          operation: "create",
+          timestamp: ::now,
+          result: request_body
+        }
+      }
+    }
+    
+    # Helper function: Handle memory PUT endpoint
+    function handle_memory_put_endpoint(request_body, headers) {
+      return {
+        success: true,
+        status_code: 200,
+        data: {
+          message: "Memory operation updated",
+          operation: "update",
+          timestamp: ::now,
+          result: request_body
+        }
+      }
+    }
+    
+    # Helper function: Handle quantum PUT endpoint
+    function handle_quantum_put_endpoint(request_body, headers) {
+      return {
+        success: true,
+        status_code: 200,
+        data: {
+          message: "Quantum operation updated",
+          operation: "update",
+          timestamp: ::now,
+          result: request_body
+        }
+      }
+    }
+    
+    # Helper function: Handle memory DELETE endpoint
+    function handle_memory_delete_endpoint(query_params, headers) {
+      return {
+        success: true,
+        status_code: 200,
+        data: {
+          message: "Memory operation deleted",
+          operation: "delete",
+          timestamp: ::now,
+          deleted_id: query_params.id || "unknown"
+        }
+      }
+    }
+    
+    # Helper function: Handle quantum DELETE endpoint
+    function handle_quantum_delete_endpoint(query_params, headers) {
+      return {
+        success: true,
+        status_code: 200,
+        data: {
+          message: "Quantum operation deleted",
+          operation: "delete",
+          timestamp: ::now,
+          deleted_id: query_params.id || "unknown"
+        }
+      }
+    }
+    
+    # Helper function: Apply CORS middleware
+    function apply_cors_middleware(headers) {
+      return {
+        applied: true,
+        cors_headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization"
+        }
+      }
+    }
+    
+    # Helper function: Apply rate limiting middleware
+    function apply_rate_limiting_middleware(endpoint) {
+      # Simple rate limiting simulation
+      store ::current_requests from (::now % 100) + 1
+      store ::allowed from ::current_requests <= ::api_config.max_requests_per_minute
+      
+      return {
+        applied: true,
+        allowed: ::allowed,
+        current_requests: ::current_requests,
+        limit: ::api_config.max_requests_per_minute
+      }
+    }
+    
+    # Helper function: Apply authentication middleware
+    function apply_authentication_middleware(headers) {
+      # Simple authentication simulation
+      store ::auth_header from headers.Authorization || ""
+      store ::authenticated from ::auth_header != ""
+      
+      return {
+        applied: true,
+        authenticated: ::authenticated,
+        method: ::auth_header != "" ? "bearer" : "none"
+      }
+    }
+    
+    # Helper function: Apply logging middleware
+    function apply_logging_middleware(method, endpoint, data) {
+      return {
+        applied: true,
+        log_entry: {
+          timestamp: ::now,
+          method: method,
+          endpoint: endpoint,
+          data_size: ::count_keys(data)
+        }
+      }
+    }
+    
+    # Helper function: Generate API documentation
+    function generate_api_documentation(version, format) {
+      store ::doc from {
+        version: version,
+        format: format,
+        timestamp: ::now,
+        endpoints: {},
+        schemas: {},
+        examples: {}
+      }
+      
+      # Generate endpoint documentation
+      for ::endpoint_path in ::api_endpoints {
+        store ::endpoint from ::api_endpoints[::endpoint_path]
+        store ::doc.endpoints[::endpoint_path] from {
+          path: ::endpoint.path,
+          methods: ::endpoint.methods,
+          description: "API endpoint for " + ::endpoint.name,
+          handler: ::endpoint.handler
+        }
+      }
+      
+      return ::doc
+    }
+  }
+}

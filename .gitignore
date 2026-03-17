@@ -1,6 +1,27 @@
-# Rust build artifacts
+# Rust build artifacts (if any)
 target/
 Cargo.lock
+
+# Python
+.venv/
+.venv_ds/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+*.manifest
+
+# Node / Electron
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # IDE files
 .vscode/
@@ -14,6 +35,35 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
+.azl/*.log
+.azl/*.log.*
+.azl/*.out
+.azl/*.err
+.azl/*.gz
+
+# AZL runtime / daemon (local only)
+.azl/daemon.*
+.azl/sysproxy
+.azl/sysproxy.*
+.azl/syswire.*
+.azl/wire.*
+.azl/*.pid
+.azl/api*.token
+.azl/daemon_status.json
+.azl/tmp/
+.azl/_lat
+.azl_setup/
+
+# Training / local data (do not commit)
+training_env/
+training.pid
+checkpoints
+datasets
+weights
+mnt/
+quarantine/
+*.pid
 
 # Test outputs
 test_output.txt
@@ -22,4 +72,5 @@ output.txt
 
 # Temporary files
 *.tmp
-*.temp 
+*.temp
+.cache/

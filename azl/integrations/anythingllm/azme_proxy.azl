@@ -2,7 +2,8 @@
 // This proxy bridges AnythingLLM with the AZME API
 
 // Configuration
-let AZME_API_URL = "http://localhost:8000"
+let AZME_API_URL = (::internal.env("AZME_API_URL") || "http://localhost:8000")
+let AZME_PROXY_PORT = parseInt(::internal.env("AZME_PROXY_PORT") || "5001")
 let ANYTHINGLLM_PORT = 3001
 
 // Health check endpoint
@@ -34,10 +35,13 @@ function chat(data) {
             "stream": false
         }
         
+        let headers = {"Content-Type": "application/json"}
+        let fwd_token = ::internal.env("AZL_API_TOKEN")
+        if (fwd_token) { headers["Authorization"] = "Bearer " + fwd_token }
         let response = http_post(
             AZME_API_URL + "/generate",
             json_stringify(azme_data),
-            {"Content-Type": "application/json"}
+            headers
         )
         
         if (response.status == 200) {
@@ -96,10 +100,13 @@ function workspace_chat(workspace_id, data) {
             "stream": false
         }
         
+        let headers = {"Content-Type": "application/json"}
+        let fwd_token = ::internal.env("AZL_API_TOKEN")
+        if (fwd_token) { headers["Authorization"] = "Bearer " + fwd_token }
         let response = http_post(
             AZME_API_URL + "/generate",
             json_stringify(azme_data),
-            {"Content-Type": "application/json"}
+            headers
         )
         
         if (response.status == 200) {
@@ -206,7 +213,7 @@ let routes = {
 }
 
 // Start HTTP server
-function start_proxy_server(port = 8080) {
+function start_proxy_server(port = AZME_PROXY_PORT) {
     print("🚀 Starting AZME Proxy Server...")
     print("📡 AZME API: " + AZME_API_URL)
     print("🌐 Proxy will run on port " + port)
@@ -216,5 +223,5 @@ function start_proxy_server(port = 8080) {
     start_http_server(port, routes)
 }
 
-// Main execution
-start_proxy_server(8080) 
+// Main execution (port can be overridden via AZME_PROXY_PORT)
+start_proxy_server(AZME_PROXY_PORT)

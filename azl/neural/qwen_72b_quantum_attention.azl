@@ -32,6 +32,38 @@ component ::neural.qwen_72b_quantum_attention {
   }
 
   behavior {
+    # Training-oriented API: forward/loss/backward hooks for integration
+    on train.forward {
+      set ::input = $1.input || []
+      # Use process_quantum_attention with synthetic config for training
+      emit process_quantum_attention with {
+        text: ("" + ::input.join(" ")),
+        config: { heads: ::model_specs.num_heads },
+        quantum_enhancement: { level: 1.0, factor: 1.0 }
+      }
+    }
+
+    on train.loss {
+      set ::logits = $1.logits || { data: [] }
+      set ::targets = $1.targets || { data: [] }
+      # Simple MSE over vector lengths to keep CPU-only
+      set l = 0.0
+      set n1 = (::logits.data && ::logits.data.length) || 0
+      set n2 = (::targets.data && ::targets.data.length) || 0
+      set n = n1
+      if (n2 < n1) { set n = n2 }
+      set i = 0
+      while i < n { set d = (::logits.data[i] - ::targets.data[i]); set l = l + d * d; set i = i + 1 }
+      set denom = (n <= 0) ? 1 : n
+      set l = l / denom
+      emit neural.qwen_72b.train.loss_ready with { loss: l }
+    }
+
+    on train.backward {
+      set ::loss = $1.loss || 0.0
+      # No-op gradient for now; emit completion for orchestrator compatibility
+      emit neural.qwen_72b.train.backward_done with { grads: null, loss: ::loss }
+    }
     on initialize_qwen_72b {
       set ::config = $1.config
       

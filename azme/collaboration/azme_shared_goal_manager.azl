@@ -1,3 +1,55 @@
+# AZME Shared Goal Manager (consensus + conflict resolution)
+component ::azme.shared_goal_manager {
+  init {
+    set ::goals = {}       # goal_id -> { text, votes:{agent->weight}, status }
+    set ::agents = []
+    set ::threshold = 0.6
+    emit azme.shared_goals.ready with { ok: true }
+  }
+
+  behavior {
+    on register_agent {
+      set ::agent = $1.agent
+      if ::agents.includes(::agent) != true { set ::agents = ::agents.push(::agent) }
+      emit azme.agent_registered with { agent: ::agent }
+    }
+
+    on propose_goal {
+      set ::g = $1
+      set ::id = (::g.id || ("goal-" + ::internal.now().toString()))
+      set ::goals[::id] = { text: ::g.text, votes: {}, status: "proposed" }
+      emit azme.shared_goal_proposed with { id: ::id, text: ::g.text }
+    }
+
+    on vote_goal {
+      set ::v = $1
+      set ::id = ::v.id
+      set ::agent = ::v.agent
+      set ::weight = ( (::v.weight == null) ? 1.0 : ::v.weight )
+      if ::goals[::id] == null { emit log_error with { type: "GoalNotFound", message: "vote", context: { id: ::id } }; return }
+      set ::goals[::id].votes[::agent] = ::weight
+      emit azme.shared_goal_voted with { id: ::id, agent: ::agent, weight: ::weight }
+      check_consensus(::id)
+    }
+
+    on get_shared_goals {
+      emit azme.shared_goals.list with { ids: ::goals.keys() }
+    }
+  }
+
+  function check_consensus(id) {
+    set ::g = ::goals[::id]
+    set ::total = 0.0
+    for ::a in ::g.votes { set ::total = ::total + (::g.votes[::a] || 0.0) }
+    set ::ratio = (::agents.length > 0) ? (::total / ::agents.length) : 0.0
+    if ::ratio >= ::threshold {
+      set ::g.status = "accepted"
+      set ::goals[::id] = ::g
+      emit azme.shared_goal_accepted with { id: ::id, consensus: ::ratio }
+    }
+  }
+}
+
 # AZME Shared Goal Manager
 # Consensus and shared goals
 

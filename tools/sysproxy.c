@@ -136,9 +136,8 @@ static void process_requests(void) {
         if(fd<0){ respond_err(id,"socket"); continue; }
 
         int on=1; setsockopt(fd,SOL_SOCKET,SO_REUSEADDR,&on,sizeof(on));
-#ifdef SO_REUSEPORT
-        setsockopt(fd,SOL_SOCKET,SO_REUSEPORT,&on,sizeof(on));
-#endif
+        // IMPORTANT: Do NOT enable SO_REUSEPORT to avoid multiple processes
+        // binding the same HTTP port and splitting traffic nondeterministically.
 
         struct sockaddr_in sa; memset(&sa,0,sizeof(sa));
         sa.sin_family=AF_INET;
@@ -177,15 +176,26 @@ static void process_requests(void) {
         }
         if (sfd < 0) { respond_err(id, "no_listen_fd"); continue; }
 
-        // Make the listen socket non-blocking to avoid stalling the control pipe
+        // Ensure non-blocking flag is set
         int flags = fcntl((int)sfd, F_GETFL, 0);
         if (flags >= 0) fcntl((int)sfd, F_SETFL, flags | O_NONBLOCK);
+
+        // Wait briefly for a pending connection to avoid tight EAGAIN loops
+        fd_set rfds; FD_ZERO(&rfds); FD_SET((int)sfd, &rfds);
+        struct timeval tv; tv.tv_sec = 0; tv.tv_usec = 200000; // 200ms
+        int sel = select(((int)sfd)+1, &rfds, NULL, NULL, &tv);
+        if (sel <= 0) {
+          // timeout or error -> behave as transient no-conn
+          fprintf(stderr,"[sysproxy] ACCEPT wait sel=%d for sfd=%ld\n", sel, sfd);
+          fprintf(stdout,"{\"id\":%ld,\"ok\":false,\"again\":true}\n", id);
+          continue;
+        }
 
         struct sockaddr_in ca; socklen_t calen=sizeof(ca);
         int cfd=accept((int)sfd,(struct sockaddr*)&ca,&calen);
         if(cfd<0){
           if (errno==EAGAIN || errno==EWOULDBLOCK) {
-            // no pending connection yet; respond quickly
+            fprintf(stderr,"[sysproxy] ACCEPT returned EAGAIN for sfd=%ld after sel>0\n", sfd);
             fprintf(stdout,"{\"id\":%ld,\"ok\":false,\"again\":true}\n", id);
             continue;
           }
@@ -226,6 +236,15 @@ static void process_requests(void) {
         if(rc<0){ respond_err(id,"close"); continue; }
         fprintf(stderr,"[sysproxy] CLOSE fd=%ld ok\n", fd);
         fprintf(stdout,"{\"id\":%ld,\"ok\":true}\n",id);
+      }
+      else if(strcmp(op,"peer")==0){
+        long fd=jget_long(line,"fd",-1);
+        if (fd < 0) { respond_err(id, "bad_fd"); continue; }
+        struct sockaddr_in addr; socklen_t alen=sizeof(addr); memset(&addr,0,sizeof(addr));
+        if (getpeername((int)fd, (struct sockaddr*)&addr, &alen) < 0) { respond_err(id, "getpeername"); continue; }
+        char ip[64]; inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
+        unsigned short port = ntohs(addr.sin_port);
+        fprintf(stdout, "{\"id\":%ld,\"ok\":true,\"ip\":\"%s\",\"port\":%u}\n", id, ip, (unsigned)port);
       }
       else if(strcmp(op,"stats")==0){
         fprintf(stderr,"[sysproxy] STATS pid=%d\n", getpid());

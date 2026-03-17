@@ -15,17 +15,24 @@ set ::messages_routed = 0
 on azme.connect_to_agent with ::connection_request:
   set agent = connection_request.agent
   
+  # Basic validation and error reporting
+  if not agent or not agent.id or not agent.address:
+    set error = { code: "invalid_connection_request", message: "Missing agent.id or agent.address", details: { request: connection_request }, at: "azme.connect_to_agent", correlation_id: "net-" + get_current_time(), timestamp: get_current_time() }
+    emit azme.network_error with error
+    return
+  
   emit azme.open_channel with agent
 
 # Open channel
 on azme.open_channel with ::agent:
-  set connection_info = { agent_id: agent.id, address: agent.address, protocol: "websocket", status: "connecting", created_at: get_current_time(), quantum_enhanced: true }
+  set connection_info = { agent_id: agent.id, address: agent.address, protocol: "websocket", status: "connecting", created_at: get_current_time(), correlation_id: "conn-" + get_current_time(), quantum_enhanced: true }
   
   # Determine protocol
-  emit azme.determine_protocol with agent.address
+  emit azme.determine_protocol with connection_info
 
 # Determine protocol
-on azme.determine_protocol with ::address:
+on azme.determine_protocol with ::connection_info:
+  set address = connection_info.address
   set protocol = "websocket"
   
   if "ws://" in address or "wss://" in address:
@@ -35,21 +42,20 @@ on azme.determine_protocol with ::address:
   if "localbus://" in address:
     set protocol = "localbus"
   
-  emit azme.protocol_determined with address protocol
+  set connection_info.protocol = protocol
+  emit azme.protocol_determined with connection_info
 
 # Protocol determined
-on azme.protocol_determined with ::address ::protocol:
-  emit azme.establish_connection with address protocol
+on azme.protocol_determined with ::connection_info:
+  emit azme.establish_connection with connection_info
 
 # Establish connection
-on azme.establish_connection with ::address ::protocol:
-  set connection_info = { address: address, protocol: protocol, status: "connecting", created_at: get_current_time(), quantum_enhanced: true }
-  
-  if protocol == "websocket":
+on azme.establish_connection with ::connection_info:
+  if connection_info.protocol == "websocket":
     emit azme.open_websocket_connection with connection_info
-  if protocol == "ipc":
+  if connection_info.protocol == "ipc":
     emit azme.open_ipc_connection with connection_info
-  if protocol == "localbus":
+  if connection_info.protocol == "localbus":
     emit azme.open_localbus_connection with connection_info
 
 # Open websocket connection
@@ -120,15 +126,16 @@ on azme.message_delivery_failed with ::message ::reason:
   set ::network_statistics.failed_connections = ::network_statistics.failed_connections + 1
   
   emit azme.delivery_failed with message reason
+  
+  # Structured error emission
+  set error = { code: reason, message: "Message delivery failed", details: { message: message }, at: "azme.route_message", correlation_id: "net-" + get_current_time(), timestamp: get_current_time() }
+  emit azme.network_error with error
 
 # Receive message
 on azme.receive_message with ::message:
   set ::network_statistics.messages_received = ::network_statistics.messages_received + 1
   
   emit azme.message_received with message
-
-# Message received
-on azme.receive_message with ::message:
   emit azme.process_received_message with message
 
 # Process received message
@@ -171,7 +178,7 @@ on azme.data_message_processed with ::message_data ::sender:
   emit azme.message_handled with "data" sender
 
 # Command message processed
-on azme.handle_command_message with ::message_data ::sender:
+on azme.command_message_processed with ::message_data ::sender:
   emit azme.message_handled with "command" sender
 
 # Query message processed
@@ -208,6 +215,10 @@ on azme.agent_disconnected with ::agent_id ::connection_info:
 # Disconnect failed
 on azme.disconnect_failed with ::agent_id ::reason:
   emit azme.disconnect_error with agent_id reason
+  
+  # Structured error emission
+  set error = { code: reason, message: "Disconnect failed", details: { agent_id: agent_id }, at: "azme.disconnect_agent", correlation_id: "net-" + get_current_time(), timestamp: get_current_time() }
+  emit azme.network_error with error
 
 # Broadcast message
 on azme.broadcast_message with ::broadcast_request:
@@ -266,6 +277,11 @@ on azme.get_active_connections:
   set connection_info = { connections: connections, count: connection_count, quantum_enhanced: true }
   
   emit azme.active_connections_retrieved with connection_info
+# Error system
+on azme.network_error with ::error:
+  set ::network_statistics.failed_connections = ::network_statistics.failed_connections + 1
+  emit azme.error.raised with error
+
 
 # Active connections retrieved
 on azme.active_connections_retrieved with ::connection_info:

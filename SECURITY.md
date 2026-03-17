@@ -1,17 +1,22 @@
-# Security Guide
+# Security Policy
 
-## HTTP Surface Hardening
-- Authentication: Bearer token via `AZL_API_TOKEN` required; reject missing/invalid tokens.
-- Methods: Enforce allowed methods per route (405 otherwise).
-- Input validation: For JSON payloads (e.g., /build), validate structure before use.
+## Supported Versions
 
-## Recommended Runtime Flags
-- `AZL_STRICT=1` (default): halts on fatal errors like division_by_zero.
-- Restrict `AZL_BUILD_API_ENABLED` in untrusted environments.
+We release updates for the AZL Language runtime and tooling as needed. Security fixes are applied to the current main branch.
 
-## Supply Chain
-- No external runtime dependencies; sysproxy is compiled locally from `tools/sysproxy.c`.
+## Reporting a Vulnerability
 
-## Next Steps
-- Rate limiting and request size caps in `::net.http.server`.
-- Structured JSON parser to replace naive parsing helpers.
+If you believe you have found a security vulnerability in the AZL Language project:
+
+1. **Do not** open a public GitHub issue.
+2. Email the maintainers (see repository owner/links) or report via GitHub Security Advisories: **Repository → Security → Advisories → New draft**.
+3. Include a clear description, steps to reproduce, and impact if possible.
+4. Allow reasonable time for a fix before any public disclosure.
+
+We will acknowledge your report and work with you to understand and address the issue.
+
+## Scope
+
+- AZL runtime and interpreter (`azl_runner.py`, `azl/`), parser, compiler, and standard library.
+- System interface, sysproxy bridge, and any host-facing APIs.
+- Out of scope: third-party dependencies; please report to their maintainers.

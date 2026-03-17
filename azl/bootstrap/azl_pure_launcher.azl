@@ -127,8 +127,12 @@ component ::azl.pure_launcher {
       return handle_check_command(args)
     } else if (command == "build") {
       return handle_build_command(args)
+    } else if (command == "train") {
+      return handle_train_command(args)
     } else if (command == "symbolize") {
       return handle_symbolize_command(args)
+    } else if (command == "api") {
+      return handle_api_command(args)
     } else if (command == "help") {
       return handle_help_command(args)
     } else {
@@ -150,7 +154,9 @@ component ::azl.pure_launcher {
     say "  compile <file>    Compile AZL to native executable"
     say "  check <file>      Compile for diagnostics; JSON to stdout"
     say "  build <files..>   Orchestrated build (incremental/parallel)"
+    say "  train advanced [--data <path>] [--mode <mode>] [--device cpu|cuda] [--gpu-limit <0..100>] [--epochs N] [--batch N] [--num-gpus N]"
     say "  symbolize <bin> <addr>  Map address to AZL stmt via .azlmap.json"
+    say "  api               Start HTTP API (training endpoints)"
     say "  repl              Start interactive REPL"
     say "  bootstrap         Bootstrap pure AZL system"
     say "  version           Show version information"
@@ -223,6 +229,100 @@ component ::azl.pure_launcher {
     return 0
   }
 
+  # azl train advanced [--data <path>] [--mode <mode>] [--device cpu|cuda] [--gpu-limit <0..100>] [--epochs N] [--batch N]
+  fn handle_train_command(args) {
+    if (len(args) < 3) {
+      say "❌ Usage: azl train advanced [--data <path>] [--mode <mode>] [--device cpu|cuda] [--gpu-limit <0..100>] [--epochs N] [--batch N]"
+      return 2
+    }
+
+    set subcmd = args[2]
+    if (subcmd != "advanced") {
+      say "❌ Unknown train subcommand: " + subcmd
+      say "   Supported: advanced"
+      return 2
+    }
+
+    # Defaults favor CPU to avoid GPU overhead unless explicitly enabled
+    set device      = (::internal.env("AZL_DEVICE") or "auto")
+    set gpu_limit   = parseInt((::internal.env("AZL_GPU_LIMIT") or "0"))   # 0 disables GPU usage by policy
+    set epochs      = parseInt((::internal.env("AZL_EPOCHS") or "1"))
+    set batch_size  = parseInt((::internal.env("AZL_BATCH") or "1"))
+    set mode        = (::internal.env("AZL_TRAIN_MODE") or "supervised")
+    set dataset_path = null
+    set num_gpus = parseInt((::internal.env("AZL_NUM_GPUS") or "1"))
+
+    # Parse CLI flags
+    set i = 3
+    while i < len(args) {
+      set a = args[i]
+      if a == "--data" { set dataset_path = args[i+1]; set i = i + 2; continue }
+      if a == "--mode" { set mode = args[i+1]; set i = i + 2; continue }
+      if a == "--device" { set device = args[i+1]; set i = i + 2; continue }
+      if a == "--gpu-limit" { set gpu_limit = parseInt(args[i+1]); set i = i + 2; continue }
+      if a == "--epochs" { set epochs = parseInt(args[i+1]); set i = i + 2; continue }
+      if a == "--batch" { set batch_size = parseInt(args[i+1]); set i = i + 2; continue }
+      if a == "--num-gpus" { set num_gpus = parseInt(args[i+1]); set i = i + 2; continue }
+      say "⚠️ Ignoring unknown option: " + a
+      set i = i + 1
+    }
+
+    if (dataset_path == null or dataset_path == "") {
+      emit log_error with { type: "runtime", message: "missing_dataset_path", context: { command: "train advanced" } }
+      say "❌ Dataset path is required: use --data <path>"
+      return 2
+    }
+
+    # Ensure system is ready
+    if (!::system_ready) {
+      say "🔧 System not ready, bootstrapping..."
+      emit bootstrap with {}
+      wait_for_bootstrap()
+    }
+
+    # Link orchestrator and advanced systems
+    link ::orchestrator.comprehensive_training_controller
+    link ::nlp.advanced_training
+    link ::memory.enhanced_lha3
+    link ::quantum.processor
+
+    set cfg = {
+      device: device,
+      gpu_limit: gpu_limit,
+      num_gpus: num_gpus,
+      epochs: epochs,
+      batch_size: batch_size,
+      strict: true
+    }
+
+    say "🚀 Starting ADVANCED training pipeline"
+    say "🗂️ Dataset: " + dataset_path
+    say "🧭 Mode: " + mode + ", Device: " + device + ", GPU limit: " + gpu_limit
+
+    emit start_advanced_training_pipeline to ::orchestrator.comprehensive_training_controller with {
+      dataset_path: dataset_path,
+      mode: mode,
+      config: cfg
+    }
+
+    # Log completion summary when done
+    listen for "orchestrator.advanced_training_complete" then {
+      set res = ::event.data
+      say "🎉 Advanced training complete"
+      say "📈 Mode: " + res.mode
+      say "📊 Metrics: " + ::to_json(res.metrics)
+      say "🔧 Final config: " + ::to_json(res.config)
+    }
+
+    # GPU/resource safety log forwarding
+    listen for "gpu.disabled" then { say "🛡️ GPU disabled by policy (launcher)" }
+    listen for "gpu.unavailable" then { say "🛡️ GPU unavailable; training halted (launcher)"; emit log_error with { type: "gpu", message: "gpu_unavailable", context: { policy: "strict_no_fallback" } } }
+    listen for "gpu.allocated" then { say "🎚️ GPU allocated with throttle (launcher)" }
+    }
+
+    return 0
+  }
+
   fn handle_run_command(args) {
     if (len(args) < 3) {
       say "❌ Usage: azl run <file>"
@@ -240,20 +340,23 @@ component ::azl.pure_launcher {
       wait_for_bootstrap()
     }
     
-    # Execute file through pure AZL pipeline (compiler → VM)
-    # 1) Read file via kernel (file.read) and wait for completion
-    emit file.read with { path: file_path }
-    listen for "file.read.complete" then {
-      set source_code = ::event.data.content
-      # 2) Compile via pure compiler
-      emit compile with { source_code: source_code, component_name: file_path }
-      listen for "generate_complete" then {
-        set bytecode = ::event.data.bytecode
-        # 3) Execute via VM
-        emit execute_bytecode with { bytecode: bytecode, component_name: file_path }
-      }
+    # Execute via interpreter path (production default)
+    set content = null
+    if (::azl && ::azl.system_interface && ::azl.system_interface.read_file_host_sync) {
+      set content = ::azl.system_interface.read_file_host_sync(file_path)
     }
-    
+    if (content == null || content == "") {
+      emit file.read with { path: file_path }
+      listen for "file.read.complete" then {
+        set content = (::event.data.content || "")
+        if (content == "") { emit log_error with { type: "io", message: "empty_source", context: { path: file_path } }; return 1 }
+        emit interpret with { code: content, component_name: file_path }
+      }
+      listen for "interpretation_complete" then { say "✅ File interpretation complete: $file_path" }
+      return 0
+    }
+    emit interpret with { code: content, component_name: file_path }
+    listen for "interpretation_complete" then { say "✅ File interpretation complete: $file_path" }
     return 0
   }
 
@@ -351,6 +454,18 @@ component ::azl.pure_launcher {
     say "  • AZL Standard Library (complete implementation)"
     say ""
     
+    return 0
+  }
+
+  fn handle_api_command(args) {
+    # Start HTTP API service for training endpoints
+    say "🌐 Starting AZL HTTP API"
+    if (!::system_ready) {
+      say "🔧 System not ready, bootstrapping..."
+      emit bootstrap with {}
+      wait_for_bootstrap()
+    }
+    link ::api.training_endpoints
     return 0
   }
 
@@ -580,12 +695,24 @@ component ::azl.pure_launcher {
   # UTILITY FUNCTIONS
 
   fn load_azl_component(path) {
-    # Load AZL component from file
-    # This would be implemented with actual file loading
-    
+    # Load and interpret AZL component from file using the interpreter path
     say "📦 Loading component: $path"
-    
-    # For now, assume successful loading
+    set content = null
+    if (::azl && ::azl.system_interface && ::azl.system_interface.read_file_host_sync) {
+      set content = ::azl.system_interface.read_file_host_sync(path)
+    }
+    if (content == null || content == "") {
+      emit syscall with { type: "read_file", args: { path: path } }
+      listen for "syscall.response" then {
+        set content = (::event.data.content || ::event.data.result || "")
+      }
+    }
+    if (content == null || content == "") {
+      emit log_error with { type: "io", message: "component_load_failed", context: { path: path } }
+      return false
+    }
+    emit interpret with { code: content, component_name: path }
+    listen for "interpretation_complete" then { say "✅ Component loaded: $path" }
     return true
   }
 

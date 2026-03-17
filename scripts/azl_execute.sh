@@ -19,33 +19,12 @@ echo "📁 File: $AZL_FILE"
 # Create a simple test execution environment
 echo "🔧 Setting up execution environment..."
 
-# For now, let's simulate the execution since we need to implement the actual runtime
-# In a real implementation, this would load the minimal runtime and execute the AZL code
-
-echo "🧠 Loading AZL file..."
-echo "📝 File contents:"
-echo "---"
-head -20 "$AZL_FILE"
-echo "---"
-
-echo "🔍 Checking for components..."
-if grep -q "^component" "$AZL_FILE"; then
-  echo "✅ Found component definitions"
-  
-  # Extract component names
-  echo "📦 Components found:"
-  grep "^component" "$AZL_FILE" | sed 's/^component //' | sed 's/ {.*$//'
-  
-  echo ""
-  echo "🧪 Simulating component execution..."
-  echo "✅ Test simulation complete"
-  
-else
-  echo "❌ No component definitions found"
-  exit 1
+# Real execution using Python AZL runner (pure AZL interpreter path)
+if command -v python3 >/dev/null 2>&1; then
+  echo "🧠 Executing via azl_runner.py"
+  exec python3 azl_runner.py "$AZL_FILE"
 fi
 
-echo ""
-echo "🎉 AZL file processed successfully!"
-echo "💡 Note: This is a simulation - actual execution requires the runtime engine"
+echo "❌ python3 not found; cannot execute AZL file"
+exit 1
 

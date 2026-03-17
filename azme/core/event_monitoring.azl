@@ -1,0 +1,167 @@
+# Event Prediction Monitoring System
+# Real-time tracking of prediction accuracy and performance metrics
+
+component ::azme.event_monitoring {
+  init {
+    set ::prediction_log = []
+    set ::accuracy_metrics = {
+      total_predictions: 0,
+      correct_predictions: 0,
+      invalid_transitions: 0,
+      fallback_usage: 0,
+      accuracy_rate: 0.0
+    }
+    set ::performance_metrics = {
+      avg_prediction_time: 0.0,
+      max_prediction_time: 0.0,
+      min_prediction_time: 999999.0
+    }
+    set ::monitoring_enabled = true
+    
+    say "🔧 Event monitoring system initialized"
+    emit azme.monitoring.ready
+  }
+
+  behavior {
+    # Monitor prediction accuracy
+    on azme.event_predicted with ::event ::prediction_time:
+      if not ::monitoring_enabled:
+        return
+      
+      set current_time = get_current_time()
+      set log_entry = {
+        timestamp: current_time,
+        event: event,
+        prediction_time: prediction_time,
+        status: "predicted"
+      }
+      
+      set ::prediction_log = ::prediction_log + [log_entry]
+      set ::accuracy_metrics.total_predictions = ::accuracy_metrics.total_predictions + 1
+      
+      # Update performance metrics
+      track_performance(prediction_time)
+      
+      emit azme.prediction.logged with log_entry
+
+    # Monitor validation failures
+    on azme.invalid_transition with ::current ::predicted ::valid_targets:
+      if not ::monitoring_enabled:
+        return
+      
+      set current_time = get_current_time()
+      set error_entry = {
+        timestamp: current_time,
+        current_event: current,
+        predicted_event: predicted,
+        valid_targets: valid_targets,
+        status: "invalid_transition"
+      }
+      
+      set ::prediction_log = ::prediction_log + [error_entry]
+      set ::accuracy_metrics.invalid_transitions = ::accuracy_metrics.invalid_transitions + 1
+      
+      emit azme.validation.failed with error_entry
+
+    # Monitor fallback usage
+    on azme.fallback.used with ::original_prediction ::fallback_event:
+      if not ::monitoring_enabled:
+        return
+      
+      set current_time = get_current_time()
+      set fallback_entry = {
+        timestamp: current_time,
+        original_prediction: original_prediction,
+        fallback_event: fallback_event,
+        status: "fallback_used"
+      }
+      
+      set ::prediction_log = ::prediction_log + [fallback_entry]
+      set ::accuracy_metrics.fallback_usage = ::accuracy_metrics.fallback_usage + 1
+      
+      emit azme.fallback.logged with fallback_entry
+
+    # Calculate and report accuracy metrics
+    on azme.monitor_prediction_accuracy:
+      if ::accuracy_metrics.total_predictions > 0:
+        set ::accuracy_metrics.accuracy_rate = (::accuracy_metrics.total_predictions - ::accuracy_metrics.invalid_transitions) / ::accuracy_metrics.total_predictions
+      else:
+        set ::accuracy_metrics.accuracy_rate = 0.0
+      
+      set accuracy_stats = {
+        total_predictions: ::accuracy_metrics.total_predictions,
+        correct_predictions: ::accuracy_metrics.total_predictions - ::accuracy_metrics.invalid_transitions,
+        invalid_transitions: ::accuracy_metrics.invalid_transitions,
+        fallback_usage: ::accuracy_metrics.fallback_usage,
+        accuracy_rate: ::accuracy_metrics.accuracy_rate,
+        fallback_rate: (::accuracy_metrics.fallback_usage / ::accuracy_metrics.total_predictions) if ::accuracy_metrics.total_predictions > 0 else 0.0,
+        performance: ::performance_metrics
+      }
+      
+      emit azme.prediction_metrics with accuracy_stats
+
+    # Get monitoring statistics
+    on azme.get_monitoring_stats:
+      set stats = {
+        accuracy_metrics: ::accuracy_metrics,
+        performance_metrics: ::performance_metrics,
+        log_entries: ::prediction_log.length,
+        monitoring_enabled: ::monitoring_enabled
+      }
+      
+      emit azme.monitoring_stats_retrieved with stats
+
+    # Enable/disable monitoring
+    on azme.toggle_monitoring with ::enabled:
+      set ::monitoring_enabled = enabled
+      emit azme.monitoring.toggled with { enabled: enabled }
+
+    # Clear monitoring data
+    on azme.clear_monitoring_data:
+      set ::prediction_log = []
+      set ::accuracy_metrics = {
+        total_predictions: 0,
+        correct_predictions: 0,
+        invalid_transitions: 0,
+        fallback_usage: 0,
+        accuracy_rate: 0.0
+      }
+      set ::performance_metrics = {
+        avg_prediction_time: 0.0,
+        max_prediction_time: 0.0,
+        min_prediction_time: 999999.0
+      }
+      
+      emit azme.monitoring.cleared
+
+    # Export monitoring data
+    on azme.export_monitoring_data with ::format:
+      if format == "json":
+        set export_data = {
+          timestamp: get_current_time(),
+          accuracy_metrics: ::accuracy_metrics,
+          performance_metrics: ::performance_metrics,
+          prediction_log: ::prediction_log
+        }
+        emit azme.monitoring.exported with export_data
+      else:
+        emit azme.error.raised with {
+          code: "UNSUPPORTED_FORMAT",
+          message: "Export format not supported: " + format
+        }
+  }
+
+  # Performance tracking function
+  func track_performance(prediction_time):
+    if prediction_time > ::performance_metrics.max_prediction_time:
+      set ::performance_metrics.max_prediction_time = prediction_time
+    
+    if prediction_time < ::performance_metrics.min_prediction_time:
+      set ::performance_metrics.min_prediction_time = prediction_time
+    
+    # Calculate running average
+    set total_time = ::performance_metrics.avg_prediction_time * (::accuracy_metrics.total_predictions - 1)
+    set ::performance_metrics.avg_prediction_time = (total_time + prediction_time) / ::accuracy_metrics.total_predictions
+}
+
+say "✅ Event monitoring system loaded"

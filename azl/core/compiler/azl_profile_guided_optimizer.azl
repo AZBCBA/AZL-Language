@@ -294,13 +294,12 @@ component ::azl.profile_guided_optimizer {
     # Calculate prediction confidence
     ::calculate_prediction_confidence = (branch_data) => {
       set ::total = ::branch_data.total
-      if ::total < 10 {
-        return 0.5  # Low confidence for few samples
-      } else if ::total < 100 {
-        return 0.7  # Medium confidence
-      } else {
-        return 0.9  # High confidence
-      }
+      # Smooth confidence curve based on sample size
+      if ::total <= 0 { return 0.0 }
+      if ::total < 10 { return (::total / 20.0) }        # 0..0.5
+      if ::total < 100 { return (1.0 / 2.0) + ((::total - 10) / 180.0) }  # ~0.5..0.99
+      if ::total < 1000 { return 0.7 + ((::total - 100) / 3000.0) } # 0.7..1.0-
+      return 0.99
     }
     
     # Apply profile-guided optimizations

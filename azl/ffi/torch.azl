@@ -5,10 +5,11 @@ component ::ffi.torch {
 
   init {
     say "🧠 FFI Torch Component Initialized"
-    set ::enabled = false
+    # Enable by default; allow explicit opt-out via env
+    set ::enabled = true
     set ::flag = (::internal.env("AZL_ENABLE_TORCH_FFI") || "").to_lower()
-    if (::flag == "1" or ::flag == "true" or ::flag == "yes") { set ::enabled = true }
-    if !::enabled { say "⚠️ Torch FFI disabled (AZL_ENABLE_TORCH_FFI not set)" }
+    if (::flag == "0" or ::flag == "false" or ::flag == "no" or ::flag == "off" or ::flag == "disabled") { set ::enabled = false }
+    if !::enabled { say "⚠️ Torch FFI disabled (explicit via AZL_ENABLE_TORCH_FFI)" } else { say "🟢 Torch FFI enabled" }
     set ::device = "cuda"  # or "cpu"
     set ::batch_size = 32
     set ::vocab_size = 51200
@@ -18,9 +19,21 @@ component ::ffi.torch {
     set ::loss_history = []
     set ::step_count = 0
     set ::epoch_count = 0
+    set ::proc_pid = -1
+    set ::log_tsv = ""
+    set ::tsv_offset = 0
+    set ::last_metric = { step: 0, loss: 0.0, tps: 0.0, tokens_seen: 0 }
+    # Multi-worker (num_gpus>1) support
+    set ::worker_pids = []
+    set ::worker_logs = []
+    set ::worker_offsets = []
+    set ::worker_count = 0
+    link ::ffi.fs
+    emit "create_directory" to ::ffi.fs with "logs"
+    emit "create_directory" to ::ffi.fs with "weights"
     
-    # Pure AZL mode: no native torch. Log and continue.
-    emit log_error with { type: "ffi_disabled", message: "Torch tokenizer/model init unavailable in pure AZL", context: { component: "::ffi.torch" } }
+    # Pure AZL mode: log only when disabled
+    if !::enabled { emit log_error with { type: "ffi_disabled", message: "Torch tokenizer/model init unavailable in pure AZL", context: { component: "::ffi.torch" } } }
   }
 
   fn ensure_enabled(op) {
@@ -29,6 +42,177 @@ component ::ffi.torch {
       return false
     }
     return true
+  }
+
+  # ===== Real training bridge (external helper) =====
+  listen for "train_file" {
+    if !ensure_enabled("train_file") { emit "ffi.torch.disabled"; return }
+    set p = $1 or {}
+    set data = (p.data_path or (p.dataset_path or ""))
+    if data == "" { emit log_error with { type: "ffi_input", message: "missing data_path" }; return }
+    set dev = (p.device or (::internal.env("AZL_DEVICE") or "cpu"))
+    set steps = (p.steps or 200000)
+    set bsz = (p.batch_size or p.bsz or 8)
+    set seq = (p.seq_len or p.seq or 2048)
+    set lr  = (p.lr or 0.0003)
+    set save = (p.save or ("weights/mini_llm_ffi.pt"))
+    set save_every = (p.save_every or 10000)
+    set logtsv = (p.log_tsv or ("logs/mini_llm_ffi.tsv"))
+    set ::log_tsv = logtsv
+    set ::tsv_offset = 0
+    set ::worker_pids = []
+    set ::worker_logs = []
+    set ::worker_offsets = []
+    set ::worker_count = 0
+    say "🚀 FFI Torch: launching helper(s)"
+    link ::azl.system_interface
+    emit metrics.training.begin
+    set ng = parseInt((p.num_gpus or (::internal.env("AZL_NUM_GPUS") or "1")))
+    if (ng == null or ng < 1) { set ng = 1 }
+    set idx = 0
+    while idx < ng {
+      set dev_i = (dev == "cuda" or dev == "cuda:0") ? ("cuda:" + idx.toString()) : dev
+      set log_i = (ng > 1) ? (logtsv + "_gpu" + idx.toString()) : logtsv
+      set save_i = (ng > 1) ? (save.substring(0, save.length - 3) + "_gpu" + idx.toString() + ".pt") : save
+      emit proc.spawn to ::azl.system_interface with {
+        command: "python3",
+        args: [
+          "python_helpers/mini_llm_train.py",
+          "--data", data,
+          "--device", dev_i,
+          "--steps", steps.toString(),
+          "--bsz", bsz.toString(),
+          "--seq", seq.toString(),
+          "--lr", lr.toString(),
+          "--save", save_i,
+          "--save_every", save_every.toString(),
+          "--log_tsv", log_i
+        ],
+        env: {}
+      }
+      listen for "proc.spawn.response" then {
+        set pid_i = (::event.data.pid or -1)
+        set ::worker_pids = (::worker_pids.push(pid_i))
+        set ::worker_logs = (::worker_logs.push(log_i))
+        set ::worker_offsets = (::worker_offsets.push(0))
+      }
+      set idx = idx + 1
+    }
+    # For compatibility, set primary pid/log
+    if (::worker_pids.length > 0) { set ::proc_pid = ::worker_pids[0] }
+    ::schedule_poll()
+    emit ffi.torch.started with { pid: ::proc_pid, log_tsv: ::log_tsv, workers: ::worker_pids.length }
+  }
+
+  listen for "torch.stop" {
+    link ::azl.system_interface
+    if (::worker_pids.length > 0) {
+      for p in ::worker_pids { emit proc.kill to ::azl.system_interface with { pid: p, signal: 15 } }
+      set ::worker_pids = []
+      emit ffi.torch.stopped
+      return
+    }
+    if ::proc_pid > 0 { emit proc.kill to ::azl.system_interface with { pid: ::proc_pid, signal: 15 }; listen for "proc.kill.response" then { set ::proc_pid = -1; emit ffi.torch.stopped } }
+  }
+
+  listen for "torch.status" { emit ffi.torch.status with { pid: ::proc_pid, last_metric: ::last_metric, log_tsv: ::log_tsv } }
+
+  listen for "torch.pause" {
+    # Create pause control files alongside logs
+    link ::azl.system_interface
+    if (::worker_logs.length > 0) {
+      for l in ::worker_logs { ::azl.system_interface.write_file_host_sync((l + ".pause"), "1") }
+    } else if (::log_tsv != "") {
+      ::azl.system_interface.write_file_host_sync((::log_tsv + ".pause"), "1")
+    }
+    emit ffi.torch.paused
+  }
+  listen for "torch.resume" {
+    # Remove pause files
+    link ::azl.system_interface
+    if (::worker_logs.length > 0) {
+      for l in ::worker_logs { ::azl.system_interface.write_file_host_sync((l + ".pause"), "") }
+    } else if (::log_tsv != "") {
+      ::azl.system_interface.write_file_host_sync((::log_tsv + ".pause"), "")
+    }
+    emit ffi.torch.resumed
+  }
+
+  memory {
+    function schedule_poll() { ::schedule_next_poll() }
+    function schedule_next_poll() {
+      # 1s poll
+      ::azl.stdlib.set_timeout(1000, () => { ::poll_once() })
+    }
+    function poll_once() {
+      link ::azl.system_interface
+      if (::worker_logs.length > 0) {
+        set idx = 0
+        while idx < ::worker_logs.length {
+          set l = ::worker_logs[idx]
+          set off = (::worker_offsets[idx] or 0)
+          set txt = (::azl.system_interface.read_file_host_sync(l) or "")
+          if (txt != null) {
+            set n = (txt.length or 0)
+            if (n > off) {
+              set chunk = txt.substring(off, n)
+              set ::worker_offsets[idx] = n
+              ::parse_chunk(chunk)
+            }
+          }
+          set idx = idx + 1
+        }
+      } else {
+        if (::log_tsv == null || ::log_tsv == "") { ::schedule_next_poll(); return }
+        set txt = (::azl.system_interface.read_file_host_sync(::log_tsv) or "")
+        if (txt != null) {
+          set n = (txt.length or 0)
+          if (n > (::tsv_offset or 0)) {
+            set chunk = txt.substring(::tsv_offset, n)
+            set ::tsv_offset = n
+            ::parse_chunk(chunk)
+          }
+        }
+      }
+      ::schedule_next_poll()
+    }
+    function parse_chunk(chunk) {
+      set line = ""
+      set i = 0
+      while i < chunk.length {
+        set c = chunk[i]
+        if c == "\n" {
+          ::parse_line(line)
+          set line = ""
+        } else if c != "\r" { set line = line + c }
+        set i = i + 1
+      }
+      if line != "" { ::parse_line(line) }
+    }
+    function parse_line(s) {
+      # very simple TSV: step\tloss\t...
+      set tab = s.indexOf("\t")
+      if tab <= 0 { return }
+      set step_s = s.substring(0, tab)
+      set rest = s.substring(tab + 1, s.length)
+      set tab2 = rest.indexOf("\t")
+      set loss_s = (tab2 >= 0 ? rest.substring(0, tab2) : rest)
+      set rest2 = (tab2 >= 0 ? rest.substring(tab2 + 1, rest.length) : "")
+      set tab3 = rest2.indexOf("\t")
+      set tps_s = (tab3 >= 0 ? rest2.substring(0, tab3) : rest2)
+      set tokens_s = (tab3 >= 0 ? rest2.substring(tab3 + 1, rest2.length) : "0")
+      # try parse ints/floats
+      set st = step_s.toInt()
+      # sanitize numeric strings (keep digits, dot, minus)
+      set f1 = ""; set i1 = 0; while i1 < loss_s.length { set ch1 = loss_s[i1]; if ((ch1 >= "0" && ch1 <= "9") || ch1 == "." || ch1 == "-") { set f1 = f1 + ch1 } ; set i1 = i1 + 1 }
+      set f2 = ""; set i2 = 0; while i2 < tps_s.length { set ch2 = tps_s[i2]; if ((ch2 >= "0" && ch2 <= "9") || ch2 == "." || ch2 == "-") { set f2 = f2 + ch2 } ; set i2 = i2 + 1 }
+      set i3s = ""; set i3 = 0; while i3 < tokens_s.length { set ch3 = tokens_s[i3]; if (ch3 >= "0" && ch3 <= "9") { set i3s = i3s + ch3 } ; set i3 = i3 + 1 }
+      set ls = to_number(f1)
+      set tps = to_number(f2)
+      set tok = i3s.toInt()
+      set ::last_metric = { step: st, loss: ls, tps: tps, tokens_seen: tok }
+      emit training_metric with { step: st, loss: ls, tokens_per_sec: tps, tokens_seen: tok }
+    }
   }
 
   # -------- bridge initialization --------
@@ -109,8 +293,16 @@ component ::ffi.torch {
     say " input_ids: "
     say $2
     
+    # L1 runtime cache to avoid recomputing simulated forward output
+    link ::build.cache_manager
+    set key = "ffi.forward:" + ($1 or "") + ":" + ($2 or "")
+    set cached = ::build.cache_manager.kv_get(key)
+    if cached != null { emit "forward_done" with cached ; return }
+    
     emit log_error with { type: "ffi_disabled", message: "Torch forward unavailable in pure AZL", context: { model: $1 } }
-    emit "forward_done" with []
+    set out = []
+    ::build.cache_manager.kv_set(key, out)
+    emit "forward_done" with out
   }
 
   # -------- training step --------
@@ -157,8 +349,15 @@ component ::ffi.torch {
     say "📉 Calculating loss for logits: "
     say $1
     
+    link ::build.cache_manager
+    set key = "ffi.loss:" + ($1 or "") + ":" + ($2 or "")
+    set cached = ::build.cache_manager.kv_get(key)
+    if cached != null { emit "loss_done" with cached ; return }
+    
     emit log_error with { type: "ffi_disabled", message: "Torch loss unavailable in pure AZL", context: {} }
-    emit "loss_done" with null
+    set out = null
+    ::build.cache_manager.kv_set(key, out)
+    emit "loss_done" with out
   }
 
   # -------- backward pass --------
@@ -194,8 +393,15 @@ component ::ffi.torch {
     say " from: "
     say $2
     
+    link ::build.cache_manager
+    set key = "ffi.weights:" + ($2 or "")
+    set w = ::build.cache_manager.kv_get(key)
+    if w != null { emit "weights_loaded" with w ; return }
+    
     emit log_error with { type: "ffi_disabled", message: "Torch load_weights unavailable in pure AZL", context: {} }
-    emit "weights_loaded" with null
+    set w2 = null
+    ::build.cache_manager.kv_set(key, w2)
+    emit "weights_loaded" with w2
   }
 
   # -------- save weights --------
@@ -206,7 +412,11 @@ component ::ffi.torch {
     say " to: "
     say $2
     
+    link ::build.cache_manager
     emit log_error with { type: "ffi_disabled", message: "Torch save_weights unavailable in pure AZL", context: {} }
+    # Invalidate cache entries keyed by path
+    ::build.cache_manager.kv_remove("ffi.weights:" + ($2 or ""))
+    ::build.cache_manager.kv_remove("weights:" + ($2 or ""))
     emit "weights_saved"
   }
 

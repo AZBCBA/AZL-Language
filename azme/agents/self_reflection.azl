@@ -201,6 +201,19 @@ on azme.ask_questions:
   # Generate self-directed questions
   emit azme.generate_self_questions
 
+# Event prediction with validation
+on azme.predict_next_event with ::current_event:
+  set raw_prediction = ::neural_model.predict(current_event)
+  
+  if not is_valid_transition(current_event, raw_prediction):
+    valid_targets = EVENT_TRANSITIONS.get(current_event, [])
+    emit azme.invalid_transition with current_event raw_prediction valid_targets
+    return
+  
+  # Track successful prediction
+  track_event(raw_prediction)
+  emit azme.event_predicted with raw_prediction
+
 # Generate self questions
 on azme.generate_self_questions:
   set questions = []
@@ -255,7 +268,28 @@ on azme.get_reflection_statistics:
   set total_questions = ::questions_asked.length
   set reflection_level = ::reflection_level
   
-  set statistics = { total_reflections: total_reflections, total_insights: total_insights, total_questions: total_questions, reflection_level: reflection_level, quantum_enhanced: true }
+  # Calculate prediction accuracy metrics
+  set prediction_errors = 0
+  set total_predictions = 0
+  loop for entry in ::reflection_history:
+    if entry.type == "prediction_error":
+      set prediction_errors = prediction_errors + 1
+    set total_predictions = total_predictions + 1
+  
+  set prediction_accuracy = 0.0
+  if total_predictions > 0:
+    set prediction_accuracy = (total_predictions - prediction_errors) / total_predictions
+  
+  set statistics = { 
+    total_reflections: total_reflections, 
+    total_insights: total_insights, 
+    total_questions: total_questions, 
+    reflection_level: reflection_level,
+    prediction_accuracy: prediction_accuracy,
+    prediction_errors: prediction_errors,
+    total_predictions: total_predictions,
+    quantum_enhanced: true 
+  }
   
   emit azme.reflection_statistics_retrieved with statistics
 
@@ -294,3 +328,18 @@ on azme.get_current_time:
 on azme.system_time:
   set time = now()
   emit azme.system_time_retrieved with time 
+
+# Error System Integration
+on azme.error.raised with ::error_data:
+  error_entry = {
+    type: "prediction_error",
+    error: error_data,
+    timestamp: get_current_time()
+  }
+  set ::reflection_history = ::reflection_history + [error_entry]
+  
+  emit azme.learning_opportunity with {
+    source: "error",
+    error_data: error_data,
+    insight: "Improve event prediction accuracy"
+  }

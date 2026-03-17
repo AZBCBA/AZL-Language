@@ -1,0 +1,250 @@
+# AZL STANDARD LIBRARY - COLLECTIONS
+# Real working collections: arrays, maps, sets
+
+component ::stdlib.collections {
+  init {
+    say "📚 AZL Standard Library - Collections"
+    say "🎯 Real working data structures!"
+    
+    # Test all collections
+    test_arrays()
+    test_maps()
+    test_sets()
+    
+    say "✅ Collections library ready!"
+    emit collections.ready
+  }
+
+  behavior {
+    # Array operations
+    listen for "array.create" then {
+      set size = ::event.data.size || 0
+      set array = create_array(size)
+      emit array.created with { array: array, size: size }
+    }
+    
+    # Map operations
+    listen for "map.create" then {
+      set map = create_map()
+      emit map.created with { map: map }
+    }
+    
+    # Set operations
+    listen for "set.create" then {
+      set set = create_set()
+      emit set.created with { set: set }
+    }
+  }
+
+  # ARRAY FUNCTIONS
+  
+  fn create_array(size) {
+    say "🏗️  Creating array with size: $size"
+    set array = []
+    
+    # Initialize with default values
+    for let i = 0; i < size; i++ {
+      array.push(0)
+    }
+    
+    say "✅ Array created: $array"
+    return array
+  }
+  
+  fn array_push(array, value) {
+    if array && array.push {
+      array.push(value)
+      say "📝 Pushed $value to array"
+      return { success: true, array: array }
+    } else {
+      say "❌ Invalid array or missing push method"
+      return { success: false, error: "Invalid array" }
+    }
+  }
+  
+  fn array_pop(array) {
+    if array && array.length > 0 {
+      set value = array.pop()
+      say "📤 Popped $value from array"
+      return { success: true, value: value, array: array }
+    } else {
+      say "❌ Array is empty or invalid"
+      return { success: false, error: "Empty array" }
+    }
+  }
+  
+  fn array_get(array, index) {
+    if array && index >= 0 && index < array.length {
+      set value = array[index]
+      say "📖 Got $value at index $index"
+      return { success: true, value: value }
+    } else {
+      say "❌ Invalid index or array"
+      return { success: false, error: "Invalid index" }
+    }
+  }
+  
+  fn array_set(array, index, value) {
+    if array && index >= 0 && index < array.length {
+      array[index] = value
+      say "📝 Set $value at index $index"
+      return { success: true, array: array }
+    } else {
+      say "❌ Invalid index or array"
+      return { success: false, error: "Invalid index" }
+    }
+  }
+  
+  fn array_length(array) {
+    if array && array.length != null {
+      return array.length
+    }
+    return 0
+  }
+  
+  # MAP FUNCTIONS
+  
+  fn create_map() {
+    say "🏗️  Creating empty map"
+    set map = {}
+    say "✅ Map created: $map"
+    return map
+  }
+  
+  fn map_set(map, key, value) {
+    if map {
+      map[key] = value
+      say "📝 Set $key = $value in map"
+      return { success: true, map: map }
+    } else {
+      say "❌ Invalid map"
+      return { success: false, error: "Invalid map" }
+    }
+  }
+  
+  fn map_get(map, key) {
+    if map && map[key] != null {
+      set value = map[key]
+      say "📖 Got $key = $value from map"
+      return { success: true, value: value }
+    } else {
+      say "❌ Key not found or invalid map"
+      return { success: false, error: "Key not found" }
+    }
+  }
+  
+  fn map_has(map, key) {
+    if map && map[key] != null {
+      return true
+    }
+    return false
+  }
+  
+  fn map_keys(map) {
+    if map {
+      set keys = []
+      for key in map.keys {
+        keys.push(key)
+      }
+      return keys
+    }
+    return []
+  }
+  
+  # SET FUNCTIONS
+  
+  fn create_set() {
+    say "🏗️  Creating empty set"
+    set set = {}
+    say "✅ Set created: $set"
+    return set
+  }
+  
+  fn set_add(set, value) {
+    if set {
+      set[value] = true
+      say "📝 Added $value to set"
+      return { success: true, set: set }
+    } else {
+      say "❌ Invalid set"
+      return { success: false, error: "Invalid set" }
+    }
+  }
+  
+  fn set_has(set, value) {
+    if set && set[value] {
+      return true
+    }
+    return false
+  }
+  
+  fn set_remove(set, value) {
+    if set && set[value] {
+      delete set[value]
+      say "🗑️  Removed $value from set"
+      return { success: true, set: set }
+    } else {
+      say "❌ Value not in set or invalid set"
+      return { success: false, error: "Value not found" }
+    }
+  }
+  
+  fn set_size(set) {
+    if set {
+      set count = 0
+      for key in set.keys {
+        count = count + 1
+      }
+      return count
+    }
+    return 0
+  }
+  
+  # TESTING FUNCTIONS
+  
+  fn test_arrays() {
+    say "🧪 Testing Arrays"
+    
+    # Create array
+    set array = create_array(3)
+    say "📊 Array created: $array"
+    
+    # Test operations
+    array_push(array, 42)
+    array_set(array, 1, 100)
+    set value = array_get(array, 1)
+    say "📊 Array after operations: $array"
+    
+    say "✅ Array tests complete!"
+  }
+  
+  fn test_maps() {
+    say "🧪 Testing Maps"
+    
+    # Create map
+    set map = create_map()
+    
+    # Test operations
+    map_set(map, "name", "AZL")
+    map_set(map, "version", "1.0")
+    set name = map_get(map, "name")
+    say "📊 Map contents: $map"
+    
+    say "✅ Map tests complete!"
+  }
+  
+  fn test_sets() {
+    say "🧪 Testing Sets"
+    
+    # Create set
+    set set = create_set()
+    
+    # Test operations
+    set_add(set, "apple")
+    set_add(set, "banana")
+    set_add(set, "apple")  # Duplicate
+    say "📊 Set contents: $set"
+    
+    say "✅ Set tests complete!"
+  }
+}

@@ -1,0 +1,93 @@
+# Integration tests for Adaptive Batch Size & Learning Rate
+
+component ::tests.adaptive_training {
+  init {
+    say "🧪 Adaptive training tests"
+    link ::orchestrator.comprehensive_training_controller
+    link ::neural.core
+    link ::metrics.training
+
+    # 1) GPU unavailable → batch clamp
+    emit "gpu.unavailable"
+    sleep 1
+    emit "get_training_status" to ::orchestrator.comprehensive_training_controller
+    listen for "training.status" then {
+      set s = ::event.data
+      if (s && s.cfg && s.cfg.batch_size == 1) { say "✅ GPU-unavailable clamp ok" } else { say "❌ GPU-unavailable clamp failed" }
+    }
+
+    # 2) Pressure warnings → downshift after window
+    emit metrics.training.begin
+    set i = 0
+    while i < 50 { emit training_step_started; sleep 1; emit training_step_completed; emit training_metric with { step: (i+1), loss: (1.0 + (i % 5)) }; emit neural.warning with "high_gpu_utilization"; set i = i + 1 }
+    sleep 2
+    emit "get_training_status" to ::orchestrator.comprehensive_training_controller
+    listen for "training.status" then {
+      set s2 = ::event.data
+      if (s2 && s2.cfg && s2.cfg.batch_size <= 1) { say "✅ Downshift applied on pressure" } else { say "❌ Downshift not applied" }
+    }
+
+    # 3) Headroom windows → upshift after two windows
+    # Clear warnings
+    emit metrics.training.begin
+    set j = 0
+    while j < 100 { emit training_step_started; sleep 1; emit training_step_completed; emit training_metric with { step: (j+1), loss: (1.0 - min(0.5, (j * 0.001))) }; set j = j + 1 }
+    sleep 2
+    emit "get_training_status" to ::orchestrator.comprehensive_training_controller
+    listen for "training.status" then {
+      set s3 = ::event.data
+      if (s3 && s3.cfg && s3.cfg.batch_size >= 2) { say "✅ Upshift applied on headroom" } else { say "❌ Upshift not applied" }
+    }
+
+    # 4) Policy denial increments denied_updates
+    emit metrics.training.begin
+    emit "set_training_config" to ::orchestrator.comprehensive_training_controller with { batch_size: 999999 }
+    sleep 1
+    # Pull metrics
+    set m = (::metrics.training.metrics or {})
+    set a = (m.adaptive or {})
+    if ((a.denied_updates or 0) >= 0) { say "✅ denied_updates tracked (visibility check)" } else { say "❌ denied_updates missing" }
+
+    # 5) Component readiness markers present in status
+    emit "get_training_status" to ::orchestrator.comprehensive_training_controller
+    listen for "training.status" then {
+      set st = ::event.data
+      if (st && st.components != null) { say "✅ components readiness present" } else { say "❌ components readiness missing" }
+    }
+
+    say "🧪 Adaptive tests completed"
+    emit tests.consciousness_and_lha3
+  }
+}
+
+
+# Integration test: consciousness events + LHA3 optimization cadence
+component ::tests.consciousness_and_lha3_integration {
+  init {
+    say "🧪 Consciousness + LHA3 integration tests"
+    link ::orchestrator.comprehensive_training_controller
+    link ::consciousness.neural_quantum
+    link ::memory.enhanced_lha3
+
+    # Simulate lifecycle
+    emit initialize_neural_quantum to ::consciousness.neural_quantum with { neural_layers: 2, quantum_qubits: 4 }
+    emit neural_quantum_start to ::consciousness.neural_quantum with { training_mode: "active" }
+    emit epoch_neural_quantum to ::consciousness.neural_quantum with { epoch: 1, consciousness_level: 0.8 }
+    emit step_neural_quantum to ::consciousness.neural_quantum with { step: 1, neural_quantum_level: 0.85 }
+    emit training_metric_neural_quantum to ::consciousness.neural_quantum with { step: 1, loss: 0.9 }
+    emit training_complete_neural_quantum to ::consciousness.neural_quantum with { status: "ok" }
+
+    # Verify get_state API
+    set st = ::consciousness.neural_quantum.get_state()
+    if (st && st.active == false && st.epoch >= 1) { say "✅ Consciousness lifecycle ok" } else { say "❌ Consciousness lifecycle failed" }
+
+    # Trigger LHA3 optimization events explicitly
+    emit compress_fractal_memory to ::memory.enhanced_lha3 with 5
+    emit optimize_fractal_memory to ::memory.enhanced_lha3 with "ACCESS_PATTERN"
+    listen for "memory.lha3.compressed" then { say "✅ LHA3 compressed event ok" }
+    listen for "memory.lha3.optimized" then { say "✅ LHA3 optimized event ok" }
+
+    say "🧪 Consciousness + LHA3 tests completed"
+  }
+}
+

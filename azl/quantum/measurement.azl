@@ -1,0 +1,22 @@
+# AZL Quantum Measurement - controlled collapse policy
+
+component ::quantum.measurement {
+  init {
+    set ::threshold = 0.92
+    set ::collapse_count = 0
+    say "📏 Quantum Measurement initialized (threshold=" + ::threshold + ")"
+  }
+
+  behavior {
+    listen for "quantum.measure.check" {
+      let d = ::event.data or {}
+      let conc = (d.max_concentration or 0.0)
+      if conc >= ::threshold {
+        set ::collapse_count = ::collapse_count + 1
+        emit "thought.collapse" with { concentration: conc, time: now() }
+      }
+    }
+  }
+}
+
+

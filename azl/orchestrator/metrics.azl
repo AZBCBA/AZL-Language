@@ -5,13 +5,51 @@ component ::metrics.training {
     set ::metrics.total_loss = 0.0
     set ::metrics.peak_memory = 0.0
     set ::metrics.avg_throughput = 0.0
+    set ::metrics.avg_latency_ms = 0.0
+    set ::metrics.last_step_start = 0
+    set ::metrics.start_time = 0
+    set ::metrics.total_time_ms = 0.0
+    set ::metrics.phase_timings = {}
+    set ::metrics.recent_latencies = []
+    set ::metrics.recent_losses = []
+    set ::metrics.max_recent = 100
+    set ::metrics.total_items = null
+    set ::metrics.errors = []
+    set ::metrics.error_count = 0
     say "📊 Training Metrics System Initialized"
+    set ::metrics.security_events_validated = 0
+    set ::metrics.security_violations = 0
+    set ::metrics.adaptive = { upshifts: 0, downshifts: 0, denied_updates: 0, loss_spike_events: 0, headroom_windows: 0, last_action_reason: "" }
+    set ::metrics.per_device = {}
+    set ::metrics.pipeline = { enriched: 0, deduped: 0, dedup_rate: 0.0, avg_text_len: 0.0, curriculum_mode: "auto" }
+    set ::metrics.hybrid = { quantum_share_percent: 0.0, avg_loss: 0.0 }
+    set ::metrics.health = { risk_score: 0.0, reasons: [], suggestions: [], ts: ::now() }
+    set ::metrics.slo = { healthy: true, reasons: [], block_updates: false }
+    set ::metrics.drift = { tokens_mean: 0.0, difficulty_mean: 0.0, tokens_drift: 0.0, difficulty_drift: 0.0 }
+    set ::metrics.run_id = ""
+    set ::metrics.runs_history = []
+    # Health thresholds (env-overridable)
+    set ::health_cfg = {
+      p95_ms_max: parseInt((::internal.env("AZL_LAT_P95_MAX") or "2000")),
+      device_cv_max: parseFloat((::internal.env("AZL_DEV_IMBAL_CV_MAX") or "0.5")),
+      peak_mem_gb_max: parseFloat((::internal.env("AZL_PEAK_MEM_MAX_GB") or "16.0")),
+      errors_5m_max: parseInt((::internal.env("AZL_ERRS_5M_MAX") or "5")),
+      risk_alert_th: parseFloat((::internal.env("AZL_RISK_ALERT_TH") or "0.7")),
+      tick_ms: parseInt((::internal.env("AZL_HEALTH_TICK_MS") or "5000"))
+    }
+    # Kick periodic health evaluator
+    ::schedule_health_tick()
   }
 
   listen for "training_metric" {
     set ::metrics.total_steps = ::metrics.total_steps + 1
     set ::metrics.total_loss = ::metrics.total_loss + $1.loss
     set ::metrics.avg_loss = ::metrics.total_loss / ::metrics.total_steps
+    # Track recent losses (bounded buffer)
+    set ::metrics.recent_losses = (::metrics.recent_losses.push($1.loss))
+    if ::metrics.recent_losses.length > (::metrics.max_recent or 100) {
+      set ::metrics.recent_losses = ::metrics.recent_losses.slice(1, ::metrics.recent_losses.length)
+    }
     
     say "📈 Step ::metrics.total_steps - Loss: $1.loss - Avg Loss: ::metrics.avg_loss"
     
@@ -22,6 +60,22 @@ component ::metrics.training {
       say "  - Peak Memory: ::metrics.peak_memory GB"
       say "  - Avg Throughput: ::metrics.avg_throughput samples/sec"
     }
+  }
+
+  # Consume device-level completions to update totals for parallel orchestrator
+  listen for "metrics.training.device_step_completed" {
+    set e = $1 or {}
+    set steps = parseInt((e.steps or 0))
+    set avg_loss = parseFloat((e.avg_loss or 0.0))
+    if steps > 0 {
+      set ::metrics.total_steps = ::metrics.total_steps + steps
+      set ::metrics.total_loss = ::metrics.total_loss + (avg_loss * steps)
+      set ::metrics.avg_loss = (::metrics.total_loss / max(1, ::metrics.total_steps))
+    }
+  }
+  listen for "metrics.training.set_per_device" {
+    set d = ($1 && $1.per_device) or {}
+    set ::metrics.per_device = d
   }
 
   listen for "aba_reward" {
@@ -43,5 +97,288 @@ component ::metrics.training {
 
   listen for "throughput_update" {
     set ::metrics.avg_throughput = $1.samples_per_sec
+  }
+
+  # GPU/resource metrics to ensure we don't exhaust devices
+  listen for "gpu.allocated" {
+    say "🎚️ GPU allocated (guarded)"
+  }
+  listen for "gpu.unavailable" {
+    say "🛡️ GPU unavailable; staying on CPU"
+  }
+  listen for "gpu.disabled" {
+    say "🛡️ GPU disabled by policy"
+  }
+
+  # Total items for ETA forecasting
+  listen for "metrics.training.set_total_items" {
+    set p = $1 or {}
+    set ::metrics.total_items = parseInt((p.total_items or 0))
+  }
+  listen for "metrics.adaptive.update" {
+    set p = $1 or {}
+    if ::metrics.adaptive == null { set ::metrics.adaptive = {} }
+    for k in p { set ::metrics.adaptive[k] = p[k] }
+  }
+
+  # Profiling hooks
+  listen for "metrics.training.begin" {
+    set ::metrics.start_time = ::now()
+    set ::metrics.total_steps = 0
+    set ::metrics.total_loss = 0.0
+    set ::metrics.total_time_ms = 0.0
+    set ::metrics.avg_throughput = 0.0
+    set ::metrics.avg_latency_ms = 0.0
+    set ::metrics.phase_timings = {}
+    set ::metrics.baseline = { loss_at_start: (::metrics.avg_loss or 0.0), latency_ms_at_start: (::metrics.avg_latency_ms or 0.0) }
+  }
+
+  listen for "training_step_started" {
+    set ::metrics.last_step_start = ::now()
+  }
+
+  listen for "training_step_completed" {
+    set t1 = ::now()
+    set dt = (t1 - (::metrics.last_step_start or t1))
+    # Update latency moving average
+    if ::metrics.avg_latency_ms == 0.0 { set ::metrics.avg_latency_ms = dt } else { set ::metrics.avg_latency_ms = (0.8 * ::metrics.avg_latency_ms) + (0.2 * dt) }
+    # Track recent latencies (bounded buffer)
+    set ::metrics.recent_latencies = (::metrics.recent_latencies.push(dt))
+    if ::metrics.recent_latencies.length > (::metrics.max_recent or 100) {
+      set ::metrics.recent_latencies = ::metrics.recent_latencies.slice(1, ::metrics.recent_latencies.length)
+    }
+    # Update throughput since start
+    set elapsed = max(1, (t1 - (::metrics.start_time or t1)))
+    set ::metrics.avg_throughput = (::metrics.total_steps * 1000.0) / elapsed
+    set ::metrics.total_time_ms = elapsed
+    # Performance improvement heuristics
+    if ::metrics.baseline != null {
+      set baseL = (::metrics.baseline.loss_at_start or ::metrics.avg_loss)
+      set baseT = (::metrics.baseline.latency_ms_at_start or ::metrics.avg_latency_ms)
+      if baseL > 0 { set ::metrics.loss_improvement = (baseL - (::metrics.avg_loss or baseL)) / baseL }
+      if baseT > 0 { set ::metrics.latency_improvement = (baseT - (::metrics.avg_latency_ms or baseT)) / baseT }
+    }
+  }
+  listen for "metrics.training.device_step_completed" {
+    # Already accounted by parallel orchestrator; keep hook for future aggregation
+  }
+  listen for "metrics.training.set_per_device" {
+    set d = ($1 && $1.per_device) or {}
+    set ::metrics.per_device = d
+  }
+
+  # Pipeline metrics aggregation (from intelligent data pipeline)
+  listen for "metrics.pipeline.update" {
+    set p = $1 or {}
+    set ::metrics.pipeline.enriched = (p.enriched or ::metrics.pipeline.enriched)
+    set ::metrics.pipeline.deduped = (p.deduped or ::metrics.pipeline.deduped)
+    set ::metrics.pipeline.avg_text_len = (p.avg_text_len or ::metrics.pipeline.avg_text_len)
+    set ::metrics.pipeline.curriculum_mode = (p.curriculum_mode or ::metrics.pipeline.curriculum_mode)
+    if (::metrics.pipeline.enriched or 0) > 0 {
+      set ::metrics.pipeline.dedup_rate = ((::metrics.pipeline.enriched - ::metrics.pipeline.deduped) * 1.0) / max(1, ::metrics.pipeline.enriched)
+    }
+  }
+
+  # Hybrid switching metrics
+  listen for "metrics.hybrid.update" {
+    set p = $1 or {}
+    if p.quantum_share_percent != null { set ::metrics.hybrid.quantum_share_percent = p.quantum_share_percent }
+    if p.avg_loss != null { set ::metrics.hybrid.avg_loss = p.avg_loss }
+  }
+
+  # Pipeline feature statistics for drift detection
+  listen for "metrics.pipeline.features" {
+    set p = $1 or {}
+    set t_mean = (p.tokens_mean or ::metrics.drift.tokens_mean)
+    set d_mean = (p.difficulty_mean or ::metrics.drift.difficulty_mean)
+    # Simple drift vs baseline (first seen becomes baseline)
+    if ::metrics.drift.tokens_mean == 0.0 { set ::metrics.drift.tokens_mean = t_mean }
+    if ::metrics.drift.difficulty_mean == 0.0 { set ::metrics.drift.difficulty_mean = d_mean }
+    set ::metrics.drift.tokens_drift = abs(t_mean - ::metrics.drift.tokens_mean)
+    set ::metrics.drift.difficulty_drift = abs(d_mean - ::metrics.drift.difficulty_mean)
+  }
+
+  # Run lifecycle
+  listen for "metrics.run.start" {
+    set p = $1 or {}
+    set id = (p.run_id or ("run_" + ::now()))
+    set ::metrics.run_id = id
+    set ::metrics.runs_history = (::metrics.runs_history.push({ id: id, started_at: ::now() }))
+  }
+  listen for "metrics.run.end" {
+    set id = ( $1 && $1.run_id ) or ::metrics.run_id
+    set i = 0
+    while i < (::metrics.runs_history.length or 0) {
+      if (::metrics.runs_history[i].id == id) { set ::metrics.runs_history[i].ended_at = ::now(); break }
+      set i = i + 1
+    }
+  }
+
+  # Health evaluation tick setup and handler
+  fn schedule_health_tick() {
+    ::azl.stdlib.set_timeout((::health_cfg.tick_ms or 5000), () => { emit metrics.health.tick })
+  }
+  listen for "metrics.health.tick" {
+    ::evaluate_health()
+    ::schedule_health_tick()
+  }
+
+  fn evaluate_health() {
+    # Compute simple risk score based on latency p95, device imbalance, peak memory, recent errors
+    set lat = ::metrics.recent_latencies || []
+    set p95 = ::percentile(lat, 0.95)
+    set cv = ::device_cv(::metrics.per_device)
+    set pm = (::metrics.peak_memory or 0.0)
+    set err_win = ::errors_last_ms(300000)  # last 5 minutes
+    set score = 0.0
+    set reasons = []
+    set suggest = []
+    if p95 != null && p95 > (::health_cfg.p95_ms_max or 2000) { set score = score + 0.3; set reasons.push("high_latency_p95") ; set suggest.push("reduce_batch_or_enable_hybrid") }
+    if cv != null && cv > (::health_cfg.device_cv_max or 0.5) { set score = score + 0.25; set reasons.push("device_imbalance") ; set suggest.push("rebalance_parallel_or_reduce_workers") }
+    if pm > (::health_cfg.peak_mem_gb_max or 16.0) { set score = score + 0.2; set reasons.push("memory_pressure") ; set suggest.push("lower_batch_or_enable_checkpointing") }
+    if err_win > (::health_cfg.errors_5m_max or 5) { set score = score + 0.25; set reasons.push("error_spike") ; set suggest.push("checkpoint_and_retry_or_switch_classical") }
+    if score > 1.0 { set score = 1.0 }
+    set ::metrics.health = { risk_score: score, reasons: reasons, suggestions: suggest, ts: ::now(), p95_ms: p95, device_cv: cv, peak_mem_gb: pm, errors_5m: err_win }
+    if score >= (::health_cfg.risk_alert_th or 0.7) {
+      emit metrics.alert with { risk_score: score, reasons: reasons, suggestions: suggest, run_id: (::metrics.run_id or "") }
+    }
+    # Evaluate SLOs and budgets
+    ::evaluate_slo(p95, cv, err_win)
+  }
+
+  fn evaluate_slo(p95, cv, err_win) {
+    set slo_lat = parseInt((::internal.env("AZL_SLO_LAT_P95_MS") or "0"))
+    set slo_err = parseInt((::internal.env("AZL_SLO_ERR_BUDGET_5M") or "0"))
+    set slo_tput = parseFloat((::internal.env("AZL_SLO_TPUT_MIN") or "0"))
+    set reasons = []
+    set healthy = true
+    if slo_lat > 0 && p95 != null && p95 > slo_lat { set healthy = false; set reasons.push("slo_latency") }
+    if slo_err > 0 && err_win > slo_err { set healthy = false; set reasons.push("slo_errors") }
+    if slo_tput > 0 && (::metrics.avg_throughput or 0.0) < slo_tput { set healthy = false; set reasons.push("slo_throughput") }
+    set ::metrics.slo.healthy = healthy
+    set ::metrics.slo.reasons = reasons
+    set ::metrics.slo.block_updates = !healthy
+    if !healthy { emit metrics.slo.alert with { reasons: reasons, run_id: (::metrics.run_id or "") } }
+  }
+
+  # Webhook for alerts (optional)
+  listen for "metrics.alert" {
+    link ::ffi.http
+    set hooks = (::internal.env("AZL_ALERT_WEBHOOKS") or "").split(",")
+    set i = 0
+    while i < (hooks.length or 0) {
+      set h = hooks[i].trim()
+      if h != "" { ::ffi.http.ffi_http_post(h, ::azl.stdlib.json_stringify(($1 or {}))) }
+      set i = i + 1
+    }
+  }
+
+  # NDJSON export for metrics ticks and alerts
+  listen for "training_step_completed" {
+    link ::ffi.fs
+    set rec = { t: ::now(), kind: "step", run_id: (::metrics.run_id or ""), step: ::metrics.total_steps, loss: (::metrics.recent_losses[-1] or null), latency_ms: (::metrics.recent_latencies[-1] or null) }
+    emit "append_file" to ::ffi.fs with "logs/metrics.ndjson" (::azl.stdlib.json_stringify(rec) + "\n")
+  }
+  listen for "metrics.alert" {
+    link ::ffi.fs
+    set rec = { t: ::now(), kind: "alert", data: ($1 or {}), run_id: (::metrics.run_id or "") }
+    emit "append_file" to ::ffi.fs with "logs/metrics.ndjson" (::azl.stdlib.json_stringify(rec) + "\n")
+  }
+
+  fn device_cv(per_device) {
+    set keys = []
+    for k in per_device { if k != null { set keys.push(k) } }
+    if keys.length == 0 { return 0.0 }
+    set vals = []
+    for k in keys { set d = per_device[k]; set vals.push(d.steps or 0) }
+    set mean = 0.0; for v in vals { set mean = mean + v }; set mean = mean / max(1, vals.length)
+    if mean == 0 { return 0.0 }
+    set ss = 0.0; for v in vals { set ss = ss + ((v - mean) * (v - mean)) }
+    set var = ss / vals.length
+    set std = sqrt(var)
+    return std / mean
+  }
+
+  fn percentile(arr, q) {
+    if arr == null || arr.length == 0 { return null }
+    set a = arr.slice(0, arr.length)
+    # insertion sort
+    set i = 1
+    while i < a.length {
+      set key = a[i]; set j = i - 1
+      while j >= 0 && a[j] > key { set a[j+1] = a[j]; set j = j - 1 }
+      set a[j+1] = key; set i = i + 1
+    }
+    set pos = (q * (a.length - 1))
+    set lo = floor(pos)
+    set hi = ceil(pos)
+    if lo == hi { return a[lo] }
+    set t = (pos - lo)
+    return (a[lo] * (1 - t)) + (a[hi] * t)
+  }
+
+  fn errors_last_ms(window_ms) {
+    set t0 = (::now() - (window_ms or 300000))
+    set c = 0
+    for e in (::metrics.errors or []) { if (e.t or 0) >= t0 { set c = c + 1 } }
+    return c
+  }
+
+  # Adaptive metrics aggregation
+  listen for "metrics.adaptive.update" {
+    set m = $1 or {}
+    if m.upshifts != null { set ::metrics.adaptive.upshifts = m.upshifts }
+    if m.downshifts != null { set ::metrics.adaptive.downshifts = m.downshifts }
+    if m.denied_updates != null { set ::metrics.adaptive.denied_updates = m.denied_updates }
+    if m.loss_spike_events != null { set ::metrics.adaptive.loss_spike_events = m.loss_spike_events }
+    if m.headroom_windows != null { set ::metrics.adaptive.headroom_windows = m.headroom_windows }
+    if m.last_action_reason != null { set ::metrics.adaptive.last_action_reason = m.last_action_reason }
+  }
+
+  # Per-device step completion to power parallel metrics
+  listen for "metrics.training.device_step_completed" {
+    set e = $1 or {}
+    # Optionally accumulate per-device metrics in a nested map
+    if ::metrics.per_device == null { set ::metrics.per_device = {} }
+    set key = ("gpu:" + (e.gpu_id or -1))
+    set rec = ::metrics.per_device[key] or { steps: 0, total_loss: 0.0, avg_latency_ms: 0.0 }
+    set rec.steps = rec.steps + (e.steps or 0)
+    set rec.total_loss = rec.total_loss + ((e.avg_loss or 0.0) * max(1, (e.steps or 0)))
+    if rec.avg_latency_ms == 0.0 { set rec.avg_latency_ms = (e.latency_ms or 0.0) } else { set rec.avg_latency_ms = (0.8 * rec.avg_latency_ms) + (0.2 * (e.latency_ms or 0.0)) }
+    set ::metrics.per_device[key] = rec
+  }
+
+  listen for "metrics.training.phase_done" {
+    set p = $1 or {}
+    set name = (p.phase or "unknown")
+    set dur = (p.duration_ms or 0.0)
+    set ::metrics.phase_timings[name] = dur
+  }
+
+  # --- Security metric hooks ---
+  listen for "azme.security_status_updated" {
+    set ::metrics.security_events_validated = ::metrics.security_events_validated + 1
+  }
+  listen for "azme.security_violation" {
+    set ::metrics.security_violations = ::metrics.security_violations + 1
+  }
+
+  # Configure profiling (max_recent; reset buffers)
+  listen for "metrics.configure" {
+    set cfg = $1 or {}
+    if cfg.max_recent { set ::metrics.max_recent = parseInt(cfg.max_recent) }
+    if cfg.reset == true {
+      set ::metrics.recent_latencies = []
+      set ::metrics.recent_losses = []
+    }
+  }
+
+  # Error/event tap to track training/runtime issues for predictive maintenance
+  listen for "log_error" {
+    set e = $1 or {}
+    set rec = { t: ::now(), type: (e.type or "unknown"), message: (e.message or ""), ctx: (e.context or {}) }
+    set ::metrics.error_count = ::metrics.error_count + 1
+    set ::metrics.errors = (::metrics.errors.push(rec))
+    if ::metrics.errors.length > 50 { set ::metrics.errors = ::metrics.errors.slice(1, ::metrics.errors.length) }
   }
 }

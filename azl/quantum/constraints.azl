@@ -1,0 +1,83 @@
+# AZL Quantum Constraints - derive constraint signals from telemetry
+
+component ::quantum.constraints {
+  init {
+    set ::latest = { max_concentration: 0.0, entropy: 0.0, norm2: 0.0, step: 0 }
+    set ::signals = { goal_urgency: 0.0, goal_load: 0.0, reasoning_coherence: 0.5, conflicts: 0.0, belief_coherence: 0.5, emotion_intensity: 0.0, memory_activity: 0.0 }
+    set ::decay = 0.9
+    say "🧭 Quantum Constraints initialized"
+  }
+
+  behavior {
+    # Ingest telemetry from superposition/telemetry endpoint
+    listen for "quantum.metrics" {
+      let m = ::event.data or {}
+      set ::latest.max_concentration = (m.max_concentration or ::latest.max_concentration)
+      set ::latest.entropy = (m.entropy or ::latest.entropy)
+      set ::latest.norm2 = (m.norm2 or ::latest.norm2)
+      set ::latest.step = (m.step or ::latest.step)
+    }
+
+    # Goals and related signals
+    listen for "goal.created" { ::update_goal_signals(($1 or {}), 1.0) }
+    listen for "goal.active" { ::update_goal_signals(($1 or {}), 1.2) }
+    listen for "goals.created" { ::bump_load((($1 && $1.count) or 1)) }
+    listen for "goal.timeout" { ::penalize_conflict(0.2) }
+    listen for "azme.goal_created" { ::update_goal_signals(($1 or {}), 1.0) }
+
+    # Reasoning
+    listen for "reasoning.complete" { ::update_reasoning(($1 or {})) }
+    listen for "reasoning.completed" { ::update_reasoning(($1 or {})) }
+
+    # Narrative coherence/conflicts
+    listen for "qnse.narrative_conflict" { ::penalize_conflict(0.3) }
+    listen for "qnse.belief_continuity" { let d = ($1 or {}); set ::signals.belief_coherence = (0.8 * ::signals.belief_coherence) + 0.2 * ((d.coherence_score or 0.5) * 1.0) }
+
+    # Emotion
+    listen for "qefx.emotion_updated" { let d = ($1 or {}); set ::signals.emotion_intensity = (0.8 * ::signals.emotion_intensity) + 0.2 * (d.intensity or 0.0) }
+
+    # Memory activity
+    listen for "agent.memory.recall" { set ::signals.memory_activity = (::signals.memory_activity * ::decay) + 0.1 }
+    listen for "agent.memory.store" { set ::signals.memory_activity = (::signals.memory_activity * ::decay) + 0.1 }
+
+    # Respond to explicit requests
+    listen for "quantum.constraints.request" {
+      emit "quantum.constraints.response" with (::compute_constraints())
+    }
+  }
+
+  export fn get_constraints() {
+    return ::compute_constraints()
+  }
+
+  # Compute constraint map from latest telemetry and signals
+  ::compute_constraints = () => {
+    set mc = (::latest.max_concentration or 0.0)
+    set ent = (::latest.entropy or 0.0)
+    set explore_base = max(0.0, (1.0 - mc)) * 0.6 + max(0.0, (1.2 - ent)) * 0.4
+    set exploit_base = max(0.0, mc - 0.4)
+    set safety_base = (ent > 3.5 ? 0.1 : 0.0)
+    set urg = (::signals.goal_urgency or 0.0)
+    set load = min(1.0, (::signals.goal_load or 0.0))
+    set coher = (::signals.reasoning_coherence or 0.5)
+    set conf = min(1.0, (::signals.conflicts or 0.0))
+    set bcoh = (::signals.belief_coherence or 0.5)
+    set emo = min(1.0, (::signals.emotion_intensity or 0.0))
+    set mem = min(1.0, (::signals.memory_activity or 0.0))
+    set explore = explore_base + max(0.0, 0.5 - coher) * 0.5 + (mem * 0.1)
+    set exploit = exploit_base + (urg * 0.4) + (bcoh * 0.2)
+    set safety = safety_base + (conf * 0.6) + (emo * 0.2)
+    if explore > 1.0 { set explore = 1.0 }
+    if exploit > 1.0 { set exploit = 1.0 }
+    if safety > 1.0 { set safety = 1.0 }
+    return { explore: explore, exploit: exploit, safety: safety, step: (::latest.step or 0) }
+  }
+
+  # Helpers
+  ::update_goal_signals = (g, gain) => { set p = (g.priority or (g.final_priority or 0.0)); if p > 1.0 { set p = 1.0 }; set ::signals.goal_urgency = (::signals.goal_urgency * ::decay) + (p * gain * (1.0 - ::decay)); set ::signals.goal_load = (::signals.goal_load * ::decay) + (1.0 - ::decay) }
+  ::bump_load = (count) => { set c = (count or 1); set ::signals.goal_load = (::signals.goal_load * ::decay) + (min(1.0, c * 0.05) * (1.0 - ::decay)) }
+  ::penalize_conflict = (amt) => { set ::signals.conflicts = (::signals.conflicts * ::decay) + (amt or 0.1) * (1.0 - ::decay) }
+  ::update_reasoning = (d) => { set coh = (d.logical_coherence or d.coherence or d.score or 0.5); if coh < 0 { set coh = 0.0 }; if coh > 1 { set coh = 1.0 }; set ::signals.reasoning_coherence = (::signals.reasoning_coherence * ::decay) + (coh * (1.0 - ::decay)) }
+}
+
+

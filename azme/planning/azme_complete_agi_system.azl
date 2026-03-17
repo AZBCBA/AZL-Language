@@ -612,6 +612,11 @@ function get_agi_system_statistics() {
     return stats;
 }
 
+// Feature-flag coexistence with unified orchestrator
+let unified_orchestrator_enabled = false;
+let orchestrator_coexist = true;
+if (::internal.env("AZME_UNIFIED_ORCHESTRATOR") == "1") { unified_orchestrator_enabled = true; }
+
 // Test the complete AGI system
 print("\n=== Testing Complete AGI System ===");
 
@@ -663,3 +668,9 @@ print("Self-improvement enabled: " + agi_config.self_improvement_enabled);
 print("Metacognition enabled: " + agi_config.metacognition_enabled);
 print("Quantum enhancement enabled: " + agi_config.quantum_enhancement);
 print("AGI development now runs entirely in AZL language!"); 
+
+// Coexistence: delegate to unified orchestrator when enabled
+if (unified_orchestrator_enabled) {
+  emit configure_unified_orchestrator to ::azme.unified_agi_orchestrator with { enabled: true, coexist: orchestrator_coexist };
+  emit orchestrate_request to ::azme.unified_agi_orchestrator with { input: "hello" };
+}

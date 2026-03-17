@@ -1,0 +1,13 @@
+# Test: AZME Plugin Governance
+component ::test.azme_plugin_governance {
+  init {
+    emit configure_plugin_registry to ::azme.plugin_registry with { require_signatures: true }
+    emit register_plugin_manifest to ::azme.plugin_registry with { id: "p1", signature: "s", pubkey: "k", roles: ["external_agent"], limits: { calls_per_min: 10 } }
+
+    # Execute a simple action; host will log execution
+    emit execute_plugin_action to ::azme.plugin_host with { id: "p1", action: "echo", payload: { x: 1 } }
+
+    emit get_tool_exec_stats to ::azme.tool_execution_log with {}
+  }
+}
+

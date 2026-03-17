@@ -1,0 +1,31 @@
+{
+  "code_generation": {
+    "total_prompts": 5,
+    "successful_generations": 5,
+    "avg_length": 992.6,
+    "syntax_validity": 0.42000000000000004,
+    "semantic_relevance": 0.0
+  },
+  "event_prediction": {
+    "total_events": 3,
+    "exact_matches": 0,
+    "partial_matches": 0,
+    "avg_similarity": 0.18846153846153846,
+    "top_k_accuracy": {
+      "1": 0,
+      "3": 0,
+      "5": 0
+    },
+    "exact_match_rate": 0.0,
+    "partial_match_rate": 0.0
+  },
+  "context_understanding": {
+    "total_tests": 2,
+    "context_aware_responses": 0,
+    "avg_context_relevance": 0.0,
+    "memory_retrieval_success": 0,
+    "context_awareness_rate": 0.0
+  },
+  "memory_integration": {},
+  "overall_score": 0.126
+}

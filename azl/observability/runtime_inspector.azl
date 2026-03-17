@@ -1,0 +1,29 @@
+# AZL Runtime Inspector - Pure AZL
+
+component ::azl.runtime_inspector {
+  init {
+    set ::status = "ready"
+    say "🔍 Runtime Inspector ready"
+  }
+
+  behavior {
+    listen for "inspector.snapshot" then {
+      set snap = ::get_snapshot()
+      emit inspector.snapshot.ready with snap
+    }
+  }
+
+  export fn get_snapshot() {
+    set timers = ( ::azl.stdlib.get_timer_stats ? ::azl.stdlib.get_timer_stats() : { now_ms:0, timers_count:0, order_len:0, resolution_ms:0 } )
+    set sec = {
+      current_component: (::azl.security ? ::azl.security.current_component : ""),
+      policy_default_allow: (::azl.security ? ::azl.security.policy.default_allow : null)
+    }
+    return {
+      time: timers,
+      security: sec
+    }
+  }
+}
+
+

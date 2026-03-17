@@ -1,0 +1,27 @@
+# Example Training Plugin (manifest must be registered in azme.plugin_registry)
+component ::plugin.training.example {
+  behavior {
+    on training.after_data_processing {
+      set ctx = $1
+      # Suggest increasing augmentation when processed.neural is small
+      set count = ((ctx.processed && ctx.processed.neural && ctx.processed.neural.length) || 0)
+      if count < 100 { emit azme.set_augmentation with { level: 2.0 } }
+      emit plugin.training.example.completed with { hook: "after_data_processing" }
+    }
+    on training.after_neural {
+      set ctx = $1
+      # Suggest huber when loss high
+      set loss = ((ctx.neural && ctx.neural.bridge_metrics && ctx.neural.bridge_metrics.avg_loss) || 0)
+      if loss > 1.0 { emit azme.set_loss_strategy with { id: "huber" } }
+      emit plugin.training.example.completed with { hook: "after_neural" }
+    }
+    on training.after_consciousness {
+      emit plugin.training.example.completed with { hook: "after_consciousness" }
+    }
+    on training.after_memory {
+      emit plugin.training.example.completed with { hook: "after_memory" }
+    }
+  }
+}
+
+

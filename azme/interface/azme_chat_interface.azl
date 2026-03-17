@@ -29,6 +29,16 @@ component ::azme.chat_interface {
   }
 
   behavior {
+    listen for "process_message" then {
+      set msg = ::event.data.message
+      set uid = ::event.data.user_id || "cli"
+      set sid = ::event.data.session_id || uid
+      emit azme.chat.response_generated with {
+        text: "Echo: " + msg,
+        user_id: uid,
+        session_id: sid
+      }
+    }
     on initialize_chat_interface {
       set ::dimensions = $1.dimensions
       set ::p_adic_prime = $1.p_adic_prime
@@ -134,7 +144,11 @@ component ::azme.chat_interface {
       }
       
       emit azme.chat.response_generated with { 
-        response: ::conscious_response,
+        response: {
+          response: ::conscious_response.response,
+          final_response: ::conscious_response.response.final_response || ::conscious_response.response || "",
+          confidence: ::conscious_response.confidence || 0.0
+        },
         user_id: ::user_id,
         session_id: ::session_id,
         processing_time: ::processing_time,

@@ -1,0 +1,27 @@
+# AZL Quantum Phase Field - constraint-driven phase modulation (logic-level)
+
+component ::quantum.phase_field {
+  init {
+    set ::status = "ready"
+    set ::violations = 0
+    say "🌀 Quantum Phase Field initialized"
+  }
+
+  behavior {
+    # Apply phase separator update based on constraint signal C and gain gamma
+    listen for "quantum.phase.apply" {
+      let p = ::event.data or {}
+      let gamma = (p.gamma or 0.2)
+      let constraints = (p.constraints or {})
+      # Invariant: constraints must be finite scalars
+      if type_of(constraints) != "object" { emit quantum.logic.violation with { reason: "constraints_not_object" }; set ::violations = ::violations + 1; return }
+      # Emit normalized constraint vector for kernels to consume via ffi
+      emit "quantum.phase.normalized" with { gamma: gamma, constraints: constraints }
+    }
+
+    # Guard channel for violations
+    listen for "quantum.logic.violation" { set ::violations = ::violations + 1 }
+  }
+}
+
+

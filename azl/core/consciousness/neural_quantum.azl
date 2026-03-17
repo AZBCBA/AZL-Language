@@ -1,0 +1,174 @@
+############################################
+# azl/core/consciousness/neural_quantum.azl
+# Production-grade consciousness bridge with neural-quantum integration
+############################################
+
+component ::consciousness.neural_quantum {
+
+  init {
+    link ::error.system
+    set ::status = "initializing"
+
+    # Core consciousness state exposed to other systems
+    set ::state = {
+      initialized: false,
+      active: false,
+      training_mode: "idle",
+      current_epoch: 0,
+      current_step: 0,
+      coherence: 0.85,
+      awareness: 0.80,
+      coupling: 0.75,
+      last_update: ::now(),
+      meta: {}
+    }
+
+    # Optional bridges
+    link ::azme.reflection_engine
+    link ::azme.belief_system
+    link ::memory.enhanced_lha3
+
+    set ::status = "ready"
+    emit consciousness.neural_quantum.ready with { status: ::status }
+  }
+
+  behavior {
+    # Initialization (supports both direct and namespaced invocations)
+    listen for "initialize_neural_quantum" then {
+      set req = ::event.data || {}
+      ::initialize_consciousness(req)
+    }
+    listen for "consciousness.neural_quantum.initialize" then {
+      set req = ::event.data || {}
+      ::initialize_consciousness(req)
+    }
+
+    # Lifecycle and training hooks
+    listen for "neural_quantum_start" then {
+      set cfg = ::event.data || {}
+      set ::state.active = true
+      set ::state.training_mode = (cfg.training_mode or "active")
+      set ::state.last_update = ::now()
+      emit azme.reflection.reflect.training_phase to ::azme.reflection_engine with { phase: "consciousness_start", inputs: {}, outputs: { mode: ::state.training_mode } }
+    }
+
+    listen for "epoch_neural_quantum" then {
+      set e = ::event.data || {}
+      set ::state.current_epoch = (e.epoch or (::state.current_epoch or 0))
+      set ::state.awareness = ::clamp01((e.consciousness_level or ::state.awareness))
+      set ::state.last_update = ::now()
+    }
+
+    listen for "step_neural_quantum" then {
+      set s = ::event.data || {}
+      set ::state.current_step = (s.step or (::state.current_step or 0))
+      set ::state.awareness = ::clamp01((s.neural_quantum_level or ::state.awareness))
+      set ::state.last_update = ::now()
+      # Lightweight memory trace for associative recall
+      emit "lha3.store.processing_queue" to ::memory.enhanced_lha3 with { kind: "consciousness_step", step: ::state.current_step, awareness: ::state.awareness }
+    }
+
+    listen for "training_metric_neural_quantum" then {
+      set m = ::event.data || {}
+      set loss = (m.loss != null) ? m.loss : 0.0
+      set ::state.coherence = ::compute_coherence_from_loss(loss)
+      set ::state.coupling = ::compute_coupling_from_awareness(::state.awareness, ::state.coherence)
+      set ::state.last_update = ::now()
+      emit azme.belief.update to ::azme.belief_system with { source: "consciousness_metric", results: { step: (m.step or 0), loss: loss, coherence: ::state.coherence, coupling: ::state.coupling } }
+    }
+
+    listen for "training_complete_neural_quantum" then {
+      set fin = ::event.data || {}
+      set ::state.active = false
+      set ::state.last_update = ::now()
+      # Persist final state summary into LHA3 quantum memory
+      emit store_quantum_state to ::memory.enhanced_lha3 with {
+        state_id: ("consciousness:final:" + (::now() or 0)),
+        quantum_state: { amplitudes: [::state.coherence, ::state.awareness], phases: [0.0, 0.0], entanglement_strength: ::state.coupling },
+        coherence_time: 2000,
+        metadata: { source: "consciousness", training_mode: ::state.training_mode }
+      }
+      emit consciousness.neural_quantum.finalized with { state: ::state, result: fin }
+    }
+  }
+
+  # Public API expected by other modules
+  function get_state() {
+    return {
+      initialized: (::state.initialized or false),
+      active: (::state.active or false),
+      training_mode: (::state.training_mode or "idle"),
+      epoch: (::state.current_epoch or 0),
+      step: (::state.current_step or 0),
+      coherence: (::state.coherence or 0.0),
+      awareness: (::state.awareness or 0.0),
+      coupling: (::state.coupling or 0.0),
+      last_update: (::state.last_update or ::now())
+    }
+  }
+
+  function set_awareness_level(value) {
+    set ::state.awareness = ::clamp01(value or ::state.awareness)
+    set ::state.coupling = ::compute_coupling_from_awareness(::state.awareness, ::state.coherence)
+    set ::state.last_update = ::now()
+  }
+
+  # Internal helpers
+  function initialize_consciousness(req) {
+    set layers = (req.neural_layers or 0)
+    set qubits = (req.quantum_qubits or 0)
+    set ::state.initialized = true
+    set ::state.meta = { neural_layers: layers, quantum_qubits: qubits }
+    set ::state.last_update = ::now()
+    emit azme.reflection.reflect.training_phase to ::azme.reflection_engine with { phase: "consciousness_initialize", inputs: req, outputs: { ok: true } }
+  }
+
+  function compute_coherence_from_loss(loss) {
+    # Map decreasing loss to higher coherence in [0,1]
+    set l = (loss or 0.0)
+    if l < 0 { set l = 0.0 }
+    if l > 1000000 { set l = 1000000.0 }
+    set c = 1.0 / (1.0 + (l * 0.5))
+    return ::clamp01(c)
+  }
+
+  function compute_coupling_from_awareness(awareness, coherence) {
+    set a = ::clamp01(awareness or 0.0)
+    set c = ::clamp01(coherence or 0.0)
+    # Favor strong coupling when both awareness and coherence are high
+    set k = (0.6 * c) + (0.4 * a)
+    return ::clamp01(k)
+  }
+
+  function clamp01(x) {
+    set v = (x or 0.0)
+    if v < 0.0 { return 0.0 }
+    if v > 1.0 { return 1.0 }
+    return v
+  }
+}
+
+
+# Compatibility wrapper: allow callers addressing ::core.consciousness.neural_quantum
+component ::core.consciousness.neural_quantum {
+  init {
+    link ::consciousness.neural_quantum
+  }
+
+  behavior {
+    # Forward common events
+    listen for "initialize_neural_quantum" then { emit initialize_neural_quantum to ::consciousness.neural_quantum with (::event.data or {}) }
+    listen for "consciousness.neural_quantum.initialize" then { emit consciousness.neural_quantum.initialize to ::consciousness.neural_quantum with (::event.data or {}) }
+    listen for "neural_quantum_start" then { emit neural_quantum_start to ::consciousness.neural_quantum with (::event.data or {}) }
+    listen for "epoch_neural_quantum" then { emit epoch_neural_quantum to ::consciousness.neural_quantum with (::event.data or {}) }
+    listen for "step_neural_quantum" then { emit step_neural_quantum to ::consciousness.neural_quantum with (::event.data or {}) }
+    listen for "training_metric_neural_quantum" then { emit training_metric_neural_quantum to ::consciousness.neural_quantum with (::event.data or {}) }
+    listen for "training_complete_neural_quantum" then { emit training_complete_neural_quantum to ::consciousness.neural_quantum with (::event.data or {}) }
+  }
+
+  # Delegate API
+  function get_state() { return ::consciousness.neural_quantum.get_state() }
+  function set_awareness_level(value) { return ::consciousness.neural_quantum.set_awareness_level(value) }
+}
+
+

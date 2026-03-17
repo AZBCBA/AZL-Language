@@ -4,7 +4,8 @@ cd "$(dirname "$0")/.."
 
 # Pure AZL run: compose minimal bootstrap and feed to pure interpreter loader
 
-COMBINED="/tmp/azl_chat_$$.azl"
+: "${TMPDIR:=/tmp}"; mkdir -p "$TMPDIR"
+COMBINED="${TMPDIR}/azl_chat_$$.azl"
 cat \
   azl/core/ast_event_bus.azl \
   azl/memory/lha3_adaptive_quantum_engine.azl \

@@ -10,7 +10,9 @@ component ::ui.dashboard_connector {
       behavior_analysis: true,
       reinforcement_flow: true,
       insight_heatmap: true,
-      system_health: true
+      system_health: true,
+      error_monitoring: true,
+      recovery_control: true
     }
     set ::visualization_settings = {
       show_graphs: true,
@@ -18,6 +20,31 @@ component ::ui.dashboard_connector {
       show_metrics: true,
       auto_refresh: true
     }
+
+    # Error monitoring state
+    set ::error_history = []
+    set ::max_error_history = 500
+    set ::error_stats = {
+      total: 0,
+      by_type: {},
+      by_severity: { critical: 0, high: 0, medium: 0, low: 0 }
+    }
+
+    # Recovery control state
+    set ::auto_recovery_enabled = false
+    set ::recovery_progress = { state: "idle", started_at: null, details: null }
+    set ::recovery_results = []
+
+    # System health state
+    set ::health_indicators = { status: "unknown", components: {} }
+    set ::health_metrics = {}
+    set ::health_recommendations = []
+    set ::preventive_actions = []
+    
+    # Summary broadcast for external UIs
+    set ::summary_broadcast_enabled = true
+    set ::summary_interval = 5000
+    set ::last_summary_emitted = 0
     
     # Link to analytics components
     link ::aba.aba_analytics
@@ -27,6 +54,11 @@ component ::ui.dashboard_connector {
     # Link to AZME components
     link ::agi.azme_behavior_manager
     link ::agi.azme_feedback_processor
+
+    # Link to diagnostics and error systems
+    link ::diagnostics.overlay
+    link ::diagnostics.health
+    link ::error.system
     
     emit "ui.dashboard.initialized" with {
       status: ::status,
@@ -59,6 +91,15 @@ component ::ui.dashboard_connector {
     listen for "dashboard.system_health" then {
       display_system_health($1)
     }
+
+    # New dashboard panels
+    listen for "dashboard.error_monitoring" then {
+      display_error_monitoring($1)
+    }
+
+    listen for "dashboard.recovery_control" then {
+      display_recovery_control($1)
+    }
     
     listen for "insight:graph" then {
       display_behavior_graph($1)
@@ -74,6 +115,64 @@ component ::ui.dashboard_connector {
     
     listen for "ui.dashboard.export" then {
       export_dashboard_data($1)
+    }
+    
+    # Summary broadcasting controls and triggers
+    listen for "ui.dashboard.summary.request" then {
+      broadcast_dashboard_summary()
+    }
+    
+    listen for "ui.dashboard.summary.toggle" then {
+      toggle_summary_broadcast($1)
+    }
+    
+    # Periodic summary emission based on runtime ticks
+    listen for "runtime.tick" then {
+      if ::summary_broadcast_enabled {
+        let now_ts = now()
+        if now_ts - ::last_summary_emitted > ::summary_interval {
+          broadcast_dashboard_summary()
+          set ::last_summary_emitted = now_ts
+        }
+      }
+    }
+
+    # Error and diagnostics events
+    listen for "error.logged" then {
+      on_error_logged($1)
+    }
+
+    listen for "diagnostics.error" then {
+      on_diagnostics_error($1)
+    }
+
+    listen for "diagnostics.alert" then {
+      on_diagnostics_alert($1)
+    }
+
+    listen for "health.check.complete" then {
+      on_health_check_complete($1)
+    }
+
+    listen for "diagnostics.performance" then {
+      on_performance_metrics($1)
+    }
+
+    # Recovery control events
+    listen for "ui.recovery.auto.toggle" then {
+      toggle_auto_recovery($1)
+    }
+
+    listen for "ui.recovery.manual.execute" then {
+      start_manual_recovery($1)
+    }
+
+    listen for "afi.recovery_activated" then {
+      on_recovery_success($1)
+    }
+
+    listen for "afi.critical_error" then {
+      on_recovery_failure($1)
     }
   }
 
@@ -228,8 +327,242 @@ component ::ui.dashboard_connector {
       say "  💡 Insight Generation Efficiency: " + (indicators.insight_generation_efficiency * 100).toFixed(1) + "%"
       say "  🏥 System Health Score: " + (indicators.system_health_score * 100).toFixed(1) + "%"
     }
+
+    # Health Indicators (include quantum/LHA3 readiness if available)
+    say ""
+    say "🩺 Health Indicators:"
+    let status_icon = (::health_indicators.status == "healthy" ? "🟢" : (::health_indicators.status == "degraded" ? "🟡" : (::health_indicators.status == "unhealthy" ? "🔴" : "⚪")))
+    say "  " + status_icon + " Overall Status: " + (::health_indicators.status or "unknown")
+    if Object.keys(::health_indicators.components).length > 0) {
+      say "  Components:"
+      for (let comp of Object.keys(::health_indicators.components).slice(0, 6)) {
+        say "    • " + comp + ": " + ::health_indicators.components[comp]
+      }
+    }
+
+    # Quantum and LHA3 snapshots (best-effort)
+    say ""
+    say "🧪 Components Readiness Snapshot:"
+    let q = (::orchestrator && ::orchestrator.comprehensive_training_controller && ::orchestrator.comprehensive_training_controller.status && ::orchestrator.comprehensive_training_controller.status.components) ? ::orchestrator.comprehensive_training_controller.status.components : {}
+    if q != null {
+      say "  • Quantum: " + ((q.quantum == true) ? "🟢 ready" : "⏳ waiting")
+      say "  • LHA3: " + ((q.lha3 == true) ? "🟢 ready" : "⏳ waiting")
+    }
+
+    # Health Recommendations
+    if ::health_recommendations.length > 0) {
+      say ""
+      say "🧭 Health Recommendations:"
+      for (let rec of ::health_recommendations.slice(0, 5)) {
+        say "  - " + rec
+      }
+    }
+
+    # Preventive Actions
+    if ::preventive_actions.length > 0) {
+      say ""
+      say "🛡️ Preventive Actions:"
+      for (let act of ::preventive_actions.slice(0, 5)) {
+        say "  - " + act
+      }
+    }
     
     say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  }
+
+  # Display Error Monitoring Panel
+  function display_error_monitoring(panel_request) {
+    say "🛑 ERROR MONITORING PANEL"
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    say "📊 Total Errors: " + ::error_stats.total
+    say "  🔴 Critical: " + ::error_stats.by_severity.critical + "  🟠 High: " + ::error_stats.by_severity.high + "  🟡 Medium: " + ::error_stats.by_severity.medium + "  🟢 Low: " + ::error_stats.by_severity.low
+
+    # Current Errors (last 5)
+    if ::error_history.length > 0) {
+      say ""
+      say "🕒 Recent Errors:"
+      for (let entry of ::error_history.slice(-5)) {
+        let sev = classify_error(entry)
+        say "  • [" + sev.toUpperCase() + "] " + (entry.type or entry.kind or "unknown") + ": " + (entry.message or "")
+      }
+    }
+
+    # Error Patterns & Trends (top 5 types)
+    let topTypes = top_error_types(5)
+    if topTypes.length > 0) {
+      say ""
+      say "📈 Error Patterns (Top Types):"
+      for (let item of topTypes) {
+        say "  • " + item.type + ": " + item.count
+      }
+    }
+
+    # Error Context (last error)
+    if ::error_history.length > 0) {
+      let last = ::error_history[::error_history.length - 1]
+      say ""
+      say "🔎 Last Error Context:"
+      if last.context) {
+        let ctxKeys = Object.keys(last.context)
+        for (let k of ctxKeys.slice(0, 6)) {
+          say "  • " + k + ": " + last.context[k]
+        }
+      } else {
+        say "  (no context)"
+      }
+    }
+
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  }
+
+  # Display Recovery Control Panel
+  function display_recovery_control(panel_request) {
+    say "🔄 RECOVERY CONTROL PANEL"
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    say "⚙️ Auto-recovery: " + (::auto_recovery_enabled ? "Enabled" : "Disabled")
+    say "🧭 Manual Recovery: emit \"ui.recovery.manual.execute\" with { target: \"system\" }"
+    say "🟢 Enable Auto: emit \"ui.recovery.auto.toggle\" with { enabled: true }"
+    say "🔴 Disable Auto: emit \"ui.recovery.auto.toggle\" with { enabled: false }"
+
+    say ""
+    say "📦 Recovery Progress: " + (::recovery_progress.state or "idle")
+    if ::recovery_progress.details) {
+      say "  Details: " + ::recovery_progress.details
+    }
+
+    if ::recovery_results.length > 0) {
+      say ""
+      say "✅ Recent Recovery Results:"
+      for (let r of ::recovery_results.slice(-5)) {
+        say "  • [" + (r.success ? "SUCCESS" : "FAIL") + "] " + (r.description or "recovery") + " at " + r.timestamp
+      }
+    }
+
+    say "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  }
+
+  # Error handling helpers
+  function classify_error(entry) {
+    let t = (entry.type or entry.kind or "unknown")
+    if (t == "runtime" or t == "division_by_zero" or t == "timeout" or t == "cycle") { return "critical" }
+    if (t == "io" or t == "network" or t == "compilation") { return "high" }
+    if (t == "type" or t == "parse") { return "medium" }
+    return "low"
+  }
+
+  function on_error_logged(entry) {
+    if entry == null) { return }
+    # Maintain history
+    store ::error_history from ::error_history.push(entry)
+    if ::error_history.length > ::max_error_history) {
+      set ::error_history = ::error_history.slice(-::max_error_history)
+    }
+
+    # Update stats
+    set ::error_stats.total = ::error_stats.total + 1
+    let t = (entry.type or entry.kind or "unknown")
+    set ::error_stats.by_type[t] = (::error_stats.by_type[t] or 0) + 1
+    let sev = classify_error(entry)
+    set ::error_stats.by_severity[sev] = (::error_stats.by_severity[sev] or 0) + 1
+
+    # Auto-recovery on critical errors
+    if ::auto_recovery_enabled and sev == "critical") {
+      set ::recovery_progress = { state: "starting", started_at: now(), details: "auto-recovery triggered" }
+      emit "azme.recovery_initiated" with { recovery_type: "auto", target: (entry.context and entry.context.component) or "system" }
+      emit "revert_to_last_rollback" with { reason: "auto_recovery", source_error: entry }
+    }
+  }
+
+  function on_diagnostics_error(diag) {
+    # Normalize to error.logged shape
+    let entry = { type: (diag.type or "diagnostics"), message: (diag.message or diag), context: (diag.context or {}), timestamp: now() }
+    on_error_logged(entry)
+  }
+
+  function on_diagnostics_alert(alert) {
+    # Use alerts to refresh recommendations
+    generate_health_recommendations()
+  }
+
+  function on_health_check_complete(report) {
+    set ::health_indicators.status = report.status or ::health_indicators.status
+    set ::health_indicators.components = report.components or ::health_indicators.components
+    set ::health_metrics = report
+    generate_health_recommendations()
+  }
+
+  function on_performance_metrics(metrics) {
+    # Optionally merge performance metrics into health metrics
+    set ::health_metrics.performance = metrics
+  }
+
+  function toggle_auto_recovery(req) {
+    let enabled = (req and (req.enabled == true))
+    set ::auto_recovery_enabled = enabled
+    say (enabled ? "🟢 Auto-recovery enabled" : "🔴 Auto-recovery disabled")
+  }
+
+  function start_manual_recovery(req) {
+    set ::recovery_progress = { state: "starting", started_at: now(), details: "manual recovery requested" }
+    emit "azme.recovery_initiated" with { recovery_type: "manual", target: (req and req.target) or "system" }
+    emit "revert_to_last_rollback" with { reason: "manual_recovery", request: req }
+  }
+
+  function on_recovery_success(info) {
+    set ::recovery_progress = { state: "completed", started_at: ::recovery_progress.started_at, details: "recovery succeeded" }
+    store ::recovery_results from ::recovery_results.push({ success: true, description: "recovery_activated", timestamp: now(), info: info })
+  }
+
+  function on_recovery_failure(info) {
+    set ::recovery_progress = { state: "completed", started_at: ::recovery_progress.started_at, details: "recovery failed" }
+    store ::recovery_results from ::recovery_results.push({ success: false, description: (info and info.error) or "critical_error", timestamp: now(), info: info })
+  }
+
+  function top_error_types(limit) {
+    let arr = []
+    for (let k of Object.keys(::error_stats.by_type)) { arr.push({ type: k, count: ::error_stats.by_type[k] }) }
+    arr.sort((a,b) => b.count - a.count)
+    return arr.slice(0, (limit or 5))
+  }
+
+  function generate_health_recommendations() {
+    let recs = []
+    let actions = []
+    let status = ::health_indicators.status or "unknown"
+
+    if status == "unhealthy") {
+      recs.push("Investigate unhealthy components and restart affected subsystems")
+      actions.push("Emit \"perform_health_check\" to refresh component statuses")
+      if ::error_stats.by_severity.critical > 0) {
+        recs.push("High critical error rate detected; enable auto-recovery")
+        actions.push("Emit \"ui.recovery.auto.toggle\" with { enabled: true }")
+      }
+    } else if status == "degraded") {
+      recs.push("System degraded; optimize workloads and monitor error trends")
+      actions.push("Increase diagnostics frequency; review top error types")
+    } else if status == "healthy") {
+      recs.push("Maintain current configuration; continue monitoring")
+      actions.push("Schedule periodic health checks")
+    } else {
+      recs.push("Unknown health status; run a health check")
+      actions.push("Emit \"perform_health_check\"")
+    }
+
+    if (::error_stats.by_type["timeout"] or 0) > 0) {
+      recs.push("Timeout errors present; raise timeouts or reduce load")
+      actions.push("Tune timeout configurations for critical paths")
+    }
+    if (::error_stats.by_type["io"] or 0) > 0) {
+      recs.push("I/O errors detected; verify filesystem and permissions")
+      actions.push("Audit read/write paths and quotas")
+    }
+    if (::error_stats.by_type["network"] or 0) > 0) {
+      recs.push("Network errors detected; check connectivity and retry policies")
+      actions.push("Validate endpoints and backoff strategies")
+    }
+
+    set ::health_recommendations = recs
+    set ::preventive_actions = actions
   }
 
   # Display behavior graph visualization
@@ -330,6 +663,58 @@ component ::ui.dashboard_connector {
     
     # Request all dashboard sections
     emit "dashboard.request" with { sections: "all" }
+
+    # Immediately render panels that rely on internal state
+    display_error_monitoring({})
+    display_recovery_control({})
+  }
+
+  # Build and emit a compact dashboard summary for external UIs
+  function broadcast_dashboard_summary() {
+    let summary = generate_dashboard_summary()
+    emit "ui.dashboard.summary" with summary
+  }
+
+  function generate_dashboard_summary() {
+    # Compose a compact snapshot for external UIs
+    let latest_error = (::error_history.length > 0) ? ::error_history[::error_history.length - 1] : null
+    let top_types = top_error_types(3)
+
+    return {
+      overview: {
+        last_update: ::last_update,
+        display_mode: ::display_mode,
+        active_sections: Object.keys(::dashboard_sections).filter(section => ::dashboard_sections[section]).length
+      },
+      errors: {
+        total: ::error_stats.total,
+        by_severity: ::error_stats.by_severity,
+        top_types: top_types,
+        latest: latest_error ? {
+          type: (latest_error.type or latest_error.kind or "unknown"),
+          message: (latest_error.message or ""),
+          timestamp: latest_error.timestamp
+        } : null
+      },
+      recovery: {
+        auto_enabled: ::auto_recovery_enabled,
+        progress: ::recovery_progress,
+        last_result: (::recovery_results.length > 0) ? ::recovery_results[::recovery_results.length - 1] : null
+      },
+      health: {
+        status: ::health_indicators.status,
+        components: ::health_indicators.components,
+        recommendations: ::health_recommendations.slice(0, 3),
+        preventive_actions: ::preventive_actions.slice(0, 3)
+      },
+      performance: (::health_metrics and ::health_metrics.performance) ? ::health_metrics.performance : null
+    }
+  }
+
+  function toggle_summary_broadcast(req) {
+    let enabled = (req and (req.enabled == true))
+    set ::summary_broadcast_enabled = enabled
+    say (enabled ? "🟢 Summary broadcast enabled" : "🔴 Summary broadcast disabled")
   }
 
   # Get dashboard statistics
@@ -351,5 +736,18 @@ component ::ui.dashboard_connector {
     last_update
     dashboard_sections
     visualization_settings
+    error_history
+    max_error_history
+    error_stats
+    auto_recovery_enabled
+    recovery_progress
+    recovery_results
+    health_indicators
+    health_metrics
+    health_recommendations
+    preventive_actions
+    summary_broadcast_enabled
+    summary_interval
+    last_summary_emitted
   }
 } 

@@ -59,3 +59,56 @@ run
 say "✅ AZME→AZL ABA Integration Test Complete!"
 say "🎯 AZME can now use AZL's ABA functions for intelligent learning!"
 say "🧠 The bridge is working - high-level cognition meets low-level behavior!" 
+
+# Extended: integrate AGI core registration and task processing
+say "🔌 Step 9: Registering AGI components..."
+emit "agi.register_component" with { name: "planner", version: "1.0", capability: "symbolic" }
+emit "agi.register_component" with { name: "neural-exec", version: "1.2", capability: "neural" }
+
+say "🔌 Step 10: Enqueue tasks and process..."
+emit "agi.enqueue_task" with { task_id: "task-001", task_type: "plan", input: "optimize_goal_flow" }
+emit "agi.enqueue_task" with { task_id: "task-002", task_type: "execute", input: "apply_strategy" }
+emit "agi.process_queue"
+emit "agi.process_queue"
+emit "agi.metrics.tick"
+
+say "🔌 Step 11: Query components and capabilities"
+emit "agi.component.list"
+emit "agi.component.get" with { name: "planner", version: "1.0" }
+emit "agi.capability.query" with { capability: "symbolic" }
+
+say "🔌 Step 12: Process all and flush"
+emit "agi.process_all"
+emit "agi.queue.flush"
+
+say "🔌 Step 13: Status and health"
+emit "agi.status"
+emit "agi.health.check"
+
+say "🔌 Step 14: Hardware and capabilities APIs"
+emit "agi.hardware.get"
+emit "agi.hardware.set" with { available_ram: 20000 }
+emit "agi.hardware.get"
+emit "agi.capability.list"
+emit "agi.capability.set" with { name: "QUANTUM", enabled: true }
+emit "agi.capability.list"
+
+say "🔌 Step 15: Task result retrieval"
+emit "agi.task.result.get" with { task_id: "task-001" }
+emit "agi.system.metrics.get"
+
+say "🔌 Step 16: Component lifecycle"
+emit "agi.component.initialize" with { name: "planner", version: "1.0" }
+emit "agi.component.optimize" with { name: "planner", version: "1.0" }
+emit "agi.component.reload" with { name: "planner", version: "1.0" }
+emit "agi.component.shutdown" with { name: "planner", version: "1.0" }
+emit "agi.component.list"
+emit "agi.unregister_component" with { name: "planner", version: "1.0" }
+emit "agi.component.list"
+
+say "🔌 Step 17: Automation Wave 1"
+emit "automation.scan.inventory" with { path: "migration/INVENTORY.csv" }
+emit "automation.plan.wave1"
+emit "automation.execute.wave1"
+emit "automation.emit.tasks"
+emit "automation.report"

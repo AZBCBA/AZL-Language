@@ -5,14 +5,12 @@
  * capabilities like deductive, inductive, abductive, analogical, causal, spatial,
  * temporal, and counterfactual reasoning.
  */
-import { ReasoningEngine, ReasoningEngineConfig, ReasoningContext, ReasoningStep, ReasoningResult, ReasoningQuery, ReasoningType, ReasoningStrategy, ReasoningEngineMetrics, ReasoningEvent, ReasoningEngineListener } from "./ReasoningEngine.azli";
-import { EventEmitter } from "../types/EventEmitter.azli";
-import { Logger } from "../utils/Logger.azli";
-import { ResourceMonitor } from "../core/ResourceMonitor.azli";
+// Removed TS-style imports; this file contained non-AZL code and will be deactivated until ported
 
 /**
  * Default implementation of the ReasoningEngine interface.
  */
+/*
 class DefaultReasoningEngine implements ReasoningEngine {
     private config: ReasoningEngineConfig;
     private contexts: Map<string, ReasoningContext>;
@@ -1131,4 +1129,4 @@ class DefaultReasoningEngine implements ReasoningEngine {
 }
 
 // Export the default implementation
-export { DefaultReasoningEngine as ReasoningEngine };
+*/

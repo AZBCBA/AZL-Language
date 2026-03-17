@@ -43,7 +43,7 @@ component ::build.fs_monitor {
   }
 
   memory {
-    ::read_text = (path) => { return (::azl.system_interface.read_file_sync && ::azl.system_interface.read_file_sync(path)) || "" }
+    ::read_text = (path) => { return (::azl.system_interface.read_file_host_sync(path) || (::azl.system_interface.read_file_sync && ::azl.system_interface.read_file_sync(path)) || "") }
     ::hash_fnv1a32 = (text) => {
       set hash = 2166136261
       set i = 0

@@ -1,0 +1,27 @@
+# API metrics integration test (no HTTP server)
+
+component ::tests.api_metrics_only {
+  init {
+    say "🧪 API metrics events test (no HTTP)"
+    link ::api.metrics_endpoint
+    link ::memory.enhanced_lha3
+    link ::consciousness.neural_quantum
+
+    emit initialize_lha3_memory to ::memory.enhanced_lha3 with { p_adic_prime: 7, precision: 10, max_dimensions: 64, ram_limit_gb: 2 }
+    listen for "memory.lha3.ready" then { say "✅ LHA3 ready" }
+
+    emit initialize_neural_quantum to ::consciousness.neural_quantum with { neural_layers: 2, quantum_qubits: 4 }
+    listen for "consciousness.neural_quantum.ready" then { say "✅ Consciousness ready" }
+
+    # Request snapshots
+    emit api.metrics.consciousness
+    listen for "api.response" then { say "📥 consciousness metrics response" }
+
+    emit api.metrics.lha3
+    listen for "api.response" then { say "📥 lha3 metrics response" }
+
+    say "🧪 API metrics events test complete"
+  }
+}
+
+

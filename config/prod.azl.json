@@ -56,5 +56,40 @@
       "worker_pool": "azl/build/worker_pool.azl",
       "cache_manager": "azl/build/cache_manager.azl"
     }
+  },
+  "features": {
+    "orchestrator_coexist": true,
+    "unified_orchestrator_enabled": false
+  },
+  "quantum": {
+      "enabled": true,
+    "optimizer": {
+      "budget_ms": 250,
+      "max_qubits": 64
+    }
+  },
+  "voice": {
+    "offline_first": true,
+    "remote_fallback": false
+  },
+  "plugins": {
+    "governance_enforced": true,
+    "require_signatures": true,
+    "default_role": "external_agent"
+  },
+  "training": {
+    "loss": {
+      "default": "mse"
+    },
+    "augmentation": {
+      "level": 1.0
+    },
+    "curriculum": {
+      "mode": "auto"
+    },
+    "hybrid": {
+      "enabled": true,
+      "thresholds": { "difficulty": 3.0, "tokens": 32, "topo_geom": 4.0 }
+    }
   }
 }

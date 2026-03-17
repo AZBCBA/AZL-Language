@@ -18,12 +18,39 @@ component ::azl.stdlib {
     emit register_file_functions
     emit register_network_functions
     emit register_time_functions
-    emit register_math_functions
+    emit register_timer_functions
     
     emit stdlib.ready with "ready"
   }
 
   behavior {
+    # Register timer/scheduler functions
+    listen for "register_timer_functions" then {
+      # Logical-time scheduler (deterministic; requires explicit ticking)
+      if ::timer_initialized != true {
+        set ::timer_initialized = true
+        set ::timers = {}           # id -> { id, due_ms, interval_ms, event, args }
+        set ::timer_order = []      # ordered ids by due_ms (simple resort on insert)
+        set ::next_timer_id = 1
+        set ::now_ms = (::now_ms || 0)
+        set ::timer_resolution_ms = 50
+      }
+      set ::functions.timer = {
+        set_timeout: ::timer_set_timeout,
+        clear_timeout: ::timer_clear_timeout,
+        set_interval: ::timer_set_interval,
+        clear_interval: ::timer_clear_interval,
+        tick: ::timer_tick,
+        now_ms: ::timer_now_ms
+      }
+      # Also expose top-level helpers as stdlib functions for convenience
+      set ::set_timeout = ::timer_set_timeout
+      set ::clear_timeout = ::timer_clear_timeout
+      set ::set_interval = ::timer_set_interval
+      set ::clear_interval = ::timer_clear_interval
+      set ::tick = ::timer_tick
+      say "⏱️ Timer/scheduler functions registered"
+    }
     # Register math functions
     listen for "register_math_functions" then {
       set ::functions.math = {
@@ -647,6 +674,7 @@ component ::azl.stdlib {
 
   # File Functions (Pure AZL in-memory FS)
   function file_read(args) {
+    if ::azl.security && ::azl.security.require("fs.read") != true { return "" }
     set ::path = args[0] || ""
     set ::content = ::fs_store[::path]
     if ::content == null { return "" }
@@ -654,6 +682,7 @@ component ::azl.stdlib {
   }
   
   function file_write(args) {
+    if ::azl.security && ::azl.security.require("fs.write") != true { return false }
     set ::path = args[0] || ""
     set ::content = args[1] || ""
     set ::fs_store[::path] = ::content
@@ -662,6 +691,7 @@ component ::azl.stdlib {
   }
   
   function file_append(args) {
+    if ::azl.security && ::azl.security.require("fs.write") != true { return false }
     set ::path = args[0] || ""
     set ::content = args[1] || ""
     set ::existing = ::fs_store[::path]
@@ -673,6 +703,7 @@ component ::azl.stdlib {
   }
   
   function file_exists(args) {
+    if ::azl.security && ::azl.security.require("fs.read") != true { return false }
     set ::path = args[0] || ""
     set ::exists = false
     for ::k in ::fs_store {
@@ -682,6 +713,7 @@ component ::azl.stdlib {
   }
   
   function file_delete(args) {
+    if ::azl.security && ::azl.security.require("fs.write") != true { return false }
     set ::path = args[0] || ""
     set ::fs_store[::path] = null
     set ::fs_meta[::path] = null
@@ -689,6 +721,7 @@ component ::azl.stdlib {
   }
   
   function file_list(args) {
+    if ::azl.security && ::azl.security.require("fs.read") != true { return [] }
     set ::path = args[0] || ""
     set ::entries = []
     for ::k in ::fs_store {
@@ -702,6 +735,7 @@ component ::azl.stdlib {
   }
   
   function file_size(args) {
+    if ::azl.security && ::azl.security.require("fs.read") != true { return 0 }
     set ::path = args[0] || ""
     set ::meta = ::fs_meta[::path]
     if ::meta == null { return 0 }
@@ -709,6 +743,7 @@ component ::azl.stdlib {
   }
   
   function file_modified(args) {
+    if ::azl.security && ::azl.security.require("fs.read") != true { return 0 }
     set ::path = args[0] || ""
     set ::meta = ::fs_meta[::path]
     if ::meta == null { return 0 }
@@ -717,6 +752,7 @@ component ::azl.stdlib {
 
   # Network Functions (deterministic pure-AZL)
   function http_get(args) {
+    if ::azl.security && ::azl.security.require("net.http") != true { return "DENIED" }
     set ::url = args[0] || ""
     set ::body = ::http_store[::url]
     if ::body == null {
@@ -727,6 +763,7 @@ component ::azl.stdlib {
   }
   
   function http_post(args) {
+    if ::azl.security && ::azl.security.require("net.http") != true { return "DENIED" }
     set ::url = args[0] || ""
     set ::data = args[1] || ""
     set ::http_store[::url] = ::data
@@ -734,6 +771,7 @@ component ::azl.stdlib {
   }
   
   function http_put(args) {
+    if ::azl.security && ::azl.security.require("net.http") != true { return "DENIED" }
     set ::url = args[0] || ""
     set ::data = args[1] || ""
     set ::http_store[::url] = ::data
@@ -741,6 +779,7 @@ component ::azl.stdlib {
   }
   
   function http_delete(args) {
+    if ::azl.security && ::azl.security.require("net.http") != true { return "DENIED" }
     set ::url = args[0] || ""
     set ::http_store[::url] = null
     return "OK"
@@ -771,60 +810,225 @@ component ::azl.stdlib {
     return ::time_ticks
   }
 
+  # ===== Timer/Scheduler (deterministic logical time) =====
+
+  function timer_now_ms(args) {
+    return (::now_ms || 0)
+  }
+
+  function timer_set_timeout(args) {
+    # args: [delay_ms, event_name, payload]
+    set delay = (args[0] || 0)
+    set ev = (args[1] || "")
+    set payload = (args[2] || null)
+    if ev == "" { emit log_error with { type: "timer_invalid", message: "set_timeout requires event name", context: { delay: delay } }; return -1 }
+    set id = (::next_timer_id || 1)
+    set ::next_timer_id = id + 1
+    set due = (::now_ms || 0) + (delay || 0)
+    set rec = { id: id, due_ms: due, interval_ms: 0, event: ev, args: payload }
+    set ::timers[id] = rec
+    set ::timer_order.push(id)
+    # simple insertion sort by due_ms (small N typical)
+    set i = ::timer_order.length - 1
+    while i > 0 {
+      set a = ::timer_order[i - 1]
+      set b = ::timer_order[i]
+      if (::timers[a].due_ms <= ::timers[b].due_ms) { break }
+      # swap
+      set tmp = ::timer_order[i - 1]
+      set ::timer_order[i - 1] = ::timer_order[i]
+      set ::timer_order[i] = tmp
+      set i = i - 1
+    }
+    return id
+  }
+
+  function timer_clear_timeout(args) {
+    set id = (args[0] || -1)
+    if (::timers && ::timers[id] != null) {
+      set ::timers[id] = null
+      # remove from order
+      set newo = []
+      set i = 0
+      while i < ::timer_order.length { if (::timer_order[i] != id) { set newo.push(::timer_order[i]) } ; set i = i + 1 }
+      set ::timer_order = newo
+      return true
+    }
+    return false
+  }
+
+  function timer_set_interval(args) {
+    # args: [interval_ms, event_name, payload]
+    set interval = (args[0] || 0)
+    set ev = (args[1] || "")
+    set payload = (args[2] || null)
+    if ev == "" { emit log_error with { type: "timer_invalid", message: "set_interval requires event name", context: { interval: interval } }; return -1 }
+    set id = (::next_timer_id || 1)
+    set ::next_timer_id = id + 1
+    set due = (::now_ms || 0) + (interval || 0)
+    set rec = { id: id, due_ms: due, interval_ms: (interval || 0), event: ev, args: payload }
+    set ::timers[id] = rec
+    set ::timer_order.push(id)
+    # keep sorted by due_ms
+    set i = ::timer_order.length - 1
+    while i > 0 {
+      set a = ::timer_order[i - 1]
+      set b = ::timer_order[i]
+      if (::timers[a].due_ms <= ::timers[b].due_ms) { break }
+      set tmp = ::timer_order[i - 1]; set ::timer_order[i - 1] = ::timer_order[i]; set ::timer_order[i] = tmp
+      set i = i - 1
+    }
+    return id
+  }
+
+  function timer_clear_interval(args) {
+    return ::timer_clear_timeout(args)
+  }
+
+  function timer_tick(args) {
+    # Advance logical clock and dispatch due timers
+    set step = (args[0] || ::timer_resolution_ms || 50)
+    set ::now_ms = (::now_ms || 0) + step
+    # dispatch while head due
+    set dispatched = 0
+    loop {
+      if (::timer_order.length == 0) { break }
+      set head = ::timer_order[0]
+      set rec = ::timers[head]
+      if (rec == null) {
+        # pop
+        set newo3 = []
+        set k = 1
+        while k < ::timer_order.length { set newo3.push(::timer_order[k]); set k = k + 1 }
+        set ::timer_order = newo3
+        continue
+      }
+      if (rec.due_ms > (::now_ms || 0)) { break }
+      # pop head
+      set newo4 = []
+      set k2 = 1
+      while k2 < ::timer_order.length { set newo4.push(::timer_order[k2]); set k2 = k2 + 1 }
+      set ::timer_order = newo4
+      # dispatch
+      say "⏰ timer fired: " + rec.event
+      emit rec.event with rec.args
+      set dispatched = dispatched + 1
+      if (rec.interval_ms != null && rec.interval_ms > 0) {
+        # reschedule recurring timer
+        set rec.due_ms = rec.due_ms + rec.interval_ms
+        set ::timers[rec.id] = rec
+        set ::timer_order.push(rec.id)
+        # maintain order
+        set i2 = ::timer_order.length - 1
+        while i2 > 0 {
+          set a2 = ::timer_order[i2 - 1]
+          set b2 = ::timer_order[i2]
+          if (::timers[a2].due_ms <= ::timers[b2].due_ms) { break }
+          set tmp2 = ::timer_order[i2 - 1]; set ::timer_order[i2 - 1] = ::timer_order[i2]; set ::timer_order[i2] = tmp2
+          set i2 = i2 - 1
+        }
+      } else {
+        set ::timers[rec.id] = null
+      }
+    }
+    return dispatched
+  }
+
+  # Exported timer stats for observability
+  export fn get_timer_stats() {
+    set count = 0
+    if ::timers != null {
+      for k in ::timers { if ::timers[k] != null { set count = count + 1 } }
+    }
+    return {
+      now_ms: (::now_ms || 0),
+      timers_count: count,
+      order_len: (::timer_order ? ::timer_order.length : 0),
+      resolution_ms: (::timer_resolution_ms || 0)
+    }
+  }
+
   # JSON (minimal helpers used by HTTP and build configs)
   function json_parse(s) {
     set str = (s || "").trim()
-    if str.length == 0 { return {} }
-    if str.charAt(0) != "{" { return {} }
-    # Very small object parser: keys as strings, values as string/number/bool/null only
-    set i = 1
-    set obj = {}
-    loop {
-      while (i < str.length && (str.charAt(i) == " " || str.charAt(i) == "\n" || str.charAt(i) == "\r" || str.charAt(i) == "\t" || str.charAt(i) == ",")) { set i = i + 1 }
-      if (i >= str.length) { break }
-      if (str.charAt(i) == "}") { set i = i + 1; break }
-      if (str.charAt(i) != '"') { break }
+    if str.length == 0 { return null }
+    # Support objects and arrays recursively
+    set i = 0
+    fn skip_ws() { while (i < str.length && (str.charAt(i) == " " || str.charAt(i) == "\n" || str.charAt(i) == "\r" || str.charAt(i) == "\t")) { set i = i + 1 } }
+    fn parse_value() {
+      skip_ws()
+      if (i >= str.length) { return null }
+      set ch = str.charAt(i)
+      if (ch == '"') { return parse_string() }
+      if (ch == '{') { return parse_object() }
+      if (ch == '[') { return parse_array() }
+      # literals: true/false/null or number
+      set start = i
+      while (i < str.length) {
+        set c = str.charAt(i)
+        if (c == "," || c == "}" || c == "]" || c == " " || c == "\n" || c == "\r" || c == "\t") { break }
+        set i = i + 1
+      }
+      set token = str.substring(start, i)
+      if (token == "true") { return true }
+      if (token == "false") { return false }
+      if (token == "null") { return null }
+      return token.toInt()
+    }
+    fn parse_string() {
+      # assumes current i points to '"'
       set i = i + 1
-      set key = ""
+      set out = ""
       loop {
         if (i >= str.length) { break }
         set c = str.charAt(i)
-        if (c == '\\') { set i = i + 1; if (i < str.length) { set key = key + str.charAt(i); set i = i + 1 } else { break } }
+        if (c == '\\') { set i = i + 1; if (i < str.length) { set out = out + str.charAt(i); set i = i + 1 } else { break } }
         else if (c == '"') { set i = i + 1; break }
-        else { set key = key + c; set i = i + 1 }
+        else { set out = out + c; set i = i + 1 }
       }
-      while (i < str.length && (str.charAt(i) == " " || str.charAt(i) == "\n" || str.charAt(i) == "\r" || str.charAt(i) == "\t")) { set i = i + 1 }
-      if (i >= str.length || str.charAt(i) != ":") { break }
-      set i = i + 1
-      while (i < str.length && (str.charAt(i) == " " || str.charAt(i) == "\n" || str.charAt(i) == "\r" || str.charAt(i) == "\t")) { set i = i + 1 }
-      if (i >= str.length) { break }
-      if (str.charAt(i) == '"') {
-        set i = i + 1
-        set val = ""
-        loop {
-          if (i >= str.length) { break }
-          set c2 = str.charAt(i)
-          if (c2 == '\\') { set i = i + 1; if (i < str.length) { set val = val + str.charAt(i); set i = i + 1 } else { break } }
-          else if (c2 == '"') { set i = i + 1; break }
-          else { set val = val + c2; set i = i + 1 }
-        }
-        obj[key] = val
-      } else {
-        set j = i
-        while (j < str.length) {
-          set ch = str.charAt(j)
-          if (ch == "," || ch == "}" || ch == " " || ch == "\n" || ch == "\r" || ch == "\t") { break }
-          set j = j + 1
-        }
-        set token = str.substring(i, j)
-        if (token == "true") { obj[key] = true }
-        else if (token == "false") { obj[key] = false }
-        else if (token == "null") { obj[key] = null }
-        else { obj[key] = token.toInt() }
-        set i = j
-      }
+      return out
     }
-    return obj
+    fn parse_object() {
+      # assumes current i points to '{'
+      set i = i + 1
+      set obj = {}
+      loop {
+        skip_ws()
+        if (i >= str.length) { break }
+        if (str.charAt(i) == '}') { set i = i + 1; break }
+        # key
+        if (str.charAt(i) != '"') { return obj }
+        set key = parse_string()
+        skip_ws()
+        if (i >= str.length || str.charAt(i) != ":") { return obj }
+        set i = i + 1
+        set val = parse_value()
+        obj[key] = val
+        skip_ws()
+        if (i < str.length && str.charAt(i) == ",") { set i = i + 1; continue }
+      }
+      return obj
+    }
+    fn parse_array() {
+      # assumes current i points to '['
+      set i = i + 1
+      set arr = []
+      loop {
+        skip_ws()
+        if (i >= str.length) { break }
+        if (str.charAt(i) == ']') { set i = i + 1; break }
+        set v = parse_value()
+        arr.push(v)
+        skip_ws()
+        if (i < str.length && str.charAt(i) == ",") { set i = i + 1 }
+      }
+      return arr
+    }
+    skip_ws()
+    set ch0 = str.charAt(i)
+    if (ch0 == '{') { return parse_object() }
+    if (ch0 == '[') { return parse_array() }
+    return parse_value()
   }
 
   function json_stringify(obj) {

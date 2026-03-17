@@ -1,0 +1,28 @@
+# AZL Runtime smoke tests (pure AZL)
+
+component ::tests.runtime_smoke {
+  init {
+    link ::azl.capability_bootstrap
+    link ::azl.stdlib
+    link ::azl.interpreter
+    say "🧪 Runtime smoke starting"
+
+    # 1) Expression engine basic
+    set expr = "1 + 2 * 3"
+    emit interpret with { code: "say " + expr, component_name: "expr_test" }
+
+    # 2) Timer tick
+    ::azl.stdlib.timer_set_timeout([50, "tests.timeout", null])
+    ::azl.stdlib.timer_tick([50])
+    listen for "tests.timeout" then { say "✅ Timeout fired" }
+
+    # 3) FS capability: stdlib has fs.write
+    emit call_function with ["file", "write", ["/tmp/a.txt", "ok"]]
+    emit call_function with ["file", "read", ["/tmp/a.txt"]]
+    listen for "function.result" then { say "FS read: " + ::event.data }
+
+    say "🧪 Runtime smoke complete"
+  }
+}
+
+

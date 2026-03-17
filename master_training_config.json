@@ -1,0 +1,47 @@
+{
+  "project_name": "AZL Advanced Training System",
+  "dataset": {
+    "name": "azme_full_corpus",
+    "path": "datasets/real_world_training/azme_full_corpus.txt",
+    "type": "text",
+    "preprocessing": {
+      "min_length": 10,
+      "max_length": 1000,
+      "val_split": 0.1
+    },
+    "processed": {
+      "train": "datasets/real_world_training/azme_full_corpus.txt",
+      "validation": "datasets/real_world_training/azme_full_corpus.txt",
+      "total_samples": 0
+    }
+  },
+  "model": {
+    "architecture": "gpt_mini",
+    "custom_params": {},
+    "save_name": "my_trained_model",
+    "config": {
+      "model_type": "transformer",
+      "vocab_size": 32000,
+      "hidden_size": 768,
+      "num_layers": 12,
+      "num_heads": 12,
+      "max_seq_length": 1024,
+      "dropout": 0.1,
+      "activation": "gelu",
+      "normalization": "layer_norm"
+    }
+  },
+  "training": {
+    "continuous": true,
+    "max_epochs": 0,
+    "steps_per_epoch": 1000,
+    "learning_rate": 0.0001,
+    "batch_size": 4,
+    "checkpoint_every": 100
+  },
+  "paths": {
+    "weights_dir": "/mnt/ssd4t/azl-training/weights",
+    "logs_dir": "/mnt/ssd4t/azl-training/logs",
+    "checkpoints_dir": "/mnt/ssd4t/azl-training/checkpoints"
+  }
+}

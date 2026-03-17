@@ -300,6 +300,19 @@ component ::quantum.core {
     listen for "quantum.core.apply_gate" { 
       set ::gate_request = $1
       say "🔄 Applying quantum gate: " + ::gate_request.gate_type
+      # Try cached transformed state by key (state_id+gate)
+      link ::build.cache_manager
+      set cache_key = "qgate:" + (::gate_request.state_id or "") + ":" + (::gate_request.gate_type or "")
+      set hit = ::build.cache_manager.kv_get(cache_key)
+      if hit != null {
+        emit quantum.core.gate_applied with {
+          gate_type: ::gate_request.gate_type,
+          success: true,
+          quantum_enhanced: true,
+          cached: true
+        }
+        return
+      }
       
       if ::gate_request.gate_type == "hadamard" {
         emit quantum.core.gate_applied with {
@@ -320,17 +333,28 @@ component ::quantum.core {
           quantum_enhanced: true
         }
       }
+      # Store a generic marker to indicate success; actual state caching occurs in LHA3
+      ::build.cache_manager.kv_set(cache_key, { ok: true })
     }
 
     listen for "quantum.core.measure_state" { 
       set ::measurement_request = $1
       say "📊 Measuring quantum state"
+      link ::build.cache_manager
+      set cache_key = "qmeasure:" + (::measurement_request.state_id or "") + ":" + (::measurement_request.basis or "computational")
+      set h = ::build.cache_manager.kv_get(cache_key)
+      if h != null {
+        emit quantum.core.measurement_complete with h
+        return
+      }
       
-      emit quantum.core.measurement_complete with {
+      set out = {
         measurement_result: "0",
         probability: 0.5,
         quantum_enhanced: true
       }
+      ::build.cache_manager.kv_set(cache_key, out)
+      emit quantum.core.measurement_complete with out
     }
 
     # Subsystem routing

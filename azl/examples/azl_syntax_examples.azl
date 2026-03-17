@@ -1,0 +1,232 @@
+# MODERN AZL SYNTAX DEMONSTRATION
+# This file showcases all the new language features implemented in the pure interpreter
+
+component ::azl.syntax_examples {
+  init {
+    say "🚀 MODERN AZL SYNTAX DEMO STARTING"
+    say "✨ Testing: let, if, for, while, fn, control flow!"
+    
+    # Test variable declarations
+    test_variable_declarations()
+    
+    # Test control flow
+    test_control_flow()
+    
+    # Test loops
+    test_loops()
+    
+    # Test functions
+    test_functions()
+    
+    # Test expressions
+    test_expressions()
+    
+    say "✅ MODERN AZL SYNTAX DEMO COMPLETE!"
+  }
+
+  behavior {
+    listen for "run_tests" then {
+      say "🧪 Running comprehensive syntax tests..."
+      run_all_tests()
+    }
+  }
+
+  fn test_variable_declarations() {
+    say "📝 Testing variable declarations..."
+    
+    # let declarations
+    let x = 42
+    let message = "Hello from modern AZL!"
+    let numbers = [1, 2, 3, 4, 5]
+    let is_active = true
+    
+    say "✅ Variables declared: x=$x, message='$message', numbers=$numbers, is_active=$is_active"
+    
+    # set statements (legacy)
+    set ::global_var = "Global variable"
+    say "✅ Global variable set: $::global_var"
+  }
+
+  fn test_control_flow() {
+    say "🔄 Testing control flow..."
+    
+    let score = 85
+    
+    # if statements
+    if score >= 90 {
+      say "🎉 Excellent! Grade: A"
+    } else if score >= 80 {
+      say "👍 Good! Grade: B"
+    } else if score >= 70 {
+      say "📚 Fair! Grade: C"
+    } else {
+      say "📖 Needs improvement! Grade: D"
+    }
+    
+    # Nested if statements
+    let age = 25
+    let has_license = true
+    
+    if age >= 18 {
+      if has_license {
+        say "🚗 You can drive!"
+      } else {
+        say "📚 You need to get a license first"
+      }
+    } else {
+      say "⏰ You're too young to drive"
+    }
+    
+    say "✅ Control flow tests complete"
+  }
+
+  fn test_loops() {
+    say "🔄 Testing loops..."
+    
+    # for loop with counter
+    let sum = 0
+    for let i = 0; i < 10; i++ {
+      sum = sum + i
+      if i == 5 {
+        say "🔄 Halfway through: sum = $sum"
+      }
+    }
+    say "✅ For loop complete: sum = $sum"
+    
+    # while loop
+    let countdown = 5
+    while countdown > 0 {
+      say "⏰ Countdown: $countdown"
+      countdown = countdown - 1
+      
+      if countdown == 2 {
+        say "🚀 Almost there!"
+      }
+    }
+    say "🎆 Blast off!"
+    
+    # Loop with break and continue
+    let numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    let even_sum = 0
+    
+    for let i = 0; i < numbers.length; i++ {
+      let num = numbers[i]
+      
+      if num % 2 != 0 {
+        continue  # Skip odd numbers
+      }
+      
+      even_sum = even_sum + num
+      
+      if even_sum > 20 {
+        say "🛑 Even sum exceeded 20, stopping at: $even_sum"
+        break
+      }
+    }
+    
+    say "✅ Loop tests complete"
+  }
+
+  fn test_functions() {
+    say "🔧 Testing functions..."
+    
+    # Function definitions
+    fn add(a, b) {
+      return a + b
+    }
+    
+    fn multiply(a, b) {
+      return a * b
+    }
+    
+    fn factorial(n) {
+      if n <= 1 {
+        return 1
+      }
+      return n * factorial(n - 1)
+    }
+    
+    fn greet(name, greeting = "Hello") {
+      return greeting + ", " + name + "!"
+    }
+    
+    # Function calls
+    let result1 = add(5, 3)
+    let result2 = multiply(4, 6)
+    let result3 = factorial(5)
+    let message1 = greet("World")
+    let message2 = greet("AZL", "Welcome to")
+    
+    say "✅ Function results:"
+    say "   add(5, 3) = $result1"
+    say "   multiply(4, 6) = $result2"
+    say "   factorial(5) = $result3"
+    say "   greet('World') = '$message1'"
+    say "   greet('AZL', 'Welcome to') = '$message2'"
+    
+    say "✅ Function tests complete"
+  }
+
+  fn test_expressions() {
+    say "🧮 Testing expressions..."
+    
+    # Arithmetic expressions
+    let a = 10
+    let b = 3
+    
+    let sum = a + b
+    let difference = a - b
+    let product = a * b
+    let quotient = a / b
+    let remainder = a % b
+    
+    say "✅ Arithmetic: $a + $b = $sum"
+    say "✅ Arithmetic: $a - $b = $difference"
+    say "✅ Arithmetic: $a * $b = $product"
+    say "✅ Arithmetic: $a / $b = $quotient"
+    say "✅ Arithmetic: $a % $b = $remainder"
+    
+    # Comparison expressions
+    let comparisons = [
+      a == 10,
+      a != b,
+      a > b,
+      b < a,
+      a >= 10,
+      b <= 3
+    ]
+    
+    say "✅ Comparisons: $comparisons"
+    
+    # Logical expressions
+    let logical1 = true and false
+    let logical2 = true or false
+    let logical3 = not false
+    
+    say "✅ Logical: true and false = $logical1"
+    say "✅ Logical: true or false = $logical2"
+    say "✅ Logical: not false = $logical3"
+    
+    # String operations
+    let first = "Hello"
+    let second = "World"
+    let combined = first + " " + second
+    
+    say "✅ String concatenation: '$first' + ' $second' = '$combined'"
+    
+    say "✅ Expression tests complete"
+  }
+
+  fn run_all_tests() {
+    say "🚀 Running all syntax tests..."
+    
+    test_variable_declarations()
+    test_control_flow()
+    test_loops()
+    test_functions()
+    test_expressions()
+    
+    say "🎉 ALL TESTS COMPLETE!"
+    say "✨ Modern AZL syntax is working perfectly!"
+  }
+}

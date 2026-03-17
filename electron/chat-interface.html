@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:*"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>AZL Desktop - AZME Chat Interface</title>
+  <style>
+    :root {
+      --bg: #0f172a; --card: #111827; --fg: #e5e7eb; --muted: #9ca3af;
+      --accent: #22d3ee; --ok: #22c55e; --bad: #ef4444; --btn: #1f2937;
+      --chat-bg: #0a0f1a; --user-msg: #1e40af; --ai-msg: #1f2937;
+      --typing: #059669; --error: #dc2626; --success: #16a34a;
+    }
+    
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; }
+    
+    .chat-container {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    .sidebar {
+      width: 300px;
+      background: var(--card);
+      border-right: 1px solid #1f2937;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid #1f2937;
+      background: #0b1220;
+    }
+    
+    .sidebar-header h2 {
+      margin: 0;
+      color: var(--accent);
+      font-size: 1.5rem;
+    }
+    
+    .model-selector {
+      margin-top: 16px;
+    }
+    
+    .model-selector select {
+      width: 100%;
+      background: var(--chat-bg);
+      color: var(--fg);
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+    
+    .conversation-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+    
+    .conversation-item {
+      padding: 12px;
+      margin-bottom: 8px;
+      background: var(--chat-bg);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    .conversation-item:hover {
+      background: #1f2937;
+    }
+    
+    .conversation-item.active {
+      background: var(--accent);
+      color: var(--bg);
+    }
+    
+    .new-chat-btn {
+      margin: 16px;
+      padding: 12px;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    
+    .main-chat {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--chat-bg);
+    }
+    
+    .chat-header {
+      padding: 20px;
+      border-bottom: 1px solid #1f2937;
+      background: var(--card);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .chat-header h3 {
+      margin: 0;
+      color: var(--accent);
+    }
+    
+    .chat-controls {
+      display: flex;
+      gap: 12px;
+    }
+    
+    .control-btn {
+      padding: 8px 16px;
+      background: var(--btn);
+      color: var(--fg);
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    .control-btn:hover {
+      background: #1f2937;
+    }
+    
+    .control-btn.recording {
+      background: var(--error);
+      color: white;
+    }
+    
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    
+    .message {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 12px;
+      animation: fadeIn 0.3s ease-in;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .message.user {
+      flex-direction: row-reverse;
+    }
+    
+    .message-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    
+    .message.user .message-avatar {
+      background: var(--user-msg);
+      color: white;
+    }
+    
+    .message.ai .message-avatar {
+      background: var(--ai-msg);
+      color: var(--accent);
+    }
+    
+    .message-content {
+      flex: 1;
+      max-width: 70%;
+    }
+    
+    .message.user .message-content {
+      text-align: right;
+    }
+    
+    .message-bubble {
+      background: var(--card);
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid #1f2937;
+      word-wrap: break-word;
+      line-height: 1.5;
+    }
+    
+    .message.user .message-bubble {
+      background: var(--user-msg);
+      color: white;
+      border-color: var(--user-msg);
+    }
+    
+    .message.ai .message-bubble {
+      background: var(--ai-msg);
+      color: var(--fg);
+    }
+    
+    .message-time {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+    
+    .message.user .message-time {
+      text-align: right;
+    }
+    
+    .typing-indicator {
+      display: flex;
+      gap: 4px;
+      padding: 16px;
+      background: var(--ai-msg);
+      border-radius: 18px;
+      border: 1px solid #1f2937;
+      max-width: 70%;
+    }
+    
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: typing 1.4s infinite ease-in-out;
+    }
+    
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+    
+    @keyframes typing {
+      0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+    
+    .media-content {
+      margin-top: 12px;
+    }
+    
+    .media-content img {
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid #1f2937;
+    }
+    
+    .media-content video {
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid #1f2937;
+    }
+    
+    .media-content audio {
+      width: 100%;
+      margin-top: 8px;
+    }
+    
+    .file-upload {
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--chat-bg);
+      border: 2px dashed #1f2937;
+      border-radius: 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    
+    .file-upload:hover {
+      border-color: var(--accent);
+    }
+    
+    .file-upload.dragover {
+      border-color: var(--accent);
+      background: rgba(34, 211, 238, 0.1);
+    }
+    
+    .chat-input-container {
+      padding: 20px;
+      border-top: 1px solid #1f2937;
+      background: var(--card);
+    }
+    
+    .input-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    
+    .chat-input {
+      flex: 1;
+      background: var(--chat-bg);
+      color: var(--fg);
+      border: 1px solid #1f2937;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 16px;
+      resize: none;
+      min-height: 50px;
+      max-height: 150px;
+      font-family: inherit;
+    }
+    
+    .chat-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    
+    .input-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .input-btn {
+      padding: 12px;
+      background: var(--btn);
+      color: var(--fg);
+      border: 1px solid #1f2937;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 18px;
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .input-btn:hover {
+      background: #1f2937;
+    }
+    
+    .input-btn.send {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+    
+    .input-btn.send:hover {
+      background: #0ea5e9;
+    }
+    
+    .input-btn.recording {
+      background: var(--error);
+      color: white;
+      border-color: var(--error);
+    }
+    
+    .status-bar {
+      padding: 8px 20px;
+      background: var(--card);
+      border-top: 1px solid #1f2937;
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    
+    .status-dot.online { background: var(--success); }
+    .status-dot.offline { background: var(--error); }
+    .status-dot.connecting { background: var(--accent); }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+    }
+    
+    .modal-content {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--card);
+      padding: 24px;
+      border-radius: 12px;
+      border: 1px solid #1f2937;
+      max-width: 500px;
+      width: 90%;
+    }
+    
+    .modal h3 {
+      margin: 0 0 16px 0;
+      color: var(--accent);
+    }
+    
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+      justify-content: flex-end;
+    }
+    
+    .modal-btn {
+      padding: 8px 16px;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      cursor: pointer;
+      background: var(--btn);
+      color: var(--fg);
+    }
+    
+    .modal-btn.primary {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+    
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h2>AZME Chat</h2>
+        <div class="model-selector">
+          <label for="modelSelect" style="display:block; font-size:12px; color: var(--muted); margin-bottom:4px;">Model</label>
+          <select id="modelSelect" title="Model selection">
+            <option value="azme-consciousness-v1">AZME Consciousness v1</option>
+            <option value="azme-quantum-neural-v1">AZME Quantum Neural v1</option>
+            <option value="azme-quantum-neural-v2">AZME Quantum Neural v2</option>
+            <option value="custom">Custom Model...</option>
+          </select>
+        </div>
+      </div>
+      
+      <button class="new-chat-btn" onclick="startNewChat()">+ New Chat</button>
+      
+      <div class="conversation-list" id="conversationList">
+        <!-- Conversations will be populated here -->
+      </div>
+    </div>
+    
+    <!-- Main Chat Area -->
+    <div class="main-chat">
+      <div class="chat-header">
+        <h3 id="chatTitle">New Conversation</h3>
+        <div class="chat-controls">
+          <button class="control-btn" onclick="toggleVoiceInput()" id="voiceBtn">🎤</button>
+          <button class="control-btn" onclick="toggleVideoInput()" id="videoBtn">📹</button>
+          <button class="control-btn" onclick="uploadFile()" id="fileBtn">📎</button>
+          <button class="control-btn" onclick="clearChat()">🗑️</button>
+        </div>
+      </div>
+      
+      <div class="chat-messages" id="chatMessages">
+        <!-- Messages will be populated here -->
+      </div>
+      
+      <div class="chat-input-container">
+        <div class="input-row">
+          <textarea 
+            class="chat-input" 
+            id="chatInput" 
+            placeholder="Type your message here... (Shift+Enter for new line, Enter to send)"
+            onkeydown="handleKeyDown(event)"
+          ></textarea>
+          <div class="input-buttons">
+            <button class="input-btn" onclick="uploadFile()" title="Upload File">📎</button>
+            <button class="input-btn send" onclick="sendMessage()" title="Send Message">➤</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="status-bar">
+        <div class="status-item">
+          <div class="status-dot" id="connectionStatus"></div>
+          <span id="connectionText">Connecting...</span>
+        </div>
+        <div class="status-item">
+          <span id="modelStatus">Model: Loading...</span>
+        </div>
+        <div class="status-item">
+          <span id="tokenCount">Tokens: 0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- File Upload Modal -->
+  <div class="modal" id="fileModal">
+    <div class="modal-content">
+      <h3>Upload File</h3>
+      <div class="file-upload" id="fileDropZone">
+        <p>Drag and drop files here or click to browse</p>
+        <input type="file" id="fileInput" multiple accept="image/*,video/*,audio/*,text/*" style="display: none;">
+      </div>
+      <div class="modal-buttons">
+        <button class="modal-btn" onclick="closeFileModal()">Cancel</button>
+        <button class="modal-btn primary" onclick="processFiles()">Upload</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Model Configuration Modal -->
+  <div class="modal" id="modelModal">
+    <div class="modal-content">
+      <h3>Custom Model Configuration</h3>
+      <div style="margin-bottom: 16px;">
+        <label>Model Path:</label>
+        <input type="text" id="customModelPath" placeholder="/path/to/model.bin" style="width: 100%; margin-top: 8px; padding: 8px; background: var(--chat-bg); color: var(--fg); border: 1px solid #1f2937; border-radius: 4px;">
+      </div>
+      <div style="margin-bottom: 16px;">
+        <label>Model Type:</label>
+        <select id="customModelType" style="width: 100%; margin-top: 8px; padding: 8px; background: var(--chat-bg); color: var(--fg); border: 1px solid #1f2937; border-radius: 4px;">
+          <option value="consciousness">Consciousness</option>
+          <option value="quantum-neural">Quantum Neural</option>
+          <option value="language">Language Model</option>
+          <option value="multimodal">Multimodal</option>
+        </select>
+      </div>
+      <div class="modal-buttons">
+        <button class="modal-btn" onclick="closeModelModal()">Cancel</button>
+        <button class="modal-btn primary" onclick="loadCustomModel()">Load Model</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentConversation = null;
+    let conversations = [];
+    let isRecording = false;
+    let isVideoRecording = false;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let videoChunks = [];
+    let currentModel = 'azme-consciousness-v1';
+    let connectionStatus = 'connecting';
+    let apiToken = '';
+    let runtimeCfg = null;
+    
+    // Initialize chat interface
+    document.addEventListener('DOMContentLoaded', async () => {
+      try { const cfg = await window.azl.getRuntimeConfig(); if (cfg && cfg.ok) runtimeCfg = cfg; } catch {}
+      try { const t = await (window.electronAPI && window.electronAPI.getApiToken ? window.electronAPI.getApiToken() : Promise.resolve({ ok: true, token: '' })); if (t && t.ok) apiToken = t.token || ''; } catch {}
+      initializeChat();
+      setupEventListeners();
+      loadConversations();
+      updateConnectionStatus('online');
+      updateModelStatus(`Model: ${currentModel}`);
+    });
+    
+    function baseUrl() { return (runtimeCfg && runtimeCfg.base) ? runtimeCfg.base : 'http://127.0.0.1:8080'; }
+
+    function initializeChat() {
+      currentConversation = {
+        id: generateId(),
+        title: 'New Conversation',
+        messages: [],
+        timestamp: Date.now()
+      };
+      conversations.unshift(currentConversation);
+      saveConversations();
+      updateConversationList();
+      updateChatTitle();
+    }
+    
+    function setupEventListeners() {
+      // File upload handling
+      const fileDropZone = document.getElementById('fileDropZone');
+      const fileInput = document.getElementById('fileInput');
+      
+      fileDropZone.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', handleFileSelect);
+      
+      fileDropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        fileDropZone.classList.add('dragover');
+      });
+      
+      fileDropZone.addEventListener('dragleave', () => {
+        fileDropZone.classList.remove('dragover');
+      });
+      
+      fileDropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        fileDropZone.classList.remove('dragover');
+        handleFileDrop(e.dataTransfer.files);
+      });
+      
+      // Model selector
+      document.getElementById('modelSelect').addEventListener('change', (e) => {
+        if (e.target.value === 'custom') {
+          openModelModal();
+        } else {
+          currentModel = e.target.value;
+          loadModel(currentModel);
+        }
+      });
+    }
+    
+    function startNewChat() {
+      currentConversation = {
+        id: generateId(),
+        title: 'New Conversation',
+        messages: [],
+        timestamp: Date.now()
+      };
+      conversations.unshift(currentConversation);
+      saveConversations();
+      updateConversationList();
+      updateChatTitle();
+      clearChatMessages();
+    }
+    
+    function loadConversations() {
+      const saved = localStorage.getItem('azme-conversations');
+      if (saved) {
+        conversations = JSON.parse(saved);
+        if (conversations.length > 0) {
+          currentConversation = conversations[0];
+          loadConversation(currentConversation);
+        }
+      }
+    }
+    
+    function saveConversations() {
+      localStorage.setItem('azme-conversations', JSON.stringify(conversations));
+    }
+    
+    function updateConversationList() {
+      const list = document.getElementById('conversationList');
+      list.innerHTML = '';
+      
+      conversations.forEach(conv => {
+        const item = document.createElement('div');
+        item.className = `conversation-item ${conv.id === currentConversation?.id ? 'active' : ''}`;
+        item.onclick = () => loadConversation(conv);
+        
+        const title = document.createElement('div');
+        title.textContent = conv.title;
+        title.style.fontWeight = '600';
+        
+        const time = document.createElement('div');
+        time.textContent = new Date(conv.timestamp).toLocaleString();
+        time.style.fontSize = '12px';
+        time.style.color = 'var(--muted)';
+        time.style.marginTop = '4px';
+        
+        item.appendChild(title);
+        item.appendChild(time);
+        list.appendChild(item);
+      });
+    }
+    
+    function loadConversation(conversation) {
+      currentConversation = conversation;
+      updateConversationList();
+      updateChatTitle();
+      loadChatMessages();
+    }
+    
+    function updateChatTitle() {
+      document.getElementById('chatTitle').textContent = currentConversation?.title || 'New Conversation';
+    }
+    
+    function clearChatMessages() {
+      document.getElementById('chatMessages').innerHTML = '';
+    }
+    
+    function loadChatMessages() {
+      clearChatMessages();
+      if (currentConversation?.messages) {
+        currentConversation.messages.forEach(msg => {
+          addMessageToUI(msg);
+        });
+      }
+    }
+    
+    function handleKeyDown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    }
+    
+    async function sendMessage() {
+      const input = document.getElementById('chatInput');
+      const message = input.value.trim();
+      
+      if (!message) return;
+      
+      // Add user message
+      const userMsg = {
+        id: generateId(),
+        type: 'user',
+        content: message,
+        timestamp: Date.now(),
+        media: null
+      };
+      
+      addMessageToUI(userMsg);
+      currentConversation.messages.push(userMsg);
+      
+      // Clear input
+      input.value = '';
+      
+      // Update conversation title if it's the first message
+      if (currentConversation.messages.length === 1) {
+        currentConversation.title = message.substring(0, 50) + (message.length > 50 ? '...' : '');
+        updateChatTitle();
+        updateConversationList();
+      }
+      
+      // Show typing indicator
+      showTypingIndicator();
+      
+      try {
+        // Send to AZME backend
+        const response = await sendToAZME(message);
+        
+        // Hide typing indicator
+        hideTypingIndicator();
+        
+        // Add AI response
+        const aiMsg = {
+          id: generateId(),
+          type: 'ai',
+          content: response.content,
+          timestamp: Date.now(),
+          media: response.media || null
+        };
+        
+        addMessageToUI(aiMsg);
+        currentConversation.messages.push(aiMsg);
+        
+      } catch (error) {
+        hideTypingIndicator();
+        console.error('Error sending message:', error);
+        
+        // Show error message
+        const errorMsg = {
+          id: generateId(),
+          type: 'ai',
+          content: 'Sorry, I encountered an error processing your request. Please try again.',
+          timestamp: Date.now(),
+          media: null,
+          isError: true
+        };
+        
+        addMessageToUI(errorMsg);
+        currentConversation.messages.push(errorMsg);
+      }
+      
+      saveConversations();
+    }
+    
+    async function sendToAZME(message) {
+      const token = apiToken || (function(){ try { return localStorage.getItem('azl_api_token') || ''; } catch { return ''; } })();
+      const payload = { message, session_id: currentConversation?.id || null, user_id: 'desktop', context: { model: currentModel } };
+      try {
+        const res = await window.azl.tokenProxy('/v1/chat', token, 'POST', payload, 10);
+        if (res && res.ok && res.httpCode === 200) {
+          const data = (res.json || {});
+          return { content: data.response || '' };
+        }
+        if (res && res.httpCode === 202) { return { content: 'Processing... (accepted)' }; }
+        throw new Error(res && res.err ? res.err : 'chat_error');
+      } catch (e) {
+        throw e;
+      }
+    }
+    
+    function addMessageToUI(message) {
+      const messagesContainer = document.getElementById('chatMessages');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${message.type}`;
+      
+      const avatar = document.createElement('div');
+      avatar.className = 'message-avatar';
+      avatar.textContent = message.type === 'user' ? 'U' : 'A';
+      
+      const content = document.createElement('div');
+      content.className = 'message-content';
+      
+      const bubble = document.createElement('div');
+      bubble.className = 'message-bubble';
+      bubble.textContent = message.content;
+      
+      if (message.isError) {
+        bubble.style.borderColor = 'var(--error)';
+        bubble.style.color = 'var(--error)';
+      }
+      
+      const time = document.createElement('div');
+      time.className = 'message-time';
+      time.textContent = new Date(message.timestamp).toLocaleTimeString();
+      
+      content.appendChild(bubble);
+      content.appendChild(time);
+      
+      // Add media content if present
+      if (message.media) {
+        const mediaDiv = document.createElement('div');
+        mediaDiv.className = 'media-content';
+        mediaDiv.appendChild(createMediaElement(message.media));
+        content.appendChild(mediaDiv);
+      }
+      
+      messageDiv.appendChild(avatar);
+      messageDiv.appendChild(content);
+      messagesContainer.appendChild(messageDiv);
+      
+      // Scroll to bottom
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    function createMediaElement(media) {
+      if (media.type === 'image') {
+        const img = document.createElement('img');
+        img.src = media.url;
+        img.alt = media.description || 'Image';
+        return img;
+      } else if (media.type === 'video') {
+        const video = document.createElement('video');
+        video.src = media.url;
+        video.controls = true;
+        video.autoplay = false;
+        return video;
+      } else if (media.type === 'audio') {
+        const audio = document.createElement('audio');
+        audio.src = media.url;
+        audio.controls = true;
+        return audio;
+      }
+      return null;
+    }
+    
+    function showTypingIndicator() {
+      const messagesContainer = document.getElementById('chatMessages');
+      const typingDiv = document.createElement('div');
+      typingDiv.className = 'message ai';
+      typingDiv.id = 'typingIndicator';
+      
+      const avatar = document.createElement('div');
+      avatar.className = 'message-avatar';
+      avatar.textContent = 'A';
+      
+      const content = document.createElement('div');
+      content.className = 'message-content';
+      
+      const typing = document.createElement('div');
+      typing.className = 'typing-indicator';
+      
+      for (let i = 0; i < 3; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'typing-dot';
+        typing.appendChild(dot);
+      }
+      
+      content.appendChild(typing);
+      typingDiv.appendChild(avatar);
+      typingDiv.appendChild(content);
+      messagesContainer.appendChild(typingDiv);
+      
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    function hideTypingIndicator() {
+      const typingIndicator = document.getElementById('typingIndicator');
+      if (typingIndicator) {
+        typingIndicator.remove();
+      }
+    }
+    
+    function toggleVoiceInput() {
+      if (isRecording) {
+        stopVoiceRecording();
+      } else {
+        startVoiceRecording();
+      }
+    }
+    
+    async function startVoiceRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        
+        mediaRecorder.ondataavailable = (event) => {
+          audioChunks.push(event.data);
+        };
+        
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+          processAudioInput(audioBlob);
+        };
+        
+        mediaRecorder.start();
+        isRecording = true;
+        
+        const voiceBtn = document.getElementById('voiceBtn');
+        voiceBtn.classList.add('recording');
+        voiceBtn.textContent = '⏹️';
+        
+      } catch (error) {
+        console.error('Error starting voice recording:', error);
+        alert('Could not access microphone. Please check permissions.');
+      }
+    }
+    
+    function stopVoiceRecording() {
+      if (mediaRecorder && isRecording) {
+        mediaRecorder.stop();
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        isRecording = false;
+        
+        const voiceBtn = document.getElementById('voiceBtn');
+        voiceBtn.classList.remove('recording');
+        voiceBtn.textContent = '🎤';
+      }
+    }
+    
+    function toggleVideoInput() {
+      if (isVideoRecording) {
+        stopVideoRecording();
+      } else {
+        startVideoRecording();
+      }
+    }
+    
+    async function startVideoRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        videoChunks = [];
+        
+        mediaRecorder.ondataavailable = (event) => {
+          videoChunks.push(event.data);
+        };
+        
+        mediaRecorder.onstop = () => {
+          const videoBlob = new Blob(videoChunks, { type: 'video/webm' });
+          processVideoInput(videoBlob);
+        };
+        
+        mediaRecorder.start();
+        isVideoRecording = true;
+        
+        const videoBtn = document.getElementById('videoBtn');
+        videoBtn.classList.add('recording');
+        videoBtn.textContent = '⏹️';
+        
+      } catch (error) {
+        console.error('Error starting video recording:', error);
+        alert('Could not access camera. Please check permissions.');
+      }
+    }
+    
+    function stopVideoRecording() {
+      if (mediaRecorder && isVideoRecording) {
+        mediaRecorder.stop();
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        isVideoRecording = false;
+        
+        const videoBtn = document.getElementById('videoBtn');
+        videoBtn.classList.remove('recording');
+        videoBtn.textContent = '📹';
+      }
+    }
+    
+    function uploadFile() {
+      document.getElementById('fileModal').style.display = 'block';
+    }
+    
+    function closeFileModal() {
+      document.getElementById('fileModal').style.display = 'none';
+    }
+    
+    function handleFileSelect(event) {
+      const files = Array.from(event.target.files);
+      processFiles(files);
+    }
+    
+    function handleFileDrop(files) {
+      processFiles(Array.from(files));
+    }
+    
+    function processFiles(files) {
+      files.forEach(file => {
+        if (file.type.startsWith('image/')) {
+          processImageFile(file);
+        } else if (file.type.startsWith('video/')) {
+          processVideoFile(file);
+        } else if (file.type.startsWith('audio/')) {
+          processAudioFile(file);
+        } else if (file.type.startsWith('text/')) {
+          processTextFile(file);
+        }
+      });
+      
+      closeFileModal();
+    }
+    
+    function processImageFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const media = {
+          type: 'image',
+          url: e.target.result,
+          description: file.name,
+          file: file
+        };
+        
+        addMediaMessage(media);
+      };
+      reader.readAsDataURL(file);
+    }
+    
+    function processVideoFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const media = {
+          type: 'video',
+          url: e.target.result,
+          description: file.name,
+          file: file
+        };
+        
+        addMediaMessage(media);
+      };
+      reader.readAsDataURL(file);
+    }
+    
+    function processAudioFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const media = {
+          type: 'audio',
+          url: e.target.result,
+          description: file.name,
+          file: file
+        };
+        
+        addMediaMessage(media);
+      };
+      reader.readAsDataURL(file);
+    }
+    
+    function processTextFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target.result;
+        document.getElementById('chatInput').value = content;
+      };
+      reader.readAsText(file);
+    }
+    
+    function processAudioInput(audioBlob) {
+      const media = {
+        type: 'audio',
+        url: URL.createObjectURL(audioBlob),
+        description: 'Voice message',
+        file: audioBlob
+      };
+      
+      addMediaMessage(media);
+    }
+    
+    function processVideoInput(videoBlob) {
+      const media = {
+        type: 'video',
+        url: URL.createObjectURL(videoBlob),
+        description: 'Video message',
+        file: videoBlob
+      };
+      
+      addMediaMessage(media);
+    }
+    
+    function addMediaMessage(media) {
+      const message = {
+        id: generateId(),
+        type: 'user',
+        content: `Sent ${media.type}: ${media.description}`,
+        timestamp: Date.now(),
+        media: media
+      };
+      
+      addMessageToUI(message);
+      currentConversation.messages.push(message);
+      saveConversations();
+    }
+    
+    function openModelModal() {
+      document.getElementById('modelModal').style.display = 'block';
+    }
+    
+    function closeModelModal() {
+      document.getElementById('modelModal').style.display = 'none';
+    }
+    
+    async function loadCustomModel() {
+      const path = document.getElementById('customModelPath').value;
+      const type = document.getElementById('customModelType').value;
+      
+      if (!path) {
+        alert('Please enter a model path');
+        return;
+      }
+      
+      try {
+        // This would integrate with your AZME model loading system
+        await loadModel(path, type);
+        closeModelModal();
+        currentModel = 'custom';
+        document.getElementById('modelSelect').value = 'custom';
+      } catch (error) {
+        alert('Failed to load custom model: ' + error.message);
+      }
+    }
+    
+    async function loadModel(modelPath, type = null) {
+      // This would integrate with your AZME backend
+      console.log('Loading model:', modelPath, type);
+      
+      // Simulate model loading
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      updateModelStatus(`Model: ${modelPath}`);
+      updateConnectionStatus('online');
+    }
+    
+    function clearChat() {
+      if (confirm('Are you sure you want to clear this conversation?')) {
+        currentConversation.messages = [];
+        clearChatMessages();
+        saveConversations();
+      }
+    }
+    
+    function updateConnectionStatus(status) {
+      connectionStatus = status;
+      const statusDot = document.getElementById('connectionStatus');
+      const statusText = document.getElementById('connectionText');
+      
+      statusDot.className = `status-dot ${status}`;
+      
+      switch (status) {
+        case 'online':
+          statusText.textContent = 'Connected';
+          break;
+        case 'offline':
+          statusText.textContent = 'Disconnected';
+          break;
+        case 'connecting':
+          statusText.textContent = 'Connecting...';
+          break;
+      }
+    }
+    
+    function updateModelStatus(status) {
+      document.getElementById('modelStatus').textContent = status;
+    }
+    
+    function updateTokenCount(count) {
+      document.getElementById('tokenCount').textContent = `Tokens: ${count}`;
+    }
+    
+    function generateId() {
+      return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+    
+    // Initialize with default model
+    loadModel(currentModel);
+  </script>
+</body>
+</html>

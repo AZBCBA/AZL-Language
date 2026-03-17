@@ -7,20 +7,20 @@ component ::orchestrator.training_controller {
     say "🚀 Training Controller Initialized"
     
     # Global configuration
-    set ::cfg.total_epochs = 3
-    set ::cfg.dataset_list = ["wikitext", "openwebtext", "pile"]
-    set ::cfg.checkpoint_every = 50
+    store ::cfg.total_epochs from 3
+    store ::cfg.dataset_list from ["wikitext", "openwebtext", "pile"]
+    store ::cfg.checkpoint_every from 50
     
     # Global state
-    set ::state.current_dataset_idx = 0
-    set ::state.current_dataset_name = ::cfg.dataset_list[0]
-    set ::state.epoch = 0
-    set ::state.step = 0
+    store ::state.current_dataset_idx from 0
+    store ::state.current_dataset_name from ::cfg.dataset_list[0]
+    store ::state.epoch from 0
+    store ::state.step from 0
     
     # Metrics storage
-    set ::metrics.steps = []
-    set ::metrics.loss = []
-    set ::metrics.log_file = "logs/loss.tsv"
+    store ::metrics.steps from []
+    store ::metrics.loss from []
+    store ::metrics.log_file from "logs/loss.tsv"
     
     # Create logs directory
     emit "create_directory" to ::ffi.fs with "logs"
@@ -30,53 +30,74 @@ component ::orchestrator.training_controller {
     say ::metrics.log_file
   }
 
-  listen for "training_metric" {
-    let step = $1.step
-    let loss = $1.loss
-    
-    # Store metrics
-    push ::metrics.steps step
-    push ::metrics.loss loss
-    
-    # Append to TSV file for TensorBoard
-    set ::log_line = step + "\t" + loss + "\n"
-    emit "append_file" to ::ffi.fs with ::metrics.log_file ::log_line
-    
-    # Every 50 steps, trigger loss curve plotting
-    if (step % 50) == 0 {
-      emit "plot_loss" with step
+  behavior {
+    listen for "training_metric" then {
+      store ::step from ::event.data.step
+      store ::loss from ::event.data.loss
+      
+      # Store metrics
+      store ::metrics.steps from ::metrics.steps.push(::step)
+      store ::metrics.loss from ::metrics.loss.push(::loss)
+      
+      # Append to TSV file for TensorBoard
+      store ::log_line from ::step + "\t" + ::loss + "\n"
+      emit "append_file" to ::ffi.fs with ::metrics.log_file ::log_line
+      
+      # Every 50 steps, trigger loss curve plotting
+      branch when (::step % 50) == 0 {
+        emit "plot_loss" with ::step
+      }
+      
+      say "📉 Step "
+      say ::step
+      say " Loss: "
+      say ::loss
     }
-    
-    say "📉 Step "
-    say step
-    say " Loss: "
-    say loss
+
+    listen for "epoch_done" then {
+      store ::state.epoch from ::state.epoch + 1
+      
+      # Save checkpoint every 50 epochs
+      branch when (::state.epoch % ::cfg.checkpoint_every) == 0 {
+        store ::ckpt_path from "weights/ckpt_" + ::state.current_dataset_name + "_" + ::state.epoch + ".pt"
+        emit "save_weights" to ::ffi.torch with "gpt_mini" ::ckpt_path
+        say "💾 Checkpoint saved: "
+        say ::ckpt_path
+      }
+      
+      say "✅ Epoch "
+      say ::state.epoch
+      say " completed"
+    }
+
+    listen for "training_complete" then {
+      say "🎉 Training completed!"
+      say "📊 Final metrics:"
+      say "  Total steps: "
+      say ::state.step
+      say "  Total epochs: "
+      say ::state.epoch
+      say "  Final loss: "
+      say ::metrics.loss[::metrics.loss.length - 1]
+    }
   }
 
-  listen for "epoch_done" {
-    set ::state.epoch = ::state.epoch + 1
-    
-    # Save checkpoint every 50 epochs
-    if (::state.epoch % ::cfg.checkpoint_every) == 0 {
-      set ::ckpt_path = "weights/ckpt_" + ::state.current_dataset_name + "_" + ::state.epoch + ".pt"
-      emit "save_weights" to ::ffi.torch with "gpt_mini" ::ckpt_path
-      say "💾 Checkpoint saved: "
-      say ::ckpt_path
+  memory {
+    cfg: {
+      total_epochs: 3,
+      dataset_list: ["wikitext", "openwebtext", "pile"],
+      checkpoint_every: 50
+    },
+    state: {
+      current_dataset_idx: 0,
+      current_dataset_name: "wikitext",
+      epoch: 0,
+      step: 0
+    },
+    metrics: {
+      steps: [],
+      loss: [],
+      log_file: "logs/loss.tsv"
     }
-    
-    say "✅ Epoch "
-    say ::state.epoch
-    say " completed"
-  }
-
-  listen for "training_complete" {
-    say "🎉 Training completed!"
-    say "📊 Final metrics:"
-    say "  Total steps: "
-    say ::state.step
-    say "  Total epochs: "
-    say ::state.epoch
-    say "  Final loss: "
-    say ::metrics.loss[-1]
   }
 }

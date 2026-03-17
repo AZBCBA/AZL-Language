@@ -52,3 +52,40 @@ jobs:
           ./scripts/run_all_tests.sh
 
 
+  azme-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y gcc curl iproute2 jq
+      - name: Run AZME E2E
+        env:
+          AZL_REQUIRE_API_TOKEN: "true"
+          AZL_API_TOKEN: "ci-azme-token"
+          AZME_PROVIDER_E2E: "1"
+          AZL_HTTP_MAX_REQUEST_SIZE: "64"
+          AZL_HTTP_RATE_WINDOW_MS: "500"
+          AZL_HTTP_RATE_MAX_PER_WINDOW: "2"
+        run: |
+          bash scripts/azme_e2e.sh | cat
+      - name: Upload AZME E2E logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azme-e2e-logs
+          path: |
+            .azl/daemon.out
+            .azl/sysproxy.out
+            .azl/sysproxy.log
+            .azl/wire.log
+            .azl/wire.requests.log
+            .azl/wire.responses.log
+            .azl/azme_models.json
+            .azl/azme_chat.json
+            .azl/azme_proxy_workspaces.json
+            .azl/azme_proxy_chat.json
+

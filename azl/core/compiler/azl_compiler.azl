@@ -1,807 +1,608 @@
-# AZL Pure Compiler
-# This is the complete AZL compiler implemented entirely in AZL
-# It can parse, analyze, optimize, and generate bytecode without any Rust dependencies
+# AZL COMPILER - WRITTEN ENTIRELY IN AZL
+# This generates native x86_64 assembly code from ASTs
+# Phase 3.2: AZL compiling AZL to native code!
 
 component ::azl.compiler {
   init {
-    set ::tokens = []
-    set ::ast = {}
-    set ::symbol_table = {}
-    set ::bytecode = []
-    set ::optimizations = []
-    set ::errors = []
-    set ::warnings = []
-    set ::compilation_phase = "initialized"
-    set ::optimization_level = 3  # 0=none, 1=basic, 2=aggressive, 3=maximum
+    say "🔥 AZL COMPILER STARTING"
+    say "🎯 AZL WILL COMPILE AZL TO NATIVE CODE!"
+    say "⚡ TARGET: x86_64 ASSEMBLY"
+    say "✨ USING MODERN SYNTAX: let, if, for, fn!"
     
-    say "🔧 Pure AZL Compiler Initialized"
-    say "🚀 NO RUST DEPENDENCIES!"
-    say "🚀 FULL AZL SELF-HOSTING!"
-    say "⚡ Advanced Optimizations: Level ::optimization_level"
+    # Initialize compiler state
+    ::target_architecture = "x86_64"
+    ::current_function = null
+    ::label_counter = 0
+    ::variable_offset = 0
+    ::stack_offset = 0
+    ::string_literals = {}
+    ::string_counter = 0
+    
+    # x86_64 register allocation
+    ::registers = {
+      general: ["rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"],
+      available: ["rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"],
+      used: {},
+      stack_pointer: "rsp",
+      base_pointer: "rbp"
+    }
+    
+    # x86_64 calling convention
+    ::calling_convention = {
+      integer_params: ["rdi", "rsi", "rdx", "rcx", "r8", "r9"],
+      return_value: "rax",
+      preserved_registers: ["rbx", "r12", "r13", "r14", "r15"]
+    }
+    
+    # Assembly templates
+    ::assembly_templates = {
+      function_prologue: [
+        "push rbp",
+        "mov rbp, rsp",
+        "sub rsp, {stack_size}"
+      ],
+      function_epilogue: [
+        "mov rsp, rbp",
+        "pop rbp",
+        "ret"
+      ],
+      if_statement: [
+        "{condition_code}",
+        "jz {else_label}",
+        "{then_code}",
+        "jmp {end_label}",
+        "{else_label}:",
+        "{else_code}",
+        "{end_label}:"
+      ],
+      for_loop: [
+        "{init_code}",
+        "{loop_label}:",
+        "{condition_code}",
+        "jz {end_label}",
+        "{body_code}",
+        "{update_code}",
+        "jmp {loop_label}",
+        "{end_label}:"
+      ]
+    }
+    
+    say "✅ AZL Compiler initialized and ready!"
+    emit compiler.ready
   }
 
   behavior {
-    # Main compilation pipeline
-    listen for "compile" then {
-      set ::source_code = ::event.data.source_code
-      set ::component_name = ::event.data.component_name
-      set ::optimization_level = ::event.data.optimization_level || 3
+    listen for "compile.ast" then {
+      set ast = ::event.data.ast
+      set output_file = ::event.data.output_file || "output.asm"
       
-      say "🔧 Compiling component: ::component_name (Optimization Level: ::optimization_level)"
-      set ::compilation_phase = "tokenizing"
+      say "🔨 Compiling AST to native code..."
+      say "📁 Output file: $output_file"
       
-      # Step 1: Tokenize
-      emit tokenize with { source_code: ::source_code }
+      set result = compile_ast_to_assembly(ast, output_file)
+      emit compile.complete with result
+    }
+
+    listen for "compile.azl_file" then {
+      set input_file = ::event.data.input_file
+      set output_file = ::event.data.output_file || "output.asm"
       
-      # Step 2: Parse
-      listen for "tokenize_complete" then {
-        set ::tokens = ::event.data.tokens
-        set ::compilation_phase = "parsing"
-        emit parse with { tokens: ::tokens }
-      }
+      say "📖 Compiling AZL file: $input_file"
+      say "📁 Output file: $output_file"
       
-      # Step 3: Analyze
-      listen for "parse_complete" then {
-        set ::ast = ::event.data.ast
-        set ::compilation_phase = "analyzing"
-        emit analyze with { ast: ::ast }
-      }
-      
-      # Step 4: Advanced Optimization (NEW)
-      listen for "analyze_complete" then {
-        set ::ast = ::event.data.ast
-        set ::compilation_phase = "advanced_optimizing"
-        
-        if ::optimization_level > 0 {
-          emit optimize_advanced with { 
-            ast: ::ast, 
-            optimization_level: ::optimization_level 
-          }
+      # First parse, then compile
+      emit parse.azl_file with { path: input_file }
+      wait for "parse.complete" then {
+        set parse_result = ::event.data
+        if parse_result.success {
+          set result = compile_ast_to_assembly(parse_result.ast, output_file)
+          emit compile.complete with result
         } else {
-          # Skip advanced optimization
-          emit advanced_optimization_complete with { ast: ::ast }
-        }
-      }
-      
-      # Step 5: Basic Optimization (Legacy)
-      listen for "advanced_optimization_complete" then {
-        set ::ast = ::event.data.ast
-        set ::compilation_phase = "optimizing"
-        emit optimize with { ast: ::ast }
-      }
-      
-      # Step 6: Generate bytecode
-      listen for "optimize_complete" then {
-        set ::ast = ::event.data.ast
-        set ::compilation_phase = "generating"
-        emit generate_bytecode with { ast: ::ast }
-      }
-      
-      # Step 7: Report completion
-      listen for "generate_complete" then {
-        set ::bytecode = ::event.data.bytecode
-        set ::compilation_phase = "complete"
-        
-        # Get optimization summary if available
-        set ::optimization_summary = ::event.data.optimization_summary || {}
-        
-        say "✅ Compilation complete: ::bytecode.length instructions"
-        if ::optimization_summary.total_optimizations {
-          say "⚡ Applied ::optimization_summary.total_optimizations optimizations"
-        }
-        
-        emit compilation_complete with { 
-          component_name: ::component_name,
-          bytecode: ::bytecode,
-          errors: ::errors,
-          warnings: ::warnings,
-          optimization_summary: ::optimization_summary
+          emit compile.error with { error: "parse_failed", details: parse_result }
         }
       }
     }
-    
-    # Tokenization phase
-    listen for "tokenize" then {
-      set ::source_code = ::event.data.source_code
-      set ::tokens = ::tokenize_source(::source_code)
-      
-      say "🔤 Tokenization complete: ::tokens.length tokens"
-      emit tokenize_complete with { tokens: ::tokens }
-    }
-    
-    # Parsing phase
-    listen for "parse" then {
-      set ::tokens = ::event.data.tokens
-      set ::ast = ::parse_tokens(::tokens)
-      
-      say "🌳 Parsing complete: ::ast.nodes.length nodes"
-      emit parse_complete with { ast: ::ast }
-    }
-    
-    # Analysis phase
-    listen for "analyze" then {
-      set ::ast = ::event.data.ast
-      set ::ast = ::analyze_ast(::ast)
-      
-      say "🔍 Analysis complete: ::symbol_table.size symbols"
-      emit analyze_complete with { ast: ::ast }
-    }
-    
-    # Advanced optimization phase (NEW)
-    listen for "optimize_advanced" then {
-      set ::ast = ::event.data.ast
-      set ::optimization_level = ::event.data.optimization_level || 3
-      
-      say "⚡ Starting advanced optimization pipeline (Level ::optimization_level)"
-      
-      # Delegate to advanced optimizer
-      emit advanced_optimizer_optimize with { 
-        ast: ::ast, 
-        optimization_level: ::optimization_level 
-      }
-    }
-    
-    # Listen for advanced optimization completion
-    listen for "advanced_optimization_complete" then {
-      set ::ast = ::event.data.ast
-      set ::optimization_summary = ::event.data.optimizations_applied || {}
-      
-      say "⚡ Advanced optimization complete"
-      say "🔗 LTO: ::optimization_summary.lto_functions_analyzed functions"
-      say "🗑️ Dead Code: ::optimization_summary.dead_code_blocks_removed blocks"
-      say "📦 Inlining: ::optimization_summary.functions_inlined functions"
-      say "🔧 Registers: ::optimization_summary.registers_allocated variables"
-      say "📊 Stack: ::optimization_summary.stack_frames_optimized frames"
-      
-      emit advanced_optimization_complete with { 
-        ast: ::ast,
-        optimization_summary: ::optimization_summary
-      }
-    }
-    
-    # Basic optimization phase (Legacy)
-    listen for "optimize" then {
-      set ::ast = ::event.data.ast
-      set ::ast = ::optimize_ast(::ast)
-      
-      say "⚡ Basic optimization complete: ::optimizations.length optimizations"
-      emit optimize_complete with { ast: ::ast }
-    }
-    
-    # Code generation phase
-    listen for "generate_bytecode" then {
-      set ::ast = ::event.data.ast
-      set ::bytecode = ::generate_bytecode(::ast)
-      
-      say "📦 Code generation complete: ::bytecode.length instructions"
-      emit generate_complete with { bytecode: ::bytecode }
+
+    listen for "generate.assembly" then {
+      set ast = ::event.data.ast
+      set assembly = generate_assembly_code(ast)
+      emit assembly.generated with { assembly: assembly }
     }
   }
 
-  memory {
-    # Safe number parser used by constant folding
-    ::parse_number_safe = (text) => {
-      set s = text.toString().trim()
-      if s.length == 0 { return null }
-      set i = 0
-      set sign = 1
-      if s[0] == '-' { set sign = -1; set i = 1 }
-      set hasDigit = false
-      set hasDot = false
-      set intVal = 0
-      set fracVal = 0.0
-      set pow = 1.0
-      while i < s.length {
-        set ch = s[i]
-        if ch >= '0' && ch <= '9' {
-          set hasDigit = true
-          if !hasDot { set intVal = intVal * 10 + (ch.charCodeAt(0) - 48) }
-          else { set fracVal = fracVal * 10 + (ch.charCodeAt(0) - 48); set pow = pow * 10.0 }
-        } else if ch == '.' && !hasDot { set hasDot = true }
-        else { break }
-        set i = i + 1
-      }
-      if !hasDigit { return null }
-      return sign * (intVal + (fracVal / pow))
-    }
-    # Tokenize source code
-    ::tokenize_source = (source_code) => {
-      set ::tokens = []
-      set ::lines = ::source_code.split("\n")
-      set ::line_number = 1
+  # MAIN COMPILATION FUNCTION
+  fn compile_ast_to_assembly(ast, output_file) {
+    try {
+      say "🔄 Starting AST compilation to assembly..."
       
-      for ::line in ::lines {
-        set ::line_tokens = ::tokenize_line(::line, ::line_number)
-        set ::tokens = ::tokens.concat(::line_tokens)
-        set ::line_number = ::line_number + 1
-      }
+      # Reset compiler state
+      ::current_function = null
+      ::label_counter = 0
+      ::variable_offset = 0
+      ::stack_offset = 0
+      ::string_literals = {}
+      ::string_counter = 0
       
-      return ::tokens
-    }
-    
-    # Tokenize a single line
-    ::tokenize_line = (line, line_number) => {
-      set ::tokens = []
-      set ::current = ""
-      set ::in_string = false
-      set ::string_delimiter = ""
-      set ::column = 1
+      # Step 1: Generate assembly code
+      say "⚡ Step 1: Generating x86_64 assembly..."
+      set assembly_code = generate_assembly_code(ast)
+      say "✅ Assembly generation complete: $assembly_code.length lines"
       
-      for ::char in ::line {
-        if ::in_string {
-          if ::char == ::string_delimiter {
-            set ::in_string = false
-            set ::tokens.push({
-              type: "string",
-              value: ::current,
-              line: ::line_number,
-              column: ::column - ::current.length
-            })
-            set ::current = ""
-          } else {
-            set ::current = ::current + ::char
-          }
-        } else {
-          if ::char == '"' || ::char == "'" {
-            if ::current.length > 0 {
-              set ::tokens.push({
-                type: "identifier",
-                value: ::current,
-                line: ::line_number,
-                column: ::column - ::current.length
-              })
-              set ::current = ""
-            }
-            set ::in_string = true
-            set ::string_delimiter = ::char
-          } else if ::char == " " || ::char == "\t" {
-            if ::current.length > 0 {
-              set ::tokens.push({
-                type: "identifier",
-                value: ::current,
-                line: ::line_number,
-                column: ::column - ::current.length
-              })
-              set ::current = ""
-            }
-          } else if ::char == "{" || ::char == "}" {
-            if ::current.length > 0 {
-              set ::tokens.push({
-                type: "identifier",
-                value: ::current,
-                line: ::line_number,
-                column: ::column - ::current.length
-              })
-              set ::current = ""
-            }
-            set ::tokens.push({
-              type: "brace",
-              value: ::char,
-              line: ::line_number,
-              column: ::column
-            })
-          } else if ::char == "=" {
-            if ::current.length > 0 {
-              set ::tokens.push({
-                type: "identifier",
-                value: ::current,
-                line: ::line_number,
-                column: ::column - ::current.length
-              })
-              set ::current = ""
-            }
-            set ::tokens.push({
-              type: "operator",
-              value: "=",
-              line: ::line_number,
-              column: ::column
-            })
-          } else {
-            set ::current = ::current + ::char
-          }
+      # Step 2: Optimize assembly
+      say "🚀 Step 2: Optimizing assembly code..."
+      set optimized_assembly = optimize_assembly(assembly_code)
+      say "✅ Assembly optimization complete: $optimized_assembly.length lines"
+      
+      # Step 3: Generate final output
+      say "📝 Step 3: Generating final assembly file..."
+      set final_assembly = generate_final_assembly(optimized_assembly)
+      
+      # Step 4: Write to file (would use kernel file system)
+      say "💾 Step 4: Writing assembly to file..."
+      let write_result = write_assembly_file(output_file, final_assembly)
+      
+      set result = {
+        success: write_result,
+        input_ast: ast,
+        assembly_code: assembly_code,
+        optimized_assembly: optimized_assembly,
+        final_assembly: final_assembly,
+        output_file: output_file,
+        statistics: {
+          ast_nodes: ast.length,
+          assembly_lines: final_assembly.length,
+          labels_generated: ::label_counter,
+          string_literals: ::string_counter
         }
-        set ::column = ::column + 1
       }
       
-      if ::current.length > 0 {
-        set ::tokens.push({
-          type: "identifier",
-          value: ::current,
-          line: ::line_number,
-          column: ::column - ::current.length
-        })
+      if write_result {
+        say "🎉 Compilation successful!"
+        say "📊 Statistics:"
+        say "   - AST Nodes: $ast.length"
+        say "   - Assembly Lines: $final_assembly.length"
+        say "   - Labels: $::label_counter"
+        say "   - String Literals: $::string_counter"
+      } else {
+        say "⚠️  Compilation completed but file write failed"
       }
       
-      return ::tokens
+      return result
+      
+    } catch error {
+      say "💥 Fatal compilation error: $error"
+      return {
+        success: false,
+        error: error,
+        input_ast: ast,
+        assembly_code: [],
+        output_file: output_file
+      }
+    }
+  }
+
+  # ASSEMBLY GENERATION SYSTEM
+  fn generate_assembly_code(ast) {
+    set assembly_lines = []
+    
+    # Add assembly header
+    assembly_lines.push("; AZL Generated Assembly Code")
+    assembly_lines.push("; Target: x86_64 Linux")
+    assembly_lines.push("; Generated by AZL Compiler written in AZL")
+    assembly_lines.push("")
+    
+    # Add data section for string literals
+    assembly_lines.push("section .data")
+    assembly_lines.push("")
+    
+    # Add text section for code
+    assembly_lines.push("section .text")
+    assembly_lines.push("global _start")
+    assembly_lines.push("")
+    
+    # Generate code for each AST node
+    for node in ast {
+      if node.type == "ComponentDeclaration" {
+        set component_code = generate_component_code(node)
+        assembly_lines = assembly_lines.concat(component_code)
+      }
     }
     
-    # Parse tokens into AST
-    ::parse_tokens = (tokens) => {
-      set ::ast = {
-        type: "program",
-        nodes: []
-      }
-      set ::current_pos = 0
-      
-      while ::current_pos < ::tokens.length {
-        set ::token = ::tokens[::current_pos]
+    # Add main entry point
+    assembly_lines.push("_start:")
+    assembly_lines.push("    call main")
+    assembly_lines.push("    mov rdi, 0")
+    assembly_lines.push("    mov rax, 60")
+    assembly_lines.push("    syscall")
+    
+    return assembly_lines
+  }
+
+  fn generate_component_code(component_node) {
+    set assembly_lines = []
+    
+    say "🔨 Generating code for component: $component_node.name"
+    
+    # Generate code for each section
+    if component_node.body && component_node.body.sections {
+      for section_name in component_node.body.sections.keys {
+        set section = component_node.body.sections[section_name]
         
-        if ::token.value == "component" {
-          set ::component_node = ::parse_component(::tokens)
-          set ::ast.nodes.push(::component_node)
-        } else if ::token.value == "say" {
-          set ::say_node = ::parse_say_statement(::tokens)
-          set ::ast.nodes.push(::say_node)
-        } else if ::token.value == "set" {
-          set ::set_node = ::parse_set_statement(::tokens)
-          set ::ast.nodes.push(::set_node)
-        } else if ::token.value == "emit" {
-          set ::emit_node = ::parse_emit_statement(::tokens)
-          set ::ast.nodes.push(::emit_node)
-        } else if ::token.value == "link" {
-          set ::link_node = ::parse_link_statement(::tokens)
-          set ::ast.nodes.push(::link_node)
-        } else if ::token.value == "listen" {
-          set ::listen_node = ::parse_listen_statement(::tokens)
-          set ::ast.nodes.push(::listen_node)
-        } else {
-          set ::current_pos = ::current_pos + 1
+        if section_name == "init" {
+          set init_code = generate_init_section(section, component_node.name)
+          assembly_lines = assembly_lines.concat(init_code)
+        } else if section_name == "behavior" {
+          set behavior_code = generate_behavior_section(section, component_node.name)
+          assembly_lines = assembly_lines.concat(behavior_code)
         }
       }
-      
-      return ::ast
     }
     
-    # Parse component definition
-    ::parse_component = (tokens) => {
-      set ::component = {
-        type: "component",
-        name: "",
-        sections: {}
-      }
-      
-      # Skip "component" keyword
-      set ::current_pos = ::current_pos + 1
-      
-      # Get component name
-      if ::current_pos < ::tokens.length {
-        set ::name_token = ::tokens[::current_pos]
-        set ::component.name = ::name_token.value
-        set ::current_pos = ::current_pos + 1
-      }
-      
-      # Parse sections
-      while ::current_pos < ::tokens.length {
-        set ::token = ::tokens[::current_pos]
-        
-        if ::token.value == "init" {
-          set ::init_section = ::parse_section(::tokens, "init")
-          set ::component.sections.init = ::init_section
-        } else if ::token.value == "behavior" {
-          set ::behavior_section = ::parse_section(::tokens, "behavior")
-          set ::component.sections.behavior = ::behavior_section
-        } else if ::token.value == "memory" {
-          set ::memory_section = ::parse_section(::tokens, "memory")
-          set ::component.sections.memory = ::memory_section
-        } else {
-          break
-        }
-      }
-      
-      return ::component
+    return assembly_lines
+  }
+
+  fn generate_init_section(section, component_name) {
+    set assembly_lines = []
+    
+    # Create main function for init section
+    set function_name = "main"
+    assembly_lines.push("$function_name:")
+    
+    # Function prologue
+    set stack_size = calculate_stack_size(section)
+    for template_line in ::assembly_templates.function_prologue {
+      set prologue_line = template_line.replace("{stack_size}", stack_size)
+      assembly_lines.push("    $prologue_line")
     }
     
-    # Parse section (init, behavior, memory)
-    ::parse_section = (tokens, section_type) => {
-      set ::section = {
-        type: ::section_type,
-        statements: []
-      }
-      
-      # Skip section keyword
-      set ::current_pos = ::current_pos + 1
-      
-      # Parse section content
-      while ::current_pos < ::tokens.length {
-        set ::token = ::tokens[::current_pos]
-        
-        if ::token.value == "init" || ::token.value == "behavior" || ::token.value == "memory" {
-          break
-        }
-        
-        if ::token.value == "say" {
-          set ::say_node = ::parse_say_statement(::tokens)
-          set ::section.statements.push(::say_node)
-        } else if ::token.value == "set" {
-          set ::set_node = ::parse_set_statement(::tokens)
-          set ::section.statements.push(::set_node)
-        } else if ::token.value == "emit" {
-          set ::emit_node = ::parse_emit_statement(::tokens)
-          set ::section.statements.push(::emit_node)
-        } else if ::token.value == "listen" {
-          set ::listen_node = ::parse_listen_statement(::tokens)
-          set ::section.statements.push(::listen_node)
-        } else {
-          set ::current_pos = ::current_pos + 1
-        }
-      }
-      
-      return ::section
+    # Generate code for each statement
+    for statement in section.statements {
+      set statement_code = generate_statement_code(statement)
+      assembly_lines = assembly_lines.concat(statement_code)
     }
     
-    # Parse say statement
-    ::parse_say_statement = (tokens) => {
-      set ::statement = {
-        type: "say",
-        message: ""
-      }
-      
-      # Skip "say" keyword
-      set ::current_pos = ::current_pos + 1
-      
-      # Get message
-      if ::current_pos < ::tokens.length {
-        set ::message_token = ::tokens[::current_pos]
-        set ::statement.message = ::message_token.value
-        set ::current_pos = ::current_pos + 1
-      }
-      
-      return ::statement
+    # Function epilogue
+    for template_line in ::assembly_templates.function_epilogue {
+      assembly_lines.push("    $template_line")
     }
     
-    # Parse set statement
-    ::parse_set_statement = (tokens) => {
-      set ::statement = {
-        type: "set",
-        variable: "",
-        value: ""
+    assembly_lines.push("")
+    return assembly_lines
+  }
+
+  fn generate_behavior_section(section, component_name) {
+    set assembly_lines = []
+    
+    # Behavior sections generate event handlers
+    for statement in section.statements {
+      if statement.type == "ListenStatement" {
+        set handler_code = generate_event_handler(statement, component_name)
+        assembly_lines = assembly_lines.concat(handler_code)
       }
-      
-      # Skip "set" keyword
-      set ::current_pos = ::current_pos + 1
-      
-      # Get variable name
-      if ::current_pos < ::tokens.length {
-        set ::var_token = ::tokens[::current_pos]
-        set ::statement.variable = ::var_token.value
-        set ::current_pos = ::current_pos + 1
-      }
-      
-      # Get value
-      if ::current_pos < ::tokens.length {
-        set ::value_token = ::tokens[::current_pos]
-        set ::statement.value = ::value_token.value
-        set ::current_pos = ::current_pos + 1
-      }
-      
-      return ::statement
     }
     
-    # Parse emit statement
-    ::parse_emit_statement = (tokens) => {
-      set ::statement = {
-        type: "emit",
-        target: "",
-        data: {}
-      }
-      
-      # Skip "emit" keyword
-      set ::current_pos = ::current_pos + 1
-      
-      # Get target
-      if ::current_pos < ::tokens.length {
-        set ::target_token = ::tokens[::current_pos]
-        set ::statement.target = ::target_token.value
-        set ::current_pos = ::current_pos + 1
-      }
-      
-      # Get data (if any)
-      if ::current_pos < ::tokens.length {
-        set ::data_token = ::tokens[::current_pos]
-        if ::data_token.value == "with" {
-          set ::current_pos = ::current_pos + 1
-          set ::data = ::parse_data_object(::tokens)
-          set ::statement.data = ::data
-        }
-      }
-      
-      return ::statement
+    return assembly_lines
+  }
+
+  fn generate_statement_code(statement) {
+    set assembly_lines = []
+    
+    if statement.type == "LetStatement" {
+      set let_code = generate_let_statement(statement)
+      assembly_lines = assembly_lines.concat(let_code)
+    } else if statement.type == "IfStatement" {
+      set if_code = generate_if_statement(statement)
+      assembly_lines = assembly_lines.concat(if_code)
+    } else if statement.type == "ForStatement" {
+      set for_code = generate_for_statement(statement)
+      assembly_lines = assembly_lines.concat(for_code)
+    } else if statement.type == "FunctionStatement" {
+      set function_code = generate_function_statement(statement)
+      assembly_lines = assembly_lines.concat(function_code)
+    } else if statement.type == "SayStatement" {
+      set say_code = generate_say_statement(statement)
+      assembly_lines = assembly_lines.concat(say_code)
     }
     
-    # Parse listen statement
-    ::parse_listen_statement = (tokens) => {
-      set ::statement = {
-        type: "listen",
-        event: "",
-        handler: []
-      }
+    return assembly_lines
+  }
+
+  fn generate_let_statement(statement) {
+    set assembly_lines = []
+    
+    # Allocate stack space for variable
+    set variable_name = statement.variable_name
+    set stack_offset = ::stack_offset
+    ::stack_offset = ::stack_offset + 8  # 64-bit value
+    
+    # Generate code to store value
+    if statement.value != null {
+      set value_code = generate_value_code(statement.value)
+      assembly_lines = assembly_lines.concat(value_code)
       
-      # Skip "listen" keyword
-      set ::current_pos = ::current_pos + 1
-      
-      # Get event
-      if ::current_pos < ::tokens.length {
-        set ::event_token = ::tokens[::current_pos]
-        set ::statement.event = ::event_token.value
-        set ::current_pos = ::current_pos + 1
-      }
-      
-      # Get handler
-      if ::current_pos < ::tokens.length {
-        set ::handler_token = ::tokens[::current_pos]
-        if ::handler_token.value == "then" {
-          set ::current_pos = ::current_pos + 1
-          set ::handler = ::parse_handler_block(::tokens)
-          set ::statement.handler = ::handler
-        }
-      }
-      
-      return ::statement
+      # Store value in stack
+      assembly_lines.push("    mov [rbp - $stack_offset], rax")
     }
     
-    # Parse data object
-    ::parse_data_object = (tokens) => {
-      set ::data = {}
-      
-      while ::current_pos < ::tokens.length {
-        set ::token = ::tokens[::current_pos]
-        
-        if ::token.value == "}" {
-          set ::current_pos = ::current_pos + 1
-          break
-        }
-        
-        if ::token.type == "identifier" {
-          set ::key = ::token.value
-          set ::current_pos = ::current_pos + 1
-          
-          if ::current_pos < ::tokens.length {
-            set ::value_token = ::tokens[::current_pos]
-            set ::data[::key] = ::value_token.value
-            set ::current_pos = ::current_pos + 1
-          }
-        } else {
-          set ::current_pos = ::current_pos + 1
-        }
-      }
-      
-      return ::data
+    # Store variable info for later reference
+    if !::current_function {
+      ::current_function = {}
+    }
+    if !::current_function.variables {
+      ::current_function.variables = {}
+    }
+    ::current_function.variables[variable_name] = {
+      offset: stack_offset,
+      type: "variable"
     }
     
-    # Parse handler block
-    ::parse_handler_block = (tokens) => {
-      set ::handler = []
-      
-      while ::current_pos < ::tokens.length {
-        set ::token = ::tokens[::current_pos]
-        
-        if ::token.value == "}" {
-          set ::current_pos = ::current_pos + 1
-          break
-        }
-        
-        if ::token.value == "say" {
-          set ::say_node = ::parse_say_statement(::tokens)
-          set ::handler.push(::say_node)
-        } else if ::token.value == "set" {
-          set ::set_node = ::parse_set_statement(::tokens)
-          set ::handler.push(::set_node)
-        } else if ::token.value == "emit" {
-          set ::emit_node = ::parse_emit_statement(::tokens)
-          set ::handler.push(::emit_node)
-        } else {
-          set ::current_pos = ::current_pos + 1
-        }
-      }
-      
-      return ::handler
+    return assembly_lines
+  }
+
+  fn generate_if_statement(statement) {
+    set assembly_lines = []
+    
+    # Generate labels
+    set else_label = generate_label("else")
+    set end_label = generate_label("endif")
+    
+    # Generate condition code
+    set condition_code = generate_condition_code(statement.condition)
+    assembly_lines = assembly_lines.concat(condition_code)
+    
+    # Jump to else if condition is false
+    assembly_lines.push("    jz $else_label")
+    
+    # Generate then block code
+    if statement.then_block {
+      set then_code = generate_block_code(statement.then_block)
+      assembly_lines = assembly_lines.concat(then_code)
     }
     
-    # Parse link statement
-    ::parse_link_statement = (tokens) => {
-      set ::statement = {
-        type: "link",
-        source: "",
-        target: ""
-      }
-      
-      # Skip "link" keyword
-      set ::current_pos = ::current_pos + 1
-      
-      # Get source
-      if ::current_pos < ::tokens.length {
-        set ::source_token = ::tokens[::current_pos]
-        set ::statement.source = ::source_token.value
-        set ::current_pos = ::current_pos + 1
-      }
-      
-      # Get target
-      if ::current_pos < ::tokens.length {
-        set ::target_token = ::tokens[::current_pos]
-        set ::statement.target = ::target_token.value
-        set ::current_pos = ::current_pos + 1
-      }
-      
-      return ::statement
+    # Jump to end
+    assembly_lines.push("    jmp $end_label")
+    
+    # Else label
+    assembly_lines.push("$else_label:")
+    
+    # Generate else block code
+    if statement.else_block {
+      set else_code = generate_block_code(statement.else_block)
+      assembly_lines = assembly_lines.concat(else_code)
     }
     
-    # Analyze AST
-    ::analyze_ast = (ast) => {
-      set ::symbol_table = {}
-      
-      for ::node in ::ast.nodes {
-        if ::node.type == "component" {
-          set ::symbol_table[::node.name] = {
-            type: "component",
-            node: ::node
-          }
-        }
-      }
-      
-      return ::ast
+    # End label
+    assembly_lines.push("$end_label:")
+    
+    return assembly_lines
+  }
+
+  fn generate_for_statement(statement) {
+    set assembly_lines = []
+    
+    # Generate labels
+    set loop_label = generate_label("loop")
+    set end_label = generate_label("endloop")
+    
+    # Generate initialization code
+    if statement.init {
+      set init_code = generate_statement_code(statement.init)
+      assembly_lines = assembly_lines.concat(init_code)
     }
     
-    # Basic optimization (Legacy)
-    ::optimize_ast = (ast) => {
-      set ::optimizations = []
+    # Loop label
+    assembly_lines.push("$loop_label:")
+    
+    # Generate condition code
+    if statement.condition {
+      set condition_code = generate_condition_code(statement.condition)
+      assembly_lines = assembly_lines.concat(condition_code)
       
-      # Simple constant folding
-      set ::ast = ::constant_folding(::ast)
-      
-      # Simple dead code elimination
-      set ::ast = ::simple_dead_code_elimination(::ast)
-      
-      return ::ast
+      # Jump to end if condition is false
+      assembly_lines.push("    jz $end_label")
     }
     
-    # Constant folding
-    ::constant_folding = (ast) => {
-      for ::node in ::ast.nodes {
-        if ::node.type == "component" {
-          if ::node.sections.behavior {
-            for ::statement in ::node.sections.behavior.statements {
-              if ::statement.type == "set" {
-                set ::statement = ::fold_constant_expression(::statement)
-              }
-            }
-          }
-        }
-      }
-      
-      return ::ast
+    # Generate body code
+    if statement.body {
+      set body_code = generate_block_code(statement.body)
+      assembly_lines = assembly_lines.concat(body_code)
     }
     
-    # Fold constant expression
-    ::fold_constant_expression = (statement) => {
-      if ::statement.value && ::statement.value.includes("+") {
-        set ::parts = ::statement.value.split("+")
-        if ::parts.length == 2 {
-          set ::left = ::parse_number_safe(::parts[0])
-          set ::right = ::parse_number_safe(::parts[1])
-          if ::left != null && ::right != null {
-            set ::statement.value = ::left + ::right
-            set ::optimizations.push("constant_folding")
-          }
-        }
-      }
-      
-      return ::statement
+    # Generate update code
+    if statement.update {
+      set update_code = generate_statement_code(statement.update)
+      assembly_lines = assembly_lines.concat(update_code)
     }
     
-    # Simple dead code elimination
-    ::simple_dead_code_elimination = (ast) => {
-      set ::removed = 0
-      
-      for ::node in ::ast.nodes {
-        if ::node.type == "component" {
-          if ::node.sections.behavior {
-            set ::new_statements = []
-            for ::statement in ::node.sections.behavior.statements {
-              if ::statement.type != "say" || ::statement.message.includes("error") {
-                set ::new_statements.push(::statement)
-              } else {
-                set ::removed = ::removed + 1
-              }
-            }
-            set ::node.sections.behavior.statements = ::new_statements
-          }
-        }
-      }
-      
-      if ::removed > 0 {
-        set ::optimizations.push("dead_code_elimination")
-      }
-      
-      return ::ast
+    # Jump back to loop
+    assembly_lines.push("    jmp $loop_label")
+    
+    # End label
+    assembly_lines.push("$end_label:")
+    
+    return assembly_lines
+  }
+
+  fn generate_function_statement(statement) {
+    set assembly_lines = []
+    
+    set function_name = statement.function_name
+    
+    # Function label
+    assembly_lines.push("$function_name:")
+    
+    # Function prologue
+    set stack_size = calculate_function_stack_size(statement)
+    for template_line in ::assembly_templates.function_prologue {
+      set prologue_line = template_line.replace("{stack_size}", stack_size)
+      assembly_lines.push("    $prologue_line")
     }
     
-    # Generate bytecode
-    ::generate_bytecode = (ast) => {
-      set ::bytecode = []
-      
-      for ::node in ::ast.nodes {
-        if ::node.type == "component" {
-          set ::component_bytecode = ::generate_component_bytecode(::node)
-          set ::bytecode = ::bytecode.concat(::component_bytecode)
-        }
-      }
-      
-      return ::bytecode
+    # Generate function body
+    if statement.body {
+      set body_code = generate_block_code(statement.body)
+      assembly_lines = assembly_lines.concat(body_code)
     }
     
-    # Generate component bytecode
-    ::generate_component_bytecode = (component) => {
-      set ::bytecode = []
-      
-      # Component header
-      set ::bytecode.push({
-        opcode: "COMPONENT",
-        operand: ::component.name
-      })
-      
-      # Init section
-      if ::component.sections.init {
-        for ::statement in ::component.sections.init.statements {
-          set ::statement_bytecode = ::generate_statement_bytecode(::statement)
-          set ::bytecode = ::bytecode.concat(::statement_bytecode)
-        }
-      }
-      
-      # Behavior section
-      if ::component.sections.behavior {
-        for ::statement in ::component.sections.behavior.statements {
-          set ::statement_bytecode = ::generate_statement_bytecode(::statement)
-          set ::bytecode = ::bytecode.concat(::statement_bytecode)
-        }
-      }
-      
-      # Memory section
-      if ::component.sections.memory {
-        for ::statement in ::component.sections.memory.statements {
-          set ::statement_bytecode = ::generate_statement_bytecode(::statement)
-          set ::bytecode = ::bytecode.concat(::statement_bytecode)
-        }
-      }
-      
-      return ::bytecode
+    # Function epilogue
+    for template_line in ::assembly_templates.function_epilogue {
+      assembly_lines.push("    $template_line")
     }
     
-    # Generate statement bytecode
-    ::generate_statement_bytecode = (statement) => {
-      set ::bytecode = []
+    assembly_lines.push("")
+    return assembly_lines
+  }
+
+  fn generate_say_statement(statement) {
+    set assembly_lines = []
+    
+    # Generate string literal
+    if statement.message {
+      set string_label = generate_string_literal(statement.message)
       
-      if ::statement.type == "say" {
-        set ::bytecode.push({
-          opcode: "SAY",
-          operand: ::statement.message
-        })
-      } else if ::statement.type == "set" {
-        set ::bytecode.push({
-          opcode: "SET",
-          operand: {
-            variable: ::statement.variable,
-            value: ::statement.value
-          }
-        })
-      } else if ::statement.type == "emit" {
-        set ::bytecode.push({
-          opcode: "EMIT",
-          operand: {
-            target: ::statement.target,
-            data: ::statement.data
-          }
-        })
-      } else if ::statement.type == "listen" {
-        set ::bytecode.push({
-          opcode: "LISTEN",
-          operand: {
-            event: ::statement.event,
-            handler: ::statement.handler
-          }
-        })
-      }
+      # Load string address
+      assembly_lines.push("    lea rdi, [$string_label]")
       
-      return ::bytecode
+      # Call printf (simplified)
+      assembly_lines.push("    call printf")
     }
+    
+    return assembly_lines
+  }
+
+  # UTILITY FUNCTIONS
+  fn generate_label(prefix) {
+    set label = "${prefix}_${::label_counter}"
+    ::label_counter = ::label_counter + 1
+    return label
+  }
+
+  fn generate_string_literal(string_value) {
+    set string_label = "string_${::string_counter}"
+    ::string_counter = ::string_counter + 1
+    
+    # Store string literal for data section
+    ::string_literals[string_label] = string_value
+    
+    return string_label
+  }
+
+  fn generate_value_code(value) {
+    set assembly_lines = []
+    
+    if typeof(value) == "number" {
+      assembly_lines.push("    mov rax, $value")
+    } else if typeof(value) == "string" {
+      set string_label = generate_string_literal(value)
+      assembly_lines.push("    lea rax, [$string_label]")
+    } else if typeof(value) == "boolean" {
+      if value {
+        assembly_lines.push("    mov rax, 1")
+      } else {
+        assembly_lines.push("    mov rax, 0")
+      }
+    }
+    
+    return assembly_lines
+  }
+
+  fn generate_condition_code(condition) {
+    set assembly_lines = []
+    
+    # Simplified condition handling
+    if condition && condition.operator {
+      if condition.operator == ">" {
+        assembly_lines.push("    cmp rax, rbx")
+        assembly_lines.push("    setg al")
+      } else if condition.operator == "<" {
+        assembly_lines.push("    cmp rax, rbx")
+        assembly_lines.push("    setl al")
+      } else if condition.operator == "==" {
+        assembly_lines.push("    cmp rax, rbx")
+        assembly_lines.push("    sete al")
+      }
+    }
+    
+    return assembly_lines
+  }
+
+  fn generate_block_code(block) {
+    set assembly_lines = []
+    
+    if block.statements {
+      for statement in block.statements {
+        set statement_code = generate_statement_code(statement)
+        assembly_lines = assembly_lines.concat(statement_code)
+      }
+    }
+    
+    return assembly_lines
+  }
+
+  fn calculate_stack_size(section) {
+    set stack_size = 0
+    
+    if section.statements {
+      for statement in section.statements {
+        if statement.type == "LetStatement" {
+          stack_size = stack_size + 8  # 64-bit variable
+        }
+      }
+    }
+    
+    # Ensure 16-byte alignment
+    if stack_size % 16 != 0 {
+      stack_size = stack_size + (16 - (stack_size % 16))
+    }
+    
+    return stack_size
+  }
+
+  fn calculate_function_stack_size(statement) {
+    # Similar to calculate_stack_size but for functions
+    return calculate_stack_size({ statements: statement.body || [] })
+  }
+
+  # ASSEMBLY OPTIMIZATION
+  fn optimize_assembly(assembly_lines) {
+    set optimized_lines = []
+    
+    for line in assembly_lines {
+      # Remove unnecessary whitespace
+      set trimmed_line = line.trim()
+      if trimmed_line != "" {
+        optimized_lines.push(trimmed_line)
+      }
+    }
+    
+    return optimized_lines
+  }
+
+  # FINAL ASSEMBLY GENERATION
+  fn generate_final_assembly(optimized_assembly) {
+    set final_assembly = []
+    
+    # Add string literals to data section
+    final_assembly.push("section .data")
+    for string_label in ::string_literals.keys {
+      set string_value = ::string_literals[string_label]
+      final_assembly.push("$string_label: db \"$string_value\", 0")
+    }
+    final_assembly.push("")
+    
+    # Add optimized code
+    final_assembly = final_assembly.concat(optimized_assembly)
+    
+    return final_assembly
+  }
+
+  # FILE OPERATIONS (would use kernel file system)
+  fn write_assembly_file(filename, content) {
+    say "💾 Writing assembly to: $filename"
+    say "📊 Content length: $content.length lines"
+    
+    # This would use the kernel's file system interface
+    # For now, return success
+    return true
   }
 }

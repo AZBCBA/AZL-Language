@@ -14,6 +14,7 @@ set ::agent_settings = { enable_agent_messaging: true, enable_task_sharing: true
 set ::agent_count = 0
 set ::messages_sent = 0
 set ::messages_received = 0
+set ::event_history = {}
 
 # Event handlers for agent interface
 on azme.agent_message with ::message_info:
@@ -214,3 +215,63 @@ on azme.get_current_time:
 on azme.system_time:
   set time = now()
   emit azme.system_time_retrieved with time 
+
+# Event Transition Rules and Validation
+const EVENT_TRANSITIONS = {
+    "azme.agent_message": ["azme.validate_agent"],
+    "azme.validate_agent": ["azme.agent_validation_complete"],
+    "azme.agent_validation_complete": ["azme.route_to_processor", "azme.agent_violation_detected"],
+    "azme.route_to_processor": ["azme.process_agent_message"],
+    "azme.process_agent_message": ["azme.message_processed"],
+    "azme.agent.registered": ["azme.registration_complete"],
+    "azme.agent_registered": ["azme.registration_complete"],
+    "azme.task_shared": ["azme.task_sharing_complete"],
+    "azme.task_share_failed": ["azme.task_retry", "azme.task_abandon"],
+    "azme.memory_shared": ["azme.memory_sharing_complete"],
+    "azme.memory_share_failed": ["azme.memory_retry", "azme.memory_abandon"],
+    "azme.registration_complete": ["azme.agent_ready"],
+    "azme.message_processed": ["azme.response_ready", "azme.processing_complete"],
+    "azme.security_violation": ["azme.violation_logged", "azme.agent_blocked"]
+}
+
+func is_valid_transition(current: String, next: String) -> Bool:
+    valid_targets = EVENT_TRANSITIONS.get(current, [])
+    if valid_targets.length == 0:
+        return true
+    
+    return next in valid_targets
+
+func most_frequent(event_list: List[String]) -> String:
+    if event_list.length == 0:
+        return null
+    
+    best_event = event_list[0]
+    best_count = ::event_history.get(best_event, 0)
+    
+    loop for event in event_list:
+        count = ::event_history.get(event, 0)
+        if count > best_count:
+            best_count = count
+            best_event = event
+    
+    return best_event
+
+func track_event(event: String):
+    current_count = ::event_history.get(event, 0)
+    set ::event_history[event] = current_count + 1
+
+on azme.invalid_transition with ::current ::predicted ::valid_targets:
+    error_data = {
+        code: "INVALID_TRANSITION",
+        message: "Invalid event transition: " + current + " → " + predicted,
+        current: current,
+        predicted: predicted,
+        valid_targets: valid_targets,
+        timestamp: get_current_time()
+    }
+    emit azme.error.raised with error_data
+    if valid_targets.length > 0:
+        best_fallback = most_frequent(valid_targets)
+        if best_fallback == null:
+            best_fallback = valid_targets[0]
+        emit azme.event_predicted with best_fallback

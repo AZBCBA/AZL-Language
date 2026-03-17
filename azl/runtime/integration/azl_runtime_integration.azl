@@ -9,6 +9,7 @@ component ::azl.runtime_integration {
     set ::system_status = {}
     set ::error_handlers = {}
     set ::performance_monitors = {}
+    link ::azl.security
     
     say "🔗 AZL Runtime Integration initializing..."
     
@@ -153,6 +154,28 @@ component ::azl.runtime_integration {
       
       # Step 1: Compile
       emit azl.compiler.compile with ::source_code ::target_file
+    }
+
+    # Generic runtime command routing
+    listen for "runtime.command" then {
+      set cmd = $1.command
+      set params = $1.params or {}
+      link ::core.command_processor
+      emit process_command to ::core.command_processor with cmd params
+    }
+
+    # Entry to start advanced training via runtime
+    listen for "runtime.train.advanced" then {
+      set p = $1 or {}
+      link ::core.command_processor
+      emit process_command to ::core.command_processor with "train.advanced" {
+        dataset_path: p.dataset_path,
+        mode: (p.mode or "supervised"),
+        device: (p.config && p.config.device) or (p.device or "cpu"),
+        gpu_limit: (p.config && p.config.gpu_limit) or (p.gpu_limit or 0),
+        epochs: (p.config && p.config.epochs) or (p.epochs or 1),
+        batch_size: (p.config && p.config.batch_size) or (p.batch_size or 1)
+      }
     }
 
     # Build orchestration: compile many files with parallelism + incremental

@@ -1,0 +1,85 @@
+# AZME Plugin Registry (signed manifests, capability caps)
+component ::azme.plugin_registry {
+  init {
+    set ::plugins = {}           # id -> { manifest, status }
+    set ::caps = {}              # id -> { roles:[], limits:{} }
+    set ::require_signatures = true
+    set ::waiting = {}           # event_type -> [plugin_id]
+    emit azme.plugins.registry.ready with { count: 0 }
+  }
+
+  behavior {
+    on configure_plugin_registry {
+      set ::cfg = $1
+      if ::cfg.require_signatures != null { set ::require_signatures = ::cfg.require_signatures }
+      emit azme.plugins.registry.configured with { require_signatures: ::require_signatures }
+    }
+
+    on register_plugin_manifest {
+      set ::manifest = $1
+      set ::id = ::manifest.id
+      if ::id == null { emit log_error with { type: "PluginNotFound", message: "missing id" }; return }
+      if ::require_signatures and (::manifest.signature == null or ::manifest.pubkey == null) {
+        emit log_error with { type: "SignatureInvalid", message: "unsigned manifest", context: { id: ::id } }
+        return
+      }
+      set ::plugins[::id] = { manifest: ::manifest, status: "registered" }
+      set ::caps[::id] = { roles: (::manifest.roles || ["external_agent"]), limits: (::manifest.limits || {}) }
+      emit azme.plugins.registered with { id: ::id }
+    }
+
+    on verify_plugin_permission {
+      set ::req = $1
+      set ::id = ::req.id
+      set ::event_type = ::req.event_type
+      set ::p = ::plugins[::id]
+      if ::p == null { emit log_error with { type: "PluginNotFound", message: "unknown plugin", context: { id: ::id } }; emit azme.plugins.permission with { id: ::id, allowed: false }; return }
+      set ::roles = ::caps[::id].roles
+      # Stricter capability checks: ensure manifest declares action under capabilities
+      set man = ::p.manifest || {}
+      set caps = man.capabilities || []
+      set act = ::event_type
+      set allowed_by_caps = false
+      loop for c in caps { if (c == act || (c.endsWith(".*") && act.startsWith(c.substring(0, c.length-1)))) { set allowed_by_caps = true } }
+      if allowed_by_caps != true {
+        emit log_error with { type: "CapabilityDenied", message: "capability_not_declared", context: { id: ::id, event_type: ::event_type } }
+        emit azme.plugins.permission with { id: ::id, event_type: ::event_type, allowed: false }
+        return
+      }
+      # ask security policy to verify (global policy handlers will receive this)
+      emit azme.check_permission with { role: (::roles[0] || "external_agent"), event_type: ::event_type }
+      # track waiting for correlation by event_type
+      set ::waiting[::event_type] = (::waiting[::event_type] || []).push(::id)
+      # result will be emitted by security policy component
+    }
+
+    on azme.permission_result {
+      set ::event_type = $1.event_type
+      set ::has_permission = $1.has_permission
+      set ::queue = ::waiting[::event_type] || []
+      if ::queue.length == 0 { return }
+      # FIFO
+      set ::plugin_id = ::queue[0]
+      # pop front
+      set ::newq = []
+      set ::i = 1
+      while ::i < ::queue.length { set ::newq.push(::queue[::i]); set ::i = ::i + 1 }
+      set ::waiting[::event_type] = ::newq
+      emit azme.plugins.permission with { id: ::plugin_id, event_type: ::event_type, allowed: (::has_permission == true) }
+    }
+
+    on set_plugin_status {
+      set ::req = $1
+      if ::plugins[::req.id] == null { emit log_error with { type: "PluginNotFound", message: "set status", context: { id: ::req.id } }; return }
+      set ::plugins[::req.id].status = (::req.status || "disabled")
+      emit azme.plugins.status_updated with { id: ::req.id, status: ::plugins[::req.id].status }
+    }
+
+    on get_plugin_info {
+      set ::id = $1.id
+      emit azme.plugins.info with { id: ::id, plugin: ::plugins[::id] }
+    }
+  }
+}
+
+

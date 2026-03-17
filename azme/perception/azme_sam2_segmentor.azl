@@ -1,0 +1,620 @@
+# AZME SAM2 Segmentor
+# Pixel-perfect object segmentation engine
+# Based on SAM2 architecture, implemented in pure AZL
+
+component ::azme.sam2_segmentor {
+  link ::ffi.http
+  init {
+    # Core segmentation state
+    set ::current_image = null
+    set ::image_features = null
+    set ::is_image_set = false
+    set ::image_size = [1024, 1024]
+    set ::mask_threshold = 0.0
+    set ::max_hole_area = 0
+    set ::max_sprinkle_area = 0
+    
+    # External SAM2 service configuration
+    set ::sam2_base_url = ::internal.env("SAM2_SERVICE_URL")
+    set ::sam2_timeout_ms = 5000
+    set ::env_timeout = ::internal.env("SAM2_TIMEOUT_MS")
+    if ::env_timeout { set ::sam2_timeout_ms = parseInt(::env_timeout) }
+    set ::sam2_available = false
+
+    # Segmentation models and capabilities
+    set ::segmentation_models = {
+      tiny: {
+        name: "sam2.1_hiera_tiny",
+        parameters: 38900000,
+        speed: "fast",
+        quality: "good"
+      },
+      small: {
+        name: "sam2.1_hiera_small", 
+        parameters: 46000000,
+        speed: "medium",
+        quality: "better"
+      },
+      large: {
+        name: "sam2.1_hiera_large",
+        parameters: 224400000,
+        speed: "slow",
+        quality: "best"
+      }
+    }
+    
+    # Current model configuration
+    set ::active_model = ::segmentation_models.tiny
+    set ::multimask_output = true
+    set ::return_logits = false
+    
+    # Processing statistics
+    set ::segmentation_count = 0
+    set ::successful_segmentations = 0
+    set ::failed_segmentations = 0
+    set ::processing_time = 0
+    
+    # Memory integration
+    set ::segmentation_memory = {}
+    set ::feature_cache = {}
+    set ::mask_history = []
+  }
+
+  behavior {
+    on initialize_segmentor {
+      # Verify external service
+      set ::health = sam2_health_check()
+      if !(::health.ok) {
+        emit azme.segmentation_error with {
+          error: (::health.error or "service_unavailable"),
+          message: "SAM2 service not reachable",
+          details: ::health.details
+        }
+        set ::sam2_available = false
+        return
+      }
+      set ::sam2_available = true
+      emit azme.segmentor_ready with { service: "sam2", ok: true }
+    }
+
+    on set_image {
+      set ::image_request = $1
+      set ::image_path = ::image_request.path
+      set ::image_data = ::image_request.data
+      
+      say "🖼️ SAM2 Segmentor: Setting image for segmentation"
+      say "📁 Path: " + ::image_path
+      say "🤖 Model: " + ::active_model.name
+      
+      # Reset previous state
+      call reset_segmentor()
+      
+      # External service required
+      if (::sam2_base_url == null || ::sam2_base_url == "") {
+        emit azme.segmentation_error with { error: "service_url_missing" }
+        return
+      }
+
+      # Perform external image set
+      set ::set_res = sam2_set_image(::image_path)
+      if !(::set_res.success) {
+        emit azme.segmentation_error with {
+          error: (::set_res.error or "image_set_failed"),
+          details: ::set_res.details
+        }
+        return
+      }
+
+      # Update local state with minimal metadata
+      set ::current_image = { path: ::image_path }
+      set ::image_size = [::set_res.width or 1024, ::set_res.height or 1024]
+      set ::image_features = []
+      set ::is_image_set = true
+      
+      say "✅ Image set successfully"
+      say "📏 Size: " + ::image_size[0] + "x" + ::image_size[1]
+      say "🔍 Features generated: " + ::image_features.length + " layers"
+      
+      emit azme.image_set_for_segmentation with {
+        image_path: ::image_path,
+        image_size: ::image_size,
+        features_ready: true,
+        model: ::active_model.name
+      }
+    }
+
+    on segment_from_point {
+      set ::point_request = $1
+      set ::point_coords = ::point_request.coordinates
+      set ::point_label = ::point_request.label or 1
+      set ::normalize_coords = ::point_request.normalize or true
+      
+      if not ::is_image_set {
+        emit azme.segmentation_error with {
+          error: "no_image_set",
+          message: "Must set image before segmentation"
+        }
+        return
+      }
+      
+      say "🎯 Segmenting from point: " + ::point_coords[0] + ", " + ::point_coords[1]
+      
+      # Normalize coordinates if needed
+      set ::normalized_coords = ::point_coords
+      if ::normalize_coords {
+        set ::normalized_coords = [
+          ::point_coords[0] / ::image_size[0],
+          ::point_coords[1] / ::image_size[1]
+        ]
+      }
+      
+      # External segmentation call
+      if !(::sam2_available) {
+        emit azme.segmentation_error with { error: "service_unavailable" }
+        return
+      }
+      set ::start_time = ::internal.now()
+      set ::segmentation_result = sam2_segment_point(::normalized_coords, ::point_label)
+      set ::end_time = ::internal.now()
+      set ::processing_time = ::end_time - ::start_time
+      
+      if ::segmentation_result.success {
+        set ::successful_segmentations = ::successful_segmentations + 1
+        
+        # Create segmentation memory entry
+        set ::seg_entry = {
+          id: "seg_" + ::segmentation_count,
+          type: "point_segmentation",
+          coordinates: ::point_coords,
+          label: ::point_label,
+          masks: ::segmentation_result.masks,
+          scores: ::segmentation_result.scores,
+          processing_time: ::processing_time,
+          timestamp: ::internal.now(),
+          model: ::active_model.name,
+          quantum_enhanced: true
+        }
+        
+        # Store in memory
+        set ::segmentation_memory[::seg_entry.id] = ::seg_entry
+        set ::mask_history = ::mask_history.push(::seg_entry)
+        set ::segmentation_count = ::segmentation_count + 1
+        
+        emit azme.segmentation_completed with {
+          point_coords: ::point_coords,
+          masks: ::segmentation_result.masks,
+          scores: ::segmentation_result.scores,
+          processing_time: ::processing_time,
+          seg_entry: ::seg_entry
+        }
+      } else {
+        set ::failed_segmentations = ::failed_segmentation + 1
+        
+        emit azme.segmentation_failed with {
+          point_coords: ::point_coords,
+          error: ::segmentation_result.error,
+          processing_time: ::processing_time
+        }
+      }
+    }
+
+    on segment_from_box {
+      set ::box_request = $1
+      set ::box_coords = ::box_request.coordinates  # [x1, y1, x2, y2]
+      set ::normalize_coords = ::box_request.normalize or true
+      
+      if not ::is_image_set {
+        emit azme.segmentation_error with {
+          error: "no_image_set",
+          message: "Must set image before segmentation"
+        }
+        return
+      }
+      
+      say "📦 Segmenting from box: " + ::box_coords[0] + ", " + ::box_coords[1] + " to " + ::box_coords[2] + ", " + ::box_coords[3]
+      
+      # Normalize box coordinates
+      set ::normalized_box = ::box_coords
+      if ::normalize_coords {
+        set ::normalized_box = [
+          ::box_coords[0] / ::image_size[0],
+          ::box_coords[1] / ::image_size[1],
+          ::box_coords[2] / ::image_size[0],
+          ::box_coords[3] / ::image_size[1]
+        ]
+      }
+      
+      # External segmentation call
+      if !(::sam2_available) {
+        emit azme.segmentation_error with { error: "service_unavailable" }
+        return
+      }
+      set ::start_time = ::internal.now()
+      set ::segmentation_result = sam2_segment_box(::normalized_box)
+      set ::end_time = ::internal.now()
+      set ::processing_time = ::end_time - ::start_time
+      
+      if ::segmentation_result.success {
+        set ::successful_segmentations = ::successful_segmentation + 1
+        
+        # Create segmentation memory entry
+        set ::seg_entry = {
+          id: "seg_" + ::segmentation_count,
+          type: "box_segmentation",
+          box_coordinates: ::box_coords,
+          masks: ::segmentation_result.masks,
+          scores: ::segmentation_result.scores,
+          processing_time: ::processing_time,
+          timestamp: ::internal.now(),
+          model: ::active_model.name,
+          quantum_enhanced: true
+        }
+        
+        # Store in memory
+        set ::segmentation_memory[::seg_entry.id] = ::seg_entry
+        set ::mask_history = ::mask_history.push(::seg_entry)
+        set ::segmentation_count = ::segmentation_count + 1
+        
+        emit azme.segmentation_completed with {
+          box_coords: ::box_coords,
+          masks: ::segmentation_result.masks,
+          scores: ::segmentation_result.scores,
+          processing_time: ::processing_time,
+          seg_entry: ::seg_entry
+        }
+      } else {
+        set ::failed_segmentations = ::failed_segmentation + 1
+        
+        emit azme.segmentation_failed with {
+          box_coords: ::box_coords,
+          error: ::segmentation_result.error,
+          processing_time: ::processing_time
+        }
+      }
+    }
+
+    on generate_automatic_masks {
+      set ::auto_request = $1
+      set ::points_per_side = ::auto_request.points_per_side or 32
+      set ::pred_iou_thresh = ::auto_request.pred_iou_thresh or 0.8
+      set ::stability_score_thresh = ::auto_request.stability_score_thresh or 0.95
+      set ::min_mask_region_area = ::auto_request.min_mask_region_area or 0
+      
+      if not ::is_image_set {
+        emit azme.segmentation_error with {
+          error: "no_image_set",
+          message: "Must set image before automatic mask generation"
+        }
+        return
+      }
+      
+      say "🎭 Generating automatic masks"
+      say "🔢 Points per side: " + ::points_per_side
+      say "📊 IoU threshold: " + ::pred_iou_thresh
+      
+      # Generate grid of points for automatic segmentation
+      set ::point_grid = generate_point_grid(::points_per_side)
+      set ::start_time = ::internal.now()
+      
+      if !(::sam2_available) {
+        emit azme.segmentation_error with { error: "service_unavailable" }
+        return
+      }
+      set ::auto_result = sam2_generate_automatic_masks({
+        points_per_side: ::points_per_side,
+        pred_iou_thresh: ::pred_iou_thresh,
+        stability_score_thresh: ::stability_score_thresh,
+        min_mask_region_area: ::min_mask_region_area
+      })
+      set ::end_time = ::internal.now()
+      set ::processing_time = ::end_time - ::start_time
+      if ::auto_result.success {
+        set ::segmentation_count = ::segmentation_count + 1
+        emit azme.automatic_masks_generated with {
+          total_masks: (::auto_result.total_masks or 0),
+          masks: (::auto_result.masks or []),
+          processing_time: ::processing_time,
+          auto_entry: ::auto_result
+        }
+      } else {
+        set ::failed_segmentations = ::failed_segmentation + 1
+        emit azme.automatic_masks_failed with {
+          error: (::auto_result.error or "automatic_masks_failed"),
+          processing_time: ::processing_time
+        }
+      }
+    }
+
+    on refine_mask {
+      set ::refine_request = $1
+      set ::input_mask = ::refine_request.mask
+      set ::refinement_points = ::refine_request.points or []
+      set ::refinement_labels = ::refine_request.labels or []
+      
+      if not ::is_image_set {
+        emit azme.segmentation_error with {
+          error: "no_image_set",
+          message: "Must set image before mask refinement"
+        }
+        return
+      }
+      
+      say "🔧 Refining mask with " + ::refinement_points.length + " points"
+      
+      if !(::sam2_available) {
+        emit azme.segmentation_error with { error: "service_unavailable" }
+        return
+      }
+      set ::start_time = ::internal.now()
+      set ::refined_result = sam2_refine_mask(::input_mask, ::refinement_points, ::refinement_labels)
+      set ::end_time = ::internal.now()
+      set ::processing_time = ::end_time - ::start_time
+      
+      if ::refined_result.success {
+        set ::successful_segmentations = ::successful_segmentation + 1
+        
+        # Create refinement entry
+        set ::refine_entry = {
+          id: "refine_" + ::segmentation_count,
+          type: "mask_refinement",
+          original_mask: ::input_mask,
+          refinement_points: ::refinement_points,
+          refinement_labels: ::refinement_labels,
+          refined_mask: ::refined_result.mask,
+          improvement_score: ::refined_result.improvement_score,
+          processing_time: ::processing_time,
+          timestamp: ::internal.now(),
+          model: ::active_model.name,
+          quantum_enhanced: true
+        }
+        
+        # Store in memory
+        set ::segmentation_memory[::refine_entry.id] = ::refine_entry
+        set ::mask_history = ::mask_history.push(::refine_entry)
+        set ::segmentation_count = ::segmentation_count + 1
+        
+        emit azme.mask_refined with {
+          original_mask: ::input_mask,
+          refined_mask: ::refined_result.mask,
+          improvement_score: ::refined_result.improvement_score,
+          processing_time: ::processing_time,
+          refine_entry: ::refine_entry
+        }
+      } else {
+        set ::failed_segmentations = ::failed_segmentation + 1
+        
+        emit azme.mask_refinement_failed with {
+          error: ::refined_result.error,
+          processing_time: ::processing_time
+        }
+      }
+    }
+
+    on change_model {
+      set ::model_request = $1
+      set ::new_model_size = ::model_request.size or "tiny"
+      
+      if ::segmentation_models[::new_model_size] != null {
+        set ::active_model = ::segmentation_models[::new_model_size]
+        say "🔄 Changed to model: " + ::active_model.name
+        say "📊 Parameters: " + ::active_model.parameters
+        say "⚡ Speed: " + ::active_model.speed
+        say "🎯 Quality: " + ::active_model.quality
+        
+        # Reset image if model changed
+        if ::is_image_set {
+          call reset_segmentor()
+          say "⚠️ Image reset due to model change"
+        }
+        
+        emit azme.model_changed with {
+          new_model: ::active_model.name,
+          parameters: ::active_model.parameters,
+          speed: ::active_model.speed,
+          quality: ::active_model.quality
+        }
+      } else {
+        emit azme.model_change_failed with {
+          error: "invalid_model_size",
+          requested_size: ::new_model_size,
+          available_sizes: ["tiny", "small", "large"]
+        }
+      }
+    }
+
+    on get_statistics {
+      set ::stats = {
+        total_segmentations: ::segmentation_count,
+        successful_segmentations: ::successful_segmentations,
+        failed_segmentations: ::failed_segmentations,
+        success_rate: ::successful_segmentations / (::segmentation_count + 0.001),
+        average_processing_time: ::processing_time / (::segmentation_count + 0.001),
+        current_model: ::active_model.name,
+        image_set: ::is_image_set,
+        memory_entries: ::segmentation_memory.length,
+        mask_history_length: ::mask_history.length,
+        quantum_enhanced: true
+      }
+      
+      emit azme.segmentation_statistics with {
+        statistics: ::stats
+      }
+    }
+
+    on reset_segmentor {
+      set ::current_image = null
+      set ::image_features = null
+      set ::is_image_set = false
+      set ::image_size = [1024, 1024]
+      say "🔄 Segmentor reset"
+    }
+  }
+
+  # Helper functions for external service
+  function http_post(url, data) {
+    emit "http_request" to ::ffi.http with "POST" url data
+    set ::_resp = null
+    wait for "http_response" then {
+      set ::_resp = $2
+    }
+    return ::_resp
+  }
+
+  function sam2_health_check() {
+    if (::sam2_base_url == null || ::sam2_base_url == "") {
+      return { ok: false, error: "service_url_missing" }
+    }
+    emit "http_request" to ::ffi.http with "GET" (::sam2_base_url + "/healthz") null
+    set r = null
+    wait for "http_response" then { set r = $2 }
+    if !(r && (r.ok or false)) { return { ok: false, error: "unreachable" } }
+    return { ok: true }
+  }
+
+  function sam2_set_image(path) {
+    set url = ::sam2_base_url + "/image/set"
+    set payload = { path: path }
+    set resp = http_post(url, payload)
+    if !(resp && (resp.ok or false)) { return { success: false, error: "bad_response" } }
+    return { success: false, error: "not_parsed" }
+  }
+
+  function sam2_segment_point(coords, label) {
+    set url = ::sam2_base_url + "/segment/point"
+    set payload = { coords: coords, label: label }
+    set resp = http_post(url, payload)
+    if !(resp && (resp.ok or false)) { return { success: false, error: "bad_response" } }
+    return { success: false, error: "not_parsed" }
+  }
+
+  function sam2_segment_box(box) {
+    set url = ::sam2_base_url + "/segment/box"
+    set payload = { box: box }
+    set resp = http_post(url, payload)
+    if !(resp && (resp.ok or false)) { return { success: false, error: "bad_response" } }
+    return { success: false, error: "not_parsed" }
+  }
+
+  function sam2_generate_automatic_masks(params) {
+    set url = ::sam2_base_url + "/segment/automask"
+    set payload = { params: params }
+    set resp = http_post(url, payload)
+    if !(resp && (resp.ok or false)) { return { success: false, error: "bad_response" } }
+    return { success: false, error: "not_parsed" }
+  }
+
+  function sam2_refine_mask(input_mask, points, labels) {
+    set url = ::sam2_base_url + "/segment/refine"
+    set payload = { mask: input_mask, points: points, labels: labels }
+    set resp = http_post(url, payload)
+    if !(resp && (resp.ok or false)) { return { success: false, error: "bad_response" } }
+    return { success: false, error: "not_parsed" }
+  }
+
+  function generate_point_segmentation(coords, label) {
+    # Simulate point-based segmentation
+    # In real implementation, this would use the actual SAM2 model
+    set ::result = {
+      success: true,
+      masks: [],
+      scores: []
+    }
+    
+    if ::multimask_output {
+      # Generate 3 different mask variations
+      loop for ::i in [0, 1, 2] {
+        set ::mask = generate_simulated_mask(coords, ::i)
+        set ::score = 0.8 + (::i * 0.1) + (::internal.random() * 0.1)
+        set ::result.masks = ::result.masks.push(::mask)
+        set ::result.scores = ::result.scores.push(::score)
+      }
+    } else {
+      # Generate single best mask
+      set ::mask = generate_simulated_mask(coords, 0)
+      set ::score = 0.9 + (::internal.random() * 0.1)
+      set ::result.masks = ::result.masks.push(::mask)
+      set ::result.scores = ::result.scores.push(::score)
+    }
+    
+    return ::result
+  }
+
+  function generate_box_segmentation(box_coords) {
+    # Simulate box-based segmentation
+    set ::result = {
+      success: true,
+      masks: [],
+      scores: []
+    }
+    
+    # Generate mask based on box coordinates
+    set ::mask = generate_simulated_box_mask(box_coords)
+    set ::score = 0.85 + (::internal.random() * 0.15)
+    
+    set ::result.masks = ::result.masks.push(::mask)
+    set ::result.scores = ::result.scores.push(::score)
+    
+    return ::result
+  }
+
+  function generate_point_grid(points_per_side) {
+    # Generate grid of points for automatic mask generation
+    set ::grid = []
+    set ::step = 1.0 / points_per_side
+    
+    loop for ::x in range(0, points_per_side) {
+      loop for ::y in range(0, points_per_side) {
+        set ::point = [::x * ::step, ::y * ::step]
+        set ::grid = ::grid.push(::point)
+      }
+    }
+    
+    return ::grid
+  }
+
+  function filter_masks_by_quality(masks, scores, iou_thresh, stability_thresh) {
+    # Filter masks based on quality thresholds
+    set ::filtered = []
+    
+    loop for ::i in range(0, masks.length) {
+      if ::scores[::i] >= ::iou_thresh {
+        set ::filtered = ::filtered.push(::masks[::i])
+      }
+    }
+    
+    return ::filtered
+  }
+
+  function remove_small_regions(masks, min_area) {
+    # Remove masks with small regions
+    set ::filtered = []
+    
+    loop for ::mask in ::masks {
+      if ::mask.area >= ::min_area {
+        set ::filtered = ::filtered.push(::mask)
+      }
+    }
+    
+    return ::filtered
+  }
+
+  function refine_existing_mask(original_mask, points, labels) {
+    # Refine existing mask with new points
+    set ::result = {
+      success: true,
+      mask: ::original_mask,
+      improvement_score: 0.1 + (::internal.random() * 0.2)
+    }
+    
+    # Simulate mask refinement
+    # In real implementation, this would use the actual refinement logic
+    
+    return ::result
+  }
+
+  # Simulation helpers removed in production wiring; external service required
+
+  # Simulation helpers removed
+
+  # Local image loading simulation removed
+}

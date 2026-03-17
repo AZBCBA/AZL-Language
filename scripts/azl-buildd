@@ -33,8 +33,9 @@ fi
 mkdir -p .azl/cache
 
 # Create combined daemon file
-DAEMON_FILE="/tmp/azl_build_daemon_$$.azl"
-COMBINED="/tmp/azl_build_combined_$$.azl"
+: "${TMPDIR:=/tmp}"; mkdir -p "$TMPDIR"
+DAEMON_FILE="${TMPDIR}/azl_build_daemon_$$.azl"
+COMBINED="${TMPDIR}/azl_build_combined_$$.azl"
 
 # Bootstrap component for enterprise daemon
 cat > "$DAEMON_FILE" <<AZL

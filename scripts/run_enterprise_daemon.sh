@@ -8,11 +8,12 @@ echo "🚀 AZL Enterprise Daemon Runner"
 echo "⚡ PURE AZL EXECUTION - NO EXTERNAL DEPENDENCIES!"
 echo ""
 
-# Set environment variables
+# Set environment variables (respect existing values; provide sane defaults)
 export AZL_API_TOKEN="${AZL_API_TOKEN:-$(openssl rand -hex 32)}"
-export AZL_BUILD_CONFIG="config/prod.azl.json"
-export AZL_BUILD_API_ENABLED="true"
-export AZL_BUILD_API_PORT="8080"
+export AZL_BUILD_CONFIG="${AZL_BUILD_CONFIG:-config/prod.azl.json}"
+export AZL_BUILD_API_ENABLED="${AZL_BUILD_API_ENABLED:-true}"
+export AZL_BUILD_API_PORT="${AZL_BUILD_API_PORT:-8080}"
+export AZL_HTTP_PORT="${AZL_HTTP_PORT:-}"  # optional separate AZL http server port
 export AZL_WIRE_MANAGED=1
 
 echo "🔑 API Token: $AZL_API_TOKEN"
@@ -49,7 +50,8 @@ echo $! > .azl/syswire.pid
 sleep 0.2  # Give wire time to start
 
 # Create combined AZL file with all components
-COMBINED="/tmp/azl_enterprise_$$.azl"
+: "${TMPDIR:=/tmp}"; mkdir -p "$TMPDIR"
+COMBINED="${TMPDIR}/azl_enterprise_$$.azl"
 echo "📦 Creating combined AZL file..."
 
 cat > "$COMBINED" << 'AZL'
@@ -76,10 +78,29 @@ COMPONENTS=(
   "azl/core/error_system.azl"
   "azl/runtime/interpreter/azl_interpreter.azl"
   "azl/bootstrap/azl_pure_launcher.azl"
-  "azl/compat/launcher_shim.azl"
-  "azl/compat/interpreter_shim.azl"
   "azl/diag/env_probe.azl"
   "azl/diag/net_probe.azl"
+  # Full training stack (AZME/AZL/Quantum/LHA3)
+  "azl/orchestrator/comprehensive_training_controller.azl"
+  "azl/nlp/advanced_training_system.azl"
+  "azl/neural/model_loader.azl"
+  "azl/neural/real_neural_network.azl"
+  "azl/neural/qwen_72b_quantum_attention.azl"
+  "azl/memory/lha3_memory_system.azl"
+  "azl/memory/lha3_adaptive_quantum_engine.azl"
+  "azl/quantum/real_quantum_processor.azl"
+  "azl/monitoring/quantum_dashboard.azl"
+  "azl/weights/registry.azl"
+  # AZME memory and interfaces
+  "azme/memory/azme_unified_memory_system.azl"
+  "azme/core/agi_core.azl"
+  "azme/core/autonomous_brain.azl"
+  "azme/learning/azme_actual_dataset_training.azl"
+  "azme/learning/azme_clean_dataset_training.azl"
+  "azme/interface/azme_chat_interface.azl"
+  "azme/interface/azme_action_decider.azl"
+  "azme/cognitive/azme_cognitive_loop.azl"
+  "azme/consciousness/azme_belief_system.azl"
 )
 
 for component in "${COMPONENTS[@]}"; do
@@ -95,6 +116,19 @@ done
 
 echo "✅ Combined file created: $COMBINED"
 
+# Optional: embed a tiny launcher to start the AZME provider during E2E
+cat >> "$COMBINED" <<'AZL'
+# ===== EMBEDDED: AZME Provider E2E Launcher =====
+component ::e2e.azme_provider_launcher {
+  init {
+    if ::internal.env("AZME_PROVIDER_E2E") == "1" {
+      say "🔌 E2E: Starting AZME Provider on :5000"
+      run_server(5000)
+    }
+  }
+}
+AZL
+
 # Set environment for execution bridge
 export AZL_COMBINED_PATH="$COMBINED"
 export AZL_ENTRY="::build.daemon.enterprise"
@@ -104,14 +138,19 @@ echo "📁 Combined file: $COMBINED"
 echo "🎯 Entry point: $AZL_ENTRY"
 echo ""
 
-# Execute the combined file using the Stage-0 bootstrap
-# Line-buffer stdout & stderr, tee to daemon log, then tee to the FIFO
 echo "🧠 Loading and executing AZL components..."
-stdbuf -oL -eL scripts/azl_bootstrap.sh "$COMBINED" "::build.daemon.enterprise" 2>&1 \
-  | stdbuf -oL tee .azl/daemon.out \
-  | stdbuf -oL tee .azl/engine.out \
-  >/dev/null &
-echo $! > .azl/daemon.pid
+if [ "${AZL_SYSTEMD:-0}" = "1" ]; then
+  # Under systemd: avoid extra tee/stdbuf processes; log directly
+  scripts/azl_bootstrap.sh "$COMBINED" "::build.daemon.enterprise" >> .azl/daemon.out 2>&1 &
+  echo $! > .azl/daemon.pid
+else
+  # Interactive/dev mode: keep previous behavior with tees
+  stdbuf -oL -eL scripts/azl_bootstrap.sh "$COMBINED" "::build.daemon.enterprise" 2>&1 \
+    | stdbuf -oL tee .azl/daemon.out \
+    | stdbuf -oL tee .azl/engine.out \
+    >/dev/null &
+  echo $! > .azl/daemon.pid
+fi
 
 echo ""
 echo "🎉 AZL Enterprise Daemon execution initiated!"

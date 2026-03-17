@@ -9,6 +9,9 @@ component ::core.command_processor {
     
     say "⚡ AZL Command Processor initializing..."
     emit command_processor.initializing
+
+    # Register advanced training command for runtime routing
+    set ::command_handlers["train.advanced"] = "command.train.advanced"
   }
 
   on process_command {
@@ -42,6 +45,17 @@ component ::core.command_processor {
     
     say "⚡ Executing handler: ::handler"
     emit ::handler with ::params
+  }
+
+  # Runtime command: train.advanced → orchestrator entry
+  on command.train.advanced {
+    set p = $1 || {}
+    link ::orchestrator.comprehensive_training_controller
+    emit start_advanced_training_pipeline to ::orchestrator.comprehensive_training_controller with {
+      dataset_path: (p.dataset_path or p.data_path or ""),
+      mode: (p.mode or "supervised"),
+      config: (p.config or { device: "cpu", gpu_limit: 0, epochs: 1, batch_size: 1, strict: true })
+    }
   }
 
   on queue_command {

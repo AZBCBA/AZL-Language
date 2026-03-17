@@ -22,6 +22,14 @@ component ::azl.interpreter {
     # hard error policy
     set ::halted = false
     set ::halt_on_error = ((::internal.env("AZL_STRICT") or "1") == "1")
+    # Performance caches (pure AZL): tokenization and parse memo by source hash
+    set ::perf = { tok_cache: {}, ast_cache: {}, cap: ((::internal.env("AZL_PARSE_CACHE") or "128").toInt()) }
+    set ::perf.stats = { tok_hits: 0, tok_misses: 0, ast_hits: 0, ast_misses: 0 }
+    set ::cache_order = []  # LRU for keys of either cache (same keys)
+    link ::azl.security
+    # Expression compile cache (string → AST)
+    if ::perf == null { set ::perf = {} }
+    set ::perf.expr_cache = {}
     
     say "🧠 Pure AZL Interpreter Initialized"
     say "🚀 NO RUST DEPENDENCIES!"
@@ -63,6 +71,18 @@ component ::azl.interpreter {
     # Tokenization
     listen for "tokenize" {
       set ::code = ::event.data.code
+      # Cache check
+      set ::key = ::hash_source(::code)
+      set cached_tok = ::perf.tok_cache[::key]
+      if cached_tok != null {
+        set ::perf.stats.tok_hits = ::perf.stats.tok_hits + 1
+        ::touch_cache_key(::key)
+        set ::tokens = cached_tok
+        say "🔤 Tokenizing code... (cache hit)"
+        say "📝 Generated ::tokens.length tokens"
+        emit tokenize_complete with { tokens: ::tokens }
+        return
+      }
       set ::tokens = []
       set ::current_pos = 0
       set ::line = 1
@@ -80,14 +100,29 @@ component ::azl.interpreter {
         set ::line = ::line + 1
       }
       
+      set ::perf.stats.tok_misses = ::perf.stats.tok_misses + 1
       say "📝 Generated ::tokens.length tokens"
+      # Insert into cache
+      ::insert_cache(::key, ::tokens, null)
       emit tokenize_complete with { tokens: ::tokens }
     }
     
     # Parsing
     listen for "parse" {
       set ::tokens = ::event.data.tokens
+      set ::key = ::hash_tokens(::tokens)
+      set cached_ast = ::perf.ast_cache[::key]
+      if cached_ast != null {
+        set ::perf.stats.ast_hits = ::perf.stats.ast_hits + 1
+        ::touch_cache_key(::key)
+        set ::ast = cached_ast
+        say "🌳 Generated AST with ::ast.nodes.length nodes (cache hit)"
+        emit parse_complete with { ast: ::ast }
+        return
+      }
       set ::ast = ::parse_tokens(::tokens)
+      set ::perf.stats.ast_misses = ::perf.stats.ast_misses + 1
+      ::insert_cache(::key, null, ::ast)
       
       say "🌳 Generated AST with ::ast.nodes.length nodes"
       emit parse_complete with { ast: ::ast }
@@ -97,6 +132,14 @@ component ::azl.interpreter {
     listen for "execute" {
       set ::ast = ::event.data.ast
       set ::scope = ::event.data.scope
+      # Pre-execution import/link resolution (shallow pass)
+      if ::ast && ::ast.nodes {
+        for ::n in ::ast.nodes {
+          if ::n.type == "import" || ::n.type == "link" {
+            ::resolve_module_now(::n.module)
+          }
+        }
+      }
       set ::result = ::execute_ast(::ast, ::scope)
       
       say "⚡ Execution complete"
@@ -112,6 +155,32 @@ component ::azl.interpreter {
 
   memory {
     # Tokenize a single line
+    # Resolve module immediately via module system; strict error on failure
+    ::resolve_module_now = (name_expr) => {
+      set ::mname = ::evaluate_expression(name_expr)
+      if ::mname == null || ::mname.toString().length == 0 {
+        ::record_error("module", "invalid_module_name", { expr: name_expr })
+        return false
+      }
+      set ::mod_str = ::mname.toString()
+      # Directly use module system resolver
+      set path = ::azl.modules.resolve_module_path(::mod_str, "")
+      if path == null {
+        ::record_error("module", "module_not_found", { module: ::mod_str })
+        return false
+      }
+      # Read and interpret imported module content immediately (no cycles here)
+      set content = ::azl.system_interface.read_file_host_sync(path)
+      if content == null { content = ::azl.system_interface.read_file_sync(path) }
+      if content == null {
+        ::record_error("module", "module_read_failed", { module: ::mod_str, path: path })
+        return false
+      }
+      # Basic cycle guard: avoid re-executing same path in one session
+      if ::components && ::components[path] != null { return true }
+      emit interpret with { code: content, component_name: path }
+      return true
+    }
     ::tokenize_line = (line_text, line_number) => {
       set ::tokens = []
       set ::current = ""
@@ -230,6 +299,12 @@ component ::azl.interpreter {
         } else if ::token.value == "listen" {
           set ::listen_node = ::parse_listen_statement(::tokens)
           set ::ast.nodes.push(::listen_node)
+        } else if ::token.value == "import" {
+          set ::imp_node = ::parse_import_statement(::tokens)
+          set ::ast.nodes.push(::imp_node)
+        } else if ::token.value == "link" {
+          set ::lnk_node = ::parse_link_statement(::tokens)
+          set ::ast.nodes.push(::lnk_node)
         } else {
           set ::current_pos = ::current_pos + 1
         }
@@ -316,6 +391,12 @@ component ::azl.interpreter {
           # Function-style block: on name { ... }
           set ::fn_node = ::parse_on_function(::tokens)
           set ::section.statements.push(::fn_node)
+        } else if ::token.value == "import" {
+          set ::imp_node = ::parse_import_statement(::tokens)
+          set ::section.statements.push(::imp_node)
+        } else if ::token.value == "link" {
+          set ::lnk_node = ::parse_link_statement(::tokens)
+          set ::section.statements.push(::lnk_node)
         } else if (::token.type == "identifier" && ::current_pos + 1 < ::tokens.length && ::tokens[::current_pos + 1].type == "paren" && ::tokens[::current_pos + 1].value == "(") {
           # Call-style statement: name(...)
           set ::call_node = ::parse_call_statement(::tokens)
@@ -571,7 +652,36 @@ component ::azl.interpreter {
       return ::fn_node
     }
 
-    # Parse call statement: name(expr?)
+    # Parse import statement: import ::module.name
+    ::parse_import_statement = (tokens) => {
+      set ::imp = { type: "import", module: "" }
+      # skip 'import'
+      set ::current_pos = ::current_pos + 1
+      if ::current_pos < ::tokens.length {
+        set ::tok = ::tokens[::current_pos]
+        set ::imp.module = ::tok.value
+        set ::current_pos = ::current_pos + 1
+      }
+      # optional trailing eol
+      if ::current_pos < ::tokens.length && ::tokens[::current_pos].type == "eol" { set ::current_pos = ::current_pos + 1 }
+      return ::imp
+    }
+
+    # Parse link statement: link ::module.name
+    ::parse_link_statement = (tokens) => {
+      set ::lnk = { type: "link", module: "" }
+      # skip 'link'
+      set ::current_pos = ::current_pos + 1
+      if ::current_pos < ::tokens.length {
+        set ::tok = ::tokens[::current_pos]
+        set ::lnk.module = ::tok.value
+        set ::current_pos = ::current_pos + 1
+      }
+      if ::current_pos < ::tokens.length && ::tokens[::current_pos].type == "eol" { set ::current_pos = ::current_pos + 1 }
+      return ::lnk
+    }
+
+    # Parse call statement: name(arglist?) where arglist := expr (',' expr)*
     ::parse_call_statement = (tokens) => {
       set ::call_node = {
         type: "call",
@@ -589,28 +699,29 @@ component ::azl.interpreter {
         set ::current_pos = ::current_pos + 1
       }
 
-      # Collect argument text until matching ')'
+      # Collect tokens until matching ')' and split top-level commas
       set ::depth = 1
-      set ::arg_text = ""
+      set buf = ""
+      set parts = []
       while ::current_pos < ::tokens.length && ::depth > 0 {
         set ::t = ::tokens[::current_pos]
-        if ::t.type == "paren" && ::t.value == "(" {
-          set ::depth = ::depth + 1
-          set ::arg_text = ::arg_text + "("
-        } else if ::t.type == "paren" && ::t.value == ")" {
+        if ::t.type == "paren" && ::t.value == "(" { set ::depth = ::depth + 1; set buf = buf + "(" }
+        else if ::t.type == "paren" && ::t.value == ")" {
           set ::depth = ::depth - 1
-          if ::depth > 0 { set ::arg_text = ::arg_text + ")" }
+          if ::depth > 0 { set buf = buf + ")" }
+        } else if (::t.value == "," && ::depth == 1) {
+          set part = buf.trim()
+          if part != "" { set ::call_node.args.push(part) }
+          set buf = ""
         } else if ::t.type == "eol" && ::depth == 1 {
-          # ignore eol inside call
+          # ignore
         } else {
-          set ::arg_text = ::arg_text + ( (::arg_text.length == 0) ? "" : " " ) + ::t.value
+          set buf = buf + ( (buf.length == 0) ? "" : " " ) + ::t.value
         }
         set ::current_pos = ::current_pos + 1
       }
-
-      # Single-argument support for now
-      set ::arg = ::arg_text.trim()
-      if ::arg != "" { set ::call_node.args.push(::arg) }
+      set tail = buf.trim()
+      if tail != "" { set ::call_node.args.push(tail) }
       
       # Optional trailing eol
       if ::current_pos < ::tokens.length && ::tokens[::current_pos].type == "eol" { set ::current_pos = ::current_pos + 1 }
@@ -646,6 +757,8 @@ component ::azl.interpreter {
       set ::components[::component_name] = ::component
       
       say "📦 Executing component: ::component_name"
+      # Set current component for capability checks
+      ::azl.security.set_current(::component_name)
       
       # PHASE 1: Pre-register listeners from behavior BEFORE init to ensure early emits are caught
       if ::component.sections.behavior {
@@ -678,8 +791,16 @@ component ::azl.interpreter {
           ::execute_statement(::statement)
         }
       }
+      # Clear current component context
+      ::azl.security.clear_current()
       
       return "Component '::component_name' executed successfully"
+    }
+
+    # Grant convenience: allow component to request capabilities explicitly (if policy allows)
+    ::grant_capability = (component, cap) => {
+      if ::azl.security { return ::azl.security.grant(component, cap) }
+      return false
     }
     
     # Execute statement
@@ -780,16 +901,22 @@ component ::azl.interpreter {
       # Set standardized event context object for handlers using ::event.{name,data}
       set ::variables["event"] = { name: ::ev_name, data: ::payload_val }
       emit ::ev_name
-      # Synchronously dispatch to registered listeners in this interpreter
+      # Synchronously dispatch to registered listeners in this interpreter with owner context
       if ::listeners && ::listeners[::ev_name] {
         set ::actions = ::listeners[::ev_name]
-        for ::action_block in ::actions {
-          for ::stmt in ::action_block {
+        set ::prev_comp = ( ::azl.security ? ::azl.security.current_component : "" )
+        for ::listener in ::actions {
+          set ::target_owner = (::listener.owner || ::prev_comp)
+          if ::azl.security { ::azl.security.set_current(::target_owner) }
+          set ::block = (::listener.body || ::listener)  # back-compat if old shape
+          for ::stmt in ::block {
             ::execute_statement(::stmt)
           }
         }
+        if ::azl.security { ::azl.security.set_current(::prev_comp) }
       }
-      # pop
+      # Clear event context and pop
+      set ::variables["event"] = null
       set ::dispatch_stack = ::dispatch_stack.filter((x, i) => i < ::dispatch_stack.length - 1)
       set ::recursion_depth = ::recursion_depth - 1
       return "Emitted: " + ::ev_name
@@ -800,14 +927,27 @@ component ::azl.interpreter {
       set ::event = ::statement.event
       say "👂 Register listener for event: ::event"
       if ::listeners[::event] == null { set ::listeners[::event] = [] }
-      set ::listeners[::event].push(::statement.action)
+      set ::listeners[::event].push({ owner: ::component_name, body: ::statement.action })
       return "Registered listener: ::event"
+    }
+
+    # Listener management helper
+    ::remove_listener = (event_name) => {
+      if ::listeners && ::listeners[event_name] { set ::listeners[event_name] = null; return true }
+      return false
     }
 
     # Expression evaluation helpers
     ::evaluate_expression = (expr) => {
       if !expr { return "" }
       set ::s = expr.toString().trim()
+      # Fast path: compile to AST once and evaluate
+      set ast_cached = ::perf.expr_cache[::s]
+      if ast_cached == null {
+        set compiled = ::compile_expression(::s)
+        if compiled != null { set ::perf.expr_cache[::s] = compiled; set ast_cached = compiled }
+      }
+      if ast_cached != null { return ::eval_expr_ast(ast_cached) }
       # handle parentheses
       if ::s.startsWith("(") && ::s.endsWith(")") && ::is_balanced_any(::s) {
         return ::evaluate_expression(::s.substring(1, ::s.length - 1))
@@ -963,8 +1103,180 @@ component ::azl.interpreter {
       # number
       set ::n = ::parse_number_safe(::s)
       if ::n != null { return ::n }
-      # fallback: bare identifier
-      return ::variables[::s]
+      # strict: unknown identifier is an error (no silent fallback)
+      set ::val_unk = ::variables[::s]
+      if ::val_unk != null { return ::val_unk }
+      ::record_error("runtime", "unknown_identifier", { identifier: ::s })
+      return null
+    }
+
+    # ----- Expression compiler (string → AST) -----
+    ::compile_expression = (s) => {
+      set t = (s || "").trim()
+      if t.length == 0 { return { type: "Literal", value: "" } }
+      # Ternary (a ? b : c)
+      set tr = ::split_ternary_top_level(t)
+      if tr != null {
+        return { type: "Ternary", cond: ::compile_expression(tr.cond.trim()), then: ::compile_expression(tr.then.trim()), else: ::compile_expression(tr.else.trim()) }
+      }
+      # Binary operators by precedence
+      # Equality/relational
+      for op2 in ["==", "!=", ">=", "<="] {
+        set parts2 = ::split_top_level_any(t, op2)
+        if parts2.length == 2 { return { type: "Binary", op: op2, left: ::compile_expression(parts2[0].trim()), right: ::compile_expression(parts2[1].trim()) } }
+      }
+      for op1 in [">", "<"] {
+        set parts1 = ::split_top_level_any(t, op1)
+        if parts1.length == 2 { return { type: "Binary", op: op1, left: ::compile_expression(parts1[0].trim()), right: ::compile_expression(parts1[1].trim()) } }
+      }
+      # Add/Sub
+      set plusParts = ::split_top_level_any(t, "+")
+      if plusParts.length > 1 {
+        # fold left
+        set node = ::compile_expression(plusParts[0].trim())
+        set i = 1
+        while i < plusParts.length {
+          set rhsA = ::compile_expression(plusParts[i].trim())
+          set node = { type: "Binary", op: "+", left: node, right: rhsA }
+          set i = i + 1
+        }
+        return node
+      }
+      set minusParts = ::split_top_level_any(t, "-")
+      if minusParts.length > 1 {
+        set node2 = ::compile_expression(minusParts[0].trim())
+        set j = 1
+        while j < minusParts.length {
+          set rhsB = ::compile_expression(minusParts[j].trim())
+          set node2 = { type: "Binary", op: "-", left: node2, right: rhsB }
+          set j = j + 1
+        }
+        return node2
+      }
+      # Mul/Div
+      set mulParts = ::split_top_level_any(t, "*")
+      if mulParts.length > 1 {
+        set node3 = ::compile_expression(mulParts[0].trim())
+        set k = 1
+        while k < mulParts.length {
+          set rhsC = ::compile_expression(mulParts[k].trim())
+          set node3 = { type: "Binary", op: "*", left: node3, right: rhsC }
+          set k = k + 1
+        }
+        return node3
+      }
+      set divParts = ::split_top_level_any(t, "/")
+      if divParts.length > 1 {
+        set node4 = ::compile_expression(divParts[0].trim())
+        set m = 1
+        while m < divParts.length {
+          set rhsD = ::compile_expression(divParts[m].trim())
+          set node4 = { type: "Binary", op: "/", left: node4, right: rhsD }
+          set m = m + 1
+        }
+        return node4
+      }
+      # Arrays
+      if t.startsWith("[") && t.endsWith("]") && ::is_balanced_any(t) {
+        set inner = t.substring(1, t.length - 1)
+        set parts = ::split_top_level_any(inner, ",")
+        set items = []
+        for p in parts { set items.push(::compile_expression(p.trim())) }
+        return { type: "Array", items: items }
+      }
+      # Objects
+      if t.startsWith("{") && t.endsWith("}") && ::is_balanced_any(t) {
+        set inner2 = t.substring(1, t.length - 1)
+        set entries = ::split_top_level_any(inner2, ",")
+        set props = []
+        for e in entries {
+          set kv = ::split_top_level_any(e, ":")
+          if kv.length >= 2 {
+            set kraw = kv[0].trim()
+            set vraw = e.substring(kraw.length + 1).trim()
+            set key = (kraw.startsWith('"') && kraw.endsWith('"')) ? kraw.substring(1, kraw.length - 1) : kraw
+            set props.push({ key: key, value: ::compile_expression(vraw) })
+          }
+        }
+        return { type: "Object", props: props }
+      }
+      # Strings
+      if t.startsWith('"') && t.endsWith('"') { return { type: "Literal", value: t.substring(1, t.length - 1) } }
+      # Booleans/Null
+      if t == "true" { return { type: "Literal", value: true } }
+      if t == "false" { return { type: "Literal", value: false } }
+      if t == "null" { return { type: "Literal", value: null } }
+      # Numbers
+      set num = ::parse_number_safe(t)
+      if num != null { return { type: "Literal", value: num } }
+      # Property access chain a.b.c (avoid floats)
+      if t.indexOf(".") >= 0 {
+        set maybe = ::parse_number_safe(t)
+        if maybe == null {
+          set segs = t.split(".")
+          if segs.length >= 2 {
+            set base = segs[0]
+            set name = (base.startsWith("::")) ? base.substring(2, base.length) : base
+            set varNode = { type: "Var", name: name }
+            set idx = 1
+            set node5 = varNode
+            while idx < segs.length {
+              set node5 = { type: "PropAccess", object: node5, key: segs[idx] }
+              set idx = idx + 1
+            }
+            return node5
+          }
+        }
+      }
+      # Variable or positional parameter
+      if t.length > 0 && t[0] == "$" { return { type: "Var", name: t } }
+      if t.startsWith("::") { return { type: "Var", name: t.substring(2, t.length) } }
+      return { type: "Var", name: t }
+    }
+
+    ::eval_expr_ast = (node) => {
+      if node == null { return null }
+      if node.type == "Literal" { return node.value }
+      if node.type == "Var" {
+        return ::variables[node.name]
+      }
+      if node.type == "Array" {
+        set out = []
+        for it in node.items { set out.push(::eval_expr_ast(it)) }
+        return out
+      }
+      if node.type == "Object" {
+        set obj = {}
+        for pr in node.props { obj[pr.key] = ::eval_expr_ast(pr.value) }
+        return obj
+      }
+      if node.type == "PropAccess" {
+        set base = ::eval_expr_ast(node.object)
+        if base == null { return null }
+        return base[node.key]
+      }
+      if node.type == "Ternary" {
+        set c = ::eval_expr_ast(node.cond)
+        if (c == true || (c != null && c.toString && c.toString() == "true")) {
+          return ::eval_expr_ast(node.then)
+        }
+        return ::eval_expr_ast(node.else)
+      }
+      if node.type == "Binary" {
+        set lv = ::eval_expr_ast(node.left)
+        set rv = ::eval_expr_ast(node.right)
+        if node.op == "+" { return ::add_values(lv, rv) }
+        if node.op == "-" { return (::to_number(lv) - ::to_number(rv)) }
+        if node.op == "*" { return (::to_number(lv) * ::to_number(rv)) }
+        if node.op == "/" { set d = ::to_number(rv); if d == 0 { ::record_error("runtime", "division by zero", { op: "/" }); return null } ; return (::to_number(lv) / d) }
+        if node.op == "==" { return (lv != null && rv != null) ? (lv.toString() == rv.toString()) : (lv == rv) }
+        if node.op == "!=" { return (lv != null && rv != null) ? (lv.toString() != rv.toString()) : (lv != rv) }
+        if node.op == ">" { return (::to_number(lv) > ::to_number(rv)) }
+        if node.op == "<" { return (::to_number(lv) < ::to_number(rv)) }
+        if node.op == ">=" { return (::to_number(lv) >= ::to_number(rv)) }
+        if node.op == "<=" { return (::to_number(lv) <= ::to_number(rv)) }
+      }
+      return null
     }
 
     ::is_balanced_any = (s) => {
@@ -1124,6 +1436,58 @@ component ::azl.interpreter {
       if ::halt_on_error { set ::halted = true }
       return "error_recorded"
     }
+
+    # --- perf cache helpers ---
+    ::hash_source = (s) => {
+      # simple rolling hash
+      set h = 1469598103934665603  # FNV offset basis (64-bit)
+      set i = 0
+      while i < s.length { set h = (h ^ s.charCodeAt(i)) * 1099511628211 ; set i = i + 1 }
+      return h
+    }
+    ::hash_tokens = (toks) => {
+      set h = 1469598103934665603
+      set i = 0
+      while i < toks.length {
+        set tok = toks[i]
+        if tok && tok.value != null {
+          set j = 0
+          set v = tok.value.toString()
+          while j < v.length { set h = (h ^ v.charCodeAt(j)) * 1099511628211 ; set j = j + 1 }
+        }
+        set i = i + 1
+      }
+      return h
+    }
+    ::touch_cache_key = (key) => {
+      # move key to end
+      set out = []
+      set i = 0
+      while i < ::cache_order.length { if ::cache_order[i] != key { set out.push(::cache_order[i]) } ; set i = i + 1 }
+      set ::cache_order = out
+      set ::cache_order.push(key)
+    }
+    ::insert_cache = (key, toks, ast) => {
+      if toks != null { set ::perf.tok_cache[key] = toks }
+      if ast != null { set ::perf.ast_cache[key] = ast }
+      ::touch_cache_key(key)
+      while (::cache_order.length > ::perf.cap) {
+        set victim = ::cache_order[0]
+        # pop front
+        set out2 = []
+        set i2 = 1
+        while i2 < ::cache_order.length { set out2.push(::cache_order[i2]); set i2 = i2 + 1 }
+        set ::cache_order = out2
+        set ::perf.tok_cache[victim] = null
+        set ::perf.ast_cache[victim] = null
+      }
+    }
+
+    ::count_keys = (obj) => {
+      set n = 0
+      for k in obj { if k != null && obj[k] != null { set n = n + 1 } }
+      return n
+    }
   }
 
   # EXPORT FUNCTIONS FOR EXTERNAL USE
@@ -1145,7 +1509,7 @@ component ::azl.interpreter {
       }
     }
 
-    # Preferred fallback: kernel file.read
+    # Kernel file.read (strict flow)
     emit file.read with { path: file_path }
     listen for "file.read.complete" then {
       set file_content = ::event.data.content
@@ -1153,13 +1517,9 @@ component ::azl.interpreter {
       listen for "interpretation_complete" then { say "✅ File interpretation complete: $file_path"; return ::event.data.result }
     }
 
-    # Last resort: syscall bridge
-    emit syscall with { type: "read_file", args: { path: file_path } }
-    listen for "syscall.response" then {
-      set file_content = (::event.data.content != null) ? ::event.data.content : ::event.data.result
-      emit interpret with { code: file_content, component_name: file_path }
-      listen for "interpretation_complete" then { say "✅ File interpretation complete: $file_path"; return ::event.data.result }
-    }
+    # If no file.read response came (or content empty), treat as error rather than hidden fallback
+    emit log_error with { type: "io", message: "file_read_failed", context: { path: file_path } }
+    return { ok: false, error: "file_read_failed" }
   }
 
   export fn execute_build_system() {
@@ -1184,6 +1544,34 @@ component ::azl.interpreter {
     }
     # Return when tests complete; the client can listen for tests.complete event
     return "tests_started"
+  }
+
+  # Warm parse cache for a file without executing it (tokenize+parse only)
+  export fn warm_parse_cache_from_file(file_path) {
+    say "🧊 Warming parse cache for: $file_path"
+    # Read using host first for performance, or sync, strictly no hidden fallbacks
+    set content = (::azl.system_interface.read_file_host_sync(file_path) || ::azl.system_interface.read_file_sync(file_path) || "")
+    if content == "" { return false }
+    # Tokenize similarly to 'tokenize' handler but without emitting
+    set toks = []
+    set ln = 1
+    set lines = content.split("\n")
+    for line_text in lines {
+      set part = ::tokenize_line(line_text, ln)
+      set i = 0
+      while i < part.length { set toks.push(part[i]); set i = i + 1 }
+      set toks.push({ type: "eol", value: ";", line: ln, column: 0 })
+      set ln = ln + 1
+    }
+    # Insert tokens into cache
+    set ksrc = ::hash_source(content)
+    ::insert_cache(ksrc, toks, null)
+    # Parse to AST and cache
+    set ast = ::parse_tokens(toks)
+    set ktok = ::hash_tokens(toks)
+    ::insert_cache(ktok, null, ast)
+    say "✅ Warmed parse cache: tokens=" + toks.length.toString() + " nodes=" + ast.nodes.length.toString()
+    return true
   }
 }
 

@@ -7,6 +7,7 @@
 
 component ::build.daemon.enterprise {
   init {
+    set ::status_snapshot_path = (::internal.env("AZL_DAEMON_STATUS_PATH") || ".azl/daemon_status.json")
     set ::status = "stopped"
     set ::daemon_id = ::generate_daemon_id()
     set ::start_time = ::azl.stdlib.time_now([])
@@ -56,6 +57,7 @@ component ::build.daemon.enterprise {
     link ::azl.stdlib
     link ::error.system
     link ::build.cache_manager
+    set ::warm_paths = ( ::internal.env("AZL_WARM_FILES") || "" )
     
     say "🏢 AZL Enterprise Build Daemon ready (ID: " + ::daemon_id + ")"
     emit build.daemon.enterprise.ready with { 
@@ -63,12 +65,35 @@ component ::build.daemon.enterprise {
       api_port: ::api_server.port,
       max_workers: ::build.worker_pool.get_status().max_workers
     }
+    
+    # Auto-start the daemon after initialization
+    say "🚀 Auto-starting enterprise daemon..."
+    ::start()
+    # Kick cache warming (non-blocking)
+    if ::warm_paths != "" { emit build.daemon.enterprise.warm }
   }
+    # Warm caches for hot files: host file LRU and parse caches
+    listen for "build.daemon.enterprise.warm" then {
+      say "🧊 Warming caches for hot files"
+      set paths = ::warm_paths.split(",")
+      for p in paths {
+        set path = p.trim()
+        if path == "" { continue }
+        # Touch host-file cache
+        set _c = ::azl.system_interface.read_file_host_sync(path)
+        # Warm parse cache if interpreter available
+        if (::azl && ::azl.interpreter && ::azl.interpreter.warm_parse_cache_from_file) {
+          ::azl.interpreter.warm_parse_cache_from_file(path)
+        }
+      }
+      say "✅ Cache warming complete"
+    }
   
   behavior {
     # Start the enterprise daemon
     listen for "daemon.enterprise.start" then {
       say "🏢 Daemon start event received - processing..."
+      ::add_event("daemon.start", {})
       if ::status == "running" { 
         say "⚠️  Daemon already running"
         return 
@@ -82,6 +107,11 @@ component ::build.daemon.enterprise {
       set port = (::internal.env("AZL_BUILD_API_PORT") || 8080)
       say "🌐 Starting HTTP server on port " + port
       emit http.server.start with { port: port, host: "0.0.0.0", handler: ::api.endpoints.router }
+      # Optionally launch AZME Provider for E2E
+      if ::internal.env("AZME_PROVIDER_E2E") == "1" {
+        say "🔌 E2E: Launching AZME Provider on :5000"
+        run_server(5000)
+      }
       set ::status = "running"
       while true { sleep 1000 }  # keep the daemon up
     }
@@ -92,6 +122,7 @@ component ::build.daemon.enterprise {
       
       say "🛑 Stopping Enterprise Build Daemon..."
       set ::status = "stopping"
+      ::add_event("daemon.stop", {})
       
       # Stop all active builds
       ::stop_all_builds()
@@ -122,6 +153,7 @@ component ::build.daemon.enterprise {
     listen for "daemon.enterprise.build" then {
       set build_request = ::event.data
       set build_id = ::generate_build_id()
+      ::add_event("build.request", { files: (build_request.files || []), options: (build_request.options || {}) })
       
       # Check resource limits
       if !::check_resource_limits() {
@@ -164,6 +196,7 @@ component ::build.daemon.enterprise {
       }
       
       emit build.daemon.enterprise.build.started with { build_id: build_id }
+      ::add_event("build.started", { build_id: build_id, files: build_info.files.length })
     }
     
     # Handle build progress updates
@@ -174,6 +207,7 @@ component ::build.daemon.enterprise {
       if build_id && ::active_builds[build_id] {
         set ::active_builds[build_id].progress = progress
         emit build.daemon.enterprise.build.progress with { build_id: build_id, progress: progress }
+        ::add_event("build.progress", { build_id: build_id, percent: (progress.percent || 0) })
       }
     }
     
@@ -211,6 +245,7 @@ component ::build.daemon.enterprise {
         
         say ("✅ Build " + build_id + " " + build_info.status + " in " + duration + "ms")
         emit build.daemon.enterprise.build.completed with { build_id: build_id, result: result }
+        ::add_event("build.completed", { build_id: build_id, success: (result.success || false), completed: (result.completed || 0), failed: (result.failed || 0) })
       }
     }
     
@@ -231,6 +266,11 @@ component ::build.daemon.enterprise {
       set request = ::event.data
       set response = ::handle_api_request(request)
       emit api.response with { request_id: request.id, response: response }
+    }
+    # Periodic status snapshot
+    listen for "build.daemon.enterprise.tick" then {
+      ::write_status_snapshot()
+      ::azl.stdlib.set_timeout(2000, () => { emit build.daemon.enterprise.tick })
     }
   }
   
@@ -308,13 +348,20 @@ component ::build.daemon.enterprise {
     ::scan_for_file_changes = () => {
       for path in ::file_watchers {
         set watcher = ::file_watchers[path]
-        set current_content = ::azl.system_interface.read_file_host_sync(path) || ""
-        set current_hash = ::hash_fnv1a32(current_content)
-        
-        if current_hash != watcher.last_hash {
-          set watcher.last_hash = current_hash
-          set watcher.last_modified = ::azl.stdlib.time_now([])
-          emit fs.changed with { path: path }
+        # Try cheap size/mtime first to avoid full content read
+        set sz = ::azl.system_interface.direct_file_size(path)
+        set mt = ::azl.system_interface.direct_modified_time(path)
+        set quick_sig = ( (sz || 0) ^ (mt || 0) )
+        if watcher.quick_sig != quick_sig {
+          set watcher.quick_sig = quick_sig
+          # Confirm by hashing content only when quick signature changed
+          set current_content = ::azl.system_interface.read_file_host_sync(path) || ""
+          set current_hash = ::hash_fnv1a32(current_content)
+          if current_hash != watcher.last_hash {
+            set watcher.last_hash = current_hash
+            set watcher.last_modified = ::azl.stdlib.time_now([])
+            emit fs.changed with { path: path }
+          }
         }
       }
     }
@@ -349,11 +396,13 @@ component ::build.daemon.enterprise {
       if memory_usage > ::resource_limits.max_memory {
         say ("⚠️  Memory usage high: " + memory_usage + " bytes")
         emit build.daemon.enterprise.resource_warning with { type: "memory", usage: memory_usage, limit: ::resource_limits.max_memory }
+        ::add_event("resource.warning", { kind: "memory", usage: memory_usage })
       }
       
       if cpu_usage > ::resource_limits.max_cpu_percent {
         say ("⚠️  CPU usage high: " + cpu_usage + "%")
         emit build.daemon.enterprise.resource_warning with { type: "cpu", usage: cpu_usage, limit: ::resource_limits.max_cpu_percent }
+        ::add_event("resource.warning", { kind: "cpu", usage: cpu_usage })
       }
     }
     
@@ -517,6 +566,25 @@ component ::build.daemon.enterprise {
       
       say "✅ Daemon main function completed"
     }
+    ::write_status_snapshot = () => {
+      set snap = {
+        status: ::status,
+        daemon_id: ::daemon_id,
+        uptime_ms: ::azl.stdlib.time_diff([::start_time, ::azl.stdlib.time_now([])]),
+        active_builds: ::active_builds,
+        build_history: ::build_history.slice(-50),
+        analytics: ::analytics,
+        worker_status: ::build.worker_pool.get_status(),
+        build_cache: (::build.cache_manager && ::build.cache_manager.stats) ? ::build.cache_manager.stats() : { hits: 0, misses: 0, entries: 0 }
+      }
+      set snap.snapshot_ts = ::azl.stdlib.time_now([])
+      # Write snapshot to final path and keep a rolling backup (best-effort)
+      set s = ::azl.stdlib.json_stringify(snap)
+      ::azl.system_interface.write_file_host_sync(::status_snapshot_path, s)
+      set backup = ::status_snapshot_path + "." + snap.snapshot_ts.toString()
+      ::azl.system_interface.write_file_host_sync(backup, s)
+      return true
+    }
   }
   
   interface {
@@ -533,6 +601,7 @@ component ::build.daemon.enterprise {
     
     export fn start() {
       emit daemon.enterprise.start
+      emit build.daemon.enterprise.tick
     }
     
     export fn stop() {

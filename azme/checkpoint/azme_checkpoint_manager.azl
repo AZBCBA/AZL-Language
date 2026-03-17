@@ -1,0 +1,26 @@
+# AZME Checkpoint Manager
+component ::azme.checkpoint.manager {
+  init {
+    set ::dir = ("weights/")
+    set ::last = null
+    emit azme.checkpoint.ready with { ok: true }
+  }
+
+  behavior {
+    on checkpoint.save {
+      set req = $1
+      set run_id = (req.run_id || "run")
+      set step = (req.step || 0)
+      set loss = (req.loss || 0.0)
+      set path = ::dir + run_id + "_step_" + step.toString() + ".ckpt.json"
+      set content = json_stringify({ run_id: run_id, step: step, loss: loss, timestamp: ::internal.now(), config: (req.config || {}) })
+      emit "append_file" to ::ffi.fs with path content
+      set ::last = path
+      emit checkpoint.saved with { path: path }
+    }
+
+    on checkpoint.last { emit checkpoint.last_path with { path: (::last || "") } }
+  }
+}
+
+

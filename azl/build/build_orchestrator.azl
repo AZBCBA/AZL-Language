@@ -160,6 +160,7 @@ component ::build.orchestrator {
       while i < ::last_files.length {
         set rec = ::last_files[i]
         set p = (typeof(rec) == "Object") ? rec.path : rec
+        # Fast host read path benefits from new LRU cache in system_interface
         set s = (typeof(rec) == "Object" && rec.source != null) ? rec.source : ( ::azl.system_interface.read_file_host_sync(p) || ::azl.system_interface.read_file_sync(p) || "" )
         set refreshed.push({ path: p, source: s })
         set i = i + 1

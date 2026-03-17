@@ -1,12 +1,15 @@
-# AZL Advanced Features
+# AZL Advanced Features — FUTURE / NOT IMPLEMENTED
 
-AZL is not just a programming language - it's a complete platform for building intelligent, high-performance systems. This document covers the advanced features that make AZL stand out from other languages.
+**This document describes possible future features only. None of these features exist in the current AZL implementation.**
 
-**🚨 CRITICAL WARNING - DOCUMENTATION VS REALITY:**
-- **PLACEHOLDER DOCUMENT**: This entire document describes THEORETICAL features that DO NOT EXIST in the current implementation
-- **NOT PRODUCTION READY**: All described features (JIT compilation, SIMD, async/await, actors) are NOT IMPLEMENTED
-- **MISLEADING CLAIMS**: Performance benchmarks, feature comparisons, and code examples are FICTIONAL
-- **INTEGRATION GAPS**: Current AZL runtime in src/lib.rs is a basic interpreter - none of these advanced features exist
+For the **current** AZL language (syntax, components, events, stdlib), see [AZL_CURRENT_SPECIFICATION.md](language/AZL_CURRENT_SPECIFICATION.md) and [AZL_LANGUAGE_RULES.md](language/AZL_LANGUAGE_RULES.md). The runtime is **Python (`azl_runner.py`) + pure AZL** (interpreter/parser in `azl/`), not Rust.
+
+---
+
+**🚨 STATUS: THEORETICAL / PLACEHOLDER**
+- **NOT IMPLEMENTED**: JIT, SIMD, async/await, actors, and all other "advanced" features below.
+- **CURRENT RUNTIME**: Python host + AZL interpreter and parser in `azl/`. No JIT, no SIMD, no async in production.
+- The following sections are kept for future design reference only; code examples and benchmarks are illustrative, not runnable in the current release.
 
 ## 🚀 Core Performance Optimizations
 

@@ -1,0 +1,85 @@
+# HTTP Server Compatibility Helpers for AZME integrations
+# Provides a top-level `start_http_server(port, routesOrHandler)` function
+# that adapts to the pure AZL HTTP server component `::net.http.server`.
+
+# Start an HTTP server on the given port.
+# - If `routesOrHandler` is a map like { "/path": { "GET": fn, "POST": fn } },
+#   we will create a dispatcher that calls those functions and wraps results.
+# - If `routesOrHandler` is an object with methods `handle_get(path)` and
+#   `handle_post(path, data)`, we will call those and wrap results.
+# - If `routesOrHandler` is a function, it must return a response object
+#   { status, headers, body } which will be sent as-is.
+function start_http_server(port, routesOrHandler) {
+  let p = port || 8080
+  let handler = (req) => {
+    let method = (req && req.method ? req.method : "GET").toUpperCase()
+    let path = (req && req.path ? req.path : "/")
+    let bodyRaw = (req && req.body ? req.body : "")
+    let parsed
+    try { parsed = bodyRaw ? json_parse(bodyRaw) : {} } catch (e) { parsed = {} }
+
+    // Case 1: direct function handler returning full response
+    if (typeof(routesOrHandler) == "function") {
+      let res = routesOrHandler(req)
+      return normalize_response(res)
+    }
+
+    // Case 2: object with handle_get/handle_post
+    if (routesOrHandler && typeof(routesOrHandler) == "object") {
+      if (routesOrHandler.handle_get || routesOrHandler.handle_post) {
+        let result
+        if (method == "GET" && routesOrHandler.handle_get) {
+          result = routesOrHandler.handle_get(path)
+        } else if (method == "POST" && routesOrHandler.handle_post) {
+          result = routesOrHandler.handle_post(path, parsed)
+        } else {
+          result = { error: "Not found" }
+        }
+        return normalize_json(result)
+      }
+
+      // Case 3: routes map { "/x": { "GET": fn, "POST": fn } }
+      let route = routesOrHandler[path]
+      if (route && typeof(route) == "object") {
+        let fn = route[method]
+        if (fn && typeof(fn) == "function") {
+          let result
+          if (method == "POST") { result = fn(parsed) } else { result = fn() }
+          return normalize_json(result)
+        }
+      }
+    }
+
+    return normalize_json({ error: "Endpoint not found", path: path, method: method })
+  }
+
+  // Ensure the HTTP server component is active and start it with our handler
+  emit http.server.start with { port: p, host: "0.0.0.0", handler: handler }
+}
+
+# Normalize a response that may already be an HTTP response shape
+function normalize_response(res) {
+  if (!res) {
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: "{}" }
+  }
+  if (res.status && res.headers && typeof(res.body) != "undefined") {
+    // Already a response
+    let b = res.body
+    if (typeof(b) != "string") {
+      try { b = json_stringify(b) } catch (e) { b = "" + b }
+    }
+    let h = res.headers || { "Content-Type": "application/json" }
+    return { status: res.status, headers: h, body: b }
+  }
+  // Otherwise, wrap as JSON
+  return normalize_json(res)
+}
+
+# Wrap a plain object/value as JSON HTTP 200
+function normalize_json(obj) {
+  let s
+  try { s = json_stringify(obj || {}) } catch (e) { s = "{}" }
+  return { status: 200, headers: { "Content-Type": "application/json" }, body: s }
+}
+
+

@@ -1,0 +1,202 @@
+# RUNTIME DEMONSTRATION
+# This file demonstrates AZL runtime executing compiled assembly code!
+
+component ::azl.runtime_demo {
+  init {
+    say "🚀 RUNTIME DEMONSTRATION STARTING"
+    say "🎯 AZL WILL EXECUTE AZL COMPILED CODE!"
+    say "⚡ VIRTUAL MACHINE ENVIRONMENT"
+    say "✨ PHASE 3.3: SELF-HOSTING RUNTIME!"
+    
+    # Test the self-hosting runtime
+    test_self_hosting_runtime()
+  }
+
+  behavior {
+    listen for "test.runtime" then {
+      say "🧪 Testing self-hosting runtime..."
+      test_self_hosting_runtime()
+    }
+
+    listen for "execution.result" then {
+      display_execution_result(::event.data)
+    }
+
+    listen for "vm.status" then {
+      display_vm_status(::event.data)
+    }
+  }
+
+  fn test_self_hosting_runtime() {
+    say "🎯 PHASE 3.3: AZL RUNTIME IN AZL"
+    say "===================================="
+    
+    # Test 1: Execute simple assembly code
+    say "⚡ Test 1: Executing simple assembly code"
+    let simple_assembly = create_simple_assembly()
+    test_runtime_with_assembly(simple_assembly, "simple_test")
+    
+    # Test 2: Execute complex assembly code
+    say "⚡ Test 2: Executing complex assembly code"
+    let complex_assembly = create_complex_assembly()
+    test_runtime_with_assembly(complex_assembly, "complex_test")
+    
+    # Test 3: Execute AZL file through full pipeline (parse -> compile -> execute)
+    say "⚡ Test 3: Full pipeline execution (parse -> compile -> execute)"
+    test_full_pipeline("azl/examples/runtime_demo.azl")
+    
+    say "✅ All runtime tests initiated!"
+  }
+
+  fn test_runtime_with_assembly(assembly_code, test_name) {
+    say "⚡ Testing runtime with: $test_name"
+    say "📊 Assembly code length: $assembly_code.length lines"
+    
+    # Execute assembly code
+    emit execute.assembly with {
+      assembly: assembly_code,
+      entry_point: "main"
+    }
+    
+    # Wait for execution result
+    wait for "execution.complete" then {
+      set result = ::event.data
+      display_execution_result(result)
+    }
+  }
+
+  fn test_full_pipeline(input_file) {
+    say "🔄 Testing full pipeline: $input_file"
+    
+    # Execute AZL file through full pipeline
+    emit execute.azl_file with { input_file: input_file }
+    
+    # Wait for execution result
+    wait for "execution.complete" then {
+      set result = ::event.data
+      display_execution_result(result)
+    }
+  }
+
+  fn display_execution_result(result) {
+    say "🎉 EXECUTION RESULT RECEIVED!"
+    say "=============================="
+    say "📁 Entry Point: $result.entry_point"
+    say "✅ Success: $result.success"
+    say "⚡ Instructions Executed: $result.instructions_executed"
+    say "💾 Memory Allocated: $result.memory_allocated bytes"
+    say "⏰ Execution Time: $result.execution_time ms"
+    say "📊 Return Value: $result.return_value"
+    
+    if result.success {
+      say "🎯 EXECUTION SUCCESSFUL!"
+      say "⚡ Virtual machine executed assembly code!"
+      
+      # Show VM final state
+      if result.final_state {
+        say "🖥️  Final VM State:"
+        say "   - State: $result.final_state.state"
+        say "   - Stack Pointer: $result.final_state.stack_pointer"
+        say "   - Base Pointer: $result.final_state.base_pointer"
+        say "   - Memory Allocated: $result.final_state.memory_allocated bytes"
+        say "   - Garbage Collections: $result.final_state.garbage_collections"
+      }
+    } else {
+      say "⚠️  EXECUTION FAILED"
+      if result.error {
+        say "❌ Error: $result.error"
+      }
+    }
+    
+    say ""
+  }
+
+  fn display_vm_status(status) {
+    say "🖥️  VIRTUAL MACHINE STATUS"
+    say "============================"
+    say "📊 State: $status.state"
+    say "📍 Instruction Pointer: $status.instruction_pointer"
+    say "📍 Stack Pointer: $status.stack_pointer"
+    say "📍 Base Pointer: $status.base_pointer"
+    say "💾 Memory Allocated: $status.memory_allocated bytes"
+    say "⚡ Instructions Executed: $status.instructions_executed"
+    say "🗑️  Garbage Collections: $status.garbage_collections"
+    
+    say "🔧 Register Values:"
+    say "   - rax: $status.registers.rax"
+    say "   - rbx: $status.registers.rbx"
+    say "   - rcx: $status.registers.rcx"
+    say "   - rdx: $status.registers.rdx"
+    say "   - rsp: $status.registers.rsp"
+    say "   - rbp: $status.registers.rbp"
+    
+    say ""
+  }
+
+  fn create_simple_assembly() {
+    return [
+      "; Simple test assembly",
+      "section .text",
+      "global _start",
+      "",
+      "main:",
+      "    mov rax, 42",
+      "    mov rbx, 10",
+      "    add rax, rbx",
+      "    ret",
+      "",
+      "_start:",
+      "    call main",
+      "    mov rdi, 0",
+      "    mov rax, 60",
+      "    syscall"
+    ]
+  }
+
+  fn create_complex_assembly() {
+    return [
+      "; Complex test assembly with loops and conditionals",
+      "section .text",
+      "global _start",
+      "",
+      "main:",
+      "    push rbp",
+      "    mov rbp, rsp",
+      "    sub rsp, 16",
+      "",
+      "    ; Initialize counter",
+      "    mov rax, 0",
+      "",
+      "loop_start:",
+      "    cmp rax, 5",
+      "    jge loop_end",
+      "",
+      "    ; Increment counter",
+      "    add rax, 1",
+      "",
+      "    ; Continue loop",
+      "    jmp loop_start",
+      "",
+      "loop_end:",
+      "    ; Store final value",
+      "    mov [rbp - 8], rax",
+      "",
+      "    mov rsp, rbp",
+      "    pop rbp",
+      "    ret",
+      "",
+      "_start:",
+      "    call main",
+      "    mov rdi, 0",
+      "    mov rax, 60",
+      "    syscall"
+    ]
+  }
+
+  fn wait_for_event(event_name) {
+    # This is a simplified event waiting mechanism
+    # In a real implementation, this would use the event system
+    say "⏳ Waiting for event: $event_name"
+    return true
+  }
+}

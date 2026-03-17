@@ -1,0 +1,215 @@
+# COMPILER DEMONSTRATION
+# This file demonstrates AZL compiling AZL to native x86_64 assembly code!
+
+component ::azl.compiler_demo {
+  init {
+    say "🚀 COMPILER DEMONSTRATION STARTING"
+    say "🎯 AZL WILL COMPILE AZL TO NATIVE CODE!"
+    say "⚡ TARGET: x86_64 ASSEMBLY"
+    say "✨ PHASE 3.2: SELF-HOSTING COMPILER!"
+    
+    # Test the self-hosting compiler
+    test_self_hosting_compiler()
+  }
+
+  behavior {
+    listen for "test.compiler" then {
+      say "🧪 Testing self-hosting compiler..."
+      test_self_hosting_compiler()
+    }
+
+    listen for "compile.result" then {
+      display_compile_result(::event.data)
+    }
+
+    listen for "assembly.generated" then {
+      display_assembly_code(::event.data.assembly)
+    }
+  }
+
+  fn test_self_hosting_compiler() {
+    say "🎯 PHASE 3.2: AZL COMPILER IN AZL"
+    say "===================================="
+    
+    # Test 1: Compile simple AZL code to assembly
+    say "🔨 Test 1: Compiling simple AZL to x86_64 assembly"
+    let simple_code = "component ::simple { init { let x = 42; say \"Hello!\" } }"
+    test_compiler_with_code(simple_code, "simple_test.asm")
+    
+    # Test 2: Compile complex AZL code to assembly
+    say "🔨 Test 2: Compiling complex AZL to x86_64 assembly"
+    let complex_code = create_complex_azl_code()
+    test_compiler_with_code(complex_code, "complex_test.asm")
+    
+    # Test 3: Compile this very file to assembly (meta-compilation!)
+    say "🔨 Test 3: Compiling this file to assembly (meta-compilation!)"
+    test_compiler_with_file("azl/examples/compiler_demo.azl", "self_compilation.asm")
+    
+    say "✅ All compiler tests initiated!"
+  }
+
+  fn test_compiler_with_code(source_code, output_file) {
+    say "🔨 Testing compiler with: $output_file"
+    say "📊 Source code length: $source_code.length characters"
+    
+    # First parse the code
+    emit parse.azl_code with {
+      code: source_code,
+      file_name: "inline_code"
+    }
+    
+    # Wait for parse result, then compile
+    wait for "parse.complete" then {
+      set parse_result = ::event.data
+      if parse_result.success {
+        say "✅ Parsing successful, now compiling to assembly..."
+        
+        # Compile AST to assembly
+        emit compile.ast with {
+          ast: parse_result.ast,
+          output_file: output_file
+        }
+        
+        # Wait for compile result
+        wait for "compile.complete" then {
+          set compile_result = ::event.data
+          if compile_result.output_file == output_file {
+            display_compile_result(compile_result)
+          }
+        }
+      } else {
+        say "❌ Parsing failed, cannot compile"
+      }
+    }
+  }
+
+  fn test_compiler_with_file(input_file, output_file) {
+    say "📖 Testing compiler with file: $input_file"
+    say "📁 Output: $output_file"
+    
+    # Compile AZL file directly
+    emit compile.azl_file with {
+      input_file: input_file,
+      output_file: output_file
+    }
+    
+    # Wait for compile result
+    wait for "compile.complete" then {
+      set compile_result = ::event.data
+      if compile_result.output_file == output_file {
+        display_compile_result(compile_result)
+      }
+    }
+  }
+
+  fn display_compile_result(result) {
+    say "🎉 COMPILATION RESULT RECEIVED!"
+    say "==============================="
+    say "📁 Output File: $result.output_file"
+    say "✅ Success: $result.success"
+    say "🌳 Input AST Nodes: $result.statistics.ast_nodes"
+    say "⚡ Assembly Lines: $result.statistics.assembly_lines"
+    say "🏷️  Labels Generated: $result.statistics.labels_generated"
+    say "📝 String Literals: $result.statistics.string_literals"
+    
+    if result.success {
+      say "🎯 COMPILATION SUCCESSFUL!"
+      say "⚡ Generated x86_64 assembly code!"
+      
+      # Show sample of generated assembly
+      if result.final_assembly && result.final_assembly.length > 0 {
+        say "📋 Sample Assembly Output:"
+        say "---------------------------"
+        
+        let display_count = result.final_assembly.length > 10 ? 10 : result.final_assembly.length
+        
+        for let i = 0; i < display_count; i++ {
+          set line = result.final_assembly[i]
+          say "   $i: $line"
+        }
+        
+        if result.final_assembly.length > 10 {
+          say "   ... and $result.final_assembly.length - 10 more lines"
+        }
+      }
+    } else {
+      say "⚠️  COMPILATION FAILED"
+      if result.error {
+        say "❌ Error: $result.error"
+      }
+    }
+    
+    say ""
+  }
+
+  fn display_assembly_code(assembly_lines) {
+    say "⚡ ASSEMBLY CODE GENERATED!"
+    say "============================"
+    say "📊 Total Lines: $assembly_lines.length"
+    say ""
+    
+    if assembly_lines.length > 0 {
+      say "📋 Generated x86_64 Assembly:"
+      say "-------------------------------"
+      
+      for let i = 0; i < assembly_lines.length; i++ {
+        set line = assembly_lines[i]
+        say "   $i: $line"
+      }
+    }
+    
+    say ""
+  }
+
+  fn create_complex_azl_code() {
+    return `component ::complex_example {
+  init {
+    say "Complex component starting"
+    let x = 42
+    let message = "Hello from complex component"
+    
+    if x > 40 {
+      say "X is greater than 40: $x"
+    } else {
+      say "X is not greater than 40"
+    }
+    
+    for let i = 0; i < 5; i++ {
+      say "Loop iteration: $i"
+      if i == 3 {
+        say "Special iteration!"
+      }
+    }
+    
+    let result = calculate_sum(10, 20)
+    say "Sum result: $result"
+  }
+  
+  behavior {
+    listen for "test_event" then {
+      say "Event received!"
+      let data = [1, 2, 3, 4, 5]
+      let sum = 0
+      
+      for let i = 0; i < data.length; i++ {
+        sum = sum + data[i]
+      }
+      
+      say "Array sum: $sum"
+    }
+  }
+  
+  fn calculate_sum(a, b) {
+    let result = a + b
+    return result
+  }
+}`
+  }
+
+  fn wait_for_event(event_name) {
+    # This is a simplified event waiting mechanism
+    # In a real implementation, this would use the event system
+    say "⏳ Waiting for event: $event_name"
+    return true
+  }
+}

@@ -21,20 +21,56 @@ component ::neural.core {
   }
 
   behavior {
+    # Lightweight GPU resource guard to avoid exhausting devices
+    listen for "neural.core.configure_device" then {
+      set cfg = $1 || {}
+      set desired_device = (cfg.device or "cpu")
+      set gpu_limit = parseInt((cfg.gpu_limit or 0))
+      set num_gpus = parseInt((cfg.num_gpus or (::internal.env("AZL_NUM_GPUS") or "1")))
+
+      if desired_device != "cuda" or gpu_limit <= 0 {
+        set ::enable_gpu = false
+        set ::allocated_gpu_id = null
+        say "🛡️ GPU disabled (policy): running CPU-only"
+        emit "gpu.disabled" with { reason: "policy", gpu_limit: gpu_limit }
+      } else {
+        # Lightweight detector: infer availability from env or default to false
+        set ::gpu_available = ((::internal.env("AZL_HAS_GPU") or "0") != "0")
+        if ::gpu_available != true {
+          set ::enable_gpu = false
+          set ::allocated_gpu_id = null
+          emit log_error with { type: "runtime", message: "gpu_not_available", context: { requested: true } }
+          say "⚠️ GPU requested but not available; halting GPU-dependent operations"
+          emit "gpu.unavailable" with { policy: "strict_no_fallback" }
+          set ::halted = true
+          return
+        } else {
+          set ::enable_gpu = true
+          set ::gpu_throttle = clamp(gpu_limit, 1, 100)
+          set ::gpu_utilization = min(::gpu_utilization, (::gpu_throttle / 100.0))
+          say "🎚️ GPU enabled with throttle %: "
+          say ::gpu_throttle
+          emit "gpu.allocated" with { id: (::gpu_device_id or 0), throttle: ::gpu_throttle, count: num_gpus }
+        }
+      }
+    }
     // Initialize neural processor
     listen for "initialize_neural" then {
       set ::status = "initializing"
       
       // Initialize GPU acceleration
       branch when ::enable_gpu = true {
-        store ::gpu_available from ::detect_gpu()
+        set ::gpu_available = ((::internal.env("AZL_HAS_GPU") or "0") != "0")
         branch when ::gpu_available = true {
           set ::allocated_gpu_id = ::gpu_device_id
           set ::gpu_utilization = 0.1
           emit "gpu.allocated" with ::allocated_gpu_id
         } else {
           set ::allocated_gpu_id = null
-          emit "gpu.unavailable" with "falling_back_to_cpu"
+          emit log_error with { type: "runtime", message: "gpu_unavailable", context: { during: "initialize_neural" } }
+          emit "gpu.unavailable" with { policy: "strict_no_fallback" }
+          set ::status = "error"
+          return
         }
       } else {
         set ::allocated_gpu_id = null

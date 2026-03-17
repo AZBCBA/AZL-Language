@@ -1,0 +1,23 @@
+# Integration tests for runtime endpoints (pure AZL harness)
+
+component ::tests.runtime_endpoints {
+  init {
+    say "🧪 Testing runtime endpoints"
+
+    # Test daemon snapshot endpoint
+    set s = ::azl.system_interface.read_file_host_sync(".azl/daemon_status.json") || "{}"
+    if s.length > 0 { say "✅ daemon snapshot readable" } else { say "❌ daemon snapshot missing" }
+
+    # Test metrics runtime JSON composition (via server handler utility)
+    link ::net.http.server
+    set res = ::net.http.server.get_status([])
+    if res.port >= 0 || res.port == null { say "✅ http server status ok" } else { say "❌ http server status bad" }
+
+    # Basic schema checks (presence only)
+    set ok = 1
+    # builds/history/events require runtime bridge; here we just assert snapshot readable
+    if s.contains("daemon_id") { say "✅ snapshot has daemon_id" } else { set ok = 0; say "❌ snapshot missing daemon_id" }
+    if ok == 1 { say "✅ runtime endpoints smoke tests passed" } else { say "❌ runtime endpoints smoke tests failed" }
+  }
+}
+

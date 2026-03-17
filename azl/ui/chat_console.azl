@@ -4,28 +4,30 @@ component ::ui.chat_console {
   init {
     say "🧠 AZME Chat Console"
     say "Type your message and press Enter. Type /exit to quit."
+    link ::azme.chat_interface
+    emit initialize_chat_interface to ::azme.chat_interface with {
+      dimensions: 4, p_adic_prime: 7, precision: 10
+    }
     emit "console.read"
   }
 
-  listen for "console.read" {
-    say "> "
-    readline into ::user_input
-    # Normalize
-    set ::msg = ::user_input
-    # Exit command
-    if ::msg == "/exit" {
-      say "👋 Bye"
-      emit "azl.exit" with { reason: "user_exit" }
-    } else {
-      emit "azme.chat.message" with ::msg
-      # Continue reading after response
-      emit "console.read"
+  behavior {
+    listen for "console.read" then {
+      say "> "
+      readline into ::user_input
+      set ::msg = ::user_input
+      if ::msg == "/exit" { say "👋 Bye" ; emit "azl.exit" with { reason: "user_exit" } }
+      else {
+        emit process_message to ::azme.chat_interface with {
+          message: ::msg, user_id: "cli", session_id: "cli", context: {}
+        }
+        listen for "azme.chat.response_generated" then {
+          set ::text = ::event.data.text
+          say "AZME: " + (::text || "OK")
+        }
+        emit "console.read"
+      }
     }
-  }
-
-  listen for "azme.chat.response" {
-    let text = ::event.data
-    say "AZME: " + text
   }
 }
 

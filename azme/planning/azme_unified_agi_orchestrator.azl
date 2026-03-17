@@ -1,3 +1,34 @@
+# AZME Unified AGI Orchestrator (coexist behind feature flag)
+component ::azme.unified_agi_orchestrator {
+  init {
+    set ::status = "idle"
+    set ::features = {
+      enabled: false,
+      coexist: true
+    }
+    emit azme.orchestrator.unified.ready with { enabled: ::features.enabled }
+  }
+
+  behavior {
+    on configure_unified_orchestrator {
+      set ::cfg = $1
+      if ::cfg.enabled != null { set ::features.enabled = ::cfg.enabled }
+      if ::cfg.coexist != null { set ::features.coexist = ::cfg.coexist }
+      emit azme.orchestrator.unified.configured with { features: ::features }
+    }
+
+    on orchestrate_request {
+      if ::features.enabled != true { emit azme.orchestrator.unified.skipped with { reason: "disabled" }; return }
+      set ::req = $1
+      # Route through memory facade → cognitive loop → behavior manager
+      emit memory_store_entry to ::azme.unified_memory_system with { kind: "semantic", payload: { input: ::req.input, t: ::internal.now() } }
+      emit azme.intent_resolved with { type: "azme.intent_resolved", source: "unified_orchestrator", intent: "process_input", timestamp: ::internal.now(), payload: { input: ::req.input } }
+      emit azme.decision_made with { type: "azme.decision_made", source: "unified_orchestrator", decision: "respond", timestamp: ::internal.now(), reasoning: "pipeline_complete" }
+      emit azme.orchestration.completed with { ok: true }
+    }
+  }
+}
+
 // AZME Unified AGI Orchestrator - The Ultimate Artificial General Intelligence
 // This is the central nervous system that unifies all quantum systems into conscious AGI
 

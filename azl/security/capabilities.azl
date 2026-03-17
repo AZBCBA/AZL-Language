@@ -1,0 +1,58 @@
+# AZL Security Capabilities - Pure AZL
+# Capability model: per-component capability registry and current-caller tracking.
+
+component ::azl.security {
+  init {
+    set ::policy = { default_allow: true }
+    set ::caps = {}            # component -> { cap_name: true }
+    set ::current_component = ""  # set by interpreter during component execution
+    link ::error.system
+    say "🔐 AZL Security Capabilities initialized"
+  }
+
+  behavior {}
+
+  # Register capabilities for a component
+  export fn register(component, capabilities) {
+    if ::caps[component] == null { set ::caps[component] = {} }
+    for c in capabilities { set ::caps[component][c] = true }
+    return true
+  }
+
+  # Grant a single capability
+  export fn grant(component, capability) {
+    if ::caps[component] == null { set ::caps[component] = {} }
+    set ::caps[component][capability] = true
+    return true
+  }
+
+  # Policy control
+  export fn set_default_allow(flag) {
+    set ::policy.default_allow = (flag == true)
+    return true
+  }
+
+  # Set/clear current component (called by interpreter on entry/exit)
+  export fn set_current(component) { set ::current_component = component; return true }
+  export fn clear_current() { set ::current_component = ""; return true }
+
+  # Check if current component can perform capability
+  export fn can(cap) {
+    set caller = (::current_component || "")
+    if caller == "" { return (::policy.default_allow == true) }
+    set entry = ::caps[caller]
+    if entry == null { return (::policy.default_allow == true) }
+    return (entry[cap] == true)
+  }
+
+  # Require capability or emit violation and halt
+  export fn require(cap) {
+    if ::azl.security.can(cap) == true { return true }
+    set caller = (::current_component || "<unknown>")
+    emit log_error with { type: "capability_violation", message: "capability denied", context: { component: caller, capability: cap } }
+    emit halt_execution with { source: "azl.security", kind: "capability_violation", message: "denied: " + cap, context: { component: caller } }
+    return false
+  }
+}
+
+

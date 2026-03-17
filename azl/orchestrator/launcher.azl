@@ -6,6 +6,9 @@ component ::nlp.comprehensive_launcher {
     say "⚡ FFI Bridge to LibTorch/CUDA"
     say "🎯 Production-Ready Training"
     emit "start_training" with "begin"
+
+    # Optional: expose a simple trigger for advanced training from orchestrator space
+    emit "register_handler" to ::core.command_processor with "train.advanced" "command.train.advanced"
   }
 
   behavior {

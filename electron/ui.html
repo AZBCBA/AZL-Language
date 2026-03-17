@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>AZL Desktop Launcher</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://127.0.0.1:8080 http://127.0.0.1:5000 http://127.0.0.1:5001; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"/>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #111827;
+      --fg: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #22d3ee;
+      --ok: #22c55e;
+      --bad: #ef4444;
+      --btn: #1f2937;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    header { padding: 16px 20px; background: #0b1220; border-bottom: 1px solid #1f2937; display: flex; align-items: center; justify-content: space-between; }
+    .header-actions { display: flex; gap: 12px; align-items: center; }
+    header h2 { margin: 0; font-weight: 600; letter-spacing: 0.2px; }
+    .container { padding: 16px 20px; display: grid; grid-template-columns: 1fr 1fr; grid-gap: 16px; }
+    .card { background: var(--card); border: 1px solid #1f2937; border-radius: 10px; padding: 14px; }
+    .row { margin: 10px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .btn { background: var(--btn); color: var(--fg); border: 1px solid #374151; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+    .btn:hover { border-color: #4b5563; }
+    .accent { color: var(--accent); }
+    .badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid #374151; }
+    .ok { color: var(--ok); border-color: #14532d; }
+    .bad { color: var(--bad); border-color: #7f1d1d; }
+    textarea { width: 100%; height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #0a0f1a; color: #cbd5e1; border: 1px solid #1f2937; border-radius: 8px; padding: 10px; }
+    input[type=text] { background: #0a0f1a; color: #cbd5e1; border: 1px solid #1f2937; border-radius: 8px; padding: 8px; }
+    label { font-size: 13px; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .ml-auto { margin-left: auto; }
+    .mt-8 { margin-top: 8px; }
+    .w-250 { width: 250px; }
+    .log-tail { height: 160px; margin-top: 8px; }
+    .w-70 { width: 70px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .kpi { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; }
+    .kpi .val { font-weight: 600; }
+    .muted-small { color: var(--muted); font-size: 11px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h2>AZL Desktop Launcher</h2>
+    <div class="muted">Control AZL runtime & sysproxy</div>
+    <div class="header-actions">
+      <button id="btnChat" class="btn" title="Open AZME Chat" aria-label="Open chat">💬 Chat</button>
+      <button id="btnPreferences" class="btn" title="Open Preferences">⚙️ Preferences</button>
+      <button id="btnUpdates" class="btn" title="Check for Updates">🔄 Updates</button>
+      <button id="btnProcessStatus" class="btn" title="Process Status">📊 Status</button>
+    </div>
+  </header>
+  <div class="container">
+    <div class="card">
+      <div class="row">
+        <strong>Mode:</strong>
+        <label><input type="radio" name="mode" value="system" checked> System (systemd)</label>
+        <label><input type="radio" name="mode" value="user"> App (user processes)</label>
+      </div>
+      <div class="row">
+        <button id="start" class="btn">Start All</button>
+        <button id="stop" class="btn">Stop All</button>
+        <button id="status" class="btn">Status</button>
+        <button id="health" class="btn">Health</button>
+        <span id="healthBadge" class="badge">unknown</span>
+      </div>
+      <div class="row">
+        <strong>Services:</strong>
+        <button class="btn" data-svc="sysproxy" data-act="restart">Restart Sysproxy</button>
+        <button class="btn" data-svc="runtime" data-act="restart">Restart Runtime</button>
+        <button class="btn" data-svc="provider" data-act="restart">Restart Provider</button>
+        <button class="btn" data-svc="proxy" data-act="restart">Restart Proxy</button>
+      </div>
+      <div class="row">
+        <strong>Health:</strong>
+        <span id="hRuntime" class="badge">8080</span>
+        <span id="hProvider" class="badge">5000</span>
+        <span id="hProxy" class="badge">5001</span>
+        <button id="healthAll" class="btn">Refresh</button>
+      </div>
+      <div class="row">
+        <label for="token">API Token (Bearer) <span class="muted">for /readyz, /status, /metrics</span></label>
+        <input id="token" type="text" placeholder="optional" title="API token for authenticated endpoints" aria-label="API token" class="w-250" />
+        <button id="readyz" class="btn">Ready</button>
+        <button id="statusApi" class="btn">API Status</button>
+        <button id="metrics" class="btn">Metrics</button>
+      </div>
+      <div class="row">
+        <strong>Training:</strong>
+        <input id="dataset" type="text" placeholder="/abs/path/to/dataset.txt" class="w-250" title="Dataset path" aria-label="Dataset path" />
+        <select id="device" title="Device">
+          <option value="cpu">cpu</option>
+          <option value="cuda">cuda</option>
+        </select>
+        <input id="epochs" type="text" placeholder="1" class="w-70" title="epochs" aria-label="epochs" />
+        <input id="batch" type="text" placeholder="1" class="w-70" title="batch size" aria-label="batch size" />
+        <button id="startTrain" class="btn">Start</button>
+        <button id="pauseTrain" class="btn">Pause</button>
+        <button id="resumeTrain" class="btn">Resume</button>
+        <button id="stopTrain" class="btn">Stop</button>
+      </div>
+      <div class="row muted" id="statusText">Status not loaded</div>
+    </div>
+    <div class="card">
+      <div class="row"><strong id="logsHeading">Logs</strong> <span class="muted">(auto-refresh)</span>
+        <button id="refreshLogs" class="btn ml-auto">Refresh</button>
+      </div>
+      <label for="out" class="sr-only">Runtime output log</label>
+      <textarea id="out" readonly title="Runtime output log" aria-label="Runtime output log" placeholder="Runtime output log will appear here"></textarea>
+      <label for="err" class="sr-only">Runtime error log</label>
+      <textarea id="err" readonly class="mt-8" title="Runtime error log" aria-label="Runtime error log" placeholder="Runtime error log will appear here"></textarea>
+      <div class="row">
+        <label for="logSelect" class="sr-only">Log source selector</label>
+        <select id="logSelect" title="Log source selector" aria-label="Log source selector">
+          <option value="runtimeOut">Runtime Out</option>
+          <option value="runtimeErr">Runtime Err</option>
+          <option value="providerOut">Provider Out</option>
+          <option value="providerErr">Provider Err</option>
+          <option value="proxyOut">Proxy Out</option>
+          <option value="proxyErr">Proxy Err</option>
+          <option value="sysproxyLog">Sysproxy Log</option>
+        </select>
+        <button id="readLog" class="btn">Read Selected Log</button>
+      </div>
+      <label for="logTail" class="sr-only">Selected log tail</label>
+      <textarea id="logTail" readonly class="log-tail" title="Selected log tail" aria-label="Selected log tail" placeholder="Selected log will appear here"></textarea>
+    </div>
+    <div class="card" id="metricsCard">
+      <div class="row"><strong>Performance Dashboard</strong>
+        <button id="metricsStart" class="btn ml-auto">Start Live</button>
+        <button id="metricsStop" class="btn">Stop</button>
+      </div>
+      <div class="row grid-2">
+        <div class="kpi"><span class="muted-small">Latency (avg ms)</span><span id="kLatency" class="val">-</span></div>
+        <div class="kpi"><span class="muted-small">p95 (ms)</span><span id="kP95" class="val">-</span></div>
+        <div class="kpi"><span class="muted-small">Peak Mem (GB)</span><span id="kMem" class="val">-</span></div>
+        <div class="kpi"><span class="muted-small">Throughput</span><span id="kThpt" class="val">-</span></div>
+        <div class="kpi"><span class="muted-small">Avg Loss</span><span id="kLoss" class="val">-</span></div>
+        <div class="kpi"><span class="muted-small">Quantum Share (%)</span><span id="kQuantum" class="val">-</span></div>
+      </div>
+      <div class="row grid-2">
+        <div class="kpi"><span class="muted-small">Latency Δ%</span><span id="iLatency" class="val">-</span></div>
+        <div class="kpi"><span class="muted-small">Memory Δ (GB)</span><span id="iMem" class="val">-</span></div>
+        <div class="kpi"><span class="muted-small">Loss Δ%</span><span id="iLoss" class="val">-</span></div>
+        <div class="kpi"><span class="muted-small">Quantum Δ%</span><span id="iQuantum" class="val">-</span></div>
+      </div>
+      <div class="row"><strong>Predictions</strong></div>
+      <div class="row">
+        <label><input id="autoMaintenance" type="checkbox"/> Auto maintenance</label>
+      </div>
+      <div class="row"><ul id="predictions" class="pred-list"></ul></div>
+      <style>
+        .pred-list { margin: 0; padding-left: 16px; }
+      </style>
+      <div class="row">
+        <button id="attemptRecovery" class="btn">Attempt Recovery</button>
+      </div>
+    </div>
+  </div>
+  <script src="renderer.js"></script>
+</body>
+</html>

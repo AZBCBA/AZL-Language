@@ -6,14 +6,109 @@ component ::build.cache_manager {
     set ::cache_path = ( ::internal.env("AZL_BUILD_CACHE") || "build/.azl_cache.json" )
     set ::mem_cache = {}      # path -> record
     set ::version = "v1"
+    set ::hit_count = 0
+    set ::miss_count = 0
+    # Ephemeral KV cache (in-memory LRU) for runtime data (weights, quantum states, etc.)
+    set ::kv_capacity = ((::internal.env("AZL_KV_CACHE_CAP") or "1024").toInt())
+    set ::kv_ttl_ms = ((::internal.env("AZL_KV_TTL_MS") or "600000").toInt())  # default 10 min
+    set ::kv_disk_dir = (::internal.env("AZL_KV_DISK_DIR") or ".azl/data_cache")
+    set ::kv_ns_quotas = ::parse_ns_quotas((::internal.env("AZL_KV_NS_QUOTAS") or "weights:256,logits:2048,loss:2048,qstate:1024,qgate:2048,qmeasure:2048,ffi.weights:256"))
+    set ::kv_cache = {}       # key -> { value, ts }
+    set ::kv_order = []       # LRU order: oldest at index 0
+    set ::kv_hits = 0
+    set ::kv_misses = 0
+    set ::kv_evictions = 0
     ::load()
   }
 
   interface {
-    export fn get(path) { return ::mem_cache[path] }
+    export fn get(path) { set v = ::mem_cache[path]; if v != null { set ::hit_count = ::hit_count + 1 } else { set ::miss_count = ::miss_count + 1 } ; return v }
     export fn set(path, rec) { set ::mem_cache[path] = rec ; ::save_throttled() }
     export fn clear() { set ::mem_cache = {} ; ::save() }
-    export fn stats() { return { entries: ::count_entries(), version: ::version, path: ::cache_path } }
+    export fn stats() { return { entries: ::count_entries(), version: ::version, path: ::cache_path, hits: ::hit_count, misses: ::miss_count } }
+
+    # Ephemeral KV cache API (not persisted; optimized for hot runtime data)
+    export fn kv_get(key) {
+      set v = ::kv_cache[key]
+      if v != null {
+        set ::kv_hits = ::kv_hits + 1
+        ::kv_touch(key)
+        return v.value
+      } else {
+        set ::kv_misses = ::kv_misses + 1
+        return null
+      }
+    }
+    export fn kv_set(key, value) {
+      if key == null { return false }
+      set entry = { value: value, ts: ::azl.stdlib.time_now([]), ttl: ::kv_ttl_ms }
+      set ::kv_cache[key] = entry
+      ::kv_touch(key)
+      ::kv_evict_if_needed()
+      return true
+    }
+    export fn kv_set_ttl(key, value, ttl_ms) {
+      if key == null { return false }
+      set entry = { value: value, ts: ::azl.stdlib.time_now([]), ttl: (ttl_ms or ::kv_ttl_ms) }
+      set ::kv_cache[key] = entry
+      ::kv_touch(key)
+      ::kv_evict_if_needed()
+      return true
+    }
+    export fn kv_remove(key) {
+      if ::kv_cache[key] != null { set ::kv_cache[key] = null; ::kv_remove_order(key); return true }
+      return false
+    }
+    export fn kv_remove_prefix(prefix) {
+      if prefix == null { return 0 }
+      set removed = 0
+      set new_order = []
+      for k in ::kv_cache {
+        if k != null && k.substring(0, (prefix.length || 0)) == prefix {
+          set ::kv_cache[k] = null
+          set removed = removed + 1
+        }
+      }
+      # rebuild order without removed keys
+      for i = 0; i < (::kv_order.length || 0); i = i + 1 {
+        set keyi = ::kv_order[i]
+        if keyi != null && (keyi.substring(0, (prefix.length || 0)) != prefix) {
+          set new_order.push(keyi)
+        }
+      }
+      set ::kv_order = new_order
+      return removed
+    }
+    export fn kv_clear() {
+      set ::kv_cache = {}
+      set ::kv_order = []
+      set ::kv_hits = 0
+      set ::kv_misses = 0
+      set ::kv_evictions = 0
+      return true
+    }
+    export fn kv_stats() {
+      return {
+        entries: ::kv_entries_count(),
+        capacity: ::kv_capacity,
+        hits: ::kv_hits,
+        misses: ::kv_misses,
+        evictions: ::kv_evictions,
+        default_ttl_ms: ::kv_ttl_ms,
+        ns_quotas: ::kv_ns_quotas
+      }
+    }
+    # Optional disk-tier helpers
+    export fn kv_disk_set(key, value_str) {
+      set path = ::kv_key_to_path(key)
+      emit syscall with { type: "write_file", args: { path: path, content: (value_str or "") } }
+      return true
+    }
+    export fn kv_disk_get(key) {
+      set path = ::kv_key_to_path(key)
+      set content = (::azl.system_interface.read_file_host_sync(path) or ::azl.system_interface.read_file_sync(path) or "")
+      return content
+    }
   }
 
   memory {
@@ -88,6 +183,93 @@ component ::build.cache_manager {
     ::join_lines = (arr) => { set out = "" ; for i = 0; i < arr.length; i = i + 1 { if i > 0 { set out = out + "\n" } ; set out = out + arr[i] } ; return out }
     ::split_by_char = (s, ch) => { set out = [] ; set cur = "" ; for i = 0; i < s.length; i = i + 1 { set c = s[i] ; if c == ch { set out.push(cur) ; set cur = "" } else { set cur = cur + c } } ; set out.push(cur) ; return out }
     ::to_num = (s) => { set n = 0 ; if !s { return 0 } ; for i = 0; i < s.length; i = i + 1 { set c = s[i] ; if c >= '0' && c <= '9' { set n = n * 10 + (c - '0') } else { break } } ; return n }
+
+    # --- Ephemeral KV LRU helpers ---
+    ::kv_touch = (key) => {
+      # move key to end (most-recent)
+      ::kv_remove_order(key)
+      set ::kv_order.push(key)
+    }
+    ::kv_remove_order = (key) => {
+      set n = ::kv_order.length || 0
+      set out = []
+      for i = 0; i < n; i = i + 1 { if ::kv_order[i] != key { set out.push(::kv_order[i]) } }
+      set ::kv_order = out
+    }
+    ::kv_entries_count = () => { set n = 0 ; for k in ::kv_cache { if ::kv_cache[k] != null { set n = n + 1 } } ; return n }
+    ::kv_evict_if_needed = () => {
+      # Evict expired first
+      ::kv_evict_expired()
+      # Then enforce namespace quotas
+      ::kv_enforce_ns_quotas()
+      # Finally enforce total capacity
+      while (::kv_entries_count() > ::kv_capacity) {
+        if ::kv_order.length == 0 { break }
+        set oldest = ::kv_order[0]
+        # remove oldest
+        set ::kv_cache[oldest] = null
+        set tmp = []
+        for i = 1; i < ::kv_order.length; i = i + 1 { set tmp.push(::kv_order[i]) }
+        set ::kv_order = tmp
+        set ::kv_evictions = ::kv_evictions + 1
+      }
+    }
+    ::kv_evict_expired = () => {
+      set now = ::azl.stdlib.time_now([])
+      set keep = []
+      for i = 0; i < (::kv_order.length or 0); i = i + 1 {
+        set k = ::kv_order[i]
+        set e = ::kv_cache[k]
+        if e == null { continue }
+        set ttl = (e.ttl or ::kv_ttl_ms)
+        if ttl > 0 && (now - (e.ts or 0)) > ttl {
+          set ::kv_cache[k] = null
+          set ::kv_evictions = ::kv_evictions + 1
+        } else { set keep.push(k) }
+      }
+      set ::kv_order = keep
+    }
+    ::kv_enforce_ns_quotas = () => {
+      # Count per namespace and drop LRU within namespace overage
+      set counts = {}
+      for i = 0; i < (::kv_order.length or 0); i = i + 1 { set k = ::kv_order[i]; if ::kv_cache[k] != null { set ns = ::kv_ns_of(k); set counts[ns] = (counts[ns] or 0) + 1 } }
+      # Iterate from oldest; drop within over-quota namespaces
+      set keep = []
+      for i = 0; i < (::kv_order.length or 0); i = i + 1 {
+        set k = ::kv_order[i]
+        set e = ::kv_cache[k]
+        if e == null { continue }
+        set ns = ::kv_ns_of(k)
+        set quota = (::kv_ns_quotas[ns] or 2147483647)
+        if counts[ns] > quota {
+          set ::kv_cache[k] = null
+          set ::kv_evictions = ::kv_evictions + 1
+          set counts[ns] = counts[ns] - 1
+        } else { set keep.push(k) }
+      }
+      set ::kv_order = keep
+    }
+    ::kv_ns_of = (key) => {
+      set colon = (key.index_of(":") or -1)
+      if colon <= 0 { return "default" }
+      return key.substring(0, colon)
+    }
+    ::parse_ns_quotas = (s) => {
+      set out = {}
+      set parts = (s.split(",") or [])
+      loop for p in parts {
+        set kv = (p.split(":") or [])
+        if kv.length >= 2 { set out[kv[0]] = (kv[1].toInt() or 0) }
+      }
+      return out
+    }
+    ::kv_key_to_path = (key) => {
+      # sanitize key for fs
+      set safe = key
+      set safe = safe.replace("/", "_")
+      set safe = safe.replace(":", "_")
+      return (::kv_disk_dir + "/" + safe + ".cache")
+    }
   }
 }
 
@@ -95,87 +277,4 @@ component ::build.cache_manager {
 # - Stores per-file build metadata
 # - Persists to JSON file under build/.cache.json
 
-component ::build.cache_manager {
-  init {
-    set ::cache_path = "build/.cache.json"
-    set ::cache = {}
-    ::load()
-    emit build.cache.ready with "ready"
-  }
-
-  behavior {}
-
-  memory {
-    ::json_stringify = (obj) => {
-      # Minimal stringify (sync with compiler json_stringify for consistency)
-      fn esc(str) {
-        set o = ""; set i = 0
-        while i < str.length {
-          set c = str[i]
-          if c == "\\" { set o = o + "\\\\" }
-          else if c == '"' { set o = o + "\\\"" }
-          else if c == "\n" { set o = o + "\\n" }
-          else if c == "\r" { set o = o + "\\r" }
-          else if c == "\t" { set o = o + "\\t" }
-          else { set o = o + c }
-          set i = i + 1
-        }
-        return o
-      }
-      fn str(o) {
-        if o == null { return "null" }
-        if typeof(o) == "Boolean" { return o ? "true" : "false" }
-        if typeof(o) == "Number" { return "" + o }
-        if typeof(o) == "String" { return '"' + esc(o) + '"' }
-        if typeof(o) == "Array" {
-          set i = 0; set parts = []
-          while i < o.length { set parts.push(str(o[i])); set i = i + 1 }
-          return "[" + parts.join(",") + "]"
-        }
-        set parts2 = []
-        for k in o { if k != null { set parts2.push('"' + esc(k) + '":' + str(o[k])) } }
-        return "{" + parts2.join(",") + "}"
-      }
-      return str(obj)
-    }
-
-    ::bytes_from_string = (s) => {
-      set out = []
-      if s == null { return out }
-      set i = 0
-      while i < s.length { set out.push(s.charCodeAt(i) & 0xFF); set i = i + 1 }
-      return out
-    }
-
-    ::load = () => {
-      # Try host file first
-      set txt = (::azl.system_interface.read_file_host_sync(::cache_path) || ::azl.system_interface.read_file_sync(::cache_path) || "")
-      if txt == null || txt == "" { return true }
-      set J = import("azl/stdlib/core/json.azl")
-      set parsed = J.parse(txt)
-      if !parsed.ok { emit log_error with { type: "cache", message: "cache_parse_failed", context: { path: ::cache_path } } ; return false }
-      set ::cache = parsed.value || {}
-      return true
-    }
-
-    ::save = () => {
-      set json = ::json_stringify(::cache)
-      set bytes = ::bytes_from_string(json)
-      # Attempt host write via syscall bridge (best-effort)
-      emit syscall with { type: "write_binary_file", args: { path: ::cache_path, data: bytes, mode: "0644" } }
-      # Mirror in virtual fs for current session
-      set std = import("azl/stdlib/core/azl_stdlib.azl")
-      set ok = std.file_write([::cache_path, bytes])
-      if !ok { emit log_error with { type: "cache", message: "cache_virtual_write_failed", context: { path: ::cache_path } } }
-      return ok
-    }
-  }
-
-  interface {
-    export fn get(path) { return ::cache[path] }
-    export fn set(path, entry) { set ::cache[path] = entry; ::save(); return true }
-    export fn clear() { set ::cache = {}; ::save(); return true }
-  }
-}
-
-
+ 

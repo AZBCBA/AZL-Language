@@ -1,0 +1,27 @@
+# AZL Capability Bootstrap - Least-privilege defaults
+
+component ::azl.capability_bootstrap {
+  init {
+    link ::azl.security
+    say "🔐 Applying default capability grants"
+    # Default-deny can be toggled here if desired
+    ::azl.security.set_default_allow(false)
+
+    # Grant minimal FS read to core components that require stdlib or config
+    ::azl.security.grant("::azl.stdlib", "fs.read")
+    ::azl.security.grant("::azl.stdlib", "fs.write")
+    ::azl.security.grant("::azl.interpreter", "fs.read")
+    ::azl.security.grant("::azl.interpreter", "console.write")
+
+    # Build and runtime systems often need FS read/write for artifacts
+    ::azl.security.grant("::build.orchestrator", "fs.read")
+    ::azl.security.grant("::build.orchestrator", "fs.write")
+
+    # Networking for orchestrators if explicitly used
+    ::azl.security.grant("::azl.runtime_integration", "console.write")
+
+    say "✅ Capability bootstrap applied"
+  }
+}
+
+

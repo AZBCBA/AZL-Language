@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>AZL Desktop - Preferences</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://127.0.0.1:8080 http://127.0.0.1:5000 http://127.0.0.1:5001; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"/>
+  <style>
+    :root {
+      --bg: #0f172a; --card: #111827; --fg: #e5e7eb; --muted: #9ca3af;
+      --accent: #22d3ee; --ok: #22c55e; --bad: #ef4444; --btn: #1f2937;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; }
+    .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+    .section { background: var(--card); border: 1px solid #1f2937; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+    .section h2 { margin: 0 0 20px 0; color: var(--accent); }
+    .setting-item { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid #1f2937; }
+    .toggle { width: 50px; height: 24px; background: #1f2937; border-radius: 12px; cursor: pointer; position: relative; }
+    .toggle.active { background: var(--accent); }
+    .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: var(--fg); border-radius: 50%; transition: transform 0.3s; }
+    .toggle.active::after { transform: translateX(26px); }
+    .select, .input { background: #0a0f1a; color: #cbd5e1; border: 1px solid #1f2937; border-radius: 6px; padding: 8px 12px; }
+    .btn { background: var(--btn); color: var(--fg); border: 1px solid #1f2937; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: var(--bg); }
+    .theme-preview { display: flex; gap: 16px; margin-top: 16px; }
+    .theme-option { flex: 1; padding: 16px; border: 2px solid #1f2937; border-radius: 8px; cursor: pointer; text-align: center; }
+    .theme-option.active { border-color: var(--accent); background: var(--card); }
+    .theme-option.dark { background: #0f172a; color: #e5e7eb; }
+    .theme-option.light { background: #ffffff; color: #0f172a; }
+    .theme-option.high-contrast { background: #000000; color: #ffffff; }
+    .actions { text-align: center; margin-top: 40px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="section">
+      <h2>🛡️ Security</h2>
+      <div class="setting-item">
+        <div>
+          <div><strong>Enforce CSP</strong></div>
+          <div class="muted">Apply Content Security Policy headers</div>
+        </div>
+        <div class="toggle" id="cspEnforceToggle"></div>
+      </div>
+      <div class="setting-item">
+        <div>
+          <div><strong>CSP Policy</strong></div>
+          <div class="muted">Configure the CSP policy string (advanced)</div>
+        </div>
+        <label for="cspPolicy" class="sr-only">CSP policy</label>
+        <input id="cspPolicy" class="input" placeholder="CSP policy string" title="CSP policy" aria-label="CSP policy"/>
+      </div>
+      <div class="setting-item">
+        <div>
+          <div><strong>Certificate Pinning</strong></div>
+          <div class="muted">Verify server certificates via SPKI pinning</div>
+        </div>
+        <div class="toggle" id="pinningToggle"></div>
+      </div>
+      <div class="setting-item">
+        <div>
+          <div><strong>SPKI Pins (JSON)</strong></div>
+          <div class="muted">{"api.example.com":["base64-spki"],"*":["base64-spki"]}</div>
+        </div>
+        <label for="pinsJson" class="sr-only">SPKI pins</label>
+        <input id="pinsJson" class="input" placeholder='{"*": ["..."]}' title="SPKI pins" aria-label="SPKI pins"/>
+      </div>
+      <div class="setting-item">
+        <div>
+          <div><strong>Permissions Allowlist</strong></div>
+          <div class="muted">Comma-separated Electron permission names</div>
+        </div>
+        <label for="permAllowlist" class="sr-only">Permissions allowlist</label>
+        <input id="permAllowlist" class="input" placeholder="media,geolocation,notifications" title="Permissions allowlist" aria-label="Permissions allowlist"/>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>🔁 Recovery</h2>
+      <div class="setting-item">
+        <div>
+          <div><strong>Auto Recovery (Renderer)</strong></div>
+          <div class="muted">Auto-reload on renderer crash with backoff</div>
+        </div>
+        <div class="toggle" id="autoRecoveryToggle"></div>
+      </div>
+    </div>
+      <h2>🎨 Appearance & Theme</h2>
+      <div class="setting-item">
+        <div>
+          <div><strong>Theme</strong></div>
+          <div class="muted">Choose your preferred color scheme</div>
+        </div>
+        <label for="themeSelect" class="sr-only">Theme</label>
+        <select id="themeSelect" class="select" title="Theme">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+          <option value="high-contrast">High Contrast</option>
+        </select>
+      </div>
+      <div class="theme-preview">
+        <div class="theme-option dark active" data-theme="dark">
+          <strong>Dark</strong><br><small>Default dark theme</small>
+        </div>
+        <div class="theme-option light" data-theme="light">
+          <strong>Light</strong><br><small>Clean light theme</small>
+        </div>
+        <div class="theme-option high-contrast" data-theme="high-contrast">
+          <strong>High Contrast</strong><br><small>Maximum readability</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>♿ Accessibility</h2>
+      <div class="setting-item">
+        <div>
+          <div><strong>High Contrast Mode</strong></div>
+          <div class="muted">Enhance contrast for better visibility</div>
+        </div>
+        <div class="toggle" id="highContrastToggle"></div>
+      </div>
+      <div class="setting-item">
+        <div>
+          <div><strong>Reduce Motion</strong></div>
+          <div class="muted">Minimize animations and transitions</div>
+        </div>
+        <div class="toggle" id="reduceMotionToggle"></div>
+      </div>
+      <div class="setting-item">
+        <div>
+          <div><strong>Screen Reader Support</strong></div>
+          <div class="muted">Enable enhanced screen reader compatibility</div>
+        </div>
+        <div class="toggle" id="screenReaderToggle"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>⌨️ Keyboard Shortcuts</h2>
+      <div class="setting-item">
+        <div>
+          <div><strong>Show/Hide Window</strong></div>
+          <div class="muted">Toggle application visibility</div>
+        </div>
+         <label for="showHideShortcut" class="sr-only">Show/Hide Shortcut</label>
+          <input type="text" class="input" id="showHideShortcut" readonly title="Show/Hide Shortcut" placeholder="CmdOrCtrl+Shift+A">
+      </div>
+      <div class="setting-item">
+        <div>
+          <div><strong>Start All Services</strong></div>
+          <div class="muted">Start all AZL services</div>
+        </div>
+        <label for="startAllShortcut" class="sr-only">Start All Shortcut</label>
+        <input type="text" class="input" id="startAllShortcut" readonly title="Start All Shortcut" placeholder="CmdOrCtrl+Shift+S">
+      </div>
+      <div class="setting-item">
+        <div>
+          <div><strong>Stop All Services</strong></div>
+          <div class="muted">Stop all AZL services</div>
+        </div>
+        <label for="stopAllShortcut" class="sr-only">Stop All Shortcut</label>
+        <input type="text" class="input" id="stopAllShortcut" readonly title="Stop All Shortcut" placeholder="CmdOrCtrl+Shift+X">
+      </div>
+      <div class="setting-item">
+        <div>
+          <div><strong>Reset to Defaults</strong></div>
+          <div class="muted">Restore default keyboard shortcuts</div>
+        </div>
+        <button class="btn" onclick="resetShortcuts()">Reset</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>🔄 Updates</h2>
+      <div class="setting-item">
+        <div>
+          <div><strong>Auto-update</strong></div>
+          <div class="muted">Automatically check for and download updates</div>
+        </div>
+        <div class="toggle" id="autoUpdateToggle"></div>
+      </div>
+      <div class="setting-item">
+        <div>
+          <div><strong>Check for Updates</strong></div>
+          <div class="muted">Manually check for available updates</div>
+        </div>
+        <button class="btn btn-primary" onclick="checkForUpdates()">Check Now</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>⚙️ Behavior</h2>
+      <div class="setting-item">
+        <div>
+          <div><strong>Auto-start with System</strong></div>
+          <div class="muted">Launch AZL Desktop when your computer starts</div>
+        </div>
+        <div class="toggle" id="autoStartToggle"></div>
+      </div>
+      <div class="setting-item">
+        <div>
+          <div><strong>Minimize to Tray</strong></div>
+          <div class="muted">Minimize to system tray instead of closing</div>
+        </div>
+        <div class="toggle" id="minimizeToTrayToggle"></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+      <button class="btn" onclick="exportSettings()">Export</button>
+      <button class="btn" onclick="importSettings()">Import</button>
+      <button class="btn" onclick="resetSettings()">Reset to Defaults</button>
+    </div>
+  </div>
+
+  <script src="preferences.js"></script>
+</body>
+</html>

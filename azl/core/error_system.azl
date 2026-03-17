@@ -123,5 +123,13 @@ component ::error.system {
       for ::err in ::error_log { say "  - " + ::err.type + ": " + ::err.message }
       emit error.summary with { total: ::error_log.length }
     }
+    # Quantum logic violations (hard-fail reporting)
+    listen for "quantum.logic.violation" {
+      let d = ::event.data or {}
+      set ::error_count = ::error_count + 1
+      set ::last_error = { type: "quantum_violation", data: d, time: now() }
+      say "❌ Quantum logic violation: " + (d.reason or "unknown")
+      emit error.logged with { type: "quantum_violation", details: d }
+    }
   }
 }

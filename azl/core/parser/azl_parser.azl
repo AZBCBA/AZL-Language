@@ -1,0 +1,782 @@
+# AZL PARSER - WRITTEN ENTIRELY IN AZL
+# This is the foundation of self-hosting: AZL parsing AZL code
+
+component ::azl.parser {
+  init {
+    say "🔥 AZL PARSER STARTING"
+    say "🎯 AZL WILL PARSE AZL CODE!"
+    say "✨ USING MODERN SYNTAX: let, if, for, fn!"
+    
+    # Initialize parser state
+    ::tokens = []
+    ::current_position = 0
+    ::ast_nodes = []
+    ::error_count = 0
+    ::max_errors = 10
+    
+    # Token types
+    ::token_types = {
+      KEYWORD: "keyword",
+      IDENTIFIER: "identifier",
+      LITERAL: "literal",
+      OPERATOR: "operator",
+      PUNCTUATION: "punctuation",
+      WHITESPACE: "whitespace",
+      COMMENT: "comment",
+      STRING: "string",
+      NUMBER: "number",
+      BOOLEAN: "boolean"
+    }
+    
+    # Keywords
+    ::keywords = [
+      "component", "init", "behavior", "memory",
+      "let", "set", "fn", "if", "else", "for", "while",
+      "return", "break", "continue", "emit", "listen",
+      "say", "link", "try", "catch", "throw"
+    ]
+    
+    # Operators
+    ::operators = [
+      "+", "-", "*", "/", "%", "=", "==", "!=", ">", "<", ">=", "<=",
+      "and", "or", "not", "++", "--", "+=", "-=", "*=", "/="
+    ]
+    
+    # Punctuation
+    ::punctuation = [
+      "{", "}", "(", ")", "[", "]", ";", ",", ".", ":", "::"
+    ]
+    
+    say "✅ AZL Parser initialized and ready!"
+    emit parser.ready
+  }
+
+  behavior {
+    listen for "parse.azl_code" then {
+      set source_code = ::event.data.code
+      set file_name = ::event.data.file_name || "unknown"
+      
+      say "📝 Parsing AZL code from: $file_name"
+      say "📊 Source length: $source_code.length characters"
+      
+      set result = parse_azl_code(source_code, file_name)
+      emit parse.complete with result
+    }
+
+    listen for "parse.azl_file" then {
+      set file_path = ::event.data.path
+      
+      say "📖 Parsing AZL file: $file_path"
+      set source_code = read_file_content(file_path)
+      
+      if source_code {
+        set result = parse_azl_code(source_code, file_path)
+        emit parse.complete with result
+      } else {
+        emit parse.error with { error: "file_read_failed", file: file_path }
+      }
+    }
+
+    listen for "tokenize.only" then {
+      set source_code = ::event.data.code
+      set tokens = tokenize(source_code)
+      emit tokenize.complete with { tokens: tokens }
+    }
+  }
+
+  # MAIN PARSING FUNCTION
+  fn parse_azl_code(source_code, file_name) {
+    try {
+      say "🔄 Starting AZL code parsing..."
+      
+      # Reset parser state
+      ::tokens = []
+      ::current_position = 0
+      ::ast_nodes = []
+      ::error_count = 0
+      
+      # Step 1: Tokenize the source code
+      say "🔤 Step 1: Tokenizing source code..."
+      set tokens = tokenize(source_code)
+      say "✅ Tokenization complete: $tokens.length tokens"
+      
+      # Step 2: Parse into AST
+      say "🌳 Step 2: Building Abstract Syntax Tree..."
+      set ast = build_ast(tokens)
+      say "✅ AST construction complete: $ast.length root nodes"
+      
+      # Step 3: Validate AST
+      say "✅ Step 3: Validating AST..."
+      set validation = validate_ast(ast)
+      
+      set result = {
+        success: validation.valid,
+        file: file_name,
+        tokens: tokens,
+        ast: ast,
+        validation: validation,
+        error_count: ::error_count,
+        parse_time: current_timestamp()
+      }
+      
+      if validation.valid {
+        say "🎉 AZL parsing successful!"
+        say "📊 Statistics:"
+        say "   - Tokens: $tokens.length"
+        say "   - AST Nodes: $ast.length"
+        say "   - Errors: $::error_count"
+      } else {
+        say "⚠️  AZL parsing completed with errors:"
+        say "   - Errors: $validation.errors.length"
+        say "   - Warnings: $validation.warnings.length"
+      }
+      
+      return result
+      
+    } catch error {
+      say "💥 Fatal parsing error: $error"
+      return {
+        success: false,
+        error: error,
+        file: file_name,
+        tokens: [],
+        ast: [],
+        error_count: ::error_count + 1
+      }
+    }
+  }
+
+  # TOKENIZATION SYSTEM
+  fn tokenize(source_code) {
+    set tokens = []
+    set lines = source_code.split("\n")
+    set line_number = 1
+    
+    for line in lines {
+      set line_tokens = tokenize_line(line, line_number)
+      tokens = tokens.concat(line_tokens)
+      line_number = line_number + 1
+    }
+    
+    # Filter out whitespace and comments
+    set filtered_tokens = []
+    for token in tokens {
+      if token.type != ::token_types.WHITESPACE && token.type != ::token_types.COMMENT {
+        filtered_tokens.push(token)
+      }
+    }
+    
+    return filtered_tokens
+  }
+
+  fn tokenize_line(line, line_number) {
+    set tokens = []
+    set current_pos = 0
+    set line_length = line.length
+    
+    while current_pos < line_length {
+      set char = line[current_pos]
+      
+      # Skip whitespace
+      if char == " " || char == "\t" {
+        current_pos = current_pos + 1
+        continue
+      }
+      
+      # Handle comments
+      if char == "#" {
+        set comment_token = {
+          type: ::token_types.COMMENT,
+          value: line.substring(current_pos),
+          line: line_number,
+          column: current_pos + 1
+        }
+        tokens.push(comment_token)
+        break  # Comment extends to end of line
+      }
+      
+      # Handle strings
+      if char == "\"" {
+        set string_token = parse_string_literal(line, current_pos, line_number)
+        tokens.push(string_token)
+        current_pos = string_token.end_pos
+        continue
+      }
+      
+      # Handle numbers
+      if is_digit(char) {
+        set number_token = parse_number_literal(line, current_pos, line_number)
+        tokens.push(number_token)
+        current_pos = number_token.end_pos
+        continue
+      }
+      
+      # Handle identifiers and keywords
+      if is_identifier_start(char) {
+        set identifier_token = parse_identifier(line, current_pos, line_number)
+        tokens.push(identifier_token)
+        current_pos = identifier_token.end_pos
+        continue
+      }
+      
+      # Handle operators and punctuation
+      set operator_token = parse_operator_or_punctuation(line, current_pos, line_number)
+      if operator_token {
+        tokens.push(operator_token)
+        current_pos = operator_token.end_pos
+        continue
+      }
+      
+      # Unknown character
+      report_error("Unknown character: $char", line_number, current_pos + 1)
+      current_pos = current_pos + 1
+    }
+    
+    return tokens
+  }
+
+  fn parse_string_literal(line, start_pos, line_number) {
+    set start_pos = start_pos + 1  # Skip opening quote
+    set current_pos = start_pos
+    set value = ""
+    
+    while current_pos < line.length {
+      set char = line[current_pos]
+      
+      if char == "\"" {
+        # End of string
+        break
+      } else if char == "\\" {
+        # Escape sequence
+        current_pos = current_pos + 1
+        if current_pos < line.length {
+          set next_char = line[current_pos]
+          if next_char == "n" { value = value + "\n" }
+          else if next_char == "t" { value = value + "\t" }
+          else if next_char == "r" { value = value + "\r" }
+          else if next_char == "\\" { value = value + "\\" }
+          else if next_char == "\"" { value = value + "\"" }
+          else { value = value + next_char }
+        }
+      } else {
+        value = value + char
+      }
+      
+      current_pos = current_pos + 1
+    }
+    
+    return {
+      type: ::token_types.STRING,
+      value: value,
+      line: line_number,
+      column: start_pos,
+      end_pos: current_pos + 1
+    }
+  }
+
+  fn parse_number_literal(line, start_pos, line_number) {
+    set current_pos = start_pos
+    set value = ""
+    set has_decimal = false
+    
+    while current_pos < line.length {
+      set char = line[current_pos]
+      
+      if is_digit(char) {
+        value = value + char
+      } else if char == "." && !has_decimal {
+        value = value + char
+        has_decimal = true
+      } else if char == "e" || char == "E" {
+        value = value + char
+        current_pos = current_pos + 1
+        if current_pos < line.length {
+          set next_char = line[current_pos]
+          if next_char == "+" || next_char == "-" {
+            value = value + next_char
+            current_pos = current_pos + 1
+          }
+        }
+      } else {
+        break
+      }
+      
+      current_pos = current_pos + 1
+    }
+    
+    return {
+      type: ::token_types.NUMBER,
+      value: parseFloat(value),
+      line: line_number,
+      column: start_pos + 1,
+      end_pos: current_pos
+    }
+  }
+
+  fn parse_identifier(line, start_pos, line_number) {
+    set current_pos = start_pos
+    set value = ""
+    
+    while current_pos < line.length {
+      set char = line[current_pos]
+      
+      if is_identifier_part(char) {
+        value = value + char
+        current_pos = current_pos + 1
+      } else {
+        break
+      }
+    }
+    
+    # Determine if it's a keyword
+    set token_type = ::token_types.IDENTIFIER
+    if ::keywords.includes(value) {
+      token_type = ::token_types.KEYWORD
+    } else if value == "true" || value == "false" {
+      token_type = ::token_types.BOOLEAN
+    }
+    
+    return {
+      type: token_type,
+      value: value,
+      line: line_number,
+      column: start_pos + 1,
+      end_pos: current_pos
+    }
+  }
+
+  fn parse_operator_or_punctuation(line, start_pos, line_number) {
+    set current_pos = start_pos
+    set max_length = 3  # Longest operator is 3 characters
+    
+    # Try to match longest operator first
+    for length in range(max_length, 0, -1) {
+      if start_pos + length <= line.length {
+        set candidate = line.substring(start_pos, start_pos + length)
+        
+        if ::operators.includes(candidate) {
+          return {
+            type: ::token_types.OPERATOR,
+            value: candidate,
+            line: line_number,
+            column: start_pos + 1,
+            end_pos: start_pos + length
+          }
+        }
+        
+        if ::punctuation.includes(candidate) {
+          return {
+            type: ::token_types.PUNCTUATION,
+            value: candidate,
+            line: line_number,
+            column: start_pos + 1,
+            end_pos: start_pos + length
+          }
+        }
+      }
+    }
+    
+    return null
+  }
+
+  # AST BUILDING SYSTEM
+  fn build_ast(tokens) {
+    set ast = []
+    ::current_position = 0
+    
+    while ::current_position < tokens.length {
+      set token = tokens[::current_position]
+      
+      if token.type == ::token_types.KEYWORD {
+        if token.value == "component" {
+          set component_node = parse_component_declaration(tokens)
+          ast.push(component_node)
+        } else {
+          # Skip other keywords for now
+          ::current_position = ::current_position + 1
+        }
+      } else {
+        ::current_position = ::current_position + 1
+      }
+    }
+    
+    return ast
+  }
+
+  fn parse_component_declaration(tokens) {
+    set start_pos = ::current_position
+    set component_node = {
+      type: "ComponentDeclaration",
+      start_pos: start_pos,
+      children: []
+    }
+    
+    # Skip 'component' keyword
+    ::current_position = ::current_position + 1
+    
+    # Parse component name
+    if ::current_position < tokens.length {
+      set name_token = tokens[::current_position]
+      if name_token.type == ::token_types.IDENTIFIER || name_token.type == ::token_types.PUNCTUATION {
+        component_node.name = name_token.value
+        ::current_position = ::current_position + 1
+      }
+    }
+    
+    # Parse component body
+    if ::current_position < tokens.length {
+      set body_token = tokens[::current_position]
+      if body_token.type == ::token_types.PUNCTUATION && body_token.value == "{" {
+        component_node.body = parse_component_body(tokens)
+      }
+    }
+    
+    component_node.end_pos = ::current_position
+    return component_node
+  }
+
+  fn parse_component_body(tokens) {
+    set body = {
+      type: "ComponentBody",
+      sections: {}
+    }
+    
+    # Skip opening brace
+    ::current_position = ::current_position + 1
+    
+    while ::current_position < tokens.length {
+      set token = tokens[::current_position]
+      
+      if token.type == ::token_types.PUNCTUATION && token.value == "}" {
+        ::current_position = ::current_position + 1
+        break
+      }
+      
+      if token.type == ::token_types.KEYWORD {
+        if token.value == "init" || token.value == "behavior" || token.value == "memory" {
+          set section = parse_section(tokens, token.value)
+          body.sections[token.value] = section
+        } else {
+          ::current_position = ::current_position + 1
+        }
+      } else {
+        ::current_position = ::current_position + 1
+      }
+    }
+    
+    return body
+  }
+
+  fn parse_section(tokens, section_name) {
+    set section = {
+      type: "Section",
+      name: section_name,
+      statements: []
+    }
+    
+    # Skip section keyword
+    ::current_position = ::current_position + 1
+    
+    # Parse opening brace
+    if ::current_position < tokens.length {
+      set brace_token = tokens[::current_position]
+      if brace_token.type == ::token_types.PUNCTUATION && brace_token.value == "{" {
+        ::current_position = ::current_position + 1
+        
+        # Parse section body
+        while ::current_position < tokens.length {
+          set token = tokens[::current_position]
+          
+          if token.type == ::token_types.PUNCTUATION && token.value == "}" {
+            ::current_position = ::current_position + 1
+            break
+          }
+          
+          # Parse statements (simplified for now)
+          set statement = parse_statement(tokens)
+          if statement {
+            section.statements.push(statement)
+          }
+        }
+      }
+    }
+    
+    return section
+  }
+
+  fn parse_statement(tokens) {
+    if ::current_position >= tokens.length {
+      return null
+    }
+    
+    set token = tokens[::current_position]
+    
+    if token.type == ::token_types.KEYWORD {
+      if token.value == "let" {
+        return parse_let_statement(tokens)
+      } else if token.value == "if" {
+        return parse_if_statement(tokens)
+      } else if token.value == "for" {
+        return parse_for_statement(tokens)
+      } else if token.value == "fn" {
+        return parse_function_statement(tokens)
+      }
+    }
+    
+    # Skip unknown statements for now
+    ::current_position = ::current_position + 1
+    return null
+  }
+
+  fn parse_let_statement(tokens) {
+    set statement = {
+      type: "LetStatement",
+      start_pos: ::current_position
+    }
+    
+    # Skip 'let' keyword
+    ::current_position = ::current_position + 1
+    
+    # Parse variable name
+    if ::current_position < tokens.length {
+      set name_token = tokens[::current_position]
+      if name_token.type == ::token_types.IDENTIFIER {
+        statement.variable_name = name_token.value
+        ::current_position = ::current_position + 1
+      }
+    }
+    
+    # Parse assignment operator
+    if ::current_position < tokens.length {
+      set op_token = tokens[::current_position]
+      if op_token.type == ::token_types.OPERATOR && op_token.value == "=" {
+        ::current_position = ::current_position + 1
+      }
+    }
+    
+    # Parse value (simplified)
+    if ::current_position < tokens.length {
+      set value_token = tokens[::current_position]
+      statement.value = value_token.value
+      ::current_position = ::current_position + 1
+    }
+    
+    statement.end_pos = ::current_position
+    return statement
+  }
+
+  fn parse_if_statement(tokens) {
+    set statement = {
+      type: "IfStatement",
+      start_pos: ::current_position
+    }
+    
+    # Skip 'if' keyword
+    ::current_position = ::current_position + 1
+    
+    # Parse condition (simplified)
+    if ::current_position < tokens.length {
+      set condition_token = tokens[::current_position]
+      statement.condition = condition_token.value
+      ::current_position = ::current_position + 1
+    }
+    
+    # Parse opening brace
+    if ::current_position < tokens.length {
+      set brace_token = tokens[::current_position]
+      if brace_token.type == ::token_types.PUNCTUATION && brace_token.value == "{" {
+        ::current_position = ::current_position + 1
+        
+        # Parse body (simplified)
+        while ::current_position < tokens.length {
+          set token = tokens[::current_position]
+          if token.type == ::token_types.PUNCTUATION && token.value == "}" {
+            ::current_position = ::current_position + 1
+            break
+          }
+          ::current_position = ::current_position + 1
+        }
+      }
+    }
+    
+    statement.end_pos = ::current_position
+    return statement
+  }
+
+  fn parse_for_statement(tokens) {
+    set statement = {
+      type: "ForStatement",
+      start_pos: ::current_position
+    }
+    
+    # Skip 'for' keyword
+    ::current_position = ::current_position + 1
+    
+    # Parse for loop header (simplified)
+    if ::current_position < tokens.length {
+      set header_token = tokens[::current_position]
+      statement.header = header_token.value
+      ::current_position = ::current_position + 1
+    }
+    
+    # Parse opening brace
+    if ::current_position < tokens.length {
+      set brace_token = tokens[::current_position]
+      if brace_token.type == ::token_types.PUNCTUATION && brace_token.value == "{" {
+        ::current_position = ::current_position + 1
+        
+        # Parse body (simplified)
+        while ::current_position < tokens.length {
+          set token = tokens[::current_position]
+          if token.type == ::token_types.PUNCTUATION && token.value == "}" {
+            ::current_position = ::current_position + 1
+            break
+          }
+          ::current_position = ::current_position + 1
+        }
+      }
+    }
+    
+    statement.end_pos = ::current_position
+    return statement
+  }
+
+  fn parse_function_statement(tokens) {
+    set statement = {
+      type: "FunctionStatement",
+      start_pos: ::current_position
+    }
+    
+    # Skip 'fn' keyword
+    ::current_position = ::current_position + 1
+    
+    # Parse function name
+    if ::current_position < tokens.length {
+      set name_token = tokens[::current_position]
+      if name_token.type == ::token_types.IDENTIFIER {
+        statement.function_name = name_token.value
+        ::current_position = ::current_position + 1
+      }
+    }
+    
+    # Parse parameters (simplified)
+    if ::current_position < tokens.length {
+      set paren_token = tokens[::current_position]
+      if paren_token.type == ::token_types.PUNCTUATION && paren_token.value == "(" {
+        ::current_position = ::current_position + 1
+        
+        # Skip to closing parenthesis
+        while ::current_position < tokens.length {
+          set token = tokens[::current_position]
+          if token.type == ::token_types.PUNCTUATION && token.value == ")" {
+            ::current_position = ::current_position + 1
+            break
+          }
+          ::current_position = ::current_position + 1
+        }
+      }
+    }
+    
+    # Parse function body
+    if ::current_position < tokens.length {
+      set brace_token = tokens[::current_position]
+      if brace_token.type == ::token_types.PUNCTUATION && brace_token.value == "{" {
+        ::current_position = ::current_position + 1
+        
+        # Parse body (simplified)
+        while ::current_position < tokens.length {
+          set token = tokens[::current_position]
+          if token.type == ::token_types.PUNCTUATION && token.value == "}" {
+            ::current_position = ::current_position + 1
+            break
+          }
+          ::current_position = ::current_position + 1
+        }
+      }
+    }
+    
+    statement.end_pos = ::current_position
+    return statement
+  }
+
+  # AST VALIDATION SYSTEM
+  fn validate_ast(ast) {
+    set validation = {
+      valid: true,
+      errors: [],
+      warnings: []
+    }
+    
+    for node in ast {
+      if node.type == "ComponentDeclaration" {
+        set component_validation = validate_component(node)
+        if !component_validation.valid {
+          validation.valid = false
+          validation.errors = validation.errors.concat(component_validation.errors)
+        }
+        validation.warnings = validation.warnings.concat(component_validation.warnings)
+      }
+    }
+    
+    return validation
+  }
+
+  fn validate_component(component_node) {
+    set validation = {
+      valid: true,
+      errors: [],
+      warnings: []
+    }
+    
+    # Check component name
+    if !component_node.name {
+      validation.valid = false
+      validation.errors.push("Component missing name")
+    }
+    
+    # Check component body
+    if !component_node.body {
+      validation.valid = false
+      validation.errors.push("Component missing body")
+    }
+    
+    return validation
+  }
+
+  # UTILITY FUNCTIONS
+  fn is_digit(char) {
+    return char >= "0" && char <= "9"
+  }
+
+  fn is_identifier_start(char) {
+    return (char >= "a" && char <= "z") || (char >= "A" && char <= "Z") || char == "_"
+  }
+
+  fn is_identifier_part(char) {
+    return is_identifier_start(char) || is_digit(char)
+  }
+
+  fn report_error(message, line, column) {
+    if ::error_count < ::max_errors {
+      say "❌ Parse Error (Line $line, Column $column): $message"
+      ::error_count = ::error_count + 1
+    }
+  }
+
+  fn read_file_content(path) {
+    # Use the real system interface strictly
+    if (::azl && ::azl.system_interface && ::azl.system_interface.read_file_host_sync) {
+      set content = ::azl.system_interface.read_file_host_sync(path)
+      if (content != null && content != "") { return content }
+    }
+    emit file.read with { path: path }
+    listen for "file.read.complete" then { return (::event.data.content || null) }
+    emit log_error with { type: "io", message: "file_read_failed", context: { path: path } }
+    return null
+  }
+
+  fn current_timestamp() {
+    # Simple timestamp - in real implementation, this would use system time
+    return "timestamp_" + (::variables["__counter"] || 0)
+  }
+}

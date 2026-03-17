@@ -1,5 +1,5 @@
 # azl/ffi/torch_bridge.azl
-component ::ffi.torch {
+component ::ffi.torch_bridge {
   init { set ::enabled = false }
   # forward
   listen for "forward" {

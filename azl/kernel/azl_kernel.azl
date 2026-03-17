@@ -233,7 +233,7 @@ component ::azl.kernel {
     if (::azl && ::azl.stdlib && ::azl.stdlib.file && ::azl.stdlib.file.read) {
       return ::azl.stdlib.file.read([path])
     }
-    # Fallback: ask system interface
+    # Strict dispatch to system interface
     emit syscall with { type: "read_file", args: { path: path } }
     return { status: 202, info: "dispatched" }
   }
@@ -290,7 +290,7 @@ component ::azl.kernel {
       if (::azl && ::azl.stdlib && ::azl.stdlib.file && ::azl.stdlib.file.read) {
         return ::azl.stdlib.file.read([args[0]])
       }
-      # Fallback: dispatch to file.read event; caller listens for file.read.complete
+      # Dispatch to file.read event; caller must listen for file.read.complete
       emit file.read with { path: args[0] }
       return { status: 202, info: "file.read dispatched" }
     } else if call_name == "write_file" {
@@ -446,23 +446,27 @@ component ::azl.kernel {
   fn azl_run_file(file_path) {
     say "🚀 Running AZL file: $file_path (PURE AZL EXECUTION)"
     
-    # Read source file using pure AZL
-    emit syscall with { type: "read_file", args: { path: file_path } }
-    
-    # Wait for file read response
-    # (Event handling will be implemented)
-    
-    # Compile using pure AZL compiler
-    emit compile with { 
-      source_code: "FILE_CONTENT",
-      component_name: file_path
+    # Prefer interpreter path for production until compiler/VM parity
+    # 1) Read file via system interface (host) synchronously if available
+    set content = null
+    if (::azl && ::azl.system_interface && ::azl.system_interface.read_file_host_sync) {
+      set content = ::azl.system_interface.read_file_host_sync(file_path)
+    }
+    if (content == null || content == "") {
+      # Strict: async syscall then interpret on callback if content returned; otherwise error
+      emit syscall with { type: "read_file", args: { path: file_path } }
+      listen for "syscall.response" then {
+        set content = (::event.data.content || ::event.data.result || "")
+        if (content == "") { emit log_error with { type: "io", message: "empty_source", context: { path: file_path } }; return 1 }
+        emit interpret with { code: content, component_name: file_path }
+      }
+      listen for "interpretation_complete" then { say "✅ File interpretation complete: $file_path" }
+      return 0
     }
     
-    # Execute using pure AZL VM
-    emit execute_bytecode with {
-      bytecode: "COMPILED_BYTECODE"
-    }
-    
+    # 2) Interpret directly
+    emit interpret with { code: content, component_name: file_path }
+    listen for "interpretation_complete" then { say "✅ File interpretation complete: $file_path" }
     return 0
   }
 

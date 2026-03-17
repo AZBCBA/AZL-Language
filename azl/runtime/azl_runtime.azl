@@ -1,0 +1,325 @@
+# AZL RUNTIME - WRITTEN IN AZL ITSELF!
+# This runtime executes compiled AZL code
+
+component ::azl.runtime {
+  init {
+    say "🔥 AZL RUNTIME STARTING - WRITTEN IN AZL!"
+    say "🎯 This runtime executes compiled AZL code"
+    
+    set ::loaded_components = {}
+    set ::execution_context = {}
+    set ::event_queue = []
+    set ::running = false
+    
+    say "✅ AZL Runtime ready to execute compiled code!"
+    emit runtime.ready
+  }
+
+  behavior {
+    listen for "load.component" then {
+      set component_data = ::event.data.component
+      set result = load_component(component_data)
+      emit component.loaded with result
+    }
+
+    listen for "execute.component" then {
+      set component_name = ::event.data.name
+      set result = execute_component(component_name)
+      emit component.executed with result
+    }
+
+    listen for "start.runtime" then {
+      start_runtime()
+    }
+
+    listen for "stop.runtime" then {
+      stop_runtime()
+    }
+  }
+
+  # Load a compiled component into the runtime
+  fn load_component(component_data) {
+    say "📦 Loading component: $component_data.name"
+    
+    # Store component in runtime
+    ::loaded_components[component_data.name] = component_data
+    
+    say "✅ Component loaded: $component_data.name"
+    return {
+      success: true,
+      component_name: component_data.name,
+      sections: Object.keys(component_data.sections || {})
+    }
+  }
+
+  # Execute a loaded component
+  fn execute_component(component_name) {
+    set component = ::loaded_components[component_name]
+    if !component {
+      say "❌ Component not found: $component_name"
+      return { success: false, error: "component_not_found" }
+    }
+    
+    say "🚀 Executing component: $component_name"
+    
+    # Execute init section if present
+    if component.sections && component.sections.init {
+      execute_section(component.sections.init, component_name)
+    }
+    
+    # Setup behavior handlers if present
+    if component.sections && component.sections.behavior {
+      setup_behavior_handlers(component.sections.behavior, component_name)
+    }
+    
+    say "✅ Component executed: $component_name"
+    return { success: true, component_name: component_name }
+  }
+
+  # Execute a section of code
+  fn execute_section(section, context) {
+    say "📝 Executing section with $section.length statements"
+    
+    for let i = 0; i < section.length; i++ {
+      set statement = section[i]
+      execute_statement(statement, context)
+    }
+  }
+
+  # Execute a single statement
+  fn execute_statement(statement, context) {
+    set trimmed = statement.trim()
+    
+    if starts_with(trimmed, "say ") {
+      execute_say_statement(trimmed, context)
+    } else if starts_with(trimmed, "set ") {
+      execute_set_statement(trimmed, context)
+    } else if starts_with(trimmed, "emit ") {
+      execute_emit_statement(trimmed, context)
+    } else if starts_with(trimmed, "let ") {
+      execute_let_statement(trimmed, context)
+    } else if starts_with(trimmed, "fn ") {
+      # Function definitions are handled during parsing
+      say "📝 Function definition: $trimmed"
+    } else if contains_string(trimmed, "(") && ends_with(trimmed, ")") {
+      execute_function_call(trimmed, context)
+    }
+  }
+
+  # Execute say statement
+  fn execute_say_statement(statement, context) {
+    set message = statement.substring(4).trim()
+    # Remove quotes if present
+    if starts_with(message, "\"") && ends_with(message, "\"") {
+      message = message.substring(1, message.length - 1)
+    }
+    
+    # Replace variables in message
+    message = replace_variables(message, context)
+    
+    say "💬 $message"
+  }
+
+  # Execute set statement
+  fn execute_set_statement(statement, context) {
+    set parts = statement.split("=", 2)
+    if parts.length == 2 {
+      set var_name = parts[0].substring(4).trim()
+      set value = parts[1].trim()
+      
+      # Evaluate the value
+      set evaluated_value = evaluate_expression(value, context)
+      
+      # Store in execution context
+      if !::execution_context[context] {
+        ::execution_context[context] = {}
+      }
+      ::execution_context[context][var_name] = evaluated_value
+      
+      say "💾 Set $var_name = $evaluated_value"
+    }
+  }
+
+  # Execute let statement
+  fn execute_let_statement(statement, context) {
+    set parts = statement.split("=", 2)
+    if parts.length == 2 {
+      set var_name = parts[0].substring(4).trim()
+      set value = parts[1].trim()
+      
+      # Check if RHS is a function call
+      if contains_string(value, "(") && ends_with(value, ")") {
+        set return_value = execute_function_call(value, context)
+        if return_value != null {
+          value = return_value
+        }
+      } else {
+        # Regular expression evaluation
+        value = evaluate_expression(value, context)
+      }
+      
+      # Store in execution context
+      if !::execution_context[context] {
+        ::execution_context[context] = {}
+      }
+      ::execution_context[context][var_name] = value
+      
+      say "📝 Let $var_name = $value"
+    }
+  }
+
+  # Execute emit statement
+  fn execute_emit_statement(statement, context) {
+    set event_name = statement.substring(5).split(" ")[0].trim()
+    
+    # Remove quotes if present
+    if starts_with(event_name, "\"") && ends_with(event_name, "\"") {
+      event_name = event_name.substring(1, event_name.length - 1)
+    }
+    
+    # Add to event queue
+    ::event_queue.push({
+      event: event_name,
+      source: context,
+      timestamp: get_timestamp()
+    })
+    
+    say "📡 Emitting: $event_name"
+  }
+
+  # Execute function call
+  fn execute_function_call(statement, context) {
+    set match = statement.match(/^([^(]+)\(([^)]*)\)$/)
+    if match {
+      set func_name = match[1].trim()
+      set params_str = match[2].trim()
+      
+      say "🔧 Calling function: $func_name"
+      # Minimal strict dispatch: invoke function from loaded component context if present
+      set comp = ::loaded_components[context]
+      if comp == null { return null }
+      # Parse args into list (comma-separated, no nesting support here)
+      set args = []
+      if params_str != "" {
+        set parts = params_str.split(",")
+        set i = 0
+        while i < parts.length { set args.push(parts[i].trim()); set i = i + 1 }
+      }
+      # Record call for tracing
+      emit runtime.call.trace with { component: context, fn: func_name, argc: (args.length or 0) }
+      # Until full function registry is wired, return null strictly (no placeholder)
+      return null
+    }
+    return null
+  }
+
+  # Setup behavior handlers
+  fn setup_behavior_handlers(behavior_section, component_name) {
+    say "🎭 Setting up behavior handlers for $component_name"
+    
+    # Parse behavior blocks and set up event handlers
+    for let i = 0; i < behavior_section.length; i++ {
+      set line = behavior_section[i]
+      if starts_with(line, "listen for") {
+        set event_name = extract_event_name(line)
+        say "🎯 Behavior handler for event: $event_name"
+      }
+    }
+  }
+
+  # Start the runtime
+  fn start_runtime() {
+    set ::running = true
+    say "🚀 AZL Runtime started"
+    
+    # Process event queue
+    while ::running && ::event_queue.length > 0 {
+      set event = ::event_queue.shift()
+      process_event(event)
+    }
+  }
+
+  # Stop the runtime
+  fn stop_runtime() {
+    set ::running = false
+    say "🛑 AZL Runtime stopped"
+  }
+
+  # Process an event
+  fn process_event(event) {
+    say "🔄 Processing event: $event.event"
+    
+    # Find components that listen for this event
+    for component_name in Object.keys(::loaded_components) {
+      set component = ::loaded_components[component_name]
+      if component.sections && component.sections.behavior {
+        say "🎯 Component $component_name handling event: $event.event"
+      }
+    }
+  }
+
+  # Utility functions
+  fn starts_with(text, prefix) {
+    return text.indexOf(prefix) === 0
+  }
+
+  fn ends_with(text, suffix) {
+    return text.indexOf(suffix, text.length - suffix.length) !== -1
+  }
+
+  fn contains_string(text, search) {
+    return text.indexOf(search) >= 0
+  }
+
+  fn replace_variables(text, context) {
+    # Simple variable replacement for $var patterns
+    set result = text
+    if ::execution_context[context] {
+      for variable_name in Object.keys(::execution_context[context]) {
+        set pattern = "$" + variable_name
+        set value = ::execution_context[context][variable_name]
+        result = result.replace(pattern, value)
+      }
+    }
+    return result
+  }
+
+  fn evaluate_expression(expr, context) {
+    # Simple expression evaluation
+    set trimmed = expr.trim()
+    
+    # String literals
+    if starts_with(trimmed, "\"") && ends_with(trimmed, "\"") {
+      return trimmed.substring(1, trimmed.length - 1)
+    }
+    
+    # Numbers
+    if !isNaN(trimmed) {
+      return parseFloat(trimmed)
+    }
+    
+    # Variable references
+    if starts_with(trimmed, "::") {
+      set var_name = trimmed.substring(2)
+      if ::execution_context[context] && ::execution_context[context][var_name] != null {
+        return ::execution_context[context][var_name]
+      }
+    }
+    
+    # Default: return as string
+    return trimmed
+  }
+
+  fn extract_event_name(line) {
+    # Extract event name from "listen for \"event_name\" then {"
+    set match = line.match(/listen for "([^"]+)"/)
+    if match {
+      return match[1]
+    }
+    return "unknown_event"
+  }
+
+  fn get_timestamp() {
+    return Date.now()
+  }
+}

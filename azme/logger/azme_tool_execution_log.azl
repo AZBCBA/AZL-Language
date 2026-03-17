@@ -1,0 +1,30 @@
+# AZME Tool Execution Log (structured, queryable)
+component ::azme.tool_execution_log {
+  init {
+    set ::entries = []
+    set ::by_plugin = {}
+    emit azme.tool_log.ready with { ok: true }
+  }
+
+  behavior {
+    on azme.tool_execution.logged {
+      set ::e = $1
+      set ::entry = { t: ::internal.now(), plugin_id: ::e.plugin_id, action: ::e.action, elapsed_ms: ::e.elapsed_ms, ok: ::e.result_ok }
+      set ::entries = ::entries.push(::entry)
+      set ::by_plugin[::e.plugin_id] = (::by_plugin[::e.plugin_id] || []).push(::entry)
+      emit azme.journal_entry_created with { entry: { timestamp: ::entry.t, event_type: "tool_execution", data: ::entry, summary: "Tool exec: " + ::e.plugin_id + "." + ::e.action, tags: ["tool","exec"] } }
+    }
+
+    on get_tool_exec_stats {
+      set ::stats = { total: ::entries.length, plugins: ::by_plugin.keys().length }
+      emit azme.tool_log.stats with ::stats
+    }
+
+    on query_tool_exec_by_plugin {
+      set ::pid = $1.plugin_id
+      emit azme.tool_log.entries with { plugin_id: ::pid, entries: (::by_plugin[::pid] || []) }
+    }
+  }
+}
+
+

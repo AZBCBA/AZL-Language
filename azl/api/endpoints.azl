@@ -1,3 +1,403 @@
+# azl/api/endpoints.azl
+component ::api.training_endpoints {
+  init {
+    set ::port = parseInt((::internal.env("AZL_API_PORT") or "8080"))
+    link ::core.command_processor
+    link ::orchestrator.comprehensive_training_controller
+    link ::system.http_server_compat
+    link ::azme.speech_recognition
+    link ::azme.speech_synthesis
+    link ::azme.vision_processor
+    link ::azme.visual_memory_linker
+    say "🌐 Training API starting on port "
+    say ::port
+    emit start_http_server with ::port ::routes
+  }
+
+  behavior {
+    # Start advanced training via HTTP
+    listen for "api.train.start" {
+      set p = $1 or {}
+      link ::azme.security_policy_rules
+      emit azme.check_permission to ::azme.security_policy_rules with { role: (::internal.env("AZL_API_ROLE") or "runtime"), event_type: "training.start" }
+      listen for "azme.permission_result" then { if (!::event.data.has_permission) { emit api.response with { ok: false, error: "access_denied" }; return } }
+      # Validate
+      if (!p.dataset_path or p.dataset_path == "") {
+        emit api.response with { ok: false, error: "missing_dataset_path" }
+        return
+      }
+      if (p.device && !(p.device == "cpu" or p.device == "cuda")) {
+        emit api.response with { ok: false, error: "invalid_device" }
+        return
+      }
+      if (p.gpu_limit && (parseInt(p.gpu_limit) < 0 or parseInt(p.gpu_limit) > 100)) {
+        emit api.response with { ok: false, error: "invalid_gpu_limit" }
+        return
+      }
+      emit process_command to ::core.command_processor with "train.advanced" p
+      emit api.response with { ok: true, started: true }
+    }
+
+    # Training status — surface last known state from orchestrator/metrics
+    listen for "api.train.status" {
+      set status = { epoch: 0, step: 0, dataset: "", metrics: {} }
+      listen for "training.status" then { set status = ::event.data }
+      emit "get_training_status" to ::orchestrator.comprehensive_training_controller
+      emit api.response with { ok: true, status: status }
+    }
+
+    # Control: pause/resume/stop
+    listen for "api.train.control" {
+      set action = ($1 && $1.action) or ""
+      link ::azme.security_policy_rules
+      emit azme.check_permission to ::azme.security_policy_rules with { role: (::internal.env("AZL_API_ROLE") or "runtime"), event_type: ("training." + action) }
+      listen for "azme.permission_result" then { if (!::event.data.has_permission) { emit api.response with { ok: false, error: "access_denied" }; return } }
+      if action == "pause" { emit "pause_training" to ::orchestrator.comprehensive_training_controller; emit api.response with { ok: true, action: action } ; return }
+      if action == "resume" { emit "resume_training" to ::orchestrator.comprehensive_training_controller; emit api.response with { ok: true, action: action } ; return }
+      if action == "stop" { emit "stop_training" to ::orchestrator.comprehensive_training_controller; emit api.response with { ok: true, action: action } ; return }
+      emit api.response with { ok: false, error: "invalid_action" }
+    }
+
+    # Configuration: set default training params
+    listen for "api.train.configure" {
+      set cfg = $1 or {}
+      link ::azme.security_policy_rules
+      emit azme.check_permission to ::azme.security_policy_rules with { role: (::internal.env("AZL_API_ROLE") or "runtime"), event_type: "training.config_update" }
+      listen for "azme.permission_result" then { if (!::event.data.has_permission) { emit api.response with { ok: false, error: "access_denied" }; return } }
+      set ::default_config = {
+        device: (cfg.device or (::internal.env("AZL_DEVICE") or "auto")),
+        gpu_limit: parseInt((cfg.gpu_limit or (::internal.env("AZL_GPU_LIMIT") or "0"))),
+        epochs: parseInt((cfg.epochs or (::internal.env("AZL_EPOCHS") or "1"))),
+        batch_size: parseInt((cfg.batch_size or (::internal.env("AZL_BATCH") or "1"))),
+        mode: (cfg.mode or (::internal.env("AZL_TRAIN_MODE") or "supervised"))
+      }
+      emit "set_training_config" to ::orchestrator.comprehensive_training_controller with ::default_config
+      emit api.response with { ok: true, config: ::default_config }
+    }
+
+    # Generic command endpoint → route through runtime integration
+    listen for "api.command" {
+      set payload = $1 or {}
+      if (!payload.command) { emit api.response with { ok: false, error: "missing_command" }; return }
+      link ::azme.security_policy_rules
+      emit azme.check_permission to ::azme.security_policy_rules with { role: (::internal.env("AZL_API_ROLE") or "runtime"), event_type: ("command." + payload.command) }
+      listen for "azme.permission_result" then { if (!::event.data.has_permission) { emit api.response with { ok: false, error: "access_denied" }; return } }
+      link ::azl.runtime_integration
+      emit runtime.command to ::azl.runtime_integration with { command: payload.command, params: (payload.params or {}) }
+      emit api.response with { ok: true }
+    }
+
+    # Build endpoint: supports training commands or project builds
+    listen for "api.build" {
+      set req = $1 or {}
+      link ::azl.runtime_integration
+      link ::azme.security_policy_rules
+      emit azme.check_permission to ::azme.security_policy_rules with { role: (::internal.env("AZL_API_ROLE") or "runtime"), event_type: "build.request" }
+      listen for "azme.permission_result" then { if (!::event.data.has_permission) { emit api.response with { ok: false, error: "access_denied" }; return } }
+      # Case A: build project manifest
+      if (req.files && len(req.files) > 0) {
+        emit build_project to ::azl.runtime_integration with (req.files or []) (req.options or { backend: "bytecode", workers: 4, incremental: true })
+        emit api.response with { ok: true, kind: "build" }
+        return
+      }
+      # Case B: training commands via /build
+      if (req.train && req.train == "advanced") {
+        set p = req.params or {}
+        if (!p.dataset_path or p.dataset_path == "") { emit api.response with { ok: false, error: "missing_dataset_path" }; return }
+        emit runtime.train.advanced to ::azl.runtime_integration with {
+          dataset_path: p.dataset_path,
+          mode: (p.mode or (::internal.env("AZL_TRAIN_MODE") or "supervised")),
+          config: {
+            device: (p.device or (::internal.env("AZL_DEVICE") or "auto")),
+            gpu_limit: parseInt((p.gpu_limit or (::internal.env("AZL_GPU_LIMIT") or "0"))),
+            epochs: parseInt((p.epochs or (::internal.env("AZL_EPOCHS") or "1"))),
+            batch_size: parseInt((p.batch_size or (::internal.env("AZL_BATCH") or "1"))),
+            strict: true
+          }
+        }
+        emit api.response with { ok: true, kind: "train.advanced" }
+        return
+      }
+      # Case C: generic command through /build (compat)
+      if (req.command) {
+        emit runtime.command to ::azl.runtime_integration with { command: req.command, params: (req.params or {}) }
+        emit api.response with { ok: true, kind: "command" }
+        return
+      }
+      emit api.response with { ok: false, error: "invalid_build_request" }
+    }
+
+    # HTTP server adapter
+    listen for "start_http_server" {
+      set port = $1
+      set routes = $2
+      emit http.server.start with { port: port, host: "0.0.0.0", handler: (req) => route_request(req, routes) }
+    }
+
+    # Simplified runner handlers for parallel training
+    fn training_parallel_start_handler(req) {
+      try {
+        set body = (req && req.body ? json_parse(req.body) : {})
+      } catch (e) { set body = {} }
+      if (!body.dataset_path || body.dataset_path == "") { return { ok: false, error: "missing_dataset_path" } }
+      set cfg = body.config || {}
+      if (!(cfg.device == "cuda" && parseInt((cfg.num_gpus or 0)) > 1)) { return { ok: false, error: "parallel_requires_cuda_and_num_gpus>1" } }
+      link ::ffi.fs
+      set ds = body.dataset_path
+    set req_id = ("req:" + (::azl.stdlib.time_now([]) % 1000000))
+    emit read_file to ::ffi.fs with { path: ds, request_id: req_id }
+    listen for "file_read" then {
+      # Expect event as either (path, content) or { path, content, request_id }
+      set ok = false
+      if ($1 && $1.path) { if $1.path == ds && ($1.request_id == null || $1.request_id == req_id) { set ok = true; set raw = ($1.content or "") } }
+      else { if $1 == ds { set ok = true; set raw = ($2 or "") } }
+      if !ok { return }
+      if raw == "" { return { ok: false, error: "dataset_empty" } }
+        # split
+        set lines = []
+        set cur = ""; set i = 0; while i < raw.length { set ch = raw[i]; if ch == "\n" { if cur != "" { set lines.push(cur) } set cur = "" } else if ch != "\r" { set cur = cur + ch } set i = i + 1 }; if cur != "" { set lines.push(cur) }
+        link ::orchestrator.parallel_training
+        emit training.parallel.start to ::orchestrator.parallel_training with { data: lines, mode: (body.mode or "supervised"), config: (cfg or {}) }
+      }
+      return { ok: true, started: true }
+    }
+    fn training_parallel_status_handler(req) {
+      link ::orchestrator.parallel_training
+      set s = (::orchestrator.parallel_training.status or { state: "unknown" })
+      return { ok: true, status: s }
+    }
+  }
+
+  fn route_request(req, routes) {
+    set method = (req && req.method ? req.method : "GET").toUpperCase()
+    set path = (req && req.path ? req.path : "/")
+    set body = {}
+    if req && req.body { try { set body = json_parse(req.body) } catch (e) { set body = {} } }
+    if routes[path] && routes[path][method] {
+      set fn = routes[path][method]
+      set result = (method == "POST" ? fn(body) : fn())
+      return { status: 200, headers: { "Content-Type": "application/json" }, body: json_stringify(result) }
+    }
+    return { status: 404, headers: { "Content-Type": "application/json" }, body: json_stringify({ error: "not_found", path: path }) }
+  }
+
+  memory {
+    routes = {
+      "/health": { "GET": () => ({ ok: true }) },
+      "/training/start": { "POST": (data) => { emit api.train.start with data; return { ok: true } } },
+      "/training/status": { "GET": () => { emit api.train.status; return { ok: true } } },
+      "/training/control": { "POST": (data) => { emit api.train.control with data; return { ok: true } } },
+      "/training/config": { "POST": (data) => { emit api.train.configure with data; return { ok: true } } },
+      "/command": { "POST": (data) => { emit api.command with data; return { ok: true } } },
+      "/build": { "POST": (data) => { emit api.build with data; return { ok: true } } },
+      "/metrics": { "GET": () => { return (::api.metrics_endpoint.get_metrics()) } },
+      "/metrics/detailed": { "GET": () => { return (::api.metrics_endpoint.get_metrics_detailed()) } },
+      "/training/profile": { "POST": (cfg) => { emit metrics.configure with cfg; return { ok: true } } },
+      "/voice/command": { "POST": (body) => { return (::api.voice_bridge.handle_command(body)) } },
+      "/voice/say": { "POST": (body) => { return (::api.voice_bridge.say(body)) } },
+      "/vision/process": { "POST": (body) => { return (::api.vision_bridge.process(body)) } },
+      "/evolution/suggestions": { "GET": () => { return (::api.evolution_endpoint.get_suggestions()) } },
+      "/evolution/apply": { "POST": (body) => { return (::api.evolution_endpoint.apply_suggestion(body)) } },
+      "/training/parallel/start": { "POST": (data) => { emit api.train.parallel.start with data; return { ok: true } } },
+      "/training/parallel/status": { "GET": () => { emit api.train.parallel.status; return { ok: true } } },
+      "/plugins/register": { "POST": (body) => { emit api.plugins.register with body; return { ok: true } } },
+      "/plugins/unregister": { "POST": (body) => { emit api.plugins.unregister with body; return { ok: true } } },
+      "/plugins/enable": { "POST": (body) => { emit api.plugins.enable with body; return { ok: true } } },
+      "/plugins/disable": { "POST": (body) => { emit api.plugins.disable with body; return { ok: true } } },
+        "/plugins/list": { "GET": () => { emit api.plugins.list; return { ok: true } } },
+        
+        # Runtime toggles (secured via policy): device and hybrid thresholds
+        "/training/toggle/device": { "POST": (data) => { emit api.train.toggle.device with data; listen for "api.response" then { set r = ::event.data }; return (r or { ok: true }) } },
+        "/training/toggle/hybrid": { "POST": (data) => { emit api.train.toggle.hybrid with data; listen for "api.response" then { set r = ::event.data }; return (r or { ok: true }) } }
+    }
+    default_config = {}
+  }
+}
+
+# Training Plugin API endpoints
+component ::api.training_plugins_endpoints {
+  init {
+    link ::extensions.training_plugin_manager
+    link ::azme.security_policy_rules
+  }
+
+  # Runtime toggle endpoints (policy-gated)
+  component ::api.training_runtime_toggles {
+    init { link ::azme.security_policy_rules }
+    behavior {
+      listen for "api.train.toggle.device" {
+        set p = $1 or {}
+        emit azme.check_permission to ::azme.security_policy_rules with { role: (::internal.env("AZL_API_ROLE") or "runtime"), event_type: "training.config_update" }
+        listen for "azme.permission_result" then { if (!::event.data.has_permission) { emit api.response with { ok: false, error: "access_denied" }; return } }
+        set dev = (p.device or (::internal.env("AZL_DEVICE") or "cpu"))
+        if !(dev == "cpu" or dev == "cuda") { emit api.response with { ok: false, error: "invalid_device" }; return }
+        set gpu = parseInt((p.gpu_limit or (::internal.env("AZL_GPU_LIMIT") or "0")))
+        if (gpu < 0 or gpu > 100) { emit api.response with { ok: false, error: "invalid_gpu_limit" }; return }
+        emit "set_training_config" to ::orchestrator.comprehensive_training_controller with { device: dev, gpu_limit: gpu }
+        emit api.response with { ok: true, device: dev, gpu_limit: gpu }
+        
+        # Metrics snapshots: consciousness state and LHA3 stats (best-effort)
+        "/metrics/consciousness": { "GET": () => { emit api.metrics.consciousness; return { ok: true } } },
+        "/metrics/lha3": { "GET": () => { emit api.metrics.lha3; return { ok: true } } }
+      }
+      listen for "api.train.toggle.hybrid" {
+        set p = $1 or {}
+        emit azme.check_permission to ::azme.security_policy_rules with { role: (::internal.env("AZL_API_ROLE") or "runtime"), event_type: "training.config_update" }
+        listen for "azme.permission_result" then { if (!::event.data.has_permission) { emit api.response with { ok: false, error: "access_denied" }; return } }
+        # Forward to advanced_training hybrid config event
+        set enabled = (p.enabled != null ? (p.enabled == true) : null)
+        set thresholds = (p.thresholds or null)
+        emit azme.set_hybrid_config to ::nlp.advanced_training with { enabled: enabled, thresholds: thresholds }
+        emit api.response with { ok: true }
+      }
+    }
+  }
+  behavior {
+    listen for "api.plugins.register" { emit training.plugins.register to ::extensions.training_plugin_manager with $1 }
+    listen for "api.plugins.unregister" { emit training.plugins.unregister to ::extensions.training_plugin_manager with $1 }
+    listen for "api.plugins.enable" { emit training.plugins.enable to ::extensions.training_plugin_manager with $1 }
+    listen for "api.plugins.disable" { emit training.plugins.disable to ::extensions.training_plugin_manager with $1 }
+    listen for "api.plugins.list" { emit training.plugins.list to ::extensions.training_plugin_manager with $1 }
+  }
+}
+
+# Metrics endpoint component (concise JSON)
+component ::api.metrics_endpoint {
+  init {}
+  behavior {
+    listen for "api.metrics.consciousness" {
+      link ::consciousness.neural_quantum
+      set s = (::consciousness.neural_quantum.get_state() or {})
+      emit api.response with { ok: true, state: s }
+    }
+    listen for "api.metrics.lha3" {
+      link ::memory.enhanced_lha3
+      emit get_quantum_memory_stats to ::memory.enhanced_lha3
+      listen for "memory.quantum_stats.retrieved" then { emit api.response with { ok: true, stats: ::event.data } }
+    }
+  }
+  memory {}
+  export fn get_metrics() {
+    set m = ::metrics.training.metrics || {}
+    return {
+      total_steps: m.total_steps || 0,
+      avg_loss: m.avg_loss || 0.0,
+      avg_throughput: m.avg_throughput || 0.0,
+      avg_latency_ms: m.avg_latency_ms || 0.0,
+      peak_memory_gb: m.peak_memory || 0.0,
+      total_time_ms: m.total_time_ms || 0.0,
+      phases: m.phase_timings || {},
+      per_device: m.per_device || {},
+      adaptive: (m.adaptive || {}),
+      pipeline: (m.pipeline || {}),
+      hybrid: (m.hybrid || {}),
+      health: (m.health || {})
+    }
+  }
+
+  export fn get_metrics_detailed() {
+    set m = ::metrics.training.metrics || {}
+    return {
+      core: {
+        total_steps: m.total_steps || 0,
+        avg_loss: m.avg_loss || 0.0,
+        avg_throughput: m.avg_throughput || 0.0,
+        avg_latency_ms: m.avg_latency_ms || 0.0,
+        peak_memory_gb: m.peak_memory || 0.0,
+        total_time_ms: m.total_time_ms || 0.0,
+        phases: m.phase_timings || {}
+      },
+      recent: {
+        losses: m.recent_losses || [],
+        latencies_ms: m.recent_latencies || []
+      },
+      adaptive: {
+        upshifts: (m.adaptive && m.adaptive.upshifts) || 0,
+        downshifts: (m.adaptive && m.adaptive.downshifts) || 0,
+        denied_updates: (m.adaptive && m.adaptive.denied_updates) || 0,
+        loss_spike_events: (m.adaptive && m.adaptive.loss_spike_events) || 0,
+        headroom_windows: (m.adaptive && m.adaptive.headroom_windows) || 0,
+        last_action_reason: (m.adaptive && m.adaptive.last_action_reason) || ""
+      },
+      pipeline: {
+        enriched: (m.pipeline && m.pipeline.enriched) || 0,
+        deduped: (m.pipeline && m.pipeline.deduped) || 0,
+        dedup_rate: (m.pipeline && m.pipeline.dedup_rate) || 0.0,
+        avg_text_len: (m.pipeline && m.pipeline.avg_text_len) || 0.0,
+        curriculum_mode: (m.pipeline && m.pipeline.curriculum_mode) || "auto"
+      },
+      hybrid: {
+        quantum_share_percent: (m.hybrid && m.hybrid.quantum_share_percent) || 0.0,
+        avg_loss: (m.hybrid && m.hybrid.avg_loss) || 0.0
+      },
+      health: {
+        risk_score: (m.health && m.health.risk_score) || 0.0,
+        reasons: (m.health && m.health.reasons) || [],
+        suggestions: (m.health && m.health.suggestions) || [],
+        p95_ms: (m.health && m.health.p95_ms) || null,
+        device_cv: (m.health && m.health.device_cv) || null,
+        peak_mem_gb: (m.health && m.health.peak_mem_gb) || null,
+        ts: (m.health && m.health.ts) || null
+      }
+    }
+  }
+}
+
+# Voice and Vision API bridges
+component ::api.voice_bridge {
+  init {}
+  behavior {}
+  memory {}
+  export fn handle_command(body) {
+    set text = (body && body.text) or ""
+    if text == "" { return { ok: false, error: "missing_text" } }
+    # Simple intent mapping
+    set lower = text.toLowerCase()
+    if lower.contains("start") && lower.contains("train") {
+      emit process_command to ::core.command_processor with "train.advanced" { dataset_path: (body.dataset_path or ""), device: (body.device or "cpu"), gpu_limit: parseInt((body.gpu_limit or 0)) }
+      return { ok: true, intent: "start_training" }
+    }
+    if lower.contains("pause") { emit "pause_training" to ::orchestrator.comprehensive_training_controller; return { ok: true, intent: "pause" } }
+    if lower.contains("resume") { emit "resume_training" to ::orchestrator.comprehensive_training_controller; return { ok: true, intent: "resume" } }
+    if lower.contains("stop") { emit "stop_training" to ::orchestrator.comprehensive_training_controller; return { ok: true, intent: "stop" } }
+    if lower.contains("status") { emit "get_training_status" to ::orchestrator.comprehensive_training_controller; return { ok: true, intent: "status" } }
+    return { ok: false, error: "unrecognized_command" }
+  }
+  export fn say(body) {
+    set text = (body && body.text) or ""
+    if text == "" { return { ok: false, error: "missing_text" } }
+    emit azme.respond_with_voice to ::azme.speech_synthesis with { text: text }
+    return { ok: true }
+  }
+}
+
+component ::api.vision_bridge {
+  init {}
+  behavior {}
+  memory {}
+  export fn process(body) {
+    set path = (body && body.path) or ""
+    if path == "" { return { ok: false, error: "missing_path" } }
+    emit process_image to ::azme.vision_processor with { path: path, source: "api" }
+    return { ok: true }
+  }
+}
+
+# Evolution suggestions endpoints (read-only by default)
+component ::api.evolution_endpoint {
+  init {}
+  behavior {}
+  memory {}
+  export fn get_suggestions() {
+    # Expose recent entries from self-execution engine suggestions buffer
+    return { ok: true, suggestions: (::azl.self_execution_engine.suggestions or []) }
+  }
+  export fn apply_suggestion(body) {
+    # Disabled by default for safety
+    return { ok: false, error: "apply_disabled" }
+  }
+}
+
 # AZL API Endpoints - HTTP endpoints for the enterprise daemon
 # Provides health, readiness, build, and status endpoints
 
@@ -9,14 +409,19 @@ component ::api.endpoints {
     set ::start_time = ::azl.stdlib.time_now([])
     set ::request_count = 0
     
-    # Link to HTTP server
+    # Link to HTTP server and chat interface
     link ::net.http.server
+    # Ensure training/runtime subsystems are online for command dispatch
+    link ::core.command_processor
+    link ::orchestrator.comprehensive_training_controller
+    link ::error.system
+    link ::azme.chat_interface
     
     say "✅ API Endpoints ready"
   }
   
   behavior {
-    listen for "net.http.server.started" then {
+    listen for "http.server.started" then {
       say "🌐 HTTP server started, setting up endpoints..."
       ::setup_endpoints()
     }
@@ -25,6 +430,116 @@ component ::api.endpoints {
       say "✅ Daemon ready, enabling endpoints"
       set ::ready = true
     }
+    
+    # For testing in the simplified runner, set up endpoints immediately
+    listen for "initialize_chat_interface" then {
+      # Dev-gated inline endpoints for simplified runner only
+      set ::dev_inline = ((::internal.env("AZL_DEV_INLINE_ENDPOINTS") or "0") == "1")
+      if !::dev_inline { say "🔒 Inline endpoints disabled (set AZL_DEV_INLINE_ENDPOINTS=1 to enable)"; return }
+      say "🔧 Setting up endpoints for testing (dev inline enabled)..."
+      
+      # Inline route setup for testing
+      say "🔗 Adding route: GET /healthz"
+      emit "http.server.add_route" to ::net.http.server with { path: "/healthz", method: "GET", handler: ::health_check }
+      
+      say "🔗 Adding route: GET /readyz"
+      emit "http.server.add_route" to ::net.http.server with { path: "/readyz", method: "GET", handler: ::ready_check }
+      
+      say "🔗 Adding route: GET /status"
+      emit "http.server.add_route" to ::net.http.server with { path: "/status", method: "GET", handler: ::status_check }
+      
+      say "🔗 Adding route: POST /build"
+      emit "http.server.add_route" to ::net.http.server with { path: "/build", method: "POST", handler: ::handle_build }
+      
+      say "🔗 Adding route: GET /analytics"
+      emit "http.server.add_route" to ::net.http.server with { path: "/analytics", method: "GET", handler: ::get_analytics }
+
+      say "🔗 Adding route: POST /chat"
+      emit "http.server.add_route" to ::net.http.server with { path: "/chat", method: "POST", handler: ::handle_chat }
+      
+      # Training endpoints for simplified runner
+      say "🔗 Adding route: POST /training/start"
+      emit "http.server.add_route" to ::net.http.server with { path: "/training/start", method: "POST", handler: ::training_start_handler }
+
+      say "🔗 Adding route: GET /training/status"
+      emit "http.server.add_route" to ::net.http.server with { path: "/training/status", method: "GET", handler: ::training_status_handler }
+
+      say "🔗 Adding route: POST /training/control"
+      emit "http.server.add_route" to ::net.http.server with { path: "/training/control", method: "POST", handler: ::training_control_handler }
+
+      say "🔗 Adding route: POST /training/config"
+      emit "http.server.add_route" to ::net.http.server with { path: "/training/config", method: "POST", handler: ::training_config_handler }
+
+      # Parallel training endpoints for simplified runner
+      say "🔗 Adding route: POST /training/parallel/start"
+      emit "http.server.add_route" to ::net.http.server with { path: "/training/parallel/start", method: "POST", handler: ::training_parallel_start_handler }
+
+      say "🔗 Adding route: GET /training/parallel/status"
+      emit "http.server.add_route" to ::net.http.server with { path: "/training/parallel/status", method: "GET", handler: ::training_parallel_status_handler }
+
+      # Quantum endpoints for simplified runner
+      say "🔗 Adding route: POST /quantum/telemetry"
+      emit "http.server.add_route" to ::net.http.server with { path: "/quantum/telemetry", method: "POST", handler: ::quantum_telemetry_handler }
+      say "🔗 Adding route: GET /quantum/state"
+      emit "http.server.add_route" to ::net.http.server with { path: "/quantum/state", method: "GET", handler: ::quantum_state_handler }
+      say "🔗 Adding route: GET /quantum/constraints"
+      emit "http.server.add_route" to ::net.http.server with { path: "/quantum/constraints", method: "GET", handler: ::quantum_constraints_handler }
+      say "🔗 Adding route: POST /quantum/tick"
+      emit "http.server.add_route" to ::net.http.server with { path: "/quantum/tick", method: "POST", handler: ::quantum_tick_handler }
+
+      # Command/build and metrics endpoints for simplified runner
+      say "🔗 Adding route: POST /command"
+      emit "http.server.add_route" to ::net.http.server with { path: "/command", method: "POST", handler: ::handle_command_inline }
+
+      say "🔗 Adding route: POST /build"
+      emit "http.server.add_route" to ::net.http.server with { path: "/build", method: "POST", handler: ::handle_build_inline }
+
+      say "🔗 Adding route: GET /metrics"
+      emit "http.server.add_route" to ::net.http.server with { path: "/metrics", method: "GET", handler: ::metrics_handler }
+
+      say "🔗 Adding route: GET /metrics/detailed"
+      emit "http.server.add_route" to ::net.http.server with { path: "/metrics/detailed", method: "GET", handler: ::metrics_detailed_handler }
+
+      # Metrics SSE stream (Server-Sent Events)
+      say "🔗 Adding route: GET /metrics/stream"
+      emit "http.server.add_route" to ::net.http.server with { path: "/metrics/stream", method: "GET", handler: ::metrics_stream_handler }
+
+      # Voice and vision endpoints for simplified runner
+      say "🔗 Adding route: POST /voice/command"
+      emit "http.server.add_route" to ::net.http.server with { path: "/voice/command", method: "POST", handler: ::voice_command_handler }
+
+      say "🔗 Adding route: POST /voice/say"
+      emit "http.server.add_route" to ::net.http.server with { path: "/voice/say", method: "POST", handler: ::voice_say_handler }
+
+      say "🔗 Adding route: POST /vision/process"
+      emit "http.server.add_route" to ::net.http.server with { path: "/vision/process", method: "POST", handler: ::vision_process_handler }
+
+      # Evolution endpoints
+      say "🔗 Adding route: GET /evolution/suggestions"
+      emit "http.server.add_route" to ::net.http.server with { path: "/evolution/suggestions", method: "GET", handler: ::metrics_handler_evolution }
+      say "🔗 Adding route: POST /evolution/apply"
+      emit "http.server.add_route" to ::net.http.server with { path: "/evolution/apply", method: "POST", handler: ::evolution_apply_handler }
+
+      # Parallel training endpoints
+      say "🔗 Adding route: POST /training/parallel/start"
+      emit "http.server.add_route" to ::net.http.server with { path: "/training/parallel/start", method: "POST", handler: ::training_parallel_start_handler }
+      say "🔗 Adding route: GET /training/parallel/status"
+      emit "http.server.add_route" to ::net.http.server with { path: "/training/parallel/status", method: "GET", handler: ::training_parallel_status_handler }
+
+      # Plugin management
+      say "🔗 Adding route: POST /plugins/register"
+      emit "http.server.add_route" to ::net.http.server with { path: "/plugins/register", method: "POST", handler: ::plugins_register_handler }
+      say "🔗 Adding route: POST /plugins/unregister"
+      emit "http.server.add_route" to ::net.http.server with { path: "/plugins/unregister", method: "POST", handler: ::plugins_unregister_handler }
+      say "🔗 Adding route: POST /plugins/enable"
+      emit "http.server.add_route" to ::net.http.server with { path: "/plugins/enable", method: "POST", handler: ::plugins_enable_handler }
+      say "🔗 Adding route: POST /plugins/disable"
+      emit "http.server.add_route" to ::net.http.server with { path: "/plugins/disable", method: "POST", handler: ::plugins_disable_handler }
+      say "🔗 Adding route: GET /plugins/list"
+      emit "http.server.add_route" to ::net.http.server with { path: "/plugins/list", method: "GET", handler: ::plugins_list_handler }
+
+      say "✅ API endpoints configured inline"
+    }
   }
   
   # Setup API endpoints
@@ -32,19 +547,64 @@ component ::api.endpoints {
     say "📡 Setting up API endpoints..."
     
     # Health check endpoint
-    ::net.http.server.add_route("/healthz", "GET", ::health_check)
+    say "🔗 Adding route: GET /healthz"
+    emit "http.server.add_route" to ::net.http.server with { path: "/healthz", method: "GET", handler: ::health_check }
     
     # Readiness check endpoint
-    ::net.http.server.add_route("/readyz", "GET", ::ready_check)
+    say "🔗 Adding route: GET /readyz"
+    emit "http.server.add_route" to ::net.http.server with { path: "/readyz", method: "GET", handler: ::ready_check }
     
     # Status endpoint
-    ::net.http.server.add_route("/status", "GET", ::status_check)
+    say "🔗 Adding route: GET /status"
+    emit "http.server.add_route" to ::net.http.server with { path: "/status", method: "GET", handler: ::status_check }
     
     # Build endpoint
-    ::net.http.server.add_route("/build", "POST", ::handle_build)
+    say "🔗 Adding route: POST /build"
+    emit "http.server.add_route" to ::net.http.server with { path: "/build", method: "POST", handler: ::handle_build }
     
     # Analytics endpoint
-    ::net.http.server.add_route("/analytics", "GET", ::get_analytics)
+    say "🔗 Adding route: GET /analytics"
+    emit "http.server.add_route" to ::net.http.server with { path: "/analytics", method: "GET", handler: ::get_analytics }
+
+    # Metrics SSE stream (Server-Sent Events)
+    say "🔗 Adding route: GET /metrics/stream"
+    emit "http.server.add_route" to ::net.http.server with { path: "/metrics/stream", method: "GET", handler: ::metrics_stream_handler }
+
+    # Quantum: query constraints, superposition, and manual tick
+    say "🔗 Adding route: GET /quantum/constraints"
+    emit "http.server.add_route" to ::net.http.server with { path: "/quantum/constraints", method: "GET", handler: ::quantum_constraints_handler }
+    say "🔗 Adding route: GET /quantum/state"
+    emit "http.server.add_route" to ::net.http.server with { path: "/quantum/state", method: "GET", handler: ::quantum_state_handler }
+    say "🔗 Adding route: POST /quantum/tick"
+    emit "http.server.add_route" to ::net.http.server with { path: "/quantum/tick", method: "POST", handler: ::quantum_tick_handler }
+
+    # Chat endpoint (POST /chat)
+    say "🔗 Adding route: POST /chat"
+    emit "http.server.add_route" to ::net.http.server with { path: "/chat", method: "POST", handler: ::handle_chat }
+
+    # Training control endpoints (central runtime integration)
+    say "🔗 Adding route: POST /training/start"
+    emit "http.server.add_route" to ::net.http.server with { path: "/training/start", method: "POST", handler: ::training_start_handler }
+
+    say "🔗 Adding route: GET /training/status"
+    emit "http.server.add_route" to ::net.http.server with { path: "/training/status", method: "GET", handler: ::training_status_handler }
+
+    say "🔗 Adding route: POST /training/control"
+    emit "http.server.add_route" to ::net.http.server with { path: "/training/control", method: "POST", handler: ::training_control_handler }
+
+    say "🔗 Adding route: POST /training/config"
+    emit "http.server.add_route" to ::net.http.server with { path: "/training/config", method: "POST", handler: ::training_config_handler }
+
+    # Quantum telemetry ingestion (from Python trainer)
+    say "🔗 Adding route: POST /quantum/telemetry"
+    emit "http.server.add_route" to ::net.http.server with { path: "/quantum/telemetry", method: "POST", handler: ::quantum_telemetry_handler }
+
+    # Recovery endpoints
+    say "🔗 Adding route: POST /training/recover"
+    emit "http.server.add_route" to ::net.http.server with { path: "/training/recover", method: "POST", handler: ::training_recover_handler }
+
+    say "🔗 Adding route: POST /training/checkpoint"
+    emit "http.server.add_route" to ::net.http.server with { path: "/training/checkpoint", method: "POST", handler: ::training_checkpoint_handler }
     
     say "✅ API endpoints configured"
   }
@@ -93,57 +653,498 @@ component ::api.endpoints {
   # Build handler
   ::handle_build = (request) => {
     set ::request_count = ::request_count + 1
-    
-    # Parse build request
-    set build_data = ::parse_json(request.body)
-    
-    # Emit build event
-    emit daemon.enterprise.build with {
-      files: build_data.files || [],
-      options: build_data.options || {}
+    set payload = ::safe_parse_json(request.body)
+    # Case A: training via /build
+    if payload.train && payload.train == "advanced" {
+      set p = payload.params or {}
+      set dataset_path = p.dataset_path || p.data_path || ""
+      if (dataset_path == null or dataset_path == "") {
+        return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"missing_dataset_path"}' }
+      }
+      set mode = (p.mode or (::internal.env("AZL_TRAIN_MODE") or "supervised"))
+      set device = (p.device or (::internal.env("AZL_DEVICE") or "auto"))
+      set cfg = {
+        device: device,
+        gpu_limit: parseInt((p.gpu_limit or (::internal.env("AZL_GPU_LIMIT") or "0"))),
+        num_gpus: parseInt((p.num_gpus or (::internal.env("AZL_NUM_GPUS") or "1"))),
+        epochs: parseInt((p.epochs or (::internal.env("AZL_EPOCHS") or "1"))),
+        batch_size: parseInt((p.batch_size or (::internal.env("AZL_BATCH") or "1"))),
+        strict: true
+      }
+      emit runtime.train.advanced to ::azl.runtime_integration with { dataset_path: dataset_path, mode: mode, config: cfg }
+      return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"accepted","kind":"train.advanced"}' }
     }
-    
-    return {
-      status: 202,
-      headers: { "Content-Type": "application/json" },
-      body: '{"status":"accepted","message":"Build submitted"}'
+    # Case B: explicit command routing
+    if payload.command {
+      set cmd = payload.command
+      set params = (payload.params or {})
+      if cmd == "train.advanced" {
+        # Validate
+        set dataset_path = params.dataset_path || params.data_path || ""
+        if (dataset_path == null or dataset_path == "") { return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"missing_dataset_path"}' } }
+        set mode = (params.mode or (::internal.env("AZL_TRAIN_MODE") or "supervised"))
+        set cfg = {
+          device: (params.device or (::internal.env("AZL_DEVICE") or "auto")),
+          gpu_limit: parseInt((params.gpu_limit or (::internal.env("AZL_GPU_LIMIT") or "0"))),
+          num_gpus: parseInt((params.num_gpus or (::internal.env("AZL_NUM_GPUS") or "1"))),
+          epochs: parseInt((params.epochs or (::internal.env("AZL_EPOCHS") or "1"))),
+          batch_size: parseInt((params.batch_size or (::internal.env("AZL_BATCH") or "1"))),
+          strict: true
+        }
+        emit runtime.train.advanced to ::azl.runtime_integration with { dataset_path: dataset_path, mode: mode, config: cfg }
+        return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"accepted","kind":"train.advanced"}' }
+      }
+      # Strict: unknown command rejected
+      emit log_error with { type: "invalid_request", message: "unknown_command", context: { path: "/build", command: cmd } }
+      return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"unknown_command"}' }
     }
+    # Case C: project build request
+    set build_data = payload
+    emit daemon.enterprise.build with { files: (build_data.files or []), options: (build_data.options or {}) }
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"accepted","message":"Build submitted"}' }
   }
   
   # Analytics handler
   ::get_analytics = (request) => {
     set ::request_count = ::request_count + 1
-    
-    return {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-      body: '{"analytics":"available","request_count":' + ::request_count + ',"uptime":' + (::azl.stdlib.time_now([]) - ::start_time) + '}'
+    link ::metrics.training
+    link ::build.cache_manager
+    set m = ::metrics.training.metrics || {}
+    # Compute derived analytics: percentiles, trend, anomalies, gpu imbalance, ETA
+    set recent_lat = (m.recent_latencies || [])
+    set recent_loss = (m.recent_losses || [])
+    set p50 = ::percentile(recent_lat, 0.50)
+    set p95 = ::percentile(recent_lat, 0.95)
+    set p99 = ::percentile(recent_lat, 0.99)
+    set trend = ::linear_trend(recent_loss)
+    set anomalies = ::detect_anomalies(recent_lat)
+    set dev = (m.per_device || {})
+    set imbalance = ::device_imbalance(dev)
+    set total_items = (m.total_items || null)
+    set done = (m.total_steps || 0)
+    set eta_ms = (total_items && m.avg_throughput && m.avg_throughput > 0) ? ((total_items - done) * 1000.0 / m.avg_throughput) : null
+    set out = {
+      request_count: ::request_count,
+      uptime_ms: (::azl.stdlib.time_now([]) - ::start_time),
+      core: {
+        total_steps: (m.total_steps || 0),
+        avg_loss: (m.avg_loss || 0.0),
+        avg_throughput: (m.avg_throughput || 0.0),
+        avg_latency_ms: (m.avg_latency_ms || 0.0),
+        total_time_ms: (m.total_time_ms || 0.0)
+      },
+      percentiles_ms: { p50: p50, p95: p95, p99: p99 },
+      trends: { loss_slope: trend.slope, loss_intercept: trend.intercept },
+      anomalies: anomalies,
+      per_device: dev,
+      gpu_imbalance: imbalance,
+      forecasting: { total_items: total_items, done: done, eta_ms: eta_ms },
+      errors: { recent: (m.errors || []), count: (m.error_count || 0) },
+      cache: ::build.cache_manager.kv_stats()
     }
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(out) }
+  }
+
+  # Metrics SSE stream (snapshot)
+  ::metrics_stream_handler = (request) => {
+    link ::metrics.training
+    set m = ::metrics.training.metrics || {}
+    set payload = ::azl.stdlib.json_stringify({
+      t: ::azl.stdlib.time_now([]),
+      run_id: (m.run_id || ""),
+      core: { total_steps: (m.total_steps || 0), avg_loss: (m.avg_loss || 0.0), avg_latency_ms: (m.avg_latency_ms || 0.0) },
+      health: (m.health || {}),
+      pipeline: (m.pipeline || {}),
+      hybrid: (m.hybrid || {}),
+      slo: (m.slo || {}),
+      drift: (m.drift || {})
+    })
+    return { status: 200, headers: { "Content-Type": "text/event-stream" }, body: "data: " + payload + "\n\n" }
+  }
+
+  # --- Plugin management handlers (security-gated via manager events) ---
+  ::plugins_register_handler = (request) => {
+    set body = ::safe_parse_json(request.body)
+    link ::extensions.training_plugin_manager
+    emit training.plugins.register to ::extensions.training_plugin_manager with { plugin_id: (body.plugin_id or ""), plugin_config: (body.plugin_config or {}), role: (::internal.env("AZL_API_ROLE") or "runtime") }
+    set resp = { ok: true }
+    listen for "training.plugins.response" then { set resp = ::event.data }
+    return { status: (resp.ok ? 200 : 403), headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(resp) }
+  }
+  ::plugins_unregister_handler = (request) => {
+    set body = ::safe_parse_json(request.body)
+    link ::extensions.training_plugin_manager
+    emit training.plugins.unregister to ::extensions.training_plugin_manager with { plugin_id: (body.plugin_id or ""), role: (::internal.env("AZL_API_ROLE") or "runtime") }
+    set resp = { ok: true }
+    listen for "training.plugins.response" then { set resp = ::event.data }
+    return { status: (resp.ok ? 200 : 403), headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(resp) }
+  }
+  ::plugins_enable_handler = (request) => {
+    set body = ::safe_parse_json(request.body)
+    link ::extensions.training_plugin_manager
+    emit training.plugins.enable to ::extensions.training_plugin_manager with { plugin_id: (body.plugin_id or ""), stage: (body.stage or ""), role: (::internal.env("AZL_API_ROLE") or "runtime") }
+    set resp = { ok: true }
+    listen for "training.plugins.response" then { set resp = ::event.data }
+    return { status: (resp.ok ? 200 : 400), headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(resp) }
+  }
+  ::plugins_disable_handler = (request) => {
+    set body = ::safe_parse_json(request.body)
+    link ::extensions.training_plugin_manager
+    emit training.plugins.disable to ::extensions.training_plugin_manager with { plugin_id: (body.plugin_id or ""), stage: (body.stage or ""), role: (::internal.env("AZL_API_ROLE") or "runtime") }
+    set resp = { ok: true }
+    listen for "training.plugins.response" then { set resp = ::event.data }
+    return { status: (resp.ok ? 200 : 400), headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(resp) }
+  }
+  ::plugins_list_handler = (request) => {
+    link ::extensions.training_plugin_manager
+    emit training.plugins.list to ::extensions.training_plugin_manager with {}
+    set resp = { ok: true }
+    listen for "training.plugins.response" then { set resp = ::event.data }
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(resp) }
+  }
+
+  # Chat handler
+  ::handle_chat = (request) => {
+    set payload = ::parse_json(request.body)
+    set msg = payload.message || ""
+    set uid = payload.user_id || "api"
+    set uid = uid || "api"
+    set sid = payload.session_id || uid
+
+    if (msg == "") {
+      return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"message_required"}' }
+    }
+
+    # For now, return a simple response since we're in the simplified runner
+    # In the full runtime, this would emit to ::azme.chat_interface and wait for response
+    return { 
+      status: 200, 
+      headers: { "Content-Type": "application/json" }, 
+      body: '{"response":"I received your message: \'' + msg + '\'. (Simplified AZME response)"}' 
+    }
+  }
+
+  # --- Analytics helpers (pure AZL, CPU-safe) ---
+  ::percentile = (arr, q) => {
+    if arr == null || arr.length == 0 { return null }
+    set a = arr.slice(0, arr.length)
+    # simple insertion sort
+    set i = 1
+    while i < a.length {
+      set key = a[i]; set j = i - 1
+      while j >= 0 && a[j] > key { set a[j+1] = a[j]; set j = j - 1 }
+      set a[j+1] = key; set i = i + 1
+    }
+    set pos = (q * (a.length - 1))
+    set lo = floor(pos)
+    set hi = ceil(pos)
+    if lo == hi { return a[lo] }
+    set t = (pos - lo)
+    return (a[lo] * (1 - t)) + (a[hi] * t)
+  }
+  ::linear_trend = (arr) => {
+    if arr == null || arr.length < 2 { return { slope: 0.0, intercept: (arr && arr.length > 0 ? arr[0] : 0.0) } }
+    set n = arr.length
+    set sumx = 0.0; set sumy = 0.0; set sumxy = 0.0; set sumx2 = 0.0
+    set i = 0
+    while i < n { set sumx = sumx + i; set sumy = sumy + arr[i]; set sumxy = sumxy + (i * arr[i]); set sumx2 = sumx2 + (i * i); set i = i + 1 }
+    set denom = (n * sumx2) - (sumx * sumx)
+    if denom == 0 { return { slope: 0.0, intercept: arr[0] } }
+    set slope = ((n * sumxy) - (sumx * sumy)) / denom
+    set intercept = (sumy - (slope * sumx)) / n
+    return { slope: slope, intercept: intercept }
+  }
+  ::detect_anomalies = (arr) => {
+    set res = []
+    if arr == null || arr.length < 5 { return res }
+    # MAD-based anomaly detection
+    set med = ::percentile(arr, 0.5)
+    set dev = []
+    for v in arr { set dev.push(abs(v - med)) }
+    set mad = ::percentile(dev, 0.5)
+    if mad == 0 { return res }
+    set i = 0
+    while i < arr.length {
+      set score = abs(arr[i] - med) / mad
+      if score > 6.0 { set res.push({ idx: i, value: arr[i], score: score }) }
+      set i = i + 1
+    }
+    return res
+  }
+  ::device_imbalance = (per_device) => {
+    set keys = []
+    for k in per_device { if k != null { set keys.push(k) } }
+    if keys.length == 0 { return { cv: 0.0, max: null, min: null } }
+    set vals = []
+    for k in keys { set d = per_device[k]; set vals.push(d.steps or 0) }
+    # coefficient of variation = std/mean
+    set mean = 0.0; for v in vals { set mean = mean + v }; set mean = mean / max(1, vals.length)
+    if mean == 0 { return { cv: 0.0, max: null, min: null } }
+    set ss = 0.0; for v in vals { set ss = ss + ((v - mean) * (v - mean)) }
+    set var = ss / vals.length
+    set std = sqrt(var)
+    set cv = std / mean
+    # find max/min devices
+    set maxk = keys[0]; set mink = keys[0]
+    set i = 1; while i < keys.length { set k = keys[i]; if (per_device[k].steps or 0) > (per_device[maxk].steps or 0) { set maxk = k } if (per_device[k].steps or 0) < (per_device[mink].steps or 0) { set mink = k } set i = i + 1 }
+    return { cv: cv, max: maxk, min: mink }
+  }
+
+  # Security-gated wrappers for simplified runner parallel control
+  listen for "api.train.parallel.start" {
+    set p = $1 or {}
+    link ::azme.security_policy_rules
+    emit azme.check_permission to ::azme.security_policy_rules with { role: (::internal.env("AZL_API_ROLE") or "runtime"), event_type: "training.parallel.start" }
+    listen for "azme.permission_result" then { if (!::event.data.has_permission) { emit api.response with { ok: false, error: "access_denied" }; return } }
+    # Defer to inline handler by constructing a fake request object
+    set req = { body: ::azl.stdlib.json_stringify(p) }
+    set res = training_parallel_start_handler(req)
+    emit api.response with res
+  }
+  listen for "api.train.parallel.status" {
+    set req = { }
+    set res = training_parallel_status_handler(req)
+    emit api.response with res
+  }
+
+  # ---- Training HTTP Handlers (integrated with runtime command processor) ----
+  ::training_start_handler = (request) => {
+    set payload = ::safe_parse_json(request.body)
+    # Idempotency: if idempotency_key present and recently used, return 200
+    set idem = payload.idempotency_key || ""
+    if idem != "" {
+      link ::build.cache_manager
+      set seen = ::build.cache_manager.kv_get("idem:start:" + idem)
+      if seen != null { return { status: 200, headers: { "Content-Type": "application/json" }, body: '{"status":"ok","idempotent":true}' } }
+      ::build.cache_manager.kv_set_ttl("idem:start:" + idem, { ts: ::azl.stdlib.time_now([]) }, 300000)
+    }
+    set dataset_path = payload.dataset_path || payload.data_path || ""
+    set mode = payload.mode || (::internal.env("AZL_TRAIN_MODE") or "supervised")
+    set device = payload.device || (::internal.env("AZL_DEVICE") or "auto")
+    set gpu_limit = parseInt((payload.gpu_limit or (::internal.env("AZL_GPU_LIMIT") or "0")))
+    set epochs = parseInt((payload.epochs or (::internal.env("AZL_EPOCHS") or "1")))
+    set batch_size = parseInt((payload.batch_size or (::internal.env("AZL_BATCH") or "1")))
+    
+    if (dataset_path == null or dataset_path == "") {
+      emit log_error with { type: "invalid_request", message: "missing_dataset_path", context: { path: "/training/start" } }
+      return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"missing_dataset_path"}' }
+    }
+    # Validate dataset readability
+    set probe = ::azl.system_interface.read_file_host_sync(dataset_path)
+    if (probe == null or probe == "") {
+      emit log_error with { type: "io", message: "dataset_unreadable", context: { path: dataset_path } }
+      return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"dataset_unreadable"}' }
+    }
+    
+    # Dispatch through core command processor for consistent runtime handling
+    emit process_command to ::core.command_processor with "train.advanced" {
+      dataset_path: dataset_path,
+      mode: mode,
+      config: { device: device, gpu_limit: gpu_limit, epochs: epochs, batch_size: batch_size, strict: true }
+    }
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"accepted","command":"train.advanced"}' }
+  }
+
+  # Inline handlers matching routes-map behavior
+  ::handle_command_inline = (request) => {
+    set payload = ::safe_parse_json(request.body)
+    if !payload || !payload.command { return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"missing_command"}' } }
+    emit runtime.command to ::azl.runtime_integration with { command: payload.command, params: (payload.params or {}) }
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"accepted"}' }
+  }
+
+  ::handle_build_inline = (request) => {
+    set payload = ::safe_parse_json(request.body)
+    if payload.train && payload.train == "advanced" {
+      set p = payload.params or {}
+      if !p.dataset_path { return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"missing_dataset_path"}' } }
+      emit runtime.train.advanced to ::azl.runtime_integration with {
+        dataset_path: p.dataset_path,
+        mode: (p.mode or (::internal.env("AZL_TRAIN_MODE") or "supervised")),
+        config: {
+          device: (p.device or (::internal.env("AZL_DEVICE") or "auto")),
+          gpu_limit: parseInt((p.gpu_limit or (::internal.env("AZL_GPU_LIMIT") or "0"))),
+          epochs: parseInt((p.epochs or (::internal.env("AZL_EPOCHS") or "1"))),
+          batch_size: parseInt((p.batch_size or (::internal.env("AZL_BATCH") or "1"))),
+          strict: true
+        }
+      }
+      return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"accepted","kind":"train.advanced"}' }
+    }
+    emit daemon.enterprise.build with { files: (payload.files or []), options: (payload.options or {}) }
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"accepted","kind":"build"}' }
+  }
+
+  ::metrics_handler = (request) => {
+    set m = ::api.metrics_endpoint.get_metrics()
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(m) }
+  }
+
+  ::metrics_detailed_handler = (request) => {
+    set m = ::api.metrics_endpoint.get_metrics_detailed()
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(m) }
+  }
+
+  ::quantum_constraints_handler = (request) => {
+    link ::quantum.constraints
+    set c = ::quantum.constraints.get_constraints()
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(c) }
+  }
+
+  ::quantum_state_handler = (request) => {
+    link ::quantum.superposition
+    set s = { entropy: (::quantum.superposition.entropy or null), norm2: (::quantum.superposition.norm2 or null), max_concentration: (::quantum.superposition.max_concentration or null) }
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(s) }
+  }
+
+  ::quantum_tick_handler = (request) => {
+    emit "orchestrator.quantum.tick"
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"ok":true,"tick":true}' }
+  }
+
+  # Quantum telemetry handler: ingest metrics and emit runtime events
+  ::quantum_telemetry_handler = (request) => {
+    set payload = ::safe_parse_json(request.body)
+    set mc = (payload.max_concentration or null)
+    set norm2 = (payload.norm2 or null)
+    set entropy = (payload.entropy or null)
+    set step = (payload.step or null)
+    set ok = true
+    if mc == null { set ok = false }
+    emit quantum.metrics with { max_concentration: mc, norm2: norm2, entropy: entropy, step: step }
+    emit quantum.measure.check with { max_concentration: mc }
+    # Drive a single cognitive tick per telemetry to apply updated constraints
+    emit "orchestrator.quantum.tick"
+    return { status: (ok ? 200 : 202), headers: { "Content-Type": "application/json" }, body: (ok ? '{"ok":true}' : '{"ok":true,"note":"partial"}') }
+  }
+
+  # Best-effort SSE snapshot (single event)
+  ::metrics_stream_handler = (request) => {
+    set m = ::api.metrics_endpoint.get_metrics_detailed()
+    set evt = "event: metrics\n" + "data: " + ::azl.stdlib.json_stringify(m) + "\n\n"
+    return { status: 200, headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" }, body: evt }
+  }
+
+  ::metrics_handler_evolution = (request) => {
+    set r = ::api.evolution_endpoint.get_suggestions()
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(r) }
   }
   
-  # Router function for HTTP server
-  ::router = (request) => {
-    set path = request.path
-    set method = request.method
-    
-    if path == "/healthz" && method == "GET" {
-      return ::health_check(request)
-    } else if path == "/readyz" && method == "GET" {
-      return ::ready_check(request)
-    } else if path == "/status" && method == "GET" {
-      return ::status_check(request)
-    } else if path == "/build" && method == "POST" {
-      return ::handle_build(request)
-    } else if path == "/analytics" && method == "GET" {
-      return ::get_analytics(request)
-    } else {
-      return {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-        body: '{"error":"not_found","path":"' + path + '"}'
-      }
-    }
+  ::evolution_apply_handler = (request) => {
+    set body = ::safe_parse_json(request.body)
+    set r = ::api.evolution_endpoint.apply_suggestion(body)
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(r) }
   }
+
+  ::voice_command_handler = (request) => {
+    set payload = ::safe_parse_json(request.body)
+    set res = ::api.voice_bridge.handle_command(payload)
+    return { status: (res.ok ? 202 : 400), headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(res) }
+  }
+
+  ::voice_say_handler = (request) => {
+    set payload = ::safe_parse_json(request.body)
+    set res = ::api.voice_bridge.say(payload)
+    return { status: (res.ok ? 200 : 400), headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(res) }
+  }
+
+  ::vision_process_handler = (request) => {
+    set payload = ::safe_parse_json(request.body)
+    set res = ::api.vision_bridge.process(payload)
+    return { status: (res.ok ? 202 : 400), headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(res) }
+  }
+
+  ::training_status_handler = (request) => {
+    set captured = { s: null }
+    listen for "training.status" then { set captured.s = ::event.data }
+    emit "get_training_status" to ::orchestrator.comprehensive_training_controller
+    set s = captured.s
+    if s == null { set s = { mode: null, step: null, epoch: null, error: "pending" } }
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(s) }
+  }
+
+  ::training_control_handler = (request) => {
+    set payload = ::safe_parse_json(request.body)
+    set action = payload.action || ""
+    # Simple per-route rate limit (best-effort): 1 request/sec per action
+    link ::build.cache_manager
+    set rlkey = "rl:control:" + action
+    set last = ::build.cache_manager.kv_get(rlkey)
+    if last != null { return { status: 429, headers: { "Content-Type": "application/json" }, body: '{"error":"rate_limited"}' } }
+    ::build.cache_manager.kv_set_ttl(rlkey, { ts: ::azl.stdlib.time_now([]) }, 1000)
+    if action == "pause" { emit "pause_training" to ::orchestrator.comprehensive_training_controller; return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"paused"}' } }
+    if action == "resume" { emit "resume_training" to ::orchestrator.comprehensive_training_controller; return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"resumed"}' } }
+    if action == "stop" { emit "stop_training" to ::orchestrator.comprehensive_training_controller; return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"stopped"}' } }
+    emit log_error with { type: "invalid_request", message: "invalid_action", context: { path: "/training/control", action: action } }
+    return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"invalid_action"}' }
+  }
+
+  ::training_config_handler = (request) => {
+    set cfg = ::safe_parse_json(request.body) || {}
+    set normalized = {
+      device: (cfg.device or (::internal.env("AZL_DEVICE") or "auto")),
+      gpu_limit: parseInt((cfg.gpu_limit or (::internal.env("AZL_GPU_LIMIT") or "0"))),
+      epochs: parseInt((cfg.epochs or (::internal.env("AZL_EPOCHS") or "1"))),
+      batch_size: parseInt((cfg.batch_size or (::internal.env("AZL_BATCH") or "1"))),
+      mode: (cfg.mode or (::internal.env("AZL_TRAIN_MODE") or "supervised"))
+    }
+    emit "set_training_config" to ::orchestrator.comprehensive_training_controller with normalized
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify({ status: "config_updated", config: normalized }) }
+  }
+
+  ::training_recover_handler = (request) => {
+    # Force a recovery attempt (e.g., after transient infra issues)
+    emit "attempt_recovery" to ::orchestrator.comprehensive_training_controller
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"recovery_initiated"}' }
+  }
+
+  ::training_checkpoint_handler = (request) => {
+    set body = ::safe_parse_json(request.body)
+    set step = parseInt((body.step or "0"))
+    set loss = (body.loss != null) ? body.loss : 0.0
+    emit "maybe_checkpoint" to ::orchestrator.comprehensive_training_controller with step loss
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"checkpoint_requested"}' }
+  }
+
+  ::training_parallel_start_handler = (request) => {
+    set payload = ::safe_parse_json(request.body)
+    set dataset_path = payload.dataset_path || payload.data_path || ""
+    set cfg = payload.config || {}
+    if (dataset_path == null or dataset_path == "") { return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"missing_dataset_path"}' } }
+    if !(cfg.device == "cuda" && parseInt((cfg.num_gpus or 0)) > 1) { return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"parallel_requires_cuda_and_num_gpus>1"}' } }
+    # Read dataset and trigger parallel orchestrator
+    link ::ffi.fs
+    emit read_file to ::ffi.fs with dataset_path
+    listen for "file_read" then {
+      if $1 != dataset_path { return }
+      set raw = ($2 or "")
+      if raw == "" { return }
+      # split
+      set lines = []
+      set cur = ""; set i = 0; while i < raw.length { set ch = raw[i]; if ch == "\n" { if cur != "" { set lines.push(cur) } set cur = "" } else if ch != "\r" { set cur = cur + ch } set i = i + 1 }; if cur != "" { set lines.push(cur) }
+      link ::orchestrator.parallel_training
+      emit training.parallel.start to ::orchestrator.parallel_training with { data: lines, mode: (payload.mode or "supervised"), config: cfg }
+    }
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"accepted","parallel":true}' }
+  }
+  
+  ::training_parallel_status_handler = (request) => {
+    link ::orchestrator.parallel_training
+    set s = (::orchestrator.parallel_training.status or { state: "unknown" })
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify({ ok: true, status: s }) }
+  }
+
+  # Robust JSON parse helper using stdlib; never throws
+  ::safe_parse_json = (text) => {
+    if (text == null or text == "") { return {} }
+    set obj = {}
+    try { set obj = ::azl.stdlib.json_parse(text) } catch (e) { set obj = {} }
+    if (obj == null) { set obj = {} }
+    return obj
+  }
+  
+  # Router function for HTTP server - REMOVED to allow dynamic routing
+  # The http.server.add_route system handles all routing dynamically
   
   # Helper function to parse JSON
   ::parse_json = (json_string) => {

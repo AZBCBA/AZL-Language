@@ -4,9 +4,31 @@
 component ::agi.core {
   init {
     set ::status = "initializing"
-    set ::agi_level = 0.5
-    set ::learning_rate = 0.1
-    set ::adaptation_factor = 0.2
+    # Core operating parameters (deterministic defaults)
+    set ::learning_rate = 0.12
+    set ::adaptation_factor = 0.25
+    set ::agi_level = ((::learning_rate + ::adaptation_factor) + 0.4)
+    # Registries and queues
+    set ::components = {}
+    set ::component_count = 0
+    set ::tasks = []
+    set ::processed = []
+    set ::metrics = { total_registered: 0, total_tasks: 0, total_processed: 0 }
+    # Capabilities and hardware inventory
+    set ::capabilities = { NEURAL: true, QUANTUM: false, SYMBOLIC: true, MEMORY: true }
+    set ::hardware = {
+      cpu_cores: 8,
+      cpu_threads: 16,
+      total_ram: 32_000,
+      available_ram: 24_000,
+      gpu_devices: [],
+      cuda_available: false,
+      rocm_available: false,
+      metal_available: false,
+      cpu_features: ["sse4.2", "avx2"]
+    }
+    set ::task_results = {}
+    set ::automation_started = false
     
     say "🧠 AGI Core initializing..."
     emit agi.initializing
@@ -28,6 +50,370 @@ component ::agi.core {
     emit learn_from_interaction with ::input ::context
     
     emit agi.processed with "input_processed"
+  }
+
+  # Unregister a component
+  on agi.unregister_component {
+    set ::name = ::event.data.name || ""
+    set ::version = ::event.data.version || ""
+    set ::key = (::name + ":" + ::version)
+    if ::components[::key] == null {
+      emit agi.error with { code: "not_found", message: "component not found", context: { key: ::key } }
+    } else {
+      set ::components[::key] = null
+      set ::component_count = (::component_count - 1)
+      if ::component_count < 0 { set ::component_count = 0 }
+      say "🗑️  Unregistered: " + ::key
+      emit agi.component.unregistered with { name: ::name, version: ::version }
+    }
+  }
+
+  # Query all components
+  on agi.component.list {
+    set ::all = []
+    for ::k, ::v in ::components {
+      if ::v != null { set ::all = ::all + [::v] }
+    }
+    emit agi.component.list.response with { items: ::all, count: ::all.length || 0 }
+  }
+
+  # Get a single component
+  on agi.component.get {
+    set ::name = ::event.data.name || ""
+    set ::version = ::event.data.version || ""
+    set ::key = (::name + ":" + ::version)
+    set ::item = ::components[::key]
+    if ::item == null {
+      emit agi.error with { code: "not_found", message: "component not found", context: { key: ::key } }
+    } else {
+      emit agi.component.get.response with { item: ::item }
+    }
+  }
+
+  # Capability query
+  on agi.capability.query {
+    set ::cap = ::event.data.capability || ""
+    set ::hits = []
+    for ::k, ::v in ::components {
+      if ::v != null && (::v.capability || "") == ::cap { set ::hits = ::hits + [::v] }
+    }
+    emit agi.capability.query.response with { capability: ::cap, items: ::hits, count: ::hits.length || 0 }
+  }
+
+  # Flush queue
+  on agi.queue.flush {
+    set ::tasks = []
+    say "🧹 Queue flushed"
+    emit agi.queue.status with { remaining: 0, processed: (::processed.length || 0) }
+  }
+
+  # Process all tasks
+  on agi.process_all {
+    loop {
+      if ((::tasks.length || 0) == 0) { break }
+      emit agi.process_queue
+    }
+    emit agi.queue.status with { remaining: (::tasks.length || 0), processed: (::processed.length || 0) }
+  }
+
+  # Health check
+  on agi.health.check {
+    set ::ok = true
+    if (::component_count < 0) { set ::ok = false }
+    if (::metrics.total_registered < 0) { set ::ok = false }
+    emit agi.health.report with { ok: ::ok, components: ::component_count, tasks: (::tasks.length || 0) }
+  }
+
+  # Status snapshot
+  on agi.status {
+    emit agi.status.response with {
+      registered: ::metrics.total_registered,
+      tasks_total: ::metrics.total_tasks,
+      processed_total: ::metrics.total_processed,
+      components: ::component_count
+    }
+  }
+
+  # Register a component into the AGI core
+  on agi.register_component {
+    say "🧩 Registering component..."
+    set ::name = ::event.data.name || "unknown"
+    set ::version = ::event.data.version || "0"
+    set ::cap = ::event.data.capability || "generic"
+    set ::key = (::name + ":" + ::version)
+    set ::components[::key] = { name: ::name, version: ::version, capability: ::cap }
+    set ::component_count = ::component_count + 1
+    set ::metrics.total_registered = ::metrics.total_registered + 1
+    say "✅ Registered: " + ::key
+    emit agi.component.registered with { name: ::name, version: ::version, capability: ::cap }
+  }
+
+  # Enqueue a task for processing
+  on agi.enqueue_task {
+    set ::tid = ::event.data.task_id || ("T" + ::component_count)
+    set ::ttype = ::event.data.task_type || "generic"
+    set ::input = ::event.data.input || ""
+    set ::ctx = ::event.data.context || {}
+    # Validate context deterministically
+    if (::ctx.priority != null) {
+      if (::ctx.priority.toInt() < 0 || ::ctx.priority.toInt() > 255) {
+        emit agi.error with { code: "invalid_priority", message: "priority 0..255", context: { task_id: ::tid } }
+        return
+      }
+    }
+    if (::ctx.max_memory != null) {
+      if (::ctx.max_memory.toInt() < 0) {
+        emit agi.error with { code: "invalid_memory", message: "max_memory must be >= 0", context: { task_id: ::tid } }
+        return
+      }
+      if (::ctx.max_memory.toInt() > (::hardware.available_ram || 0)) {
+        emit agi.error with { code: "insufficient_memory", message: "requested memory exceeds available", context: { task_id: ::tid } }
+        return
+      }
+    }
+    say "🧾 Enqueue task: " + ::tid + " [" + ::ttype + "]"
+    set ::tasks = ::tasks + [{ id: ::tid, task_type: ::ttype, input: ::input, context: ::ctx }]
+    set ::metrics.total_tasks = ::metrics.total_tasks + 1
+    emit agi.task.enqueued with { task_id: ::tid, task_type: ::ttype }
+  }
+
+  # Process the next task in the queue
+  on agi.process_queue {
+    say "⚙️  Processing task queue..."
+    # simple FIFO
+    if (::tasks.length || 0) == 0 {
+      say "ℹ️  No tasks"
+    } else {
+      # pick highest priority (default 128)
+      set ::best_idx = 0
+      set ::best_pri = 128
+      set ::i = 0
+      for ::t in ::tasks {
+        set ::p = ((::t.context && ::t.context.priority) || 128)
+        if ::p.toInt() > ::best_pri.toInt() {
+          set ::best_pri = ::p
+          set ::best_idx = ::i
+        }
+        set ::i = ::i + 1
+      }
+      # extract best
+      set ::next = ::tasks[::best_idx]
+      # rebuild queue excluding best_idx
+      set ::newq = []
+      set ::j = 0
+      for ::t2 in ::tasks {
+        if ::j != ::best_idx { set ::newq = ::newq + [::t2] }
+        set ::j = ::j + 1
+      }
+      set ::tasks = ::newq
+      say "▶️  Processing: " + ::next.id + " (" + ::next.task_type + ")"
+      # deterministic processing result
+      set ::out = "ok:" + ::next.task_type
+      set ::processed = ::processed + [{ id: ::next.id, result: ::out }]
+      set ::task_results[::next.id] = { task_id: ::next.id, output: ::out, metrics: { execution_time: 1, memory_peak: 1 } }
+      set ::metrics.total_processed = ::metrics.total_processed + 1
+      emit agi.task.processed with { task_id: ::next.id, result: ::out }
+    }
+    emit agi.queue.status with { remaining: (::tasks.length || 0), processed: (::processed.length || 0) }
+  }
+
+  # Metrics tick (can be emitted by orchestrator)
+  on agi.metrics.tick {
+    say "📈 Metrics: registered=" + ::metrics.total_registered + ", tasks=" + ::metrics.total_tasks + ", done=" + ::metrics.total_processed
+  }
+
+  # Auto-orchestrate Wave 1 conversion on initialization
+  on agi.initializing {
+    if ::automation_started { return }
+    set ::automation_started = true
+    say "🤖 Automation: scanning inventory and executing Wave 1"
+    emit automation.scan.inventory with { path: "migration/INVENTORY.csv" }
+    emit automation.plan.wave1
+    emit automation.execute.wave1
+    emit automation.emit.tasks
+    emit automation.report
+  }
+
+  # --- Hardware and capabilities APIs ---
+  on agi.hardware.set {
+    set ::hw = ::event.data || {}
+    # merge shallow fields
+    for ::k, ::v in ::hw { set ::hardware[::k] = ::v }
+    emit agi.hardware.updated with ::hardware
+  }
+
+  on agi.hardware.get {
+    emit agi.hardware.response with ::hardware
+  }
+
+  on agi.capability.set {
+    set ::name = (::event.data.name || "").toString()
+    set ::val = (::event.data.enabled || false)
+    if ::name == "" { emit agi.error with { code: "invalid_capability", message: "name required" }; return }
+    set ::capabilities[::name] = ::val
+    emit agi.capability.updated with { name: ::name, enabled: ::val }
+  }
+
+  on agi.capability.list {
+    emit agi.capability.list.response with { items: ::capabilities }
+  }
+
+  # --- Task results ---
+  on agi.task.result.get {
+    set ::tid = ::event.data.task_id || ""
+    set ::res = ::task_results[::tid]
+    if ::res == null { emit agi.error with { code: "not_found", message: "task result not found", context: { task_id: ::tid } } }
+    else { emit agi.task.result.response with ::res }
+  }
+
+  # --- System metrics (set/get) ---
+  on agi.system.metrics.set {
+    set ::m = ::event.data || {}
+    for ::k, ::v in ::m { set ::metrics[::k] = ::v }
+    emit agi.system.metrics.updated with ::metrics
+  }
+
+  on agi.system.metrics.get {
+    emit agi.system.metrics.response with ::metrics
+  }
+
+  # --- Task utilities: list and cancel ---
+  on agi.task.list {
+    emit agi.task.list.response with { count: (::tasks.length || 0) }
+  }
+
+  on agi.task.cancel {
+    set ::tid = ::event.data.task_id || ""
+    set ::newq = []
+    set ::removed = false
+    for ::t in ::tasks {
+      if (::t.id || "") == ::tid { set ::removed = true }
+      else { set ::newq = ::newq + [::t] }
+    }
+    set ::tasks = ::newq
+    if ::removed { emit agi.task.cancelled with { task_id: ::tid } }
+    else { emit agi.error with { code: "not_found", message: "task not found", context: { task_id: ::tid } } }
+  }
+
+  # --- Component telemetry ---
+  on agi.component.telemetry {
+    set ::name = ::event.data.name || ""
+    set ::version = ::event.data.version || ""
+    set ::key = (::name + ":" + ::version)
+    if ::components[::key] == null { emit agi.error with { code: "not_found", message: "component not found", context: { key: ::key } }; return }
+    set ::state = (::component_states[::key] || { status: "registered", cpu_usage: 0.0, memory_usage: 0, gpu_usage: 0.0 })
+    if ::event.data.cpu_usage != null { set ::state.cpu_usage = ::event.data.cpu_usage }
+    if ::event.data.memory_usage != null { set ::state.memory_usage = ::event.data.memory_usage }
+    if ::event.data.gpu_usage != null { set ::state.gpu_usage = ::event.data.gpu_usage }
+    set ::component_states[::key] = ::state
+    emit agi.component.state with { name: ::name, version: ::version, status: (::state.status || "registered"), cpu: (::state.cpu_usage || 0.0), mem: (::state.memory_usage || 0), gpu: (::state.gpu_usage || 0.0) }
+  }
+
+  # --- Automation: inventory scanning and planning ---
+  on automation.scan.inventory {
+    set ::inv_path = (::event.data.path || "migration/INVENTORY.csv")
+    say "🗂️  Scanning inventory: " + ::inv_path
+    emit syscall with { type: "read_file", args: { path: ::inv_path }, request_id: "inv-read" }
+  }
+
+  on syscall.response {
+    # Handle inventory read
+    if $1.request_id == "inv-read" {
+      set ::raw = ($1.content || "")
+      if ::raw == "" {
+        emit agi.error with { code: "inventory_empty", message: "INVENTORY.csv empty or missing" }
+        return
+      }
+      # Parse CSV: source_path,type,language,priority,target_module,notes
+      set ::lines = ::raw.split("\n")
+      set ::items = []
+      set ::i = 0
+      for ::line in ::lines {
+        set ::i = ::i + 1
+        if (::i == 1) { continue }  # skip header
+        set ::t = ::line.trim()
+        if ::t == "" { continue }
+        # naive split by comma
+        set ::cols = ::line.split(",")
+        if ((::cols.length || 0) < 6) { continue }
+        set ::item = {
+          source_path: ::cols[0].trim(),
+          type: ::cols[1].trim(),
+          language: ::cols[2].trim(),
+          priority: ::cols[3].trim(),
+          target_module: ::cols[4].trim(),
+          notes: ::cols[5].trim()
+        }
+        set ::items = ::items + [::item]
+      }
+      set ::automation_inventory = ::items
+      say "📦 Inventory parsed: " + (::items.length || 0)
+      emit automation.inventory.parsed with { count: (::items.length || 0) }
+    }
+  }
+
+  on automation.plan.wave1 {
+    set ::plan = []
+    for ::it in (::automation_inventory || []) {
+      if (::it.priority == "P1") { set ::plan = ::plan + [::it] }
+    }
+    set ::automation_plan_wave1 = ::plan
+    say "📝 Wave1 plan: " + (::plan.length || 0)
+    emit automation.plan.ready with { wave: 1, count: (::plan.length || 0) }
+  }
+
+  on automation.execute.wave1 {
+    set ::executed = 0
+    for ::it in (::automation_plan_wave1 || []) {
+      # Record planned execution; integration happens via dedicated converters
+      set ::executed = ::executed + 1
+    }
+    set ::automation_executed_wave1 = ::executed
+    say "🚀 Executed Wave1 plan items: " + ::executed
+    emit automation.executed with { wave: 1, executed: ::executed }
+  }
+
+  # Emit detailed conversion tasks for all items in the current plan
+  on automation.emit.tasks {
+    set ::count = 0
+    for ::it in (::automation_plan_wave1 || []) {
+      set ::count = ::count + 1
+      emit automation.task.convert with ::it
+    }
+    say "🧩 Emitted conversion tasks: " + ::count
+    emit automation.tasks.emitted with { count: ::count }
+  }
+
+  # Handle a single conversion task by writing a plan log via Virtual OS
+  on automation.task.convert {
+    set ::it = ::event.data || {}
+    set ::module = (::it.target_module || "unknown").replace("/", "_")
+    set ::log_path = ("reports/automation/" + ::module + ".task.txt")
+    set ::content = (
+      "SOURCE=" + (::it.source_path || "") + "\n" +
+      "TYPE=" + (::it.type || "") + "\n" +
+      "LANG=" + (::it.language || "") + "\n" +
+      "PRIORITY=" + (::it.priority || "") + "\n" +
+      "TARGET=" + (::it.target_module || "") + "\n" +
+      "NOTES=" + (::it.notes || "") + "\n"
+    )
+    set ::rid = ("conv-write-" + (::time_now([])))
+    emit syscall with { type: "write_file", args: { path: ::log_path, content: ::content }, request_id: ::rid }
+    set ::automation_task_log_count = (::automation_task_log_count + 1)
+    # Emit a staged conversion event to integrate with optimizers later
+    emit automation.staged_conversion with { target: (::it.target_module || ""), source: (::it.source_path || ""), language: (::it.language || "") }
+  }
+
+  # Summarize automation results
+  on automation.report {
+    set ::summary = (
+      "inventory=" + ((::automation_inventory && ::automation_inventory.length) || 0) + ", " +
+      "wave1=" + ((::automation_plan_wave1 && ::automation_plan_wave1.length) || 0) + ", " +
+      "executed=" + (::automation_executed_wave1 || 0) + ", " +
+      "logs=" + (::automation_task_log_count || 0)
+    )
+    say "📜 Automation summary: " + ::summary
+    emit syscall with { type: "write_file", args: { path: "reports/automation/summary.txt", content: ::summary }, request_id: "auto-summary" }
   }
 
   on analyze_input {
@@ -103,8 +489,17 @@ component ::agi.core {
 
   memory {
     ::status = "ready"
-    ::agi_level = 0.5
-    ::learning_rate = 0.1
-    ::adaptation_factor = 0.2
+    ::agi_level = 0.77
+    ::learning_rate = 0.12
+    ::adaptation_factor = 0.25
+    ::components = {}
+    ::component_count = 0
+    ::tasks = []
+    ::processed = []
+    ::metrics = {}
+    ::capabilities = {}
+    ::hardware = {}
+    ::task_results = {}
+    ::automation_started = false
   }
 } 

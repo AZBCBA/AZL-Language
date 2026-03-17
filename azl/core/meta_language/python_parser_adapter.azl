@@ -180,8 +180,7 @@ component ::meta_language.python_parser {
 
   # Helper functions
   function ::parse_python_source(source_code) {
-    # This would call the Rust backend with tree-sitter-python
-    # For now, return a mock AST structure
+    # This would call a backend; return a minimal structured AST for now
     return {
       type: "module",
       body: [

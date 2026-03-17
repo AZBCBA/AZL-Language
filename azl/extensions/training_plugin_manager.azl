@@ -1,0 +1,127 @@
+# Training Plugin Manager – integrates AZME plugins into the training pipeline
+component ::extensions.training_plugin_manager {
+  init {
+    set ::enabled_by_stage = {
+      before_data_processing: [],
+      after_data_processing: [],
+      before_aba: [],
+      after_aba: [],
+      before_neural: [],
+      after_neural: [],
+      before_consciousness: [],
+      after_consciousness: [],
+      before_memory: [],
+      after_memory: [],
+      finalization: []
+    }
+    set ::defaults = { allow_tags: ["training", "metrics", "analysis"], deny_list: [] }
+    set ::audit = { executed: 0, success: 0, failed: 0, blocked: 0, last: null }
+    link ::azme.plugin_host
+    link ::azme.plugin_registry
+    link ::azme.security_policy_rules
+    link ::metrics.training
+    link ::error.system
+  }
+
+  behavior {
+    listen for "training.plugins.configure" {
+      set cfg = $1 or {}
+      if cfg.enabled_by_stage { set ::enabled_by_stage = cfg.enabled_by_stage }
+      if cfg.allow_tags { set ::defaults.allow_tags = cfg.allow_tags }
+      if cfg.deny_list { set ::defaults.deny_list = cfg.deny_list }
+      emit metrics.adaptive.update with { plugins_config_updates: ((::metrics.training.metrics.adaptive.plugins_config_updates or 0) + 1) }
+    }
+
+    # Run all plugins for a given stage with provided context
+    listen for "training.plugins.run_stage" {
+      set p = $1 or {}
+      set stage = p.stage or ""
+      set ctx = p.context or {}
+      if stage == "" { emit log_error with { type: "plugin", message: "missing_stage", context: p }; return }
+      set list = (::enabled_by_stage[stage] or [])
+      if list.length == 0 { return }
+      # Security: allow only if policy permits plugin execution in training context
+      emit azme.check_permission to ::azme.security_policy_rules with { role: (p.role or (::internal.env("AZL_API_ROLE") or ::internal.env("AZL_TRAIN_ROLE") or "system_core")), event_type: ("training.plugins.run." + stage) }
+      listen for "azme.permission_result" then { if (!::event.data.has_permission) { emit log_error with { type: "plugin", message: "access_denied_run_stage", context: { stage: stage } }; return } }
+      # Emit native training.* hook for AZL-native plugins
+      emit ("training." + stage) with ctx
+      # Execute sequentially to simplify resource usage; could be parallelized later
+      set i = 0
+      while i < list.length {
+        set pid = list[i]
+        if ::is_denied(pid) { emit training.plugin.blocked with { plugin: pid, stage: stage, reason: "deny_list" }; set i = i + 1; continue }
+        emit run_plugin to ::azme.plugin_host with { plugin_id: pid, args: [ctx] }
+        set i = i + 1
+      }
+    }
+
+    # Management API
+    listen for "training.plugins.register" {
+      set req = $1 or {}
+      # Security
+      emit azme.check_permission to ::azme.security_policy_rules with { role: (req.role or (::internal.env("AZL_API_ROLE") or "runtime")), event_type: "training.plugins.register" }
+      listen for "azme.permission_result" then { if (!::event.data.has_permission) { emit training.plugins.response with { ok: false, error: "access_denied" }; return } }
+      emit register_plugin to ::azme.plugin_host with { plugin_id: req.plugin_id, plugin_config: (req.plugin_config or {}) }
+      emit register_plugin to ::azme.plugin_registry with { plugin_id: req.plugin_id, plugin_config: (req.plugin_config or {}) }
+      emit training.plugins.response with { ok: true }
+    }
+    listen for "training.plugins.unregister" {
+      set req = $1 or {}
+      emit azme.check_permission to ::azme.security_policy_rules with { role: (req.role or (::internal.env("AZL_API_ROLE") or "runtime")), event_type: "training.plugins.unregister" }
+      listen for "azme.permission_result" then { if (!::event.data.has_permission) { emit training.plugins.response with { ok: false, error: "access_denied" }; return } }
+      emit unregister_plugin to ::azme.plugin_host with { plugin_id: (req.plugin_id or "") }
+      emit unregister_plugin to ::azme.plugin_registry with { plugin_id: (req.plugin_id or "") }
+      emit training.plugins.response with { ok: true }
+    }
+    listen for "training.plugins.enable" {
+      set req = $1 or {}
+      set stage = req.stage or ""
+      set pid = req.plugin_id or ""
+      if stage == "" or pid == "" { emit training.plugins.response with { ok: false, error: "missing_stage_or_plugin" }; return }
+      set arr = (::enabled_by_stage[stage] or [])
+      if arr.index_of(pid) < 0 { set arr.push(pid) }
+      set ::enabled_by_stage[stage] = arr
+      emit training.plugins.response with { ok: true, stage: stage, plugins: arr }
+    }
+    listen for "training.plugins.disable" {
+      set req = $1 or {}
+      set stage = req.stage or ""
+      set pid = req.plugin_id or ""
+      if stage == "" or pid == "" { emit training.plugins.response with { ok: false, error: "missing_stage_or_plugin" }; return }
+      set arr = (::enabled_by_stage[stage] or [])
+      set out = []
+      for x in arr { if x != pid { set out.push(x) } }
+      set ::enabled_by_stage[stage] = out
+      emit training.plugins.response with { ok: true, stage: stage, plugins: out }
+    }
+    listen for "training.plugins.list" {
+      set reg = (::azme.plugin_host.plugin_registry or {})
+      emit training.plugins.response with { ok: true, registry: reg, enabled_by_stage: ::enabled_by_stage }
+    }
+
+    # Plugin Host event taps to update metrics
+    listen for "azme.plugin_executed" then {
+      set data = ::event.data or {}
+      set success = (data.output && data.output.success) ? true : false
+      set t = (data.output && data.output.execution_time) or 0
+      set mem = (data.output && data.output.memory_usage) or 0
+      set ::audit.executed = ::audit.executed + 1
+      if success { set ::audit.success = ::audit.success + 1 } else { set ::audit.failed = ::audit.failed + 1 }
+      set ::audit.last = { plugin: data.plugin, success: success, ms: t, mem_mb: mem }
+      emit metrics.plugins.update with { executed: ::audit.executed, success: ::audit.success, failed: ::audit.failed, last: ::audit.last }
+    }
+    listen for "azme.plugin_blocked" then {
+      set ::audit.blocked = ::audit.blocked + 1
+      emit metrics.plugins.update with { blocked: ::audit.blocked }
+    }
+  }
+
+  memory {
+    function is_denied(pid) {
+      if (::defaults.deny_list.index_of(pid) >= 0) { return true }
+      return false
+    }
+  }
+}
+
+

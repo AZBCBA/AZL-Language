@@ -4,6 +4,8 @@ component ::test.debug_simple_events {
     set ::test_version = 1
     set ::status = "initializing"
     say "🔍 Starting Debug Simple Events Test v1..."
+    # Seed runtime start to trigger chain listeners under this runner
+    emit system.start
   }
 
   # Link to debug logger
@@ -40,6 +42,10 @@ component ::test.debug_simple_events {
     set ::param2 = 123
     set ::param3 = "param3_value"
     emit test.multiple_variables with ::param1 ::param2 ::param3
+
+    # Event chain execution
+    say "🔗 Initiating event chain..."
+    emit runtime.event.chain.start
   }
 
   on test.simple_string_event {
@@ -95,11 +101,31 @@ component ::test.debug_simple_events {
     say "✅ Multiple parameters working"
     say "✅ Variable parameters working"
     say "🔍 Debug logging working"
+    say "✅ Event chain executed"
   }
 
   behavior {
     on system.start {
       emit test.start
+    }
+    # Chain listeners (runtime event bus validation)
+    listen for "runtime.event.chain.start" then {
+      say "[events] chain start"
+      emit runtime.event.step1
+    }
+
+    listen for "runtime.event.step1" then {
+      say "[events] step1"
+      emit runtime.event.step2
+    }
+
+    listen for "runtime.event.step2" then {
+      say "[events] step2"
+      emit runtime.event.done
+    }
+
+    listen for "runtime.event.done" then {
+      say "[events] done"
     }
   }
 

@@ -14,11 +14,24 @@ if [ "${AZL_BOOTSTRAP_GUARD:-}" = "1" ]; then
 fi
 export AZL_BOOTSTRAP_GUARD=1
 
+# Ensure TMPDIR exists and is writable (systemd may not provide /tmp)
+TMPDIR_DEFAULT="${TMPDIR:-}"
+if [ -z "${TMPDIR_DEFAULT}" ]; then
+  if [ -d ".azl/tmp" ]; then
+    export TMPDIR="$(pwd)/.azl/tmp"
+  else
+    mkdir -p .azl/tmp
+    export TMPDIR="$(pwd)/.azl/tmp"
+  fi
+else
+  mkdir -p "${TMPDIR}"
+fi
+
 # If input already a bootstrap, do not re-wrap it
 if head -n 1 "$INPUT" 2>/dev/null | grep -q '^# AZL-BOOTSTRAP v1'; then
   BUNDLE="$INPUT"
 else
-  BUNDLE="$(mktemp -t azl_bootstrap.XXXXXX.azl)"
+  BUNDLE="$(mktemp -p "${TMPDIR}" -t azl_bootstrap.XXXXXX.azl)"
   # trap 'rm -f "$BUNDLE"' EXIT  # Commented out for debugging
 
   {

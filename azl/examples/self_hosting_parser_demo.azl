@@ -1,0 +1,194 @@
+# SELF-HOSTING PARSER DEMONSTRATION
+# This file demonstrates AZL parsing AZL code - true self-hosting!
+
+component ::azl.self_hosting_demo {
+  init {
+    say "🚀 SELF-HOSTING PARSER DEMONSTRATION STARTING"
+    say "🎯 AZL WILL PARSE AZL CODE!"
+    say "✨ THIS IS THE FIRST STEP TO TRUE INDEPENDENCE!"
+    
+    # Test the self-hosting parser
+    test_self_hosting_parser()
+  }
+
+  behavior {
+    listen for "test.parser" then {
+      say "🧪 Testing self-hosting parser..."
+      test_self_hosting_parser()
+    }
+
+    listen for "parse.result" then {
+      display_parse_result(::event.data)
+    }
+  }
+
+  fn test_self_hosting_parser() {
+    say "🎯 PHASE 3.1: AZL PARSER IN AZL"
+    say "================================="
+    
+    # Test 1: Parse simple AZL code
+    say "📝 Test 1: Parsing simple AZL code"
+    let simple_code = "component ::test { init { say \"Hello!\" } }"
+    test_parser_with_code(simple_code, "simple_test")
+    
+    # Test 2: Parse complex AZL code
+    say "📝 Test 2: Parsing complex AZL code"
+    let complex_code = create_complex_azl_code()
+    test_parser_with_code(complex_code, "complex_test")
+    
+    # Test 3: Parse this very file
+    say "📝 Test 3: Parsing this file (meta-parsing!)"
+    test_parser_with_file("azl/examples/self_hosting_parser_demo.azl")
+    
+    say "✅ All parser tests initiated!"
+  }
+
+  fn test_parser_with_code(source_code, test_name) {
+    say "🔍 Testing parser with: $test_name"
+    say "📊 Source code length: $source_code.length characters"
+    
+    # Emit parse request
+    emit parse.azl_code with {
+      code: source_code,
+      file_name: test_name
+    }
+    
+    # Wait for result
+    wait for "parse.complete" then {
+      set result = ::event.data
+      if result.file == test_name {
+        display_parse_result(result)
+      }
+    }
+  }
+
+  fn test_parser_with_file(file_path) {
+    say "📖 Testing parser with file: $file_path"
+    
+    # Emit file parse request
+    emit parse.azl_file with { path: file_path }
+    
+    # Wait for result
+    wait for "parse.complete" then {
+      set result = ::event.data
+      if result.file == file_path {
+        display_parse_result(result)
+      }
+    }
+  }
+
+  fn display_parse_result(result) {
+    say "🎉 PARSING RESULT RECEIVED!"
+    say "============================"
+    say "📁 File: $result.file"
+    say "✅ Success: $result.success"
+    say "🔤 Tokens: $result.tokens.length"
+    say "🌳 AST Nodes: $result.ast.length"
+    say "❌ Errors: $result.error_count"
+    say "⏰ Parse Time: $result.parse_time"
+    
+    if result.success {
+      say "🎯 PARSING SUCCESSFUL!"
+      display_ast_details(result.ast)
+      display_token_details(result.tokens)
+    } else {
+      say "⚠️  PARSING COMPLETED WITH ERRORS"
+      if result.validation && result.validation.errors {
+        say "❌ Validation Errors:"
+        for error in result.validation.errors {
+          say "   - $error"
+        }
+      }
+    }
+    
+    say ""
+  }
+
+  fn display_ast_details(ast) {
+    say "🌳 ABSTRACT SYNTAX TREE DETAILS:"
+    say "--------------------------------"
+    
+    for node in ast {
+      say "📦 Node Type: $node.type"
+      if node.name {
+        say "   Name: $node.name"
+      }
+      if node.start_pos != null {
+        say "   Position: $node.start_pos to $node.end_pos"
+      }
+      
+      if node.body && node.body.sections {
+        say "   Sections:"
+        for section_name in node.body.sections.keys {
+          set section = node.body.sections[section_name]
+          say "     - $section_name: $section.statements.length statements"
+        }
+      }
+    }
+  }
+
+  fn display_token_details(tokens) {
+    say "🔤 TOKEN DETAILS (First 20):"
+    say "-----------------------------"
+    
+    let display_count = tokens.length > 20 ? 20 : tokens.length
+    
+    for let i = 0; i < display_count; i++ {
+      set token = tokens[i]
+      say "   $i: [$token.type] '$token.value' (Line $token.line, Col $token.column)"
+    }
+    
+    if tokens.length > 20 {
+      say "   ... and $tokens.length - 20 more tokens"
+    }
+  }
+
+  fn create_complex_azl_code() {
+    return `component ::complex_example {
+  init {
+    say "Complex component starting"
+    let x = 42
+    let message = "Hello from complex component"
+    
+    if x > 40 {
+      say "X is greater than 40: $x"
+    } else {
+      say "X is not greater than 40"
+    }
+    
+    for let i = 0; i < 5; i++ {
+      say "Loop iteration: $i"
+      if i == 3 {
+        say "Special iteration!"
+      }
+    }
+  }
+  
+  behavior {
+    listen for "test_event" then {
+      say "Event received!"
+      let result = process_event()
+      emit "event_processed" with { result: result }
+    }
+  }
+  
+  fn process_event() {
+    let data = [1, 2, 3, 4, 5]
+    let sum = 0
+    
+    for let i = 0; i < data.length; i++ {
+      sum = sum + data[i]
+    }
+    
+    return sum
+  }
+}`
+  }
+
+  fn wait_for_event(event_name) {
+    # This is a simplified event waiting mechanism
+    # In a real implementation, this would use the event system
+    say "⏳ Waiting for event: $event_name"
+    return true
+  }
+}

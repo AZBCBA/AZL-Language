@@ -1,0 +1,29 @@
+{
+  "model_architecture": "my_trained_model",
+  "dataset_path": "datasets/real_world_training/azme_full_corpus.txt",
+  "training_params": {
+    "learning_rate": 0.0001,
+    "batch_size": 4,
+    "max_steps_per_run": 1000,
+    "checkpoint_every": 100,
+    "save_every": 50
+  },
+  "continuous_params": {
+    "max_runs": 0,
+    "restart_delay": 60,
+    "monitor_interval": 30,
+    "auto_restart": true,
+    "max_memory_gb": 18.0,
+    "max_cpu_percent": 80.0
+  },
+  "paths": {
+    "weights_dir": "/mnt/ssd4t/azl-training/weights",
+    "logs_dir": "/mnt/ssd4t/azl-training/logs",
+    "checkpoints_dir": "/mnt/ssd4t/azl-training/checkpoints"
+  },
+  "training": {
+    "gpu_acceleration": true,
+    "multi_gpu": true,
+    "gpu_memory_fraction": 0.8
+  }
+}

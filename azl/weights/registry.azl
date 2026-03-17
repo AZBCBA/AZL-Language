@@ -120,6 +120,18 @@ component ::weights.registry {
       let model_name = request.model_name
       let version = request.version
       
+      # L2 cache: check cache manager for prior fetched weights
+      link ::build.cache_manager
+      set cache_key = "weights:" + model_name + ":" + (version or "")
+      set cached = ::build.cache_manager.kv_get(cache_key)
+      if cached != null {
+        emit "load_weights" with {
+          weights: cached.weights,
+          config: cached.config
+        }
+        return
+      }
+
       emit "fetch_weights" with {
         model_name: model_name,
         version: version
@@ -133,6 +145,8 @@ component ::weights.registry {
           weights: weights_data.weights,
           config: weights_data.config
         }
+        # Store in cache for future loads
+        ::build.cache_manager.kv_set(cache_key, weights_data)
         
         say "🔄 Training weights loaded: " + model_name + " v" + weights_data.version
       }
@@ -162,6 +176,10 @@ component ::weights.registry {
       
       # Save checkpoint
       save_checkpoint_to_file(checkpoint_dir, checkpoint)
+      # Invalidate related cache entries
+      link ::build.cache_manager
+      ::build.cache_manager.kv_remove("weights:" + model_name)
+      ::build.cache_manager.kv_remove("weights:" + model_name + ":" + epoch)
       
       say "💾 Checkpoint saved: " + model_name + " epoch " + epoch
       say "📊 Loss: " + loss + " | Accuracy: " + accuracy

@@ -1,0 +1,83 @@
+{
+  "production": {
+    "models": {
+      "azl_azme_enhanced": {
+        "path": "deployment/production/azl_azme_enhanced/model.pt",
+        "size_mb": 3.649019241333008,
+        "status": "deployed"
+      },
+      "azl_only": {
+        "path": "deployment/production/azl_only/model.pt",
+        "size_mb": 3.649019241333008,
+        "status": "deployed"
+      },
+      "azme_only": {
+        "path": "deployment/production/azme_only/model.pt",
+        "size_mb": 3.649019241333008,
+        "status": "deployed"
+      },
+      "real_agi": {
+        "path": "deployment/production/real_agi/model.pt",
+        "size_mb": 3.649019241333008,
+        "status": "deployed"
+      },
+      "event_sequence": {
+        "path": "deployment/production/event_sequence/model.pt",
+        "size_mb": 3.649019241333008,
+        "status": "deployed"
+      },
+      "benchmark_a": {
+        "path": "deployment/production/benchmark_a/model.pt",
+        "size_mb": 3.649019241333008,
+        "status": "deployed"
+      },
+      "benchmark_b": {
+        "path": "deployment/production/benchmark_b/model.pt",
+        "size_mb": 3.649019241333008,
+        "status": "deployed"
+      },
+      "phase_attention_advanced": {
+        "path": "deployment/production/phase_attention_advanced/model.pt",
+        "size_mb": 369.2534656524658,
+        "status": "deployed"
+      },
+      "standard_transformer_advanced": {
+        "path": "deployment/production/standard_transformer_advanced/model.pt",
+        "size_mb": 366.9968433380127,
+        "status": "deployed"
+      },
+      "large_scale_advanced": {
+        "path": "deployment/production/large_scale_advanced/model.pt",
+        "size_mb": 369.2534656524658,
+        "status": "deployed"
+      },
+      "high_performance_advanced": {
+        "path": "deployment/production/high_performance_advanced/model.pt",
+        "size_mb": 366.9968433380127,
+        "status": "deployed"
+      },
+      "quantum_enhanced_advanced": {
+        "path": "deployment/production/quantum_enhanced_advanced/model.pt",
+        "size_mb": 369.2534656524658,
+        "status": "deployed"
+      }
+    },
+    "load_balancing": {
+      "enabled": true,
+      "strategy": "round_robin"
+    },
+    "monitoring": {
+      "enabled": true,
+      "metrics": [
+        "latency",
+        "throughput",
+        "accuracy"
+      ]
+    },
+    "scaling": {
+      "auto_scaling": true,
+      "min_instances": 2,
+      "max_instances": 10
+    }
+  }
+}

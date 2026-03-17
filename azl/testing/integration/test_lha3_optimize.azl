@@ -1,0 +1,21 @@
+# LHA3 optimization events test
+
+component ::tests.lha3_optimize_only {
+  init {
+    say "🧪 LHA3 optimization events test"
+    link ::memory.enhanced_lha3
+    emit initialize_lha3_memory to ::memory.enhanced_lha3 with { p_adic_prime: 7, precision: 10, max_dimensions: 32, ram_limit_gb: 1 }
+    listen for "memory.lha3.ready" then { say "✅ LHA3 ready" }
+
+    # trigger compress and optimize
+    listen for "memory.lha3.compressed" then { say "✅ compressed event received" }
+    listen for "memory.lha3.optimized" then { say "✅ optimized event received" }
+    emit compress_fractal_memory to ::memory.enhanced_lha3 with 3
+    emit optimize_fractal_memory to ::memory.enhanced_lha3 with "ACCESS_PATTERN"
+
+    say "🧪 LHA3 optimization events test done"
+  }
+}
+
+
+

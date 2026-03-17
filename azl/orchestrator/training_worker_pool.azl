@@ -1,0 +1,281 @@
+# Training Worker Pool (process-based parallelism for multi-GPU)
+component ::orchestrator.training_worker_pool {
+  init {
+    store ::temp_dir from (::internal.env("AZL_TRAIN_TEMP") or "/tmp/azl_train_workers")
+    store ::worker_timeout from parseInt((::internal.env("AZL_TRAIN_WORKER_TIMEOUT") or "600000")) # 10 min
+    store ::active_workers from {}
+    store ::available_workers from []
+    store ::job_queue from []
+    store ::worker_counter from 0
+    store ::job_counter from 0
+    
+    link ::azl.system_interface
+    link ::azl.stdlib
+    link ::error.system
+    
+    ::ensure_temp_dir()
+    say "🏭 Training Worker Pool ready"
+  }
+
+  behavior {
+    listen for "training.worker.submit" then {
+      store ::job from ::event.data or {}
+      store ::job_id from ::generate_job_id()
+      store ::j from {
+        id: ::job_id,
+        gpu_id: (::job.gpu_id or 0),
+        batch: (::job.batch or []),
+        config: (::job.config or {}),
+        submitted_at: ::azl.stdlib.time_now([])
+      }
+      store ::job_queue from ::job_queue.push(::j)
+      ::try_dispatch()
+    }
+
+    listen for "training.worker.check" then { 
+      ::check_completions() 
+    }
+    
+    listen for "training.worker.shutdown" then { 
+      ::shutdown_all() 
+    }
+  }
+
+  memory {
+    # Worker management
+    temp_dir: "/tmp/azl_train_workers",
+    worker_timeout: 600000,
+    active_workers: {},
+    available_workers: [],
+    job_queue: [],
+    worker_counter: 0,
+    job_counter: 0
+  }
+
+  interface {
+    # Ensure temporary directory exists
+    ::ensure_temp_dir = () => {
+      store ::exists from ::azl.system_interface.syscall("file_exists", { path: ::temp_dir })
+      branch when !::exists { 
+        ::azl.system_interface.syscall("create_directory", { path: ::temp_dir }) 
+      }
+    }
+    
+    # Generate unique job ID
+    ::generate_job_id = () => { 
+      store ::job_counter from ::job_counter + 1
+      return "tjob_" + ::job_counter + "_" + (::azl.stdlib.time_now([]) % 1000000) 
+    }
+
+    # Generate unique worker ID
+    ::generate_worker_id = () => { 
+      store ::worker_counter from ::worker_counter + 1
+      return "tworker_" + ::worker_counter + "_" + (::azl.stdlib.time_now([]) % 1000000) 
+    }
+
+    # Try to dispatch jobs to available workers
+    ::try_dispatch = () => {
+      # Simple immediate dispatch; one process per job
+      branch when ::job_queue.length > 0 {
+        store ::job from ::job_queue.shift()
+        store ::worker_id from ::generate_worker_id()
+        branch when !::spawn(::job, ::worker_id) {
+          # failed to spawn; requeue and break
+          store ::job_queue from ::job_queue.unshift(::job)
+          break
+        }
+      }
+    }
+
+    # Spawn a new worker process
+    ::spawn = (job, worker_id) => {
+      # Write job and script files
+      store ::job_file from ::temp_dir + "/" + ::job.id + ".json"
+      store ::result_file from ::temp_dir + "/" + ::job.id + ".result"
+      store ::script_file from ::temp_dir + "/" + ::worker_id + ".azl"
+
+      store ::job_json from ::azl.stdlib.json_stringify(::job)
+      branch when !::azl.system_interface.syscall("write_file", { path: ::job_file, content: ::job_json }) {
+        emit "log_error" with { 
+          type: "train_worker", 
+          message: "write_job_failed", 
+          context: { job: ::job.id, file: ::job_file } 
+        }
+        return false
+      }
+      
+      store ::script from ::generate_worker_script(::job_file, ::result_file)
+      branch when !::azl.system_interface.syscall("write_file", { path: ::script_file, content: ::script }) {
+        emit "log_error" with { 
+          type: "train_worker", 
+          message: "write_script_failed", 
+          context: { worker: ::worker_id } 
+        }
+        return false
+      }
+
+      # Spawn process with per-GPU env
+      store ::envmap from {
+        AZL_WORKER_JOB_FILE: ::job_file,
+        AZL_WORKER_RESULT_FILE: ::result_file,
+        AZL_WORKER_ID: ::worker_id,
+        AZL_WORKER_TIMEOUT: ::worker_timeout,
+        CUDA_VISIBLE_DEVICES: ("" + (::job.gpu_id or 0))
+      }
+      
+      store ::pid from ::azl.system_interface.syscall("exec", { 
+        command: "azl", 
+        args: [::script_file], 
+        background: true,
+        env: ::envmap 
+      })
+
+      branch when !::pid {
+        emit "log_error" with { 
+          type: "train_worker", 
+          message: "spawn_failed", 
+          context: { worker: ::worker_id } 
+        }
+        return false
+      }
+      
+      store ::active_workers[::worker_id] from { 
+        pid: ::pid, 
+        job: ::job, 
+        script_file: ::script_file, 
+        job_file: ::job_file, 
+        result_file: ::result_file, 
+        start: ::azl.stdlib.time_now([]) 
+      }
+
+      return true
+    }
+
+    # Check for completed workers
+    ::check_completions = () => {
+      store ::completed from []
+      
+      loop for ::worker_id in ::active_workers {
+        store ::w from ::active_workers[::worker_id]
+        store ::result_exists from ::azl.system_interface.syscall("file_exists", { path: ::w.result_file })
+        store ::elapsed from (::azl.stdlib.time_now([]) - ::w.start)
+        
+        branch when ::result_exists {
+          store ::content from ::azl.system_interface.syscall("read_file", { path: ::w.result_file })
+          store ::obj from {}
+          
+          # Parse result and add to completed list
+          store ::completed from ::completed.push({
+            worker_id: ::worker_id,
+            job: ::w.job,
+            result: ::obj,
+            elapsed: ::elapsed
+          })
+        } else branch when ::elapsed > ::worker_timeout {
+          # Worker timed out
+          store ::completed from ::completed.push({
+            worker_id: ::worker_id,
+            job: ::w.job,
+            result: { success: false, error: "timeout" },
+            elapsed: ::elapsed
+          })
+        }
+      }
+      
+      # Process completed workers
+      loop for ::c in ::completed {
+        # Remove from active workers
+        store ::active_workers[::c.worker_id] from null
+        
+        # Emit unified event for orchestrator
+        emit "training.worker.completed" with ::c
+        
+        branch when ::c.result.success != true {
+          emit "log_error" with {
+            type: "train_worker",
+            message: "worker_failed",
+            context: { worker_id: ::c.worker_id, error: ::c.result.error }
+          }
+        }
+      }
+    }
+
+    # Shutdown all workers
+    ::shutdown_all = () => {
+      loop for ::worker_id in ::active_workers {
+        store ::w from ::active_workers[::worker_id]
+        ::azl.system_interface.syscall("kill", { pid: ::w.pid })
+      }
+      store ::active_workers from {}
+      store ::job_queue from []
+      say "🛑 All training workers shut down"
+    }
+
+    # Generate worker script content
+    ::generate_worker_script = (job_file, result_file) => {
+      return [
+        "component ::training.worker {",
+        "  init {",
+        "    store ::job_file from \"" + ::job_file + "\"",
+        "    store ::result_file from \"" + ::result_file + "\"",
+        "    store ::job from ::azl.stdlib.json_parse(::azl.stdlib.read_file(::job_file))",
+        "    store ::config from ::job.config",
+        "    store ::batch from ::job.batch",
+        "    store ::start_time from ::azl.stdlib.time_now([])",
+        "    store ::result from { success: false, error: null, output: null }",
+        "    ",
+        "    # Execute training job",
+        "    ::execute_training()",
+        "  }",
+        "  ",
+        "  behavior {",
+        "    ::execute_training = () => {",
+        "      try {",
+        "        # If cuda requested but FFI disabled, return error",
+        "        branch when (::config.device == \"cuda\" && !(::ffi.torch.enabled or false)) {",
+        "          store ::result.error from \"CUDA requested but FFI disabled\"",
+        "          ::finish()",
+        "          return",
+        "        }",
+        "        ",
+        "        # Simple training loop",
+        "        store ::sum from 0.0",
+        "        store ::i from 0",
+        "        loop for ::s in ::batch {",
+        "          branch when ::s == null { continue }",
+        "          store ::len from ::s.length",
+        "          store ::tokens from 1",
+        "          store ::j from 0",
+        "          while ::j < ::len {",
+        "            branch when ::s[::j] == ' ' {",
+        "              store ::tokens from ::tokens + 1",
+        "            }",
+        "            store ::j from ::j + 1",
+        "          }",
+        "          store ::l from (::tokens * ::tokens)",
+        "          store ::sum from ::sum + ::l",
+        "          store ::i from ::i + 1",
+        "        }",
+        "        ",
+        "        store ::result.success from true",
+        "        store ::result.output from { loss: ::sum / ::i, samples: ::i }",
+        "      } catch (::e) {",
+        "        store ::result.error from ::e.message",
+        "      }",
+        "      ::finish()",
+        "    }",
+        "    ",
+        "    ::finish = () => {",
+        "      store ::elapsed from ::azl.stdlib.time_now([]) - ::start_time",
+        "      store ::result.elapsed from ::elapsed",
+        "      ::azl.stdlib.write_file(::result_file, ::azl.stdlib.json_stringify(::result))",
+        "      exit 0",
+        "    }",
+        "  }",
+        "}"
+      ].join("\n")
+    }
+  }
+}
+
+

@@ -1,0 +1,29 @@
+🚀 AZL Language Runner Starting...
+🧪 Testing Integration Fixes...
+==================================================
+📖 Parsing AZL file: azl_bootstrap.azl
+🏗️  Found component: ::azl.bootstrap
+🎯 Added behavior for event: build.daemon.enterprise.ready
+🎯 Added behavior for event: build.daemon.enterprise.started
+🎯 Added behavior for event: build.daemon.enterprise.error
+
+🎯 Running component: ::azl.bootstrap
+🚀 Initializing ::azl.bootstrap
+💬 🚀 AZL PURE BOOTSTRAP STARTING
+💬 ⚡ NO PYTHON! NO RUST! NO OTHER LANGUAGES!
+💬 🎯 PURE AZL EXECUTION ONLY!
+🔗 Linking to: ::azl.interpreter
+💬 🏢 Starting AZL Enterprise Build Daemon...
+📡 Emitting: daemon.enterprise.start
+📡 Initial events queued: ['daemon.enterprise.start']
+
+🔄 Iteration 1: Processing event 'daemon.enterprise.start'
+
+🔄 Processing event: daemon.enterprise.start
+📊 Queue status: 0 events remaining
+
+==================================================
+✅ AZL Integration Test Complete!
+🚀 All components parsed and executed successfully
+📊 Total events processed: 1
+📊 Events processed: ['daemon.enterprise.start']

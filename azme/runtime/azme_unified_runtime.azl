@@ -90,6 +90,11 @@ component ::azme.unified_runtime {
       
       # Load runtime log level
       set ::runtime_log_level = "debug"
+      # Feature flags from env (defaults)
+      set ::feature_orchestrator_coexist = ((::internal.env("AZME_ORCHESTRATOR_COEXIST") || "1") == "1")
+      set ::feature_unified_orchestrator_enabled = ((::internal.env("AZME_UNIFIED_ORCHESTRATOR") || "0") == "1")
+      set ::feature_quantum_enabled = ((::internal.env("AZME_QUANTUM_ENABLED") || "0") == "1")
+      set ::feature_voice_offline_first = ((::internal.env("AZME_VOICE_OFFLINE_FIRST") || "1") == "1")
       
       # Load autostart setting
       set ::runtime_autostart = true
@@ -104,7 +109,13 @@ component ::azme.unified_runtime {
         ports: ::runtime_ports,
         log_level: ::runtime_log_level,
         autostart: ::runtime_autostart,
-        quantum_enhanced: true
+        quantum_enhanced: true,
+        features: {
+          orchestrator_coexist: ::feature_orchestrator_coexist,
+          unified_orchestrator_enabled: ::feature_unified_orchestrator_enabled,
+          quantum_enabled: ::feature_quantum_enabled,
+          voice_offline_first: ::feature_voice_offline_first
+        }
       }
     }
 
@@ -160,6 +171,18 @@ component ::azme.unified_runtime {
         "ActionDecider",
         "APIConnector",
         "PluginHost",
+        "PluginRegistry",
+        "ToolExecutionLog",
+        "QuantumNeuralBridge",
+        "TranscendentAGI",
+        "SelfEvolvingAGI",
+        "RevolutionaryNLP",
+        "OptimizationOrchestrator",
+        "MetaLearning",
+        "TrainingExtensionManager",
+        "ExperimentRegistry",
+        "DatasetRegistry",
+        "CheckpointManager",
         "PathScoreTracker",
         "OptimizerFeedbackLoop",
         "QuantumCore",
@@ -197,6 +220,8 @@ component ::azme.unified_runtime {
         "Diagnostics", 
         "EventBus",
         "MemorySystem",
+        "PluginRegistry",
+        "QuantumNeuralBridge",
         "CognitiveLoop",
         "EmotionalSystem",
         "NeuralAgentLoader",
@@ -215,6 +240,7 @@ component ::azme.unified_runtime {
         "ActionDecider",
         "APIConnector",
         "PluginHost",
+        "ToolExecutionLog",
         "PathScoreTracker",
         "OptimizerFeedbackLoop",
         "QuantumCore",
@@ -239,6 +265,10 @@ component ::azme.unified_runtime {
         if ::component in ::azme_registered_components {
           activate_component(::component)
           set ::component_startup_order = ::component_startup_order.push(::component)
+          # Conditional activation for quantum wrapper based on feature flag
+          if ::component == "QuantumCore" and ::feature_quantum_enabled != true {
+            say "⚛️ Quantum features disabled by flag"
+          }
         }
       }
       
@@ -257,13 +287,188 @@ component ::azme.unified_runtime {
       
       say "🔌 Activating component: " + ::component
       
-      # Emit component start event
+      # Emit component start event and configure known components
       emit azme.component_start with {
         component: ::component,
         timestamp: ::internal.now(),
         quantum_enhanced: true
       }
+      # Load supporting components if needed
+      if ::component == "PluginRegistry" {
+        emit "load_component" with "azme/integrations/azme_plugin_registry.azl"
+      }
+      if ::component == "PluginHost" {
+        emit "load_component" with "azme/integrations/azme_plugin_host.azl"
+      }
+      if ::component == "ToolExecutionLog" {
+        emit "load_component" with "azme/logger/azme_tool_execution_log.azl"
+      }
+      if ::component == "MemorySystem" {
+        emit "load_component" with "azme/memory/azme_unified_memory_system.azl"
+      }
+      if ::component == "QuantumCore" and ::feature_quantum_enabled == true {
+        emit "load_component" with "azme/quantum/azme_quantum_optimizer.azl"
+      }
       
+      # Configure feature-flagged subsystems
+      if ::component == "PluginRegistry" {
+        emit configure_plugin_registry to ::azme.plugin_registry with { require_signatures: true }
+      }
+      if ::component == "PluginHost" {
+        emit configure_plugin_host to ::azme.plugin_host with { timeout_ms: 2000, max_output_kb: 256 }
+      }
+      if ::component == "ToolExecutionLog" {
+        # nothing to configure now
+      }
+      if ::component == "QuantumNeuralBridge" {
+        emit "load_component" with "azme/neural/azme_quantum_neural_bridge.azl"
+        emit configure_quantum_neural_bridge to ::azme.quantum_neural_bridge with { enabled: ((::internal.env("AZME_QUANTUM_NEURAL") || "0") == "1"), use_p_adic: ((::internal.env("AZME_P_ADIC_ENABLE") || "0") == "1"), use_quantum_processor: ::feature_quantum_enabled }
+      }
+      if ::component == "TranscendentAGI" {
+        emit "load_component" with "azme/planning/azme_transcendent_agi.azl"
+      }
+      if ::component == "SelfEvolvingAGI" {
+        emit "load_component" with "azme/planning/azme_self_evolving_agi.azl"
+      }
+      if ::component == "RevolutionaryNLP" {
+        emit "load_component" with "azme/nlp/azme_revolutionary_nlp.azl"
+      }
+      if ::component == "MetaLearning" {
+        emit "load_component" with "azme/learning/azme_meta_learning.azl"
+      }
+      if ::component == "TrainingExtensionManager" {
+        emit "load_component" with "azme/training/azme_training_extension_manager.azl"
+      }
+      if ::component == "ExperimentRegistry" {
+        emit "load_component" with "azme/experiments/azme_experiment_registry.azl"
+      }
+      if ::component == "DatasetRegistry" {
+        emit "load_component" with "azme/datasets/azme_dataset_registry.azl"
+      }
+      if ::component == "CheckpointManager" {
+        emit "load_component" with "azme/checkpoint/azme_checkpoint_manager.azl"
+      }
+      if ::component == "MemorySystem" {
+        emit configure_unified_memory to ::azme.unified_memory_system with { consolidation_batch: 64, enable_quantum_hooks: (::feature_quantum_enabled == true) }
+      }
+      if ::component == "QuantumCore" and ::feature_quantum_enabled == true {
+        emit configure_quantum_optimizer to ::azme.quantum_optimizer with { enabled: true }
+      }
+      # Start HTTP server for training control endpoints
+      if ::component == "CommandInterface" {
+        emit "load_component" with "azl/system/http_server_compat.azl"
+        # HTTP security and rate limiting state
+        set ::http_api_token = (::internal.env("AZL_API_TOKEN") || "")
+        set ::http_rl = { window_start: ::internal.now(), count: 0, window_ms: 1000, max: 50 }
+        set ::loss_stats_snapshot = {}
+        set ::training_summary_snapshot = {}
+        set ::training_status_snapshot = {}
+        
+        # Cache latest loss stats and training summary from training system
+        listen for "azme.loss_strategy_stats" then {
+          set ::loss_stats_snapshot = ::event.data
+        }
+        listen for "azme.training_summary" then {
+          set ::training_summary_snapshot = ::event.data
+        }
+        listen for "training.status.update" then {
+          set ::training_status_snapshot = ::event.data
+        }
+        # Helper functions for HTTP security / rate limiting
+        function http_request_allowed() {
+          set now = ::internal.now()
+          if (now - ::http_rl.window_start) > ::http_rl.window_ms { set ::http_rl.window_start = now; set ::http_rl.count = 0 }
+          set ::http_rl.count = ::http_rl.count + 1
+          return (::http_rl.count <= ::http_rl.max)
+        }
+        function http_authorized(body) {
+          if ::http_api_token == "" { return true }
+          set tok = (body.token || "")
+          return (tok == ::http_api_token)
+        }
+        # Minimal routes: /status and /train/start
+        set handler = {
+          handle_get: (path) => {
+            if (!::http_request_allowed()) { return { status:429, headers:{"Content-Type":"application/json"}, body: "{\"error\":\"rate_limited\"}" } }
+            if (path == "/status") { return ::normalize_json({ ok: true, runtime: ::azme_runtime_status, mode: ::azme_runtime_mode }) }
+            if (path == "/loss/stats") { return ::normalize_json({ ok: true, stats: (::loss_stats_snapshot || {}) }) }
+            if (path == "/train/summary") { return ::normalize_json({ ok: true, summary: (::training_summary_snapshot || {}) }) }
+            if (path == "/train/status") { return ::normalize_json({ ok: true, status: (::training_status_snapshot || {}) }) }
+            if (path == "/experiments") { emit experiments.list to ::azme.experiments.registry with {}; return ::normalize_json({ ok: true, experiments: (::experiments_list_snapshot || []) }) }
+            if (path.startsWith("/experiments/")) {
+              set rid = path.split("/")[2]
+              emit experiments.get to ::azme.experiments.registry with { run_id: rid }
+              return ::normalize_json({ ok: true, run_id: rid, details: (::experiments_details_snapshot || {}) })
+            }
+            return { ok: false, error: "not_found" }
+          },
+          handle_post: (path, body) => {
+            if (!::http_request_allowed()) { return { status:429, headers:{"Content-Type":"application/json"}, body: "{\"error\":\"rate_limited\"}" } }
+            if (!::http_authorized(body)) { return { status:401, headers:{"Content-Type":"application/json"}, body: "{\"error\":\"unauthorized\"}" } }
+            if (path == "/train/start") {
+              # If dataset_path provided, start advanced pipeline directly
+              if (body.dataset_path) {
+                emit "start_advanced_training_pipeline" with {
+                  dataset_path: body.dataset_path,
+                  mode: (body.mode || "supervised"),
+                  config: (body.config || { device: "cpu", gpu_limit: 0, epochs: 1, batch_size: 2, strict: true })
+                }
+                # Register dataset in registry for reproducibility
+                emit datasets.register to ::azme.dataset.registry with { path: body.dataset_path, name: (body.dataset_name || body.dataset_path) }
+              } else {
+                emit "start_comprehensive_training"
+              }
+              return { ok: true }
+            }
+            if (path == "/train/pause") { emit "pause_training"; return { ok: true } }
+            if (path == "/train/resume") {
+              if (body.from_checkpoint) { emit "resume_from_checkpoint" with { path: body.from_checkpoint } }
+              else { emit "resume_training" }
+              return { ok: true }
+            }
+            if (path == "/train/stop") { emit "stop_training"; return { ok: true } }
+            if (path == "/train/config") { emit "set_training_config" with (body.config || {}); return { ok: true } }
+            if (path == "/loss/strategy") {
+              emit azme.set_loss_strategy with { id: (body.id || null) }
+              return { ok: true, strategy: (body.id || null) }
+            }
+            if (path == "/data/augmentation") {
+              emit azme.set_augmentation with { level: (body.level || 1.0) }
+              return { ok: true, level: (body.level || 1.0) }
+            }
+            if (path == "/data/curriculum") {
+              emit azme.set_curriculum with { mode: (body.mode || "auto") }
+              return { ok: true, mode: (body.mode || "auto") }
+            }
+            if (path == "/optimize/pgo") {
+              emit "load_component" with "azl/core/compiler/azl_optimization_orchestrator.azl"
+              emit orchestrate_optimizations to ::azl.optimization_orchestrator with { ast: {}, optimization_level: 3, profile_data: (body.profile_data or {}) }
+              return { ok: true }
+            }
+            if (path == "/checkpoint/save") { emit checkpoint.save to ::azme.checkpoint.manager with { run_id: (body.run_id || "active"), step: (body.step || 0), loss: (body.loss || 0.0), config: (body.config || {}) }; return { ok: true } }
+            if (path == "/checkpoint/last") { emit checkpoint.last to ::azme.checkpoint.manager with {}; return ::normalize_json({ ok: true, path: (::last_checkpoint_snapshot || "") }) }
+            if (path == "/hybrid/config") {
+              emit azme.set_hybrid_config with { enabled: (body.enabled || true), thresholds: (body.thresholds || {}) }
+              return { ok: true }
+            }
+            return { ok: false, error: "not_found" }
+          }
+        }
+        # subscribe for experiment registry snapshots
+        set ::experiments_list_snapshot = []
+        set ::experiments_details_snapshot = {}
+        listen for "experiments.listed" then { set ::experiments_list_snapshot = ::event.data.run_ids }
+        listen for "experiments.details" then { set ::experiments_details_snapshot = (::event.data.run || {}) }
+        # subscribe for checkpoint last
+        set ::last_checkpoint_snapshot = ""
+        listen for "checkpoint.last_path" then { set ::last_checkpoint_snapshot = (::event.data.path || "") }
+        start_http_server( (::internal.env("AZME_HTTP_PORT") || 8080), handler )
+      }
+      if ::component == "OptimizationOrchestrator" {
+        emit "load_component" with "azl/core/compiler/azl_optimization_orchestrator.azl"
+        # Auto-run PGO if env supplies JSON profile data path later; here we just ensure component is loaded
+      }
+
       # Simulate component activation
       set ::activation_result = {
         component: ::component,

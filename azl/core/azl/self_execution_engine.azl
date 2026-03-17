@@ -3,10 +3,11 @@ component ::azl.self_execution_engine {
     set ::status = "initializing"
     set ::engine_version = "1.0"
     set ::code_generation_capabilities = true
-    set ::self_modification_enabled = true
+    set ::self_modification_enabled = false
     set ::runtime_integration = "active"
     set ::generated_components = {}
     set ::execution_history = []
+    set ::suggestions = []
     set ::code_templates = {}
     
     # Initialize code templates for common patterns
@@ -31,6 +32,21 @@ component ::azl.self_execution_engine {
   link ::meta_language.orchestrator
 
   behavior {
+    # Record improvement suggestions (safe; no auto-apply)
+    listen for "suggest_improvement" then {
+      set ctx = ::event.data || {}
+      set entry = {
+        phase: ctx.phase || "unknown",
+        suggestion: ctx.suggestion || "",
+        metrics: ctx.metrics || {},
+        timestamp: ::time_engine.current_time
+      }
+      set ::execution_history.push(entry)
+      # Keep separate suggestions ring buffer
+      set ::suggestions.push(entry)
+      if ::suggestions.length > 100 { set ::suggestions = ::suggestions.slice(1, ::suggestions.length) }
+      emit "azl.improvement.suggested" with entry
+    }
     # Generate AZL code from specifications
     listen for "generate_azl_code" then {
       set ::target_component = ::generation_data.component_name

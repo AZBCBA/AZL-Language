@@ -99,16 +99,20 @@ if grep -q "component ::boot.entry" "$BUNDLE"; then
   export AZL_COMBINED_PATH="$COMBINED"
   export AZL_ENTRY="$ENTRY"
   
-  # Execute the bootstrap bundle directly with the JavaScript runtime
-  if [ -f "scripts/azl_runtime.js" ]; then
-    echo "✅ Found JavaScript runtime, executing bootstrap bundle..."
-    echo "🚀 Executing bootstrap bundle with JavaScript runtime..."
-    echo "🎯 Targeting component: ::boot.entry"
-    node scripts/azl_runtime.js "$BUNDLE" "::boot.entry"
-    echo "✅ Bootstrap bundle execution complete"
+  # Optionally execute the JavaScript runtime (can be disabled via AZL_NODE_RUNTIME=0)
+  if [ "${AZL_NODE_RUNTIME:-1}" = "1" ]; then
+    if [ -f "scripts/azl_runtime.js" ]; then
+      echo "✅ Found JavaScript runtime, executing bootstrap bundle..."
+      echo "🚀 Executing bootstrap bundle with JavaScript runtime..."
+      echo "🎯 Targeting component: ::boot.entry"
+      node scripts/azl_runtime.js "$BUNDLE" "::boot.entry"
+      echo "✅ Bootstrap bundle execution complete"
+    else
+      echo "❌ JavaScript runtime not found"
+      exit 1
+    fi
   else
-    echo "❌ JavaScript runtime not found"
-    exit 1
+    echo "⚙️  AZL_NODE_RUNTIME disabled; relying on AZL engine + sysproxy wire only"
   fi
 
   echo "🚀 Bootstrap bundle execution complete"

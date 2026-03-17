@@ -1,0 +1,44 @@
+# AZME Experiment Registry
+component ::azme.experiments.registry {
+  init {
+    set ::runs = {}          # run_id -> { config, metadata, metrics:[], artifacts:[], status }
+    set ::order = []
+    set ::next_id = 1
+    emit azme.experiments.ready with { ok: true }
+  }
+
+  behavior {
+    on experiments.register {
+      set req = $1
+      set rid = (req.id || ("run-" + ::next_id.toString()))
+      set ::next_id = ::next_id + 1
+      set ::runs[rid] = { config: (req.config || {}), metadata: (req.metadata || {}), metrics: [], artifacts: [], status: "running" }
+      set ::order = ::order.push(rid)
+      emit experiments.registered with { run_id: rid }
+    }
+
+    on experiments.append_metrics {
+      set req = $1
+      set rid = req.run_id
+      if ::runs[rid] == null { emit log_error with { type: "ExperimentNotFound", message: "append_metrics", context: { run_id: rid } }; return }
+      set m = req.metrics || {}
+      set ::runs[rid].metrics = ::runs[rid].metrics.push(m)
+      emit experiments.metrics_appended with { run_id: rid, count: ::runs[rid].metrics.length }
+    }
+
+    on experiments.finalize {
+      set req = $1
+      set rid = req.run_id
+      if ::runs[rid] == null { emit log_error with { type: "ExperimentNotFound", message: "finalize", context: { run_id: rid } }; return }
+      set ::runs[rid].status = "completed"
+      set ::runs[rid].results = (req.results || {})
+      emit experiments.finalized with { run_id: rid }
+    }
+
+    on experiments.list { emit experiments.listed with { run_ids: ::order } }
+
+    on experiments.get { set rid = $1.run_id; emit experiments.details with { run_id: rid, run: (::runs[rid] || null) } }
+  }
+}
+
+

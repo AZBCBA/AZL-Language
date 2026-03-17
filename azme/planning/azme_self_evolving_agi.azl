@@ -1,0 +1,31 @@
+# AZME Self-Evolving AGI – continuous self-optimization during training
+component ::azme.self_evolving_agi {
+  init {
+    set ::status = "idle"
+    set ::evolution_log = []
+    set ::policy = { lr_min: 1e-5, lr_max: 5e-3, batch_min: 1, batch_max: 64 }
+    emit azme.self_evolving_agi.ready with { ok: true }
+  }
+
+  behavior {
+    # Given recent metrics and strategy, propose parameter updates
+    on evolve_training_config {
+      set ::req = $1
+      set ::metrics = ::req.metrics
+      set ::strategy = ::req.strategy
+      set lr = ( ::metrics && ::metrics.learning_rate ) ? ::metrics.learning_rate : 0.001
+      set loss = ( ::metrics && ::metrics.current_loss ) ? ::metrics.current_loss : 1.0
+      # Simple evolution heuristic: if loss improving slowly, nudge lr up within bounds
+      set lr_new = lr * (loss > 0.9 ? 0.9 : 1.05)
+      if lr_new < ::policy.lr_min { set lr_new = ::policy.lr_min }
+      if lr_new > ::policy.lr_max { set lr_new = ::policy.lr_max }
+      set bs_factor = (::strategy && ::strategy.batch_size_factor) ? ::strategy.batch_size_factor : 1.0
+      set batch_new = clamp(int( ( ::req.batch_size or 2 ) * bs_factor ), ::policy.batch_min, ::policy.batch_max)
+      set update = { learning_rate: lr_new, batch_size: batch_new }
+      set ::evolution_log = ::evolution_log.push({ t: ::internal.now(), update: update })
+      emit azme.self_evolving_agi.updated with update
+    }
+  }
+}
+
+

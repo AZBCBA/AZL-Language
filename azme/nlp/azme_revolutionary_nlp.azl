@@ -1,0 +1,29 @@
+# AZME Revolutionary NLP – advanced language understanding for training
+component ::azme.revolutionary_nlp {
+  init {
+    set ::status = "idle"
+    emit azme.revolutionary_nlp.ready with { ok: true }
+  }
+
+  behavior {
+    # Deep pre-processing and semantic enrichment for training data
+    on enrich_training_text {
+      set ::req = $1
+      set lines = (::req.lines or [])
+      set enriched = []
+      loop for s in lines {
+        if s == null { continue }
+        set t = s.trim()
+        if t == "" { continue }
+        # Simple linguistic features; hook for semantic engine later
+        set len = t.length
+        set sentences = (t.split(".") || []).length
+        set punctuation = (t.match ? t.match(/[,.!?]/g).length : 0)
+        set enriched.push({ text: t, len: len, sentences: sentences, punctuation: punctuation })
+      }
+      emit azme.revolutionary_nlp.enriched with { items: enriched }
+    }
+  }
+}
+
+

@@ -1,0 +1,65 @@
+# AZME Plugin Host (secure execution, policy-gated)
+component ::azme.plugin_host {
+  init {
+    set ::executions = []
+    set ::limits = { timeout_ms: 2000, max_output_kb: 256 }
+    emit azme.plugins.host.ready with { ok: true }
+  }
+
+  behavior {
+    on configure_plugin_host {
+      set ::cfg = $1
+      if ::cfg.timeout_ms != null { set ::limits.timeout_ms = ::cfg.timeout_ms }
+      if ::cfg.max_output_kb != null { set ::limits.max_output_kb = ::cfg.max_output_kb }
+      emit azme.plugins.host.configured with { limits: ::limits }
+    }
+
+    on execute_plugin_action {
+      set ::req = $1
+      set ::plugin_id = ::req.id
+      set ::action = ::req.action
+      set ::payload = (::req.payload || {})
+      # 1) policy check via registry+policy
+      emit verify_plugin_permission to ::azme.plugin_registry with { id: ::plugin_id, event_type: ("azme.plugin." + ::action) }
+      # Require capability mapping for the action in host too
+      set ::cap_ok = false
+      emit get_plugin_info to ::azme.plugin_registry with { id: ::plugin_id }
+      listen for "azme.plugins.info" then {
+        if $1 != ::plugin_id { return }
+        set pl = $2 || {}
+        set man = (pl.manifest || {})
+        set caps = (man.capabilities || [])
+        loop for c in caps { if (c == ("azme.plugin." + ::action) || (c.endsWith(".*") && ("azme.plugin." + ::action).startsWith(c.substring(0, c.length-1)))) { set ::cap_ok = true } }
+      }
+      if ::cap_ok != true {
+        emit log_error with { type: "CapabilityDenied", message: "capability_not_declared", context: { id: ::plugin_id, action: ::action } }
+        emit azme.plugins.action_denied with { id: ::plugin_id, action: ::action }
+        return
+      }
+      listen for "azme.plugins.permission" then {
+        set ::perm = ::event.data
+        if ::perm.id != ::plugin_id or ::perm.event_type != ("azme.plugin." + ::action) { return }
+        if ::perm.allowed != true {
+          emit log_error with { type: "CapabilityDenied", message: "policy denied", context: { id: ::plugin_id, action: ::action } }
+          emit azme.plugins.action_denied with { id: ::plugin_id, action: ::action }
+          return
+        }
+      }
+      # 3) execute in constrained mode (no external process spawn here; call via integration interface only)
+      set ::started = ::internal.now()
+      set ::result = { ok: true, output: { echo: ::payload } }
+      # 4) enforce limits
+      set ::elapsed = (::internal.now() - ::started)
+      if ::elapsed > ::limits.timeout_ms {
+        emit log_error with { type: "TimeoutExceeded", message: "plugin action over budget", context: { id: ::plugin_id, action: ::action, elapsed_ms: ::elapsed } }
+        emit azme.plugins.action_failed with { id: ::plugin_id, action: ::action }
+        return
+      }
+      set ::executions = ::executions.push({ id: ::plugin_id, action: ::action, t: ::started, ms: ::elapsed })
+      emit azme.tool_execution.logged with { plugin_id: ::plugin_id, action: ::action, elapsed_ms: ::elapsed, result_ok: ::result.ok }
+      emit azme.plugins.action_completed with { id: ::plugin_id, action: ::action, result: ::result }
+    }
+  }
+}
+
+

@@ -1,0 +1,26 @@
+[Unit]
+Description=AZME Proxy (for AnythingLLM)
+After=network.target azme-provider.service
+Requires=azme-provider.service
+
+[Service]
+Type=simple
+User=abdulrahman-alzalameh
+WorkingDirectory=/home/abdulrahman-alzalameh/azl-language
+Environment=AZME_PROXY_PORT=5001
+Environment=AZME_API_URL=http://127.0.0.1:5000
+ExecStart=/usr/bin/env node scripts/azme_proxy.js
+Restart=always
+RestartSec=2s
+StandardOutput=append:/home/abdulrahman-alzalameh/azl-language/.azl/azme-proxy.out
+StandardError=append:/home/abdulrahman-alzalameh/azl-language/.azl/azme-proxy.err
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+UMask=0077
+LimitNOFILE=8192
+
+[Install]
+WantedBy=multi-user.target
+
+

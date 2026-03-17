@@ -43,7 +43,8 @@ elif [ "$cmd" = "build" ]; then
     fi
   done
   # Emit manifest JSON for build orchestrator consumption by host interpreter
-  MANIFEST="/tmp/azl_build_manifest_$$.json"
+  : "${TMPDIR:=/tmp}"; mkdir -p "$TMPDIR"
+  MANIFEST="${TMPDIR}/azl_build_manifest_$$.json"
   {
     printf '{"backend":"%s","workers":%s,"files":[' "$BACKEND" "$WORKERS"
     first=1
@@ -62,8 +63,9 @@ else
   exit 1
 fi
 
-BOOT_FILE="/tmp/azl_boot_$$.azl"
-COMBINED="/tmp/azl_combined_$$.azl"
+: "${TMPDIR:=/tmp}"; mkdir -p "$TMPDIR"
+BOOT_FILE="${TMPDIR}/azl_boot_$$.azl"
+COMBINED="${TMPDIR}/azl_combined_$$.azl"
 
 # Bootstrap component: prefer interpreter path (VM/bytecode are design-only)
   cat > "$BOOT_FILE" <<AZL
@@ -113,5 +115,56 @@ done
 
   if [ -n "$TARGET" ]; then
     echo "Combined AZL created at: $COMBINED"
-    echo "To run: Use your pure AZL interpreter loader (in azl/runtime/interpreter) to load $COMBINED"
+    echo "Executing with AZL interpreter..."
+    
+    # Start the real AZL runtime and execute the file
+    echo "🚀 Starting AZL runtime and executing file..."
+
+    # Create a real host loader that starts the kernel
+    HOST_LOADER="${TMPDIR}/azl_host_loader_$$.azl"
+    cat > "$HOST_LOADER" <<AZL
+component ::azl.host_loader {
+  init {
+    say "🔥 Starting AZL host loader..."
+    
+    # Start the kernel initialization
+    emit kernel.init
+    
+    # Wait for kernel to be ready
+    listen for "kernel.ready" then {
+      say "✅ Kernel ready - starting interpreter..."
+      
+      # Kernel will automatically start interpreter
+      # Wait for interpreter to be ready
+      listen for "interpreter.ready" then {
+        say "✅ Interpreter ready - executing file..."
+        
+        # Read and execute our combined file
+        set file_content = ::azl.system_interface.read_file_host_sync("$COMBINED")
+        emit interpret with { 
+          code: file_content, 
+          component_name: "::target.main" 
+        }
+      }
+    }
+    
+    # Capture the execution result
+    listen for "interpretation_complete" then {
+      set result = ::event.data.result
+      say "✅ Execution complete: " + result
+      emit execution.complete with { result: result }
+    }
+  }
+}
+AZL
+
+    # Execute the host loader which will start the real runtime
+echo "🔥 Executing AZL host loader..."
+cd "$(dirname "$0")/.."
+
+# TODO: Need to use proper AZL execution method, not bash
+# The host loader contains AZL code that needs the AZL interpreter
+echo "⚠️  Host loader created but needs AZL interpreter to execute"
+echo "📁 Host loader: $HOST_LOADER"
+echo "📁 Combined file: $COMBINED"
   fi

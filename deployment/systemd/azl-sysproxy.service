@@ -11,8 +11,25 @@ WorkingDirectory=/home/abdulrahman-alzalameh/azl-language
 EnvironmentFile=-/etc/default/azl
 ExecStartPre=/bin/bash -lc 'mkdir -p .azl'
 ExecStart=/bin/bash -lc 'SYSPROXY_TCP=${SYSPROXY_TCP:-127.0.0.1:9099} /usr/local/bin/azl-sysproxy 1>.azl/sysproxy.out 2>.azl/sysproxy.log'
-Restart=on-failure
-RestartSec=2s
+Restart=always
+RestartSec=1s
+LimitNOFILE=8192
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+LockPersonality=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+UMask=0077
+TimeoutStopSec=10s
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target

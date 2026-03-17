@@ -1,0 +1,36 @@
+# AZL Quantum Superposition - manages amplitude state ψ and invariants
+
+component ::quantum.superposition {
+  init {
+    set ::psi = []           # amplitude state (engine-owned buffers)
+    set ::entropy = 0.0
+    set ::norm2 = 0.0
+    set ::max_concentration = 0.0
+    set ::last_snapshot = {}
+    say "🌊 Quantum Superposition ready"
+  }
+
+  behavior {
+    listen for "thought.cycle.start" {
+      set ::cycle = ($1 or 0)
+    }
+
+    # Update invariants from kernel metrics
+    listen for "quantum.metrics" {
+      let m = ::event.data or {}
+      set ::entropy = (m.entropy or ::entropy)
+      set ::norm2 = (m.norm2 or ::norm2)
+      set ::max_concentration = (m.max_concentration or ::max_concentration)
+      # Guard invariants
+      if (::norm2 <= 0.0 or ::norm2 > 1.0e12) { emit quantum.logic.violation with { reason: "norm_out_of_bounds", norm2: ::norm2 } }
+    }
+
+    # Snapshot for forensics
+    listen for "thought.snapshot" {
+      set ::last_snapshot = { entropy: ::entropy, norm2: ::norm2, max_concentration: ::max_concentration, tick: now() }
+      emit "thought.snapshot.ready" with ::last_snapshot
+    }
+  }
+}
+
+

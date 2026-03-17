@@ -62,6 +62,24 @@ component ::nlp.real_training {
   }
 
   behavior {
+    # Wire ABA/quantum/consciousness into the real training path for completeness
+    listen for "start_quantum_training" {
+      let training_data = ::event.data
+      say "⚛️ Starting quantum-enhanced training (advanced wiring)"
+      link ::nlp.advanced_training
+      emit "start_advanced_training" to ::nlp.advanced_training with {
+        training_data: {
+          conversations: training_data or [],
+          reinforcement_history: [],
+          quantum_states: [],
+          neural_weights: {},
+          consciousness_patterns: [],
+          memory_consolidations: []
+        },
+        mode: "supervised",
+        config: { quantum_enhanced: true, aba_reinforcement: true, consciousness_integration: true }
+      }
+    }
     # Initialize real dataset training
     listen for "init_real_training" {
       say "🎯 Initializing real NLP training with HuggingFace datasets"

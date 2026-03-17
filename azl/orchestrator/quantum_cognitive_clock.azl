@@ -1,0 +1,26 @@
+# Quantum Cognitive Clock - schedules phase/mix/measure cycles
+
+component ::orchestrator.quantum_cognitive_clock {
+  init {
+    set ::tick_ms = 200
+    set ::running = false
+    say "⏱️ Quantum Cognitive Clock ready (tick=" + ::tick_ms + "ms)"
+  }
+
+  behavior {
+    listen for "thought.cycle.start" { set ::running = true }
+    listen for "thought.cycle.stop" { set ::running = false }
+
+    # Periodic cycle trigger (coarse-grained simulated timer)
+    listen for "orchestrator.quantum.tick" {
+      if !::running { return }
+      # Pull constraints
+      link ::quantum.constraints
+      set c = ::quantum.constraints.get_constraints()
+      emit "quantum.phase.apply" to ::quantum.phase_field with { gamma: 0.2, constraints: c }
+      # Measurement check is driven by telemetry endpoint; we keep clock minimal
+    }
+  }
+}
+
+

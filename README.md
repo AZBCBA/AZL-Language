@@ -1,6 +1,23 @@
+## One-command run (full AZME on AZL)
+
+```
+export AZL_STRICT=1 AZL_LOG_LEVEL=debug AZL_DAEMON=1
+./scripts/run_full.sh
+python3 azl_runner.py $(tail -n1 /tmp/azl_run_build_*.out 2>/dev/null | awk -F': ' '/Prepared:/ {print $2}' || true)
+```
+
+Or run and copy the Prepared path printed by `run_full.sh`:
+
+```
+./scripts/run_full.sh
+python3 azl_runner.py /tmp/azl_full_XXXX.azl.run
+```
+
+The driver emits `azl.begin` and `system.boot`; all phases advance automatically until ready.
+
 # AZL Language
 
-Unified, component-based, event-driven programming language running in pure AZL.
+**AZL** is a unified, component-based, event-driven programming language. It has its own syntax, grammar, and rules — **this is AZL, not Java, not TypeScript.** The runtime runs in pure AZL with a Python host; see [docs/language/AZL_LANGUAGE_RULES.md](docs/language/AZL_LANGUAGE_RULES.md) and [docs/language/AZL_CURRENT_SPECIFICATION.md](docs/language/AZL_CURRENT_SPECIFICATION.md).
 
 ## Getting Started
 - JS dev harness:
@@ -12,6 +29,17 @@ Unified, component-based, event-driven programming language running in pure AZL.
   - `AZL_REQUIRE_API_TOKEN=true AZL_API_TOKEN=your-token bash scripts/test_sysproxy_setup.sh`
 
 See OPERATIONS.md for the full runbook.
+
+## Installation (clone and run)
+
+```bash
+git clone https://github.com/AZBCBA/AZL-Language.git
+cd AZL-Language
+# Python 3.8+ required; optional: pip install -r requirements.txt for extra scripts
+python3 azl_runner.py path/to/your.azl
+```
+
+Or run the CLI: `./scripts/azl run path/to/your.azl`. Optional: Node for the JS harness. See [OPERATIONS.md](OPERATIONS.md) for the full runbook and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) to contribute.
 
 ## CI
 - `ci.yml`: placeholder/v2 guards, smoke tests, perf smoke, full tests
@@ -225,26 +253,33 @@ File and directory operations:
 
 Use AZL components to assert behavior via emitted events and stdlib operations. A pure-AZL test harness is under `azl/testing`.
 
-## 📁 Project Structure (pure AZL)
+## 📁 Project Structure (pure AZL + Python host)
 
 ```
 azl-language/
+├── azl_runner.py              # Main entry: Python host for .azl execution
 ├── azl/
-│   ├── runtime/
-│   │   └── interpreter/azl_interpreter.azl
+│   ├── core/
+│   │   ├── parser/azl_parser.azl   # Grammar & parser (written in AZL)
+│   │   ├── compiler/              # Compiler pipeline
+│   │   └── error_system.azl
+│   ├── runtime/interpreter/azl_interpreter.azl
 │   ├── system/azl_system_interface.azl
 │   ├── stdlib/core/azl_stdlib.azl
-│   └── backend/asm/assembler.azl
+│   └── docs/                     # AZL-specific docs
 ├── docs/
-│   ├── STATUS.md
+│   ├── language/
+│   │   ├── AZL_CURRENT_SPECIFICATION.md   # Current syntax & behavior
+│   │   ├── AZL_LANGUAGE_RULES.md          # AZL identity & rules
+│   │   └── GRAMMAR.md                     # Grammar reference
 │   ├── ARCHITECTURE_OVERVIEW.md
 │   ├── STRICT_MODE_AND_FEATURE_FLAGS.md
 │   ├── stdlib.md
 │   └── VIRTUAL_OS_API.md
 ├── scripts/
-│   └── azl
-└── azl/testing/
-    └── integration/... (pure AZL tests)
+│   ├── azl                      # CLI: scripts/azl run <file.azl>
+│   └── run_combined_azl.py       # Combined compiler + interpreter run
+└── azl/testing/                 # Pure AZL tests
 ```
 
 ## 🛠️ Development
@@ -255,11 +290,12 @@ See `build_azl.azl` for the virtual build pipeline using the system interface’
 
 ### Contributing
 
+AZL is its own language; follow [docs/language/AZL_LANGUAGE_RULES.md](docs/language/AZL_LANGUAGE_RULES.md) and the [Contributing guide](docs/CONTRIBUTING.md). Summary:
+
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Make changes; update `docs/` when changing behavior
+4. Push and open a Pull Request
 
 ### Code Style
 
@@ -279,8 +315,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/your-username/azl-language/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-username/azl-language/discussions)
+- **Issues**: [GitHub Issues](https://github.com/AZBCBA/AZL-Language/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/AZBCBA/AZL-Language/discussions)
 - **Documentation**: [docs/](docs/)
 
 ---

@@ -1,0 +1,271 @@
+# Parallel Training Orchestrator (multi-GPU, load-balanced)
+component ::orchestrator.parallel_training {
+  init {
+    set ::status = { state: "idle", started_at: 0, completed_at: 0 }
+    set ::config = { num_gpus: 1, batch_size: 8, device: "cpu", gpu_limit: 0, scheduler: "least_latency", max_in_flight_per_gpu: 1 }
+    set ::gpus = []            # [{ id, assigned, completed, last_latency_ms }]
+    set ::batches = []         # [ [sample...] ]
+    set ::next_batch_idx = 0
+    set ::in_flight = 0
+    set ::total_batches = 0
+    set ::aggregated = { total_steps: 0, total_loss: 0.0 }
+    set ::per_device = {}      # gpu_id -> { steps, total_loss, avg_latency_ms }
+    set ::adaptive = { cap_min: 1, cap_max: max(1, parseInt((::internal.env("AZL_CAP_MAX") or "4"))), latency_low_ms: parseInt((::internal.env("AZL_LAT_LOW_MS") or "50")), latency_high_ms: parseInt((::internal.env("AZL_LAT_HIGH_MS") or "500")) }
+    link ::metrics.training
+    link ::error.system
+    link ::neural.core
+    link ::orchestrator.training_worker_pool
+    set ::items_total = 0
+    set ::items_done = 0
+  }
+
+  behavior {
+    listen for "training.parallel.configure" then {
+      set cfg = $1 or {}
+      for k in cfg { set ::config[k] = cfg[k] }
+      say "🧩 Parallel training configured: "
+      say ::to_json(::config)
+    }
+
+    # Entry point: start parallel training across GPUs
+    listen for "training.parallel.start" then {
+      set payload = $1 or {}
+      set data = payload.data or []
+      set mode = payload.mode or "supervised"
+      set cfg = payload.config or {}
+      for k in cfg { set ::config[k] = cfg[k] }
+
+      # Safety: require cuda and >1 GPUs, else reject (strict policy)
+      if (::config.device != "cuda" or parseInt(::config.num_gpus or 1) <= 1) {
+        emit log_error with { type: "parallel_disabled", message: "parallel_requires_cuda_and_num_gpus>1", context: { device: ::config.device, num_gpus: ::config.num_gpus } }
+        set ::status = { state: "error", reason: "parallel_requires_cuda_and_num_gpus>1" }
+        return
+      }
+
+      # Initialize GPU set
+      set n = parseInt((::config.num_gpus or (::internal.env("AZL_GPU_COUNT") or "1")))
+      if n < 1 { set n = 1 }
+      set ::gpus = []
+      set i = 0
+      while i < n {
+        set ::gpus.push({ id: i, assigned: 0, completed: 0, last_latency_ms: 0.0 })
+        set ::per_device["gpu:" + i] = { steps: 0, total_loss: 0.0, avg_latency_ms: 0.0 }
+        set i = i + 1
+      }
+
+      # Build batches with micro-batch per GPU awareness
+      set global_bs = parseInt((::config.batch_size or 8))
+      set ng = max(1, parseInt((::config.num_gpus or 1)))
+      set bs = max(1, int(ceil(global_bs / ng)))
+      set lines = (data.conversations != null ? data.conversations : data)
+      if lines == null { set lines = [] }
+      set ::batches = []
+      set ::next_batch_idx = 0
+      set idx = 0
+      set total_items_local = 0
+      while idx < len(lines) {
+        set end = min(idx + bs, len(lines))
+        set batch = []
+        set j = idx
+        while j < end { set batch.push(lines[j]); set j = j + 1 }
+        if len(batch) > 0 { set ::batches.push(batch) }
+        set total_items_local = total_items_local + len(batch)
+        set idx = end
+      }
+      set ::total_batches = len(::batches)
+      emit metrics.training.set_total_items with { total_items: (::total_batches or 0) }
+      set ::items_total = total_items_local
+      set ::items_done = 0
+      set ::in_flight = 0
+      set ::aggregated = { total_steps: 0, total_loss: 0.0 }
+      set ::status = { state: "running", started_at: ::now(), completed_at: 0, scheduler: (::config.scheduler or "least_latency"), cap: parseInt((::config.max_in_flight_per_gpu or 1)), total_batches: ::total_batches, in_flight: 0, items_total: ::items_total, items_done: 0 }
+      emit metrics.training.begin
+      # Surface per-device metrics map for API consumers
+      emit metrics.training.set_per_device with { per_device: ::per_device }
+      # Configure device policy with requested GPU count for visibility
+      emit "neural.core.configure_device" to ::neural.core with { device: ::config.device, gpu_limit: (::config.gpu_limit or 0), num_gpus: n }
+
+      # Prime initial assignments
+      ::schedule_assignments()
+    }
+
+    listen for "training.parallel.worker_done" then {
+      set res = $1 or {}
+      set gpu_id = res.gpu_id
+      set loss = parseFloat((res.avg_loss or 0.0))
+      set latency = parseFloat((res.latency_ms or 0.0))
+      set steps = parseInt((res.steps or 0))
+
+      # Update device state and metrics
+      loop for g in ::gpus { if g.id == gpu_id { set g.completed = g.completed + 1; set g.last_latency_ms = latency } }
+      set key = ("gpu:" + gpu_id)
+      set d = ::per_device[key]
+      if d == null { set d = { steps: 0, total_loss: 0.0, avg_latency_ms: 0.0 } }
+      set d.steps = d.steps + steps
+      set d.total_loss = d.total_loss + (loss * max(1, steps))
+      if d.avg_latency_ms == 0.0 { set d.avg_latency_ms = latency } else { set d.avg_latency_ms = (0.8 * d.avg_latency_ms) + (0.2 * latency) }
+      # per-device instantaneous throughput (steps/sec) and EMA
+      set inst_tps = (latency > 0 ? (steps * 1000.0 / latency) : 0.0)
+      if d.avg_throughput_sps == null { set d.avg_throughput_sps = inst_tps } else { set d.avg_throughput_sps = (0.7 * d.avg_throughput_sps) + (0.3 * inst_tps) }
+      set ::per_device[key] = d
+
+      # Update global metrics
+      set ::aggregated.total_steps = ::aggregated.total_steps + steps
+      set ::aggregated.total_loss = ::aggregated.total_loss + (loss * max(1, steps))
+      set ::items_done = ::items_done + steps
+      emit training_step_completed
+      emit metrics.training.device_step_completed with { gpu_id: gpu_id, steps: steps, avg_loss: loss, latency_ms: latency }
+
+      set ::in_flight = max(0, ::in_flight - 1)
+
+      # Dynamic scheduler switch based on imbalance (simple heuristic)
+      set cv = ::compute_imbalance_cv(::per_device)
+      set limit = (parseFloat((::config.imbalance_cv_limit or 0.25)))
+      if cv > limit { set ::config.scheduler = "round_robin" } else { set ::config.scheduler = "least_latency" }
+      set ::status.scheduler = ::config.scheduler
+
+      # Adaptive cap tuning based on latency
+      set cap = parseInt((::config.max_in_flight_per_gpu or 1))
+      set low = (::adaptive.latency_low_ms or 50)
+      set high = (::adaptive.latency_high_ms or 500)
+      if latency > 0 {
+        if latency < low and cap < (::adaptive.cap_max or 4) { set ::config.max_in_flight_per_gpu = cap + 1 }
+        if latency > high and cap > (::adaptive.cap_min or 1) { set ::config.max_in_flight_per_gpu = cap - 1 }
+      }
+
+      ::schedule_assignments()
+    }
+  }
+
+  memory {
+    ::select_next_gpu = () => {
+      # Respect per-GPU inflight cap
+      set cap = parseInt((::config.max_in_flight_per_gpu or 1))
+      set policy = (::config.scheduler or "least_latency")
+      set candidate_id = -1
+      if policy == "round_robin" {
+        # pick first idle with inflight < cap
+        loop for g in ::gpus {
+          set inflight = max(0, (g.assigned or 0) - (g.completed or 0))
+          if inflight < cap { return g.id }
+        }
+        return -1
+      }
+      # least_latency policy
+      set best_latency = 1e15
+      loop for g in ::gpus {
+        set inflight = max(0, (g.assigned or 0) - (g.completed or 0))
+        if inflight < cap {
+          if g.last_latency_ms < best_latency { set best_latency = g.last_latency_ms; set candidate_id = g.id }
+        }
+      }
+      return candidate_id
+    }
+
+    ::schedule_assignments = () => {
+      # Assign while capacity and batches remain
+      while (::next_batch_idx < ::total_batches) {
+        set gpu_id = ::select_next_gpu()
+        if gpu_id < 0 { break }
+        set batch = ::batches[::next_batch_idx]
+        set ::next_batch_idx = ::next_batch_idx + 1
+        # Mark busy
+        loop for g in ::gpus { if g.id == gpu_id { set g.assigned = g.assigned + 1 } }
+        set ::in_flight = ::in_flight + 1
+        set ::status.in_flight = ::in_flight
+        # Dispatch batch to in-process worker or external process pool depending on policy
+        if (::config.dispatch == "process") {
+          emit training.worker.submit to ::orchestrator.training_worker_pool with { gpu_id: gpu_id, batch: batch, config: ::config }
+        } else {
+          link ::orchestrator.training_gpu_worker
+          emit run_batch to ::orchestrator.training_gpu_worker with {
+            gpu_id: gpu_id,
+            batch: batch,
+            mode: (::config.mode or "supervised"),
+            config: ::config
+          }
+        }
+      }
+      # Completion check
+      if (::next_batch_idx >= ::total_batches and ::in_flight == 0 and ::status.state == "running") {
+        set total_steps = max(1, ::aggregated.total_steps)
+        set avg_loss = (::aggregated.total_loss / total_steps)
+        set ::status = { state: "complete", started_at: ::status.started_at, completed_at: ::now(), avg_loss: avg_loss, items_total: ::items_total, items_done: ::items_done, scheduler: (::config.scheduler or "least_latency"), per_device: ::per_device }
+        emit advanced_training_complete with { parallel: true, avg_loss: avg_loss, total_steps: total_steps, per_device: ::per_device }
+      }
+    }
+
+    ::compute_imbalance_cv = (per_device) => {
+      set keys = []
+      for k in per_device { if k != null { set keys.push(k) } }
+      if keys.length == 0 { return 0.0 }
+      set vals = []
+      for k in keys { set d = per_device[k]; set vals.push(d.steps or 0) }
+      set mean = 0.0; for v in vals { set mean = mean + v }; set mean = mean / max(1, vals.length)
+      if mean == 0 { return 0.0 }
+      set ss = 0.0; for v in vals { set ss = ss + ((v - mean) * (v - mean)) }
+      set var = ss / vals.length
+      set std = sqrt(var)
+      return (std / mean)
+    }
+  }
+}
+
+# GPU training worker (per-batch)
+component ::orchestrator.training_gpu_worker {
+  init {
+    link ::error.system
+  }
+  behavior {
+    listen for "run_batch" then {
+      set payload = $1 or {}
+      set gpu_id = payload.gpu_id or 0
+      set batch = payload.batch or []
+      set cfg = payload.config or {}
+      set t0 = ::now()
+      emit training_step_started
+      # Lightweight CPU-safe kernel that mirrors the advanced training math path
+      set processed = ::preprocess_batch(batch)
+      set res = ::train_batch(processed)
+      set t1 = ::now()
+      set latency = (t1 - t0)
+      emit training.parallel.worker_done with { gpu_id: gpu_id, steps: (res.steps or len(batch)), avg_loss: (res.avg_loss or 0.0), latency_ms: latency }
+    }
+  }
+  memory {
+    function preprocess_batch(lines) {
+      set out = []
+      loop for s in (lines or []) {
+        if s == null { continue }
+        set len = s.length
+        # approximate token count by spaces+1
+        set tokens = 1; set j = 0; while j < len { if s[j] == " " { set tokens = tokens + 1 } set j = j + 1 }
+        set vowels = 0; set i = 0; while i < len { set c = s[i].toLowerCase(); if (c == "a" || c == "e" || c == "i" || c == "o" || c == "u") { set vowels = vowels + 1 } set i = i + 1 }
+        set vr = (vowels / max(1, len))
+        set topo = (len % 7)
+        set geom = (len % 5)
+        # difficulty similar to advanced system
+        set difficulty = (0.45 * tokens) + (0.25 * (1.0 - vr)) + (0.2 * (1.0 - (len / max(1, len)))) + (0.05 * topo) + (0.05 * geom)
+        set out.push({ tokens: tokens, difficulty: difficulty, topo: topo, geom: geom })
+      }
+      return out
+    }
+    function train_batch(items) {
+      set sum = 0.0
+      set i = 0
+      loop for n in (items or []) {
+        set x = [ n.tokens or 1, n.difficulty or 1.0, (n.topo or 0), (n.geom or 0) ]
+        # forward-like calc (square sum) and scaled loss like advanced_training
+        set k = 0; set l = 0.0; while k < len(x) { set l = l + (x[k] * x[k]); set k = k + 1 }
+        set scale = 1.0 + ((n.topo or 0) * 0.01) + ((n.geom or 0) * 0.01)
+        set l = l * scale
+        set sum = sum + l
+        set i = i + 1
+      }
+      set steps = max(1, i)
+      return { steps: steps, avg_loss: (sum / steps) }
+    }
+  }
+}
+
+

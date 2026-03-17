@@ -1,0 +1,44 @@
+# AZME Training Extension Manager
+component ::azme.training_extension_manager {
+  init {
+    set ::training_plugins = []         # list of plugin_ids
+    set ::hook_results_buffer = []
+    emit azme.training_extensions.ready with { count: 0 }
+  }
+
+  behavior {
+    # Register a plugin id (manifest must be registered in plugin_registry separately)
+    on register_training_plugin {
+      set ::pid = $1.id
+      if ::pid == null { emit log_error with { type: "PluginNotFound", message: "missing id" }; return }
+      if ::training_plugins.includes(::pid) != true { set ::training_plugins = ::training_plugins.push(::pid) }
+      emit azme.training_extensions.updated with { count: ::training_plugins.length, plugins: ::training_plugins }
+    }
+
+    # List registered training plugins
+    on list_training_plugins {
+      emit azme.training_extensions.list with { plugins: ::training_plugins }
+    }
+
+    # Invoke a hook across all registered training plugins
+    on invoke_training_hook {
+      set ::hook = $1.hook
+      set ::ctx = $1.context
+      set ::results = []
+      for ::pid in ::training_plugins {
+        emit execute_plugin_action to ::azme.plugin_host with { id: ::pid, action: ("training." + ::hook), payload: ::ctx }
+      }
+      # Collect completions opportunistically within this tick
+      listen for "azme.plugins.action_completed" then {
+        set ::ac = ::event.data
+        if ::ac && ::ac.id && ::training_plugins.includes(::ac.id) && ::ac.action && ::ac.action.starts_with("training.") {
+          set ::results = ::results.push({ plugin_id: ::ac.id, action: ::ac.action, result: ::ac.result })
+        }
+      }
+      # Emit aggregated result (best-effort)
+      emit azme.training_hook_completed with { hook: ::hook, results: ::results }
+    }
+  }
+}
+
+

@@ -131,7 +131,7 @@ component ::stdlib.mini {
     return obj
   }
 
-  # time: simple monotonic-ish fallback using sleeps (no external deps)
+  # time: monotonic counter (pure AZL, explicit)
   var tick_ms = 0
   fn time_now_ms() {
     # best-effort: returns growing integer; if you have a real clock, replace this.
@@ -159,6 +159,7 @@ component ::azl.system_interface {
     # Initialize platform-specific system calls
     init_syscalls()
     
+    link ::azl.security
     say "✅ SYSTEM INTERFACE READY - VIRTUAL OS MODE!"
     # Initialize virtual stores
     set ::fs_store = {}
@@ -171,6 +172,10 @@ component ::azl.system_interface {
     set ::memory_next_addr = 4096
     set ::next_socket_id = 3
     set ::env = {}
+    # Host file cache (LRU)
+    set ::host_file_cache = {}           # path -> { content, mtime, size }
+    set ::host_file_order = []           # maintain recency
+    set ::host_file_cap = ((::internal.env("AZL_FILE_CACHE") || "64").toInt())
     emit system_interface.ready with "virtual_os_ready"
     
     # After system interface is initialized - boot ping to test sysproxy communication
@@ -186,21 +191,26 @@ component ::azl.system_interface {
       set rid = (::event.data.request_id || ("req-" + ::time_now([])))
 
       if t == "read_file" {
+        if ::azl.security && ::azl.security.require("fs.read") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
         set content = direct_read_file(a.path)
         emit syscall.response with { request_id: rid, type: t, path: a.path, content: content }
       } else if t == "write_file" {
+        if ::azl.security && ::azl.security.require("fs.write") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
         set ok = direct_write_file(a.path, (a.content || ""))
         emit syscall.response with { request_id: rid, type: t, path: a.path, success: ok }
       } else if t == "list_dir" {
+        if ::azl.security && ::azl.security.require("fs.read") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
         # simple prefix-based listing in virtual FS
         set path = a.path || "/"
         set entries = []
         for k in ::fs_store { if k != null && k.starts_with(path) && ::fs_store[k] != null { entries.push(k) } }
         emit syscall.response with { request_id: rid, type: t, path: path, entries: entries }
       } else if t == "file_exists" {
+        if ::azl.security && ::azl.security.require("fs.read") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
         set exists = ( ::fs_store[a.path] != null )
         emit syscall.response with { request_id: rid, type: t, path: a.path, exists: exists }
       } else if t == "delete_file" {
+        if ::azl.security && ::azl.security.require("fs.write") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
         set ::fs_store[a.path] = null
         set ::fs_meta[a.path] = null
         emit syscall.response with { request_id: rid, type: t, path: a.path, success: true }
@@ -211,29 +221,35 @@ component ::azl.system_interface {
         set ok2 = direct_free_memory(a.address, (a.size || 0))
         emit syscall.response with { request_id: rid, type: t, address: a.address, success: ok2 }
       } else if t == "read_binary_file" {
+        if ::azl.security && ::azl.security.require("fs.read") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
         # return raw bytes array or null
         set content_b = ::fs_store[a.path]
         emit syscall.response with { request_id: rid, type: t, path: a.path, binary_data: content_b }
       } else if t == "write_binary_file" {
+        if ::azl.security && ::azl.security.require("fs.write") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
         set data = a.data || []
         set ::fs_store[a.path] = data
         set ::fs_meta[a.path] = { size: data.length || 0, modified: ::time_now([]), mode: (a.mode || "0644") }
         emit syscall.response with { request_id: rid, type: t, path: a.path, success: true }
       } else if t == "create_directory" {
+        if ::azl.security && ::azl.security.require("fs.write") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
         # no real directories; emulate by meta marker
         set ::fs_meta[a.path] = { dir: true, modified: ::time_now([]), mode: (a.mode || "0755") }
         emit syscall.response with { request_id: rid, type: t, path: a.path, success: true }
       } else if t == "delete_directory" {
+        if ::azl.security && ::azl.security.require("fs.write") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
         # remove all keys with prefix
         for k in ::fs_store { if k != null && k.starts_with(a.path) { ::fs_store[k] = null } }
         for m in ::fs_meta { if m != null && m.starts_with(a.path) { ::fs_meta[m] = null } }
         emit syscall.response with { request_id: rid, type: t, path: a.path, success: true }
       } else if t == "chmod" {
+        if ::azl.security && ::azl.security.require("fs.write") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
         set meta = ::fs_meta[a.path] || {}
         set meta.mode = a.mode || meta.mode || "0644"
         set ::fs_meta[a.path] = meta
         emit syscall.response with { request_id: rid, type: t, path: a.path, success: true }
       } else if t == "http" {
+        if ::azl.security && ::azl.security.require("net.http") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
         set url = a.url || ""
         set method = (a.method || "GET").to_upper()
         if method == "GET" {
@@ -249,13 +265,62 @@ component ::azl.system_interface {
           emit syscall.response with { request_id: rid, type: t, status: 405, error: "METHOD_NOT_ALLOWED" }
         }
       } else if t == "exec" {
+        if ::azl.security && ::azl.security.require("proc.spawn") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
         set pid = direct_spawn_process(a.command || "", (a.args || []))
         emit syscall.response with { request_id: rid, type: t, pid: pid, exit_code: 0 }
       } else if t == "console.write" {
+        if ::azl.security && ::azl.security.require("console.write") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
         set stream = a.stream || "stdout"
         set text = a.text || ""
         direct_console_write(text, stream)
         emit syscall.response with { request_id: rid, type: t, success: true }
+      } else if t == "net.socket" {
+        if ::azl.security && ::azl.security.require("net.socket") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
+        # Create a socket (tcp/udp)
+        set ty = (a.type || "tcp")
+        set fd = direct_create_socket(ty)
+        emit syscall.response with { request_id: rid, type: t, ok: (fd >= 0), socket: fd }
+      } else if t == "socket.bind" {
+        if ::azl.security && ::azl.security.require("net.socket") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
+        # Bind a socket via sysproxy bridge
+        set host = a.host || "0.0.0.0"
+        set port = (a.port || 8080)
+        set r = direct_bind_socket(host, port)
+        emit syscall.response with { request_id: rid, type: t, ok: (r.ok == true), socket: (r.socket || -1), host: host, port: port }
+      } else if t == "socket.listen" {
+        if ::azl.security && ::azl.security.require("net.socket") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
+        set sock = a.socket
+        set backlog = (a.backlog || 128)
+        set ok = direct_listen(sock, backlog)
+        emit syscall.response with { request_id: rid, type: t, ok: ok, socket: sock }
+      } else if t == "net.accept" {
+        if ::azl.security && ::azl.security.require("net.socket") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
+        set sfd = a.socket
+        set conn = direct_accept(sfd)
+        emit syscall.response with { request_id: rid, type: t, ok: (conn >= 0), conn: conn }
+      } else if t == "net.read" {
+        if ::azl.security && ::azl.security.require("net.socket") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
+        set conn = a.conn
+        set max = (a.max || 65536)
+        set buf = direct_read(conn, max)
+        if (buf == null) {
+          emit syscall.response with { request_id: rid, type: t, ok: false }
+        } else {
+          # normalize to textual payload when possible
+          if (buf.ptr != null) { emit syscall.response with { request_id: rid, type: t, ok: true, ptr: buf.ptr, len: buf.len } }
+          else { emit syscall.response with { request_id: rid, type: t, ok: true, bytes: buf, data: buf, text: buf } }
+        }
+      } else if t == "net.write" {
+        if ::azl.security && ::azl.security.require("net.socket") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
+        set conn = a.conn
+        set data = a.bytes || a.data || ""
+        set n = direct_write(conn, data)
+        emit syscall.response with { request_id: rid, type: t, ok: (n >= 0), written: (n || 0) }
+      } else if t == "net.close" {
+        if ::azl.security && ::azl.security.require("net.socket") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
+        set conn = a.conn
+        set ok = direct_close(conn)
+        emit syscall.response with { request_id: rid, type: t, ok: ok }
       } else {
         emit syscall.response with { request_id: rid, type: t, error: "unknown_syscall" }
       }
@@ -972,19 +1037,36 @@ component ::azl.system_interface {
   }
   # Direct host file read (bypasses in-memory fs when available)
   export fn read_file_host_sync(path) {
-    if ::platform == "linux" { return linux_read_file(path) }
-    if ::platform == "macos" { return direct_read_file(path) }
-    if ::platform == "windows" { return direct_read_file(path) }
-    return direct_read_file(path)
+    # LRU check using modified time when available
+    set mt = direct_modified_time(path)
+    set ent = ::host_file_cache[path]
+    if ent != null {
+      if (mt != null && ent.mtime == mt) {
+        ::touch_host_file_lru(path)
+        return ent.content
+      }
+    }
+    # Read fresh from host
+    set content = ( (::platform == "linux") ? linux_read_file(path) : direct_read_file(path) )
+    if content == null { return content }
+    set size = (content.length || 0)
+    set rec = { content: content, mtime: (mt || direct_modified_time(path) || 0), size: size }
+    ::insert_host_file_lru(path, rec)
+    return content
   }
   export fn write_file_sync(path, content) {
     return direct_write_file(path, content)
   }
   export fn write_file_host_sync(path, content) {
-    if ::platform == "linux" { return linux_write_file(path, content) }
-    if ::platform == "macos" { return direct_write_file(path, content) }
-    if ::platform == "windows" { return direct_write_file(path, content) }
-    return direct_write_file(path, content)
+    set ok = ( (::platform == "linux") ? linux_write_file(path, content) : direct_write_file(path, content) )
+    if ok {
+      # Update cache entry on successful write
+      set mt2 = direct_modified_time(path)
+      set rec2 = { content: content, mtime: (mt2 || 0), size: (content.length || 0) }
+      ::insert_host_file_lru(path, rec2)
+      return true
+    }
+    return false
   }
   export fn file_exists_sync(path) {
     return file_exists(path)
@@ -995,8 +1077,42 @@ component ::azl.system_interface {
     for k in ::fs_store { if k != null && k.starts_with(path) && ::fs_store[k] != null { entries.push(k) } }
     return entries
   }
+  
+  # --- Host file cache LRU helpers ---
+  fn touch_host_file_lru(path) {
+    # move path to end (most recent)
+    set i = 0
+    while i < ::host_file_order.length {
+      if ::host_file_order[i] == path { break }
+      set i = i + 1
+    }
+    if i < ::host_file_order.length {
+      # remove
+      set newo = []
+      set j = 0
+      while j < ::host_file_order.length { if j != i { set newo.push(::host_file_order[j]) } ; set j = j + 1 }
+      set ::host_file_order = newo
+    }
+    set ::host_file_order.push(path)
+  }
+  
+  fn insert_host_file_lru(path, rec) {
+    set ::host_file_cache[path] = rec
+    ::touch_host_file_lru(path)
+    # Evict if over capacity
+    while (::host_file_order.length > ::host_file_cap) {
+      set victim = ::host_file_order[0]
+      # pop front
+      set newo2 = []
+      set k = 1
+      while k < ::host_file_order.length { set newo2.push(::host_file_order[k]); set k = k + 1 }
+      set ::host_file_order = newo2
+      set ::host_file_cache[victim] = null
+    }
+  }
   export fn create_directory_sync(path) {
-    # Virtual directory create (no-op in in-memory fs)
+    # Virtual directory create: mark in meta map
+    set ::fs_meta[path] = { dir: true, modified: ::time_now([]), mode: "0755" }
     return true
   }
   export fn delete_directory_sync(path) {
@@ -1075,7 +1191,7 @@ component ::azl.system_interface {
   # Memory write primitive - write one byte to memory address
   fn raw_mem_write8(addr, v) {
     # Use a simple approach: create a 1-byte buffer and write it to a temporary file
-    # then read it back to simulate memory write
+    # then read it back to verify memory write
     set temp_file = "/tmp/azl_mem_" + addr.toString()
     set byte_str = String.fromCharCode(v & 0xFF)
     
@@ -1151,7 +1267,10 @@ component ::azl.system_interface {
       sleep 0.01
       ::stdlib.mini.time_advance_ms(10)
       set ticks = ticks + 1
-      if (ticks >= 300) { return { ok:false, errno:110, msg:"sysproxy timeout", id:id } }
+      if (ticks >= 300) {
+        emit log_error with { type: "sysproxy_timeout", message: "sysproxy_call timeout", context: { op: op, id: id, args: args } }
+        return { ok:false, errno:110, msg:"sysproxy timeout", id:id }
+      }
     }
   }
 
@@ -1159,10 +1278,21 @@ component ::azl.system_interface {
 
   fn direct_bind_socket(host, port) {
     say "net.bind: host=" + host + " port=" + port.toString()
-    set r = sysproxy_call("listen", { host: host, port: port, backlog: 128 })
-    say "net.bind: rc=" + ((r.ok==true) ? "0" : ("-1 errno=" + (r.errno || -1).toString()))
-    if (r.ok != true) { return { ok:false } }
-    return { ok:true, socket: r.fd }
+    # Retry/backoff to tolerate transient control readiness
+    set attempt = 0
+    set last_err = -1
+    loop {
+      set r = sysproxy_call("listen", { host: host, port: port, backlog: 128 })
+      say "net.bind: attempt=" + attempt.toString() + " rc=" + ((r.ok==true) ? "0" : ("-1 errno=" + (r.errno || -1).toString()))
+      if (r.ok == true) { return { ok:true, socket: (r.fd || r.lfd || r.listenfd || -1) } }
+      set last_err = (r.errno || -1)
+      if (attempt >= 10) { break }
+      sleep 0.1
+      ::stdlib.mini.time_advance_ms(100)
+      set attempt = attempt + 1
+    }
+    emit log_error with { type: "sysproxy_error", message: "listen failed", context: { op: "listen", host: host, port: port, errno: last_err } }
+    return { ok:false }
   }
 
   fn direct_listen(fd, backlog) {
@@ -1174,29 +1304,39 @@ component ::azl.system_interface {
   fn direct_accept(fd) {
     set r = sysproxy_call("accept", { fd: fd })
     say "net.accept: fd=" + fd.toString() + " rc=" + ((r.ok==true) ? "0" : ("-1 errno=" + (r.errno || -1).toString()))
-    return (r.ok==true) ? r.conn : -1
+    if (r.ok==true) { return r.conn }
+    emit log_error with { type: "sysproxy_error", message: "accept failed", context: { op: "accept", fd: fd, errno: (r.errno || -1), error: (r.error || r.msg || "") } }
+    return -1
   }
 
   fn direct_read(fd, max) {
     set r = sysproxy_call("read", { fd: fd, max: max })
     if (r.ok == true) {
-      # Prefer textual payload if sysproxy provides it
+      # sysproxy returns JSON with { n, data }
+      if (r.data != null) { return r.data }
+      # Normalize alternative shapes strictly
       if (r.text != null) { return r.text }
-      # Fallback to raw buffer descriptor
-      return { ptr: r.ptr, len: r.len }
+      if (r.ptr != null) { return { ptr: r.ptr, len: (r.len || 0) } }
     }
+    emit log_error with { type: "sysproxy_error", message: "read failed", context: { op: "read", fd: fd, max: max, errno: (r.errno || -1), error: (r.error || r.msg || "") } }
     return null
   }
 
   fn direct_write(fd, data) {
-    # if your runtime differentiates strings vs {ptr,len}, adapt here
-    set r = sysproxy_call("write", { fd: fd, bytes: data })
-    return (r.ok==true) ? r.written : -1
+    # sysproxy expects { fd, data }
+    set payload = { fd: fd, data: (data.ptr != null ? "" : ("" + data)) }
+    # Note: binary {ptr,len} not supported by sysproxy; stringify as empty if encountered
+    set r = sysproxy_call("write", payload)
+    if (r.ok==true) { return r.written }
+    emit log_error with { type: "sysproxy_error", message: "write failed", context: { op: "write", fd: fd, bytes_len: ((data && data.length) || 0), errno: (r.errno || -1), error: (r.error || r.msg || "") } }
+    return -1
   }
 
   fn direct_close(fd) {
     set r = sysproxy_call("close", { fd: fd })
-    return (r.ok==true)
+    if (r.ok==true) { return true }
+    emit log_error with { type: "sysproxy_error", message: "close failed", context: { op: "close", fd: fd, errno: (r.errno || -1), error: (r.error || r.msg || "") } }
+    return false
   }
 
   # ===== file system operations =====

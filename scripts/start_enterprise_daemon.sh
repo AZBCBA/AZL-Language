@@ -24,40 +24,26 @@ echo "🔑 Token: $AZL_API_TOKEN"
 echo "📊 Workers: 8"
 echo "💾 Cache: .azl/cache"
 
-# Start the HTTP server simulation
-echo "🌐 Starting HTTP server on port $AZL_BUILD_API_PORT..."
-echo "📡 HTTP server ready on port $AZL_BUILD_API_PORT"
-echo "🎉 AZL ENTERPRISE BUILD SYSTEM IS RUNNING!"
+# Launch real Node runtime bound to sysproxy
+echo "🌐 Starting real runtime on port $AZL_BUILD_API_PORT (localhost)"
+export AZL_BIND_HOST="127.0.0.1"
+export AZL_RUNTIME_TRANSPORT="tcp"
+export SYSPROXY_HOST="127.0.0.1"
+export SYSPROXY_PORT="9099"
+export AZL_STRICT="1"
+export AZL_WARM_FILES=${AZL_WARM_FILES:-"azl/runtime/interpreter/azl_interpreter.azl,azl/system/azl_system_interface.azl,azl/system/http_server.azl,azl/build/build_orchestrator.azl"}
 
-# Keep the daemon running and handle HTTP requests
-echo "🔄 Daemon running... Press Ctrl+C to stop"
-
-# Create a simple HTTP server using netcat or similar
-if command -v nc >/dev/null 2>&1; then
-    echo "📡 Using netcat for HTTP server simulation"
-    while true; do
-        # Simulate HTTP request handling
-        if [ -f ".azl/http_request" ]; then
-            echo "📥 Processing HTTP request..."
-            rm -f ".azl/http_request"
-        fi
-        sleep 1
-    done &
-    HTTP_PID=$!
-    
-    # Keep main process alive
-    while true; do
-        sleep 10
-        echo "💓 Daemon heartbeat..."
-    done
-else
-    echo "📡 Using simple loop for HTTP server simulation"
-    while true; do
-        # Simulate HTTP request handling
-        if [ -f ".azl/http_request" ]; then
-            echo "📥 Processing HTTP request..."
-            rm -f ".azl/http_request"
-        fi
-        sleep 1
-    done
+# Ensure sysproxy is running (compile if necessary)
+if ! ss -lnt | grep -q ":${SYSPROXY_PORT} "; then
+  echo "🔧 Starting sysproxy (:${SYSPROXY_PORT})"
+  mkdir -p .azl
+  gcc -O2 -o .azl/sysproxy tools/sysproxy.c
+  SYSPROXY_TCP="127.0.0.1:${SYSPROXY_PORT}" ./.azl/sysproxy 1>.azl/sysproxy.out 2>.azl/sysproxy.log &
+  sleep 0.3
 fi
+
+node scripts/azl_runtime.js 1>.azl/runtime.out 2>.azl/runtime.log &
+RUNTIME_PID=$!
+echo "✅ Runtime PID: $RUNTIME_PID"
+echo "🔄 Daemon running... Press Ctrl+C to stop"
+wait $RUNTIME_PID

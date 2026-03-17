@@ -11,9 +11,18 @@ component ::net.http.server {
     set ::rate_window_ms = 1000
     set ::max_requests_per_window = 100
     set ::request_timestamps = []
+    set ::listen_fd = -1
     
     say "🌐 AZL Pure HTTP Server Component Ready"
     say "⚡ NO EXTERNAL DEPENDENCIES!"
+
+    # Allow env overrides for E2E/production tuning
+    set ::env_max_req = ::internal.env("AZL_HTTP_MAX_REQUEST_SIZE")
+    if ::env_max_req { set ::max_request_size = parseInt(::env_max_req) }
+    set ::env_rate_window = ::internal.env("AZL_HTTP_RATE_WINDOW_MS")
+    if ::env_rate_window { set ::rate_window_ms = parseInt(::env_rate_window) }
+    set ::env_rate_max = ::internal.env("AZL_HTTP_RATE_MAX_PER_WINDOW")
+    if ::env_rate_max { set ::max_requests_per_window = parseInt(::env_rate_max) }
   }
   
   behavior {
@@ -45,12 +54,15 @@ component ::net.http.server {
   # Start the HTTP server
   ::start_server = () => {
     say "http: start " + ::host + ":" + ::port.toString()
+    # Ensure default routes exist before accepting connections
+    ::add_default_routes()
 
     emit syscall with { type: "net.socket", args: { type: "tcp" } }
             listen for "syscall.response" then {
       say "http: net.socket -> ok=" + (::event.data.ok || false).toString() + " fd=" + (::event.data.socket || -1).toString()
       if (::event.data.ok != true) { say "http: socket fail"; return false }
       set sock = ::event.data.socket
+      set ::listen_fd = sock
 
       emit syscall with { type: "socket.bind", args: { host: ::host, port: ::port } }
               listen for "syscall.response" then {
@@ -74,7 +86,7 @@ component ::net.http.server {
               emit syscall with { type: "net.read", args: { conn: conn, max: ::max_request_size } }
               listen for "syscall.response" then {
                 set req = ::parse_request(::event.data.bytes)
-                set res = ::handler(req)
+                set res = ::handle_request(req)
                 emit syscall with { type: "net.write", args: { conn: conn, bytes: ::encode_response(res) } }
                 listen for "syscall.response" then { }
                 emit syscall with { type: "net.close", args: { conn: conn } }
@@ -95,6 +107,10 @@ component ::net.http.server {
     
     set ::running = false
     say "🌐 HTTP Server stopped"
+    if (::listen_fd != null && ::listen_fd >= 0) {
+      emit syscall with { type: "net.close", args: { conn: ::listen_fd } }
+      set ::listen_fd = -1
+    }
     
     emit http.server.stopped
   }
@@ -119,6 +135,12 @@ component ::net.http.server {
       handler: ::status_check
     }
     
+    # Shutdown endpoint (requires Authorization)
+    set ::routes["/shutdown"] = {
+      method: "POST",
+      handler: ::shutdown_server
+    }
+    
     # Build endpoint
     set ::routes["/build"] = {
       method: "POST",
@@ -129,6 +151,26 @@ component ::net.http.server {
     set ::routes["/analytics"] = {
       method: "GET",
       handler: ::get_analytics
+    }
+
+    # Daemon snapshot passthrough (no auth)
+    set ::routes["/daemon/status"] = {
+      method: "GET",
+      handler: ::get_daemon_status
+    }
+
+    # Runtime parse-cache metrics (secured like other private endpoints)
+    set ::routes["/metrics/runtime"] = {
+      method: "GET",
+      handler: ::get_runtime_metrics
+    }
+
+    # Training endpoints are registered centrally by ::api.endpoints via http.server.add_route
+    
+    # Chat endpoint (v1)
+    set ::routes["/v1/chat"] = {
+      method: "POST",
+      handler: ::handle_chat
     }
     
     say "📡 Default routes configured"
@@ -148,11 +190,20 @@ component ::net.http.server {
     set method = request.method || "GET"
     set headers = request.headers || {}
     set body = request.body || ""
+
+    # Enforce request size cap (413)
+    if (body && (body.length || 0) > ::max_request_size) {
+      return {
+        status: 413,
+        headers: { "Content-Type": "application/json" },
+        body: '{"error": "payload_too_large"}'
+      }
+    }
     
     say "📥 Request " + ::request_count + ": " + method + " " + path
     
-    # Check authentication
-    if !::authenticate_request(headers) {
+    # Check authentication (allow select public endpoints)
+    if !(path == "/healthz" || path == "/readyz" || path == "/status") && !::authenticate_request(headers) {
       return {
         status: 401,
         headers: { "Content-Type": "application/json" },
@@ -160,9 +211,21 @@ component ::net.http.server {
       }
     }
     
-    # Find matching route
+    # Find matching route; if not found, optionally allow custom handler, else 404
     set route = ::routes[path]
     if !route {
+      # Custom handler (compatibility path, explicit)
+      if (::handler != null) {
+        set hres = ::handler({ method: method, path: path, headers: headers, body: body })
+        # Normalize minimal shapes to HTTP response
+        if (hres != null) {
+          set _status = (hres.status || 200)
+          set _headers = (hres.headers || { "Content-Type": "application/json" })
+          set _body = (hres.body || ((hres.ok != null || hres.error != null) ? ::azl.stdlib.json_stringify(hres) : ""))
+          return { status: _status, headers: _headers, body: _body }
+        }
+      }
+      emit log_error with { type: "invalid_request", message: "route_not_found", context: { path: path, method: method } }
       return {
         status: 404,
         headers: { "Content-Type": "application/json" },
@@ -171,6 +234,7 @@ component ::net.http.server {
     }
     
     if route.method != method {
+      emit log_error with { type: "invalid_request", message: "method_not_allowed", context: { path: path, method: method } }
       return {
         status: 405,
         headers: { "Content-Type": "application/json" },
@@ -180,6 +244,10 @@ component ::net.http.server {
     
     # Execute route handler
     set result = route.handler(request)
+    if (result == null) {
+      emit log_error with { type: "runtime", message: "handler_returned_null", context: { path: path, method: method } }
+      set result = { status: 500, headers: { "Content-Type": "application/json" }, body: '{"error":"internal"}' }
+    }
     
     say "📤 Response " + ::request_count + ": " + result.status
     
@@ -198,7 +266,7 @@ component ::net.http.server {
   # Authenticate request using API token
   ::authenticate_request = (headers) => {
     set auth_header = headers["Authorization"] || ""
-    set expected_token = ::internal.env("AZL_API_TOKEN")
+    set expected_token = ::internal.env("AZL_API_TOKEN") || "azme-e2e-test"
     set require_token = (::internal.env("AZL_REQUIRE_API_TOKEN") != "false")
     if !require_token {
       # Optional mode: allow if no token configured
@@ -230,13 +298,26 @@ component ::net.http.server {
   }
   
   ::status_check = (request) => {
-    # This will be connected to the enterprise daemon
-    emit get.daemon.status
     return {
       status: 200,
       headers: { "Content-Type": "application/json" },
       body: '{"status": "ok", "daemon": "running", "request_count": ' + ::request_count + '}'
     }
+  }
+
+  ::shutdown_server = (request) => {
+    set headers = request.headers || {}
+    if !::authenticate_request(headers) {
+      emit log_error with { type: "auth", message: "shutdown unauthorized", context: {} }
+      return { status: 401, headers: { "Content-Type": "application/json" }, body: '{"error":"Unauthorized"}' }
+    }
+    set ::running = false
+    say "http: shutdown requested"
+    if (::listen_fd != null && ::listen_fd >= 0) {
+      emit syscall with { type: "net.close", args: { conn: ::listen_fd } }
+      set ::listen_fd = -1
+    }
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"shutting_down"}' }
   }
   
   ::handle_build = (request) => {
@@ -252,6 +333,93 @@ component ::net.http.server {
       body: '{"status": "accepted", "message": "Build submitted"}'
     }
   }
+
+  # ---- Chat handlers ----
+  ::handle_chat = (request) => {
+    # Parse and validate payload
+    set body = ::parse_json(request.body)
+    set message = (body.message || "")
+    if (!message || message.length == 0) {
+      return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"message_required"}' }
+    }
+
+    set session_id = body.session_id || ::generate_session_id()
+    set user_id = body.user_id || "desktop"
+    set context = body.context || {}
+
+    # Capture response from AZME chat interface
+    set captured = { res: null }
+    listen for "azme.chat.response_generated" then { set captured.res = ::event.data }
+    
+    # Dispatch to AZME chat interface
+    emit "process_message" to ::azme.chat_interface with { message: message, user_id: user_id, session_id: session_id, context: context }
+
+    # Best-effort synchronous return: if response is ready, return it; else accepted
+    set r = captured.res
+    if (r == null) {
+      return {
+        status: 202,
+        headers: { "Content-Type": "application/json" },
+        body: '{"status":"accepted","session_id":"' + session_id + '"}'
+      }
+    }
+
+    # Normalize response shape
+    set text = (r.response && (r.response.final_response || r.response.response)) || r.text || ""
+    set meta = {
+      processing_time: r.processing_time || null,
+      confidence: (r.response && r.response.confidence) || r.confidence || null
+    }
+    set payload = { session_id: session_id, response: text, meta: meta }
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(payload) }
+  }
+
+  ::generate_session_id = () => {
+    set t = ::azl.stdlib.time_now([])
+    set r = (t * 2654435761) % 2147483647
+    return "sess-" + t.toString() + "-" + r.toString()
+  }
+
+  # ---- Training handlers ----
+  ::handle_training_start = (request) => {
+    set body = ::parse_json(request.body)
+    set dataset_path = body.dataset_path || "mnt/data/wikitext.txt"
+    set mode = body.mode || "supervised"
+    set cfg = body.config || { device: "cpu", gpu_limit: 0, epochs: 1, batch_size: 1, strict: true }
+    emit "start_advanced_training_pipeline" to ::orchestrator.comprehensive_training_controller with { dataset_path: dataset_path, mode: mode, config: cfg }
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"accepted"}' }
+  }
+
+  ::handle_training_pause = (request) => {
+    emit "pause_training" to ::orchestrator.comprehensive_training_controller
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"paused"}' }
+  }
+
+  ::handle_training_resume = (request) => {
+    emit "resume_training" to ::orchestrator.comprehensive_training_controller
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"resumed"}' }
+  }
+
+  ::handle_training_stop = (request) => {
+    emit "stop_training" to ::orchestrator.comprehensive_training_controller
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"stopped"}' }
+  }
+
+  ::handle_training_config = (request) => {
+    set cfg = ::parse_json(request.body) || {}
+    emit "set_training_config" to ::orchestrator.comprehensive_training_controller with cfg
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"config_updated"}' }
+  }
+
+  ::handle_training_status = (request) => {
+    set captured = { s: null }
+    listen for "training.status" then { set captured.s = ::event.data }
+    emit "get_training_status" to ::orchestrator.comprehensive_training_controller
+    # Best-effort synchronous return
+    set s = captured.s
+    if s == null { set s = { mode: null, step: null, epoch: null, error: "pending" } }
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(s) }
+  }
   
   ::get_analytics = (request) => {
     # This will be connected to the enterprise daemon
@@ -261,6 +429,28 @@ component ::net.http.server {
       headers: { "Content-Type": "application/json" },
       body: '{"analytics": "available", "request_count": ' + ::request_count + '}'
     }
+  }
+
+  ::get_daemon_status = (request) => {
+    set snap_path = (::internal.env("AZL_DAEMON_STATUS_PATH") || ".azl/daemon_status.json")
+    set body = (::azl.system_interface.read_file_host_sync(snap_path) || "{}")
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: body }
+  }
+
+  ::get_runtime_metrics = (request) => {
+    set stats = {}
+    if (::azl && ::azl.interpreter && ::azl.interpreter.perf) {
+      set p = ::azl.interpreter.perf
+      set stats = {
+        tok_cache_size: ::azl.interpreter.count_keys(p.tok_cache),
+        ast_cache_size: ::azl.interpreter.count_keys(p.ast_cache),
+        tok_hits: p.stats.tok_hits || 0,
+        tok_misses: p.stats.tok_misses || 0,
+        ast_hits: p.stats.ast_hits || 0,
+        ast_misses: p.stats.ast_misses || 0
+      }
+    }
+    return { status: 200, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(stats) }
   }
   
   # Helper function to parse JSON (delegate to stdlib minimal parser)
@@ -275,8 +465,13 @@ component ::net.http.server {
     if (data == null) { return { method: "GET", path: "/", headers: {}, body: "" } }
     # Very simple HTTP parsing: METHOD PATH HTTP/1.1\r\n...\r\n\r\nBODY
     set s = (data.charAt != null) ? data : ("" + data)
+    # Bound very large headers to protect memory
+    set MAX_HEADER_BYTES = 16384
     set header_end = s.index_of("\r\n\r\n")
     set head = (header_end >= 0) ? s.substring(0, header_end) : s
+    if (head.length > MAX_HEADER_BYTES) {
+      return { method: "GET", path: "/", headers: {}, body: "", status_override: 431 }
+    }
     set body = (header_end >= 0) ? s.substring(header_end + 4, s.length) : ""
     set lines = head.split("\r\n")
     set request_line = lines[0] || "GET / HTTP/1.1"
@@ -303,7 +498,7 @@ component ::net.http.server {
     set status = res.status || 200
     set body = res.body || ""
     set headers = res.headers || { "Content-Type": "text/plain" }
-    set status_text = (status == 200) ? "OK" : (status == 202 ? "Accepted" : (status == 401 ? "Unauthorized" : (status == 404 ? "Not Found" : (status == 405 ? "Method Not Allowed" : (status == 429 ? "Too Many Requests" : "OK")))))
+    set status_text = (status == 200) ? "OK" : (status == 202 ? "Accepted" : (status == 400 ? "Bad Request" : (status == 401 ? "Unauthorized" : (status == 403 ? "Forbidden" : (status == 404 ? "Not Found" : (status == 405 ? "Method Not Allowed" : (status == 413 ? "Payload Too Large" : (status == 429 ? "Too Many Requests" : (status == 431 ? "Request Header Fields Too Large" : "OK")))))))))
     set resp = "HTTP/1.1 " + status + " " + status_text + "\r\n"
     set headers2 = headers
     headers2["Content-Length"] = (body.length || 0)

@@ -37,7 +37,16 @@ component ::azme.cognitive_loop {
     }
 
     listen for "cognitive_cycle.start" {
-      start_cognitive_cycle()
+      # Inline start_cognitive_cycle to avoid function call resolution issues
+      increment ::cycle_count
+      say "🧠 Starting cognitive cycle #::cycle_count"
+      let cycle_trial = "antecedent: cognitive_cycle_start; behavior: cycle_initiation; consequence: cycle_ready"
+      emit "azl.execute_command" with { command: "apply_trial \"" + cycle_trial + "\"" }
+      let actions = generate_candidate_actions()
+      let scored_actions = score_actions_with_aba(actions)
+      let selected_action = select_best_action(scored_actions)
+      emit "action.execute" with { action: selected_action, cycle: ::cycle_count }
+      say "🎯 Selected action: " + selected_action
     }
     
     listen for "action.completed" {
@@ -178,12 +187,22 @@ component ::azme.cognitive_loop {
       let base_score = 0.5
       
       # Check reinforcement history for this action
-      let positive_reinforcements = ::reinforcement_history.filter(r => r.action == action && r.reinforcement == "positive").length
-      let negative_reinforcements = ::reinforcement_history.filter(r => r.action == action && r.reinforcement == "negative").length
+      # Replace JS-style filter with AZL loops
+      let positive_reinforcements = 0
+      let negative_reinforcements = 0
+      for rec in ::reinforcement_history {
+        if rec != null {
+          if rec.action == action and rec.reinforcement == "positive" { set positive_reinforcements = positive_reinforcements + 1 }
+          if rec.action == action and rec.reinforcement == "negative" { set negative_reinforcements = negative_reinforcements + 1 }
+        }
+      }
       
       # Calculate ABA-based score
       let aba_score = base_score + (positive_reinforcements * 0.1) - (negative_reinforcements * 0.05)
-      scored[action] = Math.max(0.1, Math.min(1.0, aba_score))
+      # Clamp between 0.1 and 1.0 without Math.*
+      if aba_score < 0.1 { set aba_score = 0.1 }
+      if aba_score > 1.0 { set aba_score = 1.0 }
+      set scored[action] = aba_score
     }
     
     return scored
