@@ -18,6 +18,16 @@ This repo is set up so others can **use** and **contribute** to AZL on GitHub. Y
 
 ## Push to GitHub (main branch)
 
+From a machine with internet access, run:
+
+```bash
+./scripts/push_to_github.sh
+```
+
+If you see "Could not resolve host: github.com" or similar, run that script from your local machine (or any host that can reach GitHub). If push is rejected because the remote changed, run: `git push origin main --force`.
+
+---
+
 1. **Review what will be committed**
    ```bash
    git status
