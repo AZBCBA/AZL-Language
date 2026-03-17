@@ -19,6 +19,8 @@ The driver emits `azl.begin` and `system.boot`; all phases advance automatically
 
 **AZL** is a unified, component-based, event-driven programming language. It has its own syntax, grammar, and rules — **this is AZL, not Java, not TypeScript.** The runtime runs in pure AZL with a Python host; see [docs/language/AZL_LANGUAGE_RULES.md](docs/language/AZL_LANGUAGE_RULES.md) and [docs/language/AZL_CURRENT_SPECIFICATION.md](docs/language/AZL_CURRENT_SPECIFICATION.md).
 
+**This repository is the full project.** Work from here: clone from GitHub, make changes, push, and open Pull Requests. Contributions are welcome — see [Contributing](docs/CONTRIBUTING.md) and [GitHub Issues](https://github.com/AZBCBA/AZL-Language/issues).
+
 ## Getting Started
 - JS dev harness:
   - `node scripts/azl_runtime.js test_core.azl ::test.core`
@@ -32,6 +34,8 @@ See OPERATIONS.md for the full runbook.
 
 ## Installation (clone and run)
 
+The canonical source is GitHub. Clone and run:
+
 ```bash
 git clone https://github.com/AZBCBA/AZL-Language.git
 cd AZL-Language
@@ -39,7 +43,9 @@ cd AZL-Language
 python3 azl_runner.py path/to/your.azl
 ```
 
-Or run the CLI: `./scripts/azl run path/to/your.azl`. Optional: Node for the JS harness. See [OPERATIONS.md](OPERATIONS.md) for the full runbook and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) to contribute.
+Or run the CLI: `./scripts/azl run path/to/your.azl`. Optional: Node for the JS harness. See [OPERATIONS.md](OPERATIONS.md) for the full runbook.
+
+**Contributing:** Fork the repo, make changes on a branch, then open a [Pull Request](https://github.com/AZBCBA/AZL-Language/pulls). See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 ## CI
 - `ci.yml`: placeholder/v2 guards, smoke tests, perf smoke, full tests
