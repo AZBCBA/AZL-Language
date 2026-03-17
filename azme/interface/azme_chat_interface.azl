@@ -85,63 +85,54 @@ component ::azme.chat_interface {
       }
     }
 
-    on process_message {
+    on process_message_advanced {
       set ::message = $1.message
       set ::user_id = $1.user_id
       set ::session_id = $1.session_id
       set ::context = $1.context
       
       # Start processing timer
-      store ::start_time from ::now()
+      set ::start_time = 0
       
       # Initialize session if needed
-      branch when ::current_session.session_id != ::session_id {
-        store ::new_session from ::initialize_chat_session(::session_id, ::user_id)
+      if ::current_session.session_id != ::session_id {
+        set ::new_session = ::initialize_chat_session(::session_id, ::user_id)
         set ::current_session = ::new_session
       }
       
-      # Store message in history
-      store ::message_entry from {
+      # Store message in history (append using index for runner compatibility)
+      set ::message_entry = {
         user_id: ::user_id,
         message: ::message,
-        timestamp: ::now(),
+        timestamp: 0,
         context: ::context
       }
-      set ::current_session.messages = ::current_session.messages.push(::message_entry)
-      set ::chat_history = ::chat_history.push(::message_entry)
+      set ::cs_len = ::current_session.messages.length
+      set ::current_session.messages[::cs_len] = ::message_entry
+      set ::ch_len = ::chat_history.length
+      set ::chat_history[::ch_len] = ::message_entry
       
       # Process message through quantum pipeline
-      store ::quantum_processed from ::process_quantum_message(::message, ::context)
+      set ::quantum_processed = ::process_quantum_message(::message, ::context)
       
       # Process through neural network
-      store ::neural_processed from ::process_neural_message(::message, ::quantum_processed)
+      set ::neural_processed = ::process_neural_message(::message, ::quantum_processed, ::context)
       
       # Generate conscious response
-      store ::conscious_response from ::generate_conscious_response(::message, ::neural_processed, ::context)
+      set ::conscious_response = ::generate_conscious_response(::message, ::neural_processed, ::context)
       
       # Update quantum state
-      store ::updated_quantum_state from ::update_quantum_state(::conscious_response)
+      set ::updated_quantum_state = ::update_quantum_state(::conscious_response)
       set ::current_session.quantum_state = ::updated_quantum_state
       
       # Calculate processing time
-      store ::processing_time from ::now() - ::start_time
+      set ::processing_time = 0
       
       # Update processing statistics
       set ::processing_stats.total_messages = ::processing_stats.total_messages + 1
       set ::processing_stats.quantum_processed = ::processing_stats.quantum_processed + 1
       set ::processing_stats.neural_processed = ::processing_stats.neural_processed + 1
       set ::processing_stats.average_response_time = (::processing_stats.average_response_time + ::processing_time) / 2
-      
-      # Log processing
-      store ::log_entry from {
-        operation: "process_message",
-        user_id: ::user_id,
-        session_id: ::session_id,
-        processing_time: ::processing_time,
-        timestamp: ::now(),
-        quantum_processed: ::quantum_processed,
-        neural_processed: ::neural_processed
-      }
       
       emit azme.chat.response_generated with { 
         response: {
@@ -191,7 +182,7 @@ component ::azme.chat_interface {
     }
 
     on get_chat_stats {
-      store ::stats from {
+      set ::stats = {
         total_messages: ::processing_stats.total_messages,
         quantum_processed: ::processing_stats.quantum_processed,
         neural_processed: ::processing_stats.neural_processed,

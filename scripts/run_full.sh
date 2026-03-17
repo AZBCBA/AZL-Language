@@ -13,7 +13,7 @@ cat \
   azl/runtime/vm/azl_vm.azl \
   azl/stdlib/core/azl_stdlib.azl \
   azl/core/ast_event_bus.azl \
-  azl/memory/lha3_adaptive_quantum_engine.azl \
+  azl/memory/lha3_memory_system.azl \
   azl/core/error_system.azl \
   azl/runtime/bootstrap/azl_pure_azme_runtime.azl \
   azl/nlp/nlp_orchestrator.azl azl/nlp/utf8_aggregator.azl \

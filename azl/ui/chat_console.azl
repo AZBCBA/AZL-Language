@@ -16,19 +16,14 @@ component ::ui.chat_console {
       say "> "
       readline into ::user_input
       set ::msg = ::user_input
-      if ::msg == "/exit" { say "👋 Bye" ; emit "azl.exit" with { reason: "user_exit" } }
-      else {
-        emit process_message to ::azme.chat_interface with {
-          message: ::msg, user_id: "cli", session_id: "cli", context: {}
-        }
-        listen for "azme.chat.response_generated" then {
-          set ::text = ::event.data.text
-          say "AZME: " + (::text || "OK")
-        }
-        emit "console.read"
-      }
+      emit process_message to ::azme.chat_interface with { message: ::msg, user_id: "cli", session_id: "cli", context: {} }
+      say "AZME: processing..."
+    }
+
+    listen for "azme.chat.response_generated" then {
+      set ::text = ::event.data.text || ""
+      say "AZME: " + ::text
+      emit "console.read"
     }
   }
 }
-
-
