@@ -63,16 +63,25 @@ summary_curl() {
 }
 CURL_LINE="$(summary_curl)"
 
-# --- 3) AZL native API proxy (if running) ---
+# --- 3) C native engine Ollama proxy (if running) ---
+# Port 8080 is often the *enterprise* AZL HTTP stack (different routes). Only treat a port
+# as the LLM proxy if GET /api/llm/capabilities returns ollama_http_proxy:true (see tools/azl_native_engine.c).
+is_native_llm_proxy_port() {
+  local p="$1"
+  curl -fsS --max-time 3 "http://127.0.0.1:${p}/api/llm/capabilities" 2>/dev/null | grep -q '"ollama_http_proxy":true'
+}
+
 AZL_PORT="${AZL_BENCH_PORT:-}"
 if [ -z "$AZL_PORT" ]; then
-  # Try to find running AZL
   for p in 8080 30000 30001 30002; do
-    if curl -fsS "http://127.0.0.1:${p}/healthz" >/dev/null 2>&1; then
+    if is_native_llm_proxy_port "$p"; then
       AZL_PORT=$p
       break
     fi
   done
+elif ! is_native_llm_proxy_port "$AZL_PORT"; then
+  echo "WARN: AZL_BENCH_PORT=$AZL_PORT does not expose GET /api/llm/capabilities (native engine LLM honesty contract)."
+  AZL_PORT=""
 fi
 
 AZL_LINE="generate,0,0,0,0"
@@ -101,8 +110,11 @@ if [ -n "$AZL_PORT" ]; then
   fi
   rm -f "$tmp"
 else
-  echo "[3/3] AZL native API: SKIP (no AZL engine on 8080/30000-30002)"
-  echo "      Start with: AZL_BUILD_API_PORT=8080 bash scripts/start_azl_native_mode.sh"
+  echo "[3/3] C native engine LLM proxy: SKIP (no port with GET /api/llm/capabilities + ollama_http_proxy)"
+  echo "      Build: bash scripts/build_azl_native_engine.sh"
+  echo "      Run engine with bootstrap (see scripts/run_enterprise_daemon.sh / azl_bootstrap) on a free port, or use a minimal bundle +:"
+  echo "      AZL_BUILD_API_PORT=18080 AZL_API_TOKEN=your_token .azl/bin/azl-native-engine <bootstrap.azl> <entry>"
+  echo "      Then: AZL_BENCH_PORT=18080 AZL_BENCH_TOKEN=your_token $0"
 fi
 
 # --- Report ---
