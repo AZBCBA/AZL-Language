@@ -6,6 +6,8 @@ AZL is a **component–event** language: programs are built from named `componen
 
 **Broader library surface:** LHA3-style memory, quantum- and topology-flavored **software** modules, neural orchestration, optional Torch FFI (`AZL_ENABLE_TORCH_FFI`), and HTTP bridges for LLMs. Most of this is **not** exercised by the default native child; boundaries are documented in [AZL_GPU_NEURAL_QUANTUM_INVENTORY.md](docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md) and [DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md](docs/DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md). Native LLM access is designed around an **Ollama-compatible HTTP proxy**; in-process GGUF is **not** implemented and is reported via `GET /api/llm/capabilities`.
 
+**Documentation canon (shipped work + full doc map):** [docs/AZL_DOCUMENTATION_CANON.md](docs/AZL_DOCUMENTATION_CANON.md) · Index: [docs/README.md](docs/README.md)
+
 Canonical repo: **https://github.com/AZBCBA/AZL-Language** — [Contributing](docs/CONTRIBUTING.md) · [Issues](https://github.com/AZBCBA/AZL-Language/issues)
 
 ## One-command native startup
@@ -48,7 +50,7 @@ bash scripts/enforce_legacy_entrypoint_blocklist.sh
 bash scripts/verify_native_runtime_live.sh
 ```
 
-**Strength bar (gates + live capabilities in one command):** `bash scripts/verify_azl_strength_bar.sh` — see [docs/AZL_STRENGTH_BAR.md](docs/AZL_STRENGTH_BAR.md).
+**Strength bar (gates + live capabilities in one command):** `bash scripts/verify_azl_strength_bar.sh` — see [docs/AZL_DOCUMENTATION_CANON.md](docs/AZL_DOCUMENTATION_CANON.md) §1.7.
 
 **Full verification (release order + all tests):** `bash scripts/run_full_repo_verification.sh` — set `RUN_OPTIONAL_BENCHES=0` to skip LLM benches.
 
@@ -85,7 +87,7 @@ Run full native validation: `./scripts/run_all_tests.sh`.
 
 See [docs/LLM_INFRASTRUCTURE_AUDIT.md](docs/LLM_INFRASTRUCTURE_AUDIT.md).
 
-**Ordered backlog:** [docs/WORK_QUEUE.md](docs/WORK_QUEUE.md) · **HTTP profiles (C vs enterprise):** [docs/CANONICAL_HTTP_PROFILE.md](docs/CANONICAL_HTTP_PROFILE.md) · **P0 semantic slice:** `bash scripts/run_semantic_interpreter_slice.sh`
+**Shipped vs open milestones:** [docs/AZL_DOCUMENTATION_CANON.md](docs/AZL_DOCUMENTATION_CANON.md) · **HTTP profiles (C vs enterprise):** [docs/CANONICAL_HTTP_PROFILE.md](docs/CANONICAL_HTTP_PROFILE.md) · **P0 semantic slice:** `bash scripts/run_semantic_interpreter_slice.sh`
 
 ## CI
 - **`test-and-deploy.yml`**: PR/main tests, native engine matrix, benchmark regression gate, C coverage artifacts, Docker (push to GHCR on `main`), optional staging webhook — see [docs/CI_CD_PIPELINE.md](docs/CI_CD_PIPELINE.md)

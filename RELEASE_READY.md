@@ -42,7 +42,7 @@ For a fast, scripted check that still exercises **native gates** (F2/F3/G/H, eng
 bash scripts/verify_azl_strength_bar.sh
 ```
 
-Documented in `docs/AZL_STRENGTH_BAR.md`. This **does not** replace the five-step block above (it omits `enforce_*` scripts and `run_all_tests.sh`).
+Documented in `docs/AZL_DOCUMENTATION_CANON.md` §1.7. This **does not** replace the five-step block above (it omits `enforce_*` scripts and `run_all_tests.sh`).
 
 ## Optional — product / LLM benchmarks
 

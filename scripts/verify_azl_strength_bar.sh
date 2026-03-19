@@ -53,5 +53,5 @@ if [ "$rc2" -ne 0 ]; then
   exit 11
 fi
 
-echo "[AZL_STRENGTH_BAR] ok — see docs/AZL_STRENGTH_BAR.md; for release use scripts/run_full_repo_verification.sh"
+echo "[AZL_STRENGTH_BAR] ok — see docs/AZL_DOCUMENTATION_CANON.md §1.7; for release use scripts/run_full_repo_verification.sh"
 exit 0

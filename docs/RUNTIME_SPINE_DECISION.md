@@ -136,7 +136,7 @@ These map to **`docs/AZL_NATIVE_RUNTIME_CONTRACT.md`** (“Non-Negotiable Comple
 |----------|------|
 | [AZL_NATIVE_RUNTIME_CONTRACT.md](AZL_NATIVE_RUNTIME_CONTRACT.md) | Legal-style runtime + completion gates |
 | [AZL_PERFECTION_PLAN.md](AZL_PERFECTION_PLAN.md) | Broader strategic phases (still valid; this doc narrows **spine**) |
-| [STATUS.md](STATUS.md) | Short verified snapshot |
+| [AZL_DOCUMENTATION_CANON.md](AZL_DOCUMENTATION_CANON.md) | Shipped + verified snapshot (§1.8) |
 | [DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md](DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md) | Quantum / memory: real vs symbolic |
 | [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md) | Phased “whole project” work vs contract (P0–P5) |
 

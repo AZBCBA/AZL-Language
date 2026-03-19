@@ -57,7 +57,7 @@ Explicitly **deferred** unless product requires in-process weights; capabilities
 
 ## Next actions (do in order)
 
-Tracked checklist: **[WORK_QUEUE.md](WORK_QUEUE.md)**. **Automation:** `bash scripts/run_full_repo_verification.sh` (see [RELEASE_READY.md](../RELEASE_READY.md)).
+Completed queue rows and verification commands: **[AZL_DOCUMENTATION_CANON.md](AZL_DOCUMENTATION_CANON.md)** §1.6–§5. **Automation:** `bash scripts/run_full_repo_verification.sh` (see [RELEASE_READY.md](../RELEASE_READY.md)).
 
 Summary:
 

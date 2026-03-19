@@ -1,11 +1,14 @@
 # AZL Language — Documentation index
 
+**Canonical record of what is shipped and verified, plus a full map of all docs:** [AZL_DOCUMENTATION_CANON.md](AZL_DOCUMENTATION_CANON.md) (replaces former `WORK_QUEUE.md`, `STATUS.md`, and `AZL_STRENGTH_BAR.md`).
+
 Single entry point for **accurate** project docs. Older “status report”, “supervisor”, and duplicate ecosystem summaries were removed as misleading; use **git history** if you need a retired filename.
 
 ## Start here (operations)
 
 | Document | Use |
 |----------|-----|
+| [AZL_DOCUMENTATION_CANON.md](AZL_DOCUMENTATION_CANON.md) | **Shipped work, strength bar, work-queue completion, doc map, open milestones** |
 | [../README.md](../README.md) | Clone, quick start, native mode |
 | [../OPERATIONS.md](../OPERATIONS.md) | Runbook: daemons, sysproxy, tests |
 | [../RELEASE_READY.md](../RELEASE_READY.md) | **Release gate order** before shipping native profile |
@@ -16,17 +19,14 @@ Single entry point for **accurate** project docs. Older “status report”, “
 
 | Document | Use |
 |----------|-----|
-| [AZL_PERFECTION_PLAN.md](AZL_PERFECTION_PLAN.md) | Strategic gaps and phased goals |
 | [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md) | Phased completion vs contract (P0 executor gap, P1–P5) |
-| [WORK_QUEUE.md](WORK_QUEUE.md) | Ordered checklist: benchmarks, P0, HTTP profile, GGUF |
+| [AZL_PERFECTION_PLAN.md](AZL_PERFECTION_PLAN.md) | Strategic gaps and phased goals |
 | [CANONICAL_HTTP_PROFILE.md](CANONICAL_HTTP_PROFILE.md) | C native engine vs enterprise `http_server` — pick per deployment |
 | [DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md](DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md) | Quantum / LHA3 / memory: real vs symbolic |
 | [AZL_GPU_NEURAL_QUANTUM_INVENTORY.md](AZL_GPU_NEURAL_QUANTUM_INVENTORY.md) | GPU / neural / LHA3 / quantum **file map** vs default runtime; `scripts/audit_gpu_neural_quantum_surfaces.sh` |
-| [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md) | LLM / HTTP / proxy stack; includes **`GET /api/llm/capabilities`** on native engine; benches: `scripts/run_native_engine_llm_bench.sh`, `scripts/benchmark_llm_ollama.sh`, `scripts/benchmark_enterprise_v1_chat.sh` |
+| [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md) | LLM / HTTP / proxy stack; **`GET /api/llm/capabilities`**; benches |
 | [INTEGRATIONS_HOST_VS_NATIVE.md](INTEGRATIONS_HOST_VS_NATIVE.md) | AnythingLLM / `azl/integrations`: pure AZL vs host-shaped reference |
-| [AZL_STRENGTH_BAR.md](AZL_STRENGTH_BAR.md) | **Provable strength:** semantics, gates, honest benches, ecosystem — mapped to scripts; run `scripts/verify_azl_strength_bar.sh` |
 | [AUDIT_STRENGTH_ITEMS.md](AUDIT_STRENGTH_ITEMS.md) | Focused strength / risk audit (HAVE vs NEED) |
-| [STATUS.md](STATUS.md) | Short **verified** runtime snapshot |
 
 ## Language (syntax and rules)
 
@@ -60,7 +60,7 @@ Broader / historical spec draft: [../azl/docs/AZL_LANGUAGE_SPECIFICATION.md](../
 
 Workflows live under `.github/workflows/` — including **`test-and-deploy.yml`** (tests, native matrix, benchmarks, coverage artifact, Docker → GHCR, optional staging webhook).
 
-**Native gates** (`scripts/check_azl_native_gates.sh`) include **F3** (P0 interpreter slice C↔Python), **H** (`verify_p0_interpreter_tokenizer_boundary.sh` on `azl_interpreter.azl`). **Strength bar (gates + live probe):** `scripts/verify_azl_strength_bar.sh` — see [AZL_STRENGTH_BAR.md](AZL_STRENGTH_BAR.md). **Full tree:** `scripts/run_full_repo_verification.sh`. **P0 smoke:** `scripts/run_semantic_interpreter_slice.sh`. **Product LLM benches:** `scripts/run_product_benchmark_suite.sh` (see `RELEASE_READY.md`).
+**Native gates** (`scripts/check_azl_native_gates.sh`) include **F3** (P0 interpreter slice C↔Python), **H** (`verify_p0_interpreter_tokenizer_boundary.sh` on `azl_interpreter.azl`). **Strength bar:** `scripts/verify_azl_strength_bar.sh` — see [AZL_DOCUMENTATION_CANON.md](AZL_DOCUMENTATION_CANON.md) §1.7. **Full tree:** `scripts/run_full_repo_verification.sh`. **P0 smoke:** `scripts/run_semantic_interpreter_slice.sh`. **Product LLM benches:** `scripts/run_product_benchmark_suite.sh` (see `RELEASE_READY.md`).
 
 **`scripts/test_azl_use_vm_path.sh`** (from `run_all_tests.sh`) checks `AZL_USE_VM` docs + wiring, **source-level parity** between `vm_run_bytecode_program` and tree-walker say/emit (`check_azl_vm_tree_parity.py`), and the eligible fixture `azl/tests/fixtures/vm_parity_minimal.azl`.
 
@@ -70,7 +70,7 @@ Workflows live under `.github/workflows/` — including **`test-and-deploy.yml`*
 
 | Document | Use |
 |----------|-----|
-| [AZLPACK_SPEC.md](AZLPACK_SPEC.md) | Package format; first dogfood pack `packages/src/azl-hello/` |
+| [AZLPACK_SPEC.md](AZLPACK_SPEC.md) | Package format; first-party dogfood pack `packages/src/azl-hello/` |
 | [TRAIN_IN_PURE_AZL.md](TRAIN_IN_PURE_AZL.md) | Training in AZL |
 | [AZME_PRODUCTION_RUNBOOK.md](AZME_PRODUCTION_RUNBOOK.md) | AZME operations |
 | [PRODUCTION_RUN.md](PRODUCTION_RUN.md) | Production run notes |
@@ -96,3 +96,5 @@ Workflows live under `.github/workflows/` — including **`test-and-deploy.yml`*
 | [AZL_ENTERPRISE_SETUP.md](AZL_ENTERPRISE_SETUP.md) | Enterprise setup |
 
 `azl/docs/README.md` describes layout under `azl/` and links back here.
+
+**Full alphabetical / categorical list:** [AZL_DOCUMENTATION_CANON.md](AZL_DOCUMENTATION_CANON.md) §4.
