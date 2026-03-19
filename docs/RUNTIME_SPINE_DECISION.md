@@ -2,7 +2,7 @@
 
 **Purpose:** One place to read **how native execution is supposed to work** and **what is true today**. Contributors should use this doc instead of inferring architecture only from shell defaults.
 
-**Last updated:** 2026-03-19
+**Last updated:** 2026-03-20
 
 ---
 
