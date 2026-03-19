@@ -42,6 +42,9 @@ logs/
 .azl/*.err
 .azl/*.gz
 
+# AZL build artifacts
+.azl/bin/
+
 # AZL runtime / daemon (local only)
 .azl/daemon.*
 .azl/sysproxy
