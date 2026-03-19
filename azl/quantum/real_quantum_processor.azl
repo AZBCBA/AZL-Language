@@ -1,5 +1,5 @@
-# Real Quantum Processor Implementation
-# Actual quantum processing with real quantum gates and algorithms
+# Real Quantum Processor — state-vector simulation in software (normal CPU RAM).
+# Not a physical QPU binding; gates and amplitudes are plain numeric structures in AZL.
 
 component ::quantum.real_processor {
   init {

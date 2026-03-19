@@ -1,6 +1,5 @@
-# AZL Tensor Type - First-class tensor for AI workloads
-# Syntax: tensor shape [n,m] or create_tensor(shape)
-# Provides native-like tensor operations; wire to SIMD/native when available
+# AZL Tensor Type - First-class tensor for AI workloads (pure AZL nested arrays / ops).
+# No GPU/VRAM/CUDA binding in this file; a future bridge would live in native/FFI layers.
 
 component ::azl.types.tensor {
   init {

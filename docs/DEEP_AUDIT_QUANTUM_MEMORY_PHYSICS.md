@@ -181,5 +181,5 @@ See `docs/LHA3_STDLIB_API.md` for:
 - **What it is:** A map of quantum / LHA3 / fractal / entanglement / math modules—not a tutorial.
 - **When to open it:** Planning work on memory, quantum stack, or “what’s real vs symbolic.”
 - **Next work from here (pick one):** (a) audit `quantum_integrator` … `quantum_algebra`, (b) port hypercomplex p-adic, (c) GPU/tensor bridge, (d) rename `quantum_math.azl` vs topology.
-- **Pair with:** `docs/LHA3_STDLIB_API.md`, `docs/LLM_INFRASTRUCTURE_AUDIT.md` for HTTP/LLM vs quantum-memory layers.
+- **Pair with:** `docs/LHA3_STDLIB_API.md`, `docs/LLM_INFRASTRUCTURE_AUDIT.md` for HTTP/LLM vs quantum-memory layers; **`docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md`** for GPU/device/neural files not on the default native spine; **`scripts/audit_gpu_neural_quantum_surfaces.sh`** to refresh path counts.
 - **Doc index:** `docs/README.md` lists all maintained project documentation (this file included).
