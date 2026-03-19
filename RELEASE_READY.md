@@ -53,4 +53,4 @@ If any gate fails:
 
 ## CI Requirement
 
-The `native-release-gates` workflow must pass on the release branch before deploy.
+The `native-release-gates` workflow must pass on the release branch before deploy. The consolidated **`test-and-deploy.yml`** workflow also runs the full test suite plus Docker/GHCR and optional staging; see `docs/CI_CD_PIPELINE.md`.

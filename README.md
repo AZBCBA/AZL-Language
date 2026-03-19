@@ -68,8 +68,12 @@ See [OPERATIONS.md](OPERATIONS.md) for the full runbook.
 Run full native validation: `./scripts/run_all_tests.sh`.
 
 ## CI
-- `ci.yml`: placeholder/v2 guards, smoke tests, perf smoke, full tests
+- **`test-and-deploy.yml`**: PR/main tests, native engine matrix, benchmark regression gate, C coverage artifacts, Docker (push to GHCR on `main`), optional staging webhook — see [docs/CI_CD_PIPELINE.md](docs/CI_CD_PIPELINE.md)
+- `ci.yml`: placeholder/v2 guards, smoke tests, perf smoke, full tests, AZME E2E
+- `native-release-gates.yml`: canonical stack + native gates + full tests
 - `nightly.yml`: sysproxy E2E with logs
+
+Documentation index: [docs/README.md](docs/README.md).
 
 ## 🎯 Quick Start
 

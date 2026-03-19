@@ -1,29 +1,26 @@
-## CI/CD Pipeline
+# CI/CD pipeline
 
-### Current Status
-- Implemented: build (release), clippy, fmt, minimal smoke run, audit live paths, docker smoke.
-- Next: add unit/integration tests and coverage gates per Phase 1 acceptance.
+This repository’s automation is **bash + native AZL gates** (no Rust toolchain at repo root). Descriptions below match the workflows in `.github/workflows/`.
 
-**Status:** CI/CD being added incrementally.
-- Pure AZL checks replace Rust gates where applicable
-- Tests (unit + integration) — executed via AZL interpreter; coverage expansion planned
-- Gates:
-  - No `placeholder|TODO|FIXME` in `.azl`
-  - Virtual OS (fs/http/proc) paths validated by smoke tests
-  - Placeholder elimination verified on each run
+## Workflows (by role)
 
-### CI Stages
-1. Checkout, toolchain, cache
-2. Build (release)
-3. Lint (deny warnings) + fmt check
-4. Tests (unit + integration)
-5. Fuzz smoke; proptests
-6. Minimal smoke run via AZL components (listeners first, boot last)
-7. Audit live paths (`scripts/audit_live_path.sh`)
-8. Docker image build + container smoke
+| Workflow | When | What it does |
+|----------|------|----------------|
+| **`test-and-deploy.yml`** | PR + push `main`/`master` | Full `run_all_tests.sh`, native engine **matrix** (O2 / O0 / Os), **benchmark** gate + artifacts, **GCC/lcov** coverage artifact for `tools/azl_native_engine.c`, **Docker** build; on **main** push also **GHCR** publish and optional **staging** webhook (`STAGING_DEPLOY_WEBHOOK`). |
+| `ci.yml` | PR + push `main`/`master` | Placeholder / stale-v2 guards, `run_full.sh`, `audit_live_path.sh`, native smoke, perf smoke, benchmark gate, full tests, AZME E2E job. |
+| `native-release-gates.yml` | PR + push `main`/`master` | Canonical stack, native gates, legacy blocklist, live verify, `run_all_tests.sh`. |
+| `azl-ci.yml` | PR + push (all branches) | Placeholders + `run_all_tests.sh` + `run_examples.sh`. |
+| `nightly.yml` | Schedule + manual | Sysproxy integration / health checks. |
+| `release.yml` | Tags `v*.*.*` | GitHub Release assets (sample bundles + runbooks). |
 
-### Release
-- Tagged builds produce artifacts and container images
-- Strict mode is enforced; experimental flags disabled
+To save GitHub Actions minutes, consider **disabling or slimming** overlapping workflows once you standardize on `test-and-deploy.yml` + one lightweight gate workflow.
 
+## Local parity
 
+- Tests: `./scripts/run_all_tests.sh` (see root `Makefile` `make test`).
+- Release order: `RELEASE_READY.md` (canonical gate sequence).
+
+## Coverage
+
+- **Native engine (C):** produced in CI by `scripts/ci_native_engine_coverage.sh` (HTML + `coverage.info` artifacts).
+- **Full AZL source coverage:** not yet a single unified report; extend harness / tooling over time.

@@ -182,3 +182,4 @@ See `docs/LHA3_STDLIB_API.md` for:
 - **When to open it:** Planning work on memory, quantum stack, or “what’s real vs symbolic.”
 - **Next work from here (pick one):** (a) audit `quantum_integrator` … `quantum_algebra`, (b) port hypercomplex p-adic, (c) GPU/tensor bridge, (d) rename `quantum_math.azl` vs topology.
 - **Pair with:** `docs/LHA3_STDLIB_API.md`, `docs/LLM_INFRASTRUCTURE_AUDIT.md` for HTTP/LLM vs quantum-memory layers.
+- **Doc index:** `docs/README.md` lists all maintained project documentation (this file included).

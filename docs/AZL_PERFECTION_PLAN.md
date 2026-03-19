@@ -219,4 +219,4 @@ Phase 7 (Documentation) — ongoing
 
 ---
 
-*Plan generated from comprehensive azl-language codebase review. Update as implementation progresses.*
+*Update as implementation progresses. For the maintained documentation set, see [docs/README.md](README.md).*
