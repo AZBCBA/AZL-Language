@@ -80,8 +80,8 @@ if ! echo "$CAP_JSON" | rg -q '"gguf_in_process":false'; then
   echo "ERROR: /api/llm/capabilities expected gguf_in_process false until native GGUF exists: ${CAP_JSON}"
   exit 76
 fi
-if ! echo "$CAP_JSON" | rg -q 'ERR_NATIVE_GGUF_NOT_IMPLEMENTED'; then
-  echo "ERROR: /api/llm/capabilities missing ERR_NATIVE_GGUF_NOT_IMPLEMENTED: ${CAP_JSON}"
+if ! echo "$CAP_JSON" | rg -q 'ERR_NATIVE_GGUF_NOT_IN_PROCESS'; then
+  echo "ERROR: /api/llm/capabilities missing ERR_NATIVE_GGUF_NOT_IN_PROCESS: ${CAP_JSON}"
   exit 77
 fi
 

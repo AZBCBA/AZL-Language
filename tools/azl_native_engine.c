@@ -13,6 +13,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 static volatile sig_atomic_t g_running = 1;
 
@@ -192,6 +193,232 @@ static int start_runtime_pipeline(EngineState *st) {
   return 0;
 }
 
+/* Minimal JSON: extract "field":"..." string value (supports \\ and \"). */
+static int json_extract_string_field(const char *body, const char *field, char *out, size_t outsz) {
+  char key[64];
+  (void)snprintf(key, sizeof(key), "\"%s\"", field);
+  const char *k = strstr(body, key);
+  if (!k) return -1;
+  const char *c = strchr(k + strlen(key), ':');
+  if (!c) return -1;
+  c++;
+  while (*c == ' ' || *c == '\t' || *c == '\n' || *c == '\r') c++;
+  if (*c != '"') return -1;
+  c++;
+  size_t j = 0;
+  while (*c && j + 1 < outsz) {
+    if (*c == '\\') {
+      c++;
+      if (*c == 'n') out[j++] = '\n';
+      else if (*c == 't') out[j++] = '\t';
+      else if (*c == 'r') { /* skip */ }
+      else if (*c) out[j++] = *c;
+      if (*c) c++;
+      continue;
+    }
+    if (*c == '"') break;
+    out[j++] = *c++;
+  }
+  out[j] = '\0';
+  return 0;
+}
+
+static int json_extract_int_field(const char *body, const char *field, int *out, int default_val) {
+  char key[64];
+  (void)snprintf(key, sizeof(key), "\"%s\"", field);
+  const char *k = strstr(body, key);
+  if (!k) {
+    *out = default_val;
+    return -1;
+  }
+  const char *c = strchr(k + strlen(key), ':');
+  if (!c) {
+    *out = default_val;
+    return -1;
+  }
+  c++;
+  while (*c == ' ' || *c == '\t') c++;
+  *out = atoi(c);
+  if (*out <= 0) *out = default_val;
+  return 0;
+}
+
+static void write_response(int fd, int status, const char *status_text, const char *body);
+
+static void json_escape_text(const char *in, char *out, size_t outsz) {
+  size_t j = 0;
+  if (!in) {
+    out[0] = '\0';
+    return;
+  }
+  for (size_t i = 0; in[i] && j + 2 < outsz; i++) {
+    unsigned char c = (unsigned char)in[i];
+    if (c == '"' || c == '\\') {
+      out[j++] = '\\';
+      out[j++] = (char)c;
+    } else if (c == '\n') {
+      out[j++] = '\\';
+      out[j++] = 'n';
+    } else if (c == '\r') {
+      /* skip */
+    } else if (c < 32) {
+      /* skip control */
+    } else {
+      out[j++] = (char)c;
+    }
+  }
+  out[j] = '\0';
+}
+
+#define GGUF_READ_MAX (192 * 1024)
+
+static void handle_gguf_infer(int cfd, const char *req, ssize_t n, EngineState *st) {
+  (void)st;
+  const char *gguf = getenv("AZL_GGUF_PATH");
+  if (!gguf || gguf[0] == '\0') {
+    write_response(cfd, 503, "Service Unavailable",
+                  "{\"ok\":false,\"error\":\"AZL_GGUF_PATH_unset\","
+                  "\"hint\":\"Set AZL_GGUF_PATH to a local .gguf file and install llama-cli (llama.cpp).\"}");
+    return;
+  }
+  struct stat gst;
+  if (stat(gguf, &gst) != 0 || !S_ISREG(gst.st_mode)) {
+    write_response(cfd, 503, "Service Unavailable",
+                  "{\"ok\":false,\"error\":\"AZL_GGUF_PATH_not_a_file\"}");
+    return;
+  }
+
+  const char *body_start = strstr(req, "\r\n\r\n");
+  if (body_start) body_start += 4;
+  else {
+    body_start = strstr(req, "\n\n");
+    if (body_start) body_start += 2;
+    else body_start = req;
+  }
+  size_t body_len = (size_t)(req + n - body_start);
+  if (body_len > 16384) body_len = 16384;
+  char *body_copy = malloc(body_len + 1);
+  if (!body_copy) {
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+    return;
+  }
+  memcpy(body_copy, body_start, body_len);
+  body_copy[body_len] = '\0';
+
+  char prompt[12288] = {0};
+  if (json_extract_string_field(body_copy, "prompt", prompt, sizeof(prompt)) != 0) {
+    free(body_copy);
+    write_response(cfd, 400, "Bad Request", "{\"ok\":false,\"error\":\"missing_prompt_json\"}");
+    return;
+  }
+  int n_predict = 64;
+  (void)json_extract_int_field(body_copy, "n_predict", &n_predict, 64);
+  if (n_predict > 8192) n_predict = 8192;
+  free(body_copy);
+
+  char tpl[] = "/tmp/azl_gguf_p_XXXXXX";
+  int pfd = mkstemp(tpl);
+  if (pfd < 0) {
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"mkstemp_failed\"}");
+    return;
+  }
+  size_t plen = strlen(prompt);
+  if (write_all(pfd, prompt, plen) != 0) {
+    close(pfd);
+    unlink(tpl);
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"prompt_write_failed\"}");
+    return;
+  }
+  close(pfd);
+
+  const char *cli = getenv("AZL_LLAMA_CLI");
+  if (!cli || cli[0] == '\0') cli = "llama-cli";
+
+  char nbuf[32];
+  (void)snprintf(nbuf, sizeof(nbuf), "%d", n_predict);
+
+  int pipefd[2];
+  if (pipe(pipefd) != 0) {
+    unlink(tpl);
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"pipe_failed\"}");
+    return;
+  }
+
+  pid_t pid = fork();
+  if (pid < 0) {
+    close(pipefd[0]);
+    close(pipefd[1]);
+    unlink(tpl);
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"fork_failed\"}");
+    return;
+  }
+  if (pid == 0) {
+    close(pipefd[0]);
+    if (dup2(pipefd[1], STDOUT_FILENO) < 0) _exit(126);
+    if (dup2(pipefd[1], STDERR_FILENO) < 0) _exit(126);
+    close(pipefd[1]);
+    const char *use_no_cnv = getenv("AZL_LLAMA_SKIP_NO_CNV");
+    if (use_no_cnv && use_no_cnv[0] == '1') {
+      execlp(cli, cli, "-m", gguf, "-f", tpl, "-n", nbuf, "--log-disable", (char *)NULL);
+    } else {
+      execlp(cli, cli, "-m", gguf, "-f", tpl, "-n", nbuf, "-no-cnv", "--log-disable", (char *)NULL);
+    }
+    _exit(127);
+  }
+  close(pipefd[1]);
+  char *raw = malloc(GGUF_READ_MAX + 1);
+  if (!raw) {
+    close(pipefd[0]);
+    waitpid(pid, NULL, 0);
+    unlink(tpl);
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+    return;
+  }
+  size_t total = 0;
+  for (;;) {
+    ssize_t rn = read(pipefd[0], raw + total, GGUF_READ_MAX - total);
+    if (rn <= 0) break;
+    total += (size_t)rn;
+    if (total >= GGUF_READ_MAX) break;
+  }
+  close(pipefd[0]);
+  int wst = 0;
+  (void)waitpid(pid, &wst, 0);
+  unlink(tpl);
+  raw[total] = '\0';
+
+  if (!WIFEXITED(wst) || WEXITSTATUS(wst) != 0) {
+    free(raw);
+    write_response(cfd, 502, "Bad Gateway",
+                  "{\"ok\":false,\"error\":\"llama_cli_failed\","
+                  "\"hint\":\"Install llama.cpp llama-cli; or set AZL_LLAMA_SKIP_NO_CNV=1 if your build lacks -no-cnv\"}");
+    return;
+  }
+
+  char *esc = malloc(GGUF_READ_MAX * 2 + 256);
+  if (!esc) {
+    free(raw);
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+    return;
+  }
+  json_escape_text(raw, esc, GGUF_READ_MAX * 2);
+  free(raw);
+
+  size_t el = strlen(esc);
+  size_t rsz = el + 256;
+  if (rsz < 128) rsz = 128;
+  char *resp = malloc(rsz);
+  if (!resp) {
+    free(esc);
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+    return;
+  }
+  (void)snprintf(resp, rsz, "{\"ok\":true,\"backend\":\"llama_cli\",\"text\":\"%s\"}", esc);
+  free(esc);
+  write_response(cfd, 200, "OK", resp);
+  free(resp);
+}
+
 static void write_response(int fd, int status, const char *status_text, const char *body) {
   char header[4096];
   int body_len = (int)strlen(body);
@@ -324,14 +551,34 @@ static void handle_conn(int cfd, EngineState *st) {
   }
   /* GET /api/llm/capabilities — honest native LLM surface (orchestration / audits) */
   if (strcmp(path, "/api/llm/capabilities") == 0 && strcmp(method, "GET") == 0) {
-    snprintf(body, sizeof(body),
-             "{\"ok\":true,\"engine\":\"azl-native-engine\","
-             "\"ollama_http_proxy\":true,\"ollama_proxy_path\":\"/api/ollama/generate\","
-             "\"ollama_upstream_env\":\"OLLAMA_HOST\","
-             "\"gguf_in_process\":false,"
-             "\"error\":{\"code\":\"ERR_NATIVE_GGUF_NOT_IMPLEMENTED\","
-             "\"message\":\"No in-process GGUF weights; use Ollama proxy or external runtime\"}}");
-    write_response(cfd, 200, "OK", body);
+    const char *gp = getenv("AZL_GGUF_PATH");
+    int gp_ok = 0;
+    struct stat gst;
+    if (gp && gp[0] != '\0' && stat(gp, &gst) == 0 && S_ISREG(gst.st_mode)) gp_ok = 1;
+    char cap[8192];
+    int cn = snprintf(
+        cap, sizeof(cap),
+        "{\"ok\":true,\"engine\":\"azl-native-engine\","
+        "\"ollama_http_proxy\":true,\"ollama_proxy_path\":\"/api/ollama/generate\","
+        "\"ollama_upstream_env\":\"OLLAMA_HOST\","
+        "\"gguf_in_process\":false,"
+        "\"gguf_cli_infer\":%s,\"gguf_infer_path\":\"/api/llm/gguf_infer\","
+        "\"gguf_model_configured\":%s,"
+        "\"error\":{\"code\":\"ERR_NATIVE_GGUF_NOT_IN_PROCESS\","
+        "\"message\":\"Weights are not linked inside this binary; use POST /api/llm/gguf_infer "
+        "(set AZL_GGUF_PATH to a .gguf file and install llama.cpp llama-cli) or "
+        "POST /api/ollama/generate (Ollama).\"}}",
+        gp_ok ? "true" : "false", gp_ok ? "true" : "false");
+    if (cn > 0 && (size_t)cn < sizeof(cap))
+      write_response(cfd, 200, "OK", cap);
+    else
+      write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"capabilities_overflow\"}");
+    return;
+  }
+
+  /* POST /api/llm/gguf_infer: run local llama-cli on AZL_GGUF_PATH (no Ollama) */
+  if (strcmp(path, "/api/llm/gguf_infer") == 0 && strcmp(method, "POST") == 0) {
+    handle_gguf_infer(cfd, req, n, st);
     return;
   }
 

@@ -12,7 +12,7 @@
 |------|-------------|
 | Default native mode runs **C minimal** or **Python semantic subset** on the **combined** bundle | Most `.azl` files below are **not executed** on that path unless linked into the bundle **and** reached by a full interpreter. |
 | **No CUDA/Metal/OpenCL kernel bridge** in-tree for AZL tensors today | `device: "cuda"` in APIs is mostly **configuration + orchestration shape** until a native FFI path exists. |
-| **Native GGUF** | Explicitly **not** implemented — `neural.model_loader` emits `ERR_NATIVE_GGUF_NOT_IMPLEMENTED`; use Ollama proxy per capabilities endpoint. |
+| **Native GGUF** | **Not** in-process in the engine binary — `neural.model_loader` still emits `ERR_NATIVE_GGUF_NOT_IMPLEMENTED`; HTTP **`POST /api/llm/gguf_infer`** + **`AZL_GGUF_PATH`** runs **`llama-cli`** (llama.cpp) for local `.gguf`; Ollama proxy remains **`POST /api/ollama/generate`**. |
 | **“Quantum” in file names** | Often **state-vector / symbolic / event** models on a **normal CPU** — not a lab QPU unless you add hardware integration. |
 
 ---

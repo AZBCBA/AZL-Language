@@ -80,7 +80,7 @@ The canonical execution path is native-first and enforced by release gates:
 
 ### Native LLM surface (honesty, not inference)
 
-- **`GET /api/llm/capabilities`** (public, no bearer): JSON describing what the engine can do — today `ollama_http_proxy: true` for `POST /api/ollama/generate`, and `gguf_in_process: false` with `ERR_NATIVE_GGUF_NOT_IMPLEMENTED` until in-process weights exist. See `docs/LLM_INFRASTRUCTURE_AUDIT.md`.
+- **`GET /api/llm/capabilities`** (public, no bearer): JSON describing what the engine can do — today `ollama_http_proxy: true` for `POST /api/ollama/generate`, and `gguf_in_process: false` with `ERR_NATIVE_GGUF_NOT_IN_PROCESS` until weights are linked in-process. With **`AZL_GGUF_PATH`** set to a `.gguf` file, **`POST /api/llm/gguf_infer`** runs **`llama-cli`** on disk (no Ollama). See `docs/LLM_INFRASTRUCTURE_AUDIT.md`.
 
 ## Non-Negotiable Completion Gates
 
