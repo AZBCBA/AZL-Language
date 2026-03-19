@@ -26,6 +26,17 @@ Run in this exact order:
 
 All commands must pass with exit code `0`.
 
+## Optional — product / LLM benchmarks
+
+After gates are green, you can measure latency on real backends (not required for release exit code):
+
+```bash
+bash scripts/run_product_benchmark_suite.sh
+```
+
+- Requires **`ollama serve`** and a pulled model for the C-engine leg.
+- The enterprise **`POST /v1/chat`** leg runs only if **`AZL_API_TOKEN`** is set in the environment (daemon on **`AZL_ENTERPRISE_PORT`**, default `8080`).
+
 ## Expected Runtime Signals
 
 After startup, validate:

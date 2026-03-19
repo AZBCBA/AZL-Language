@@ -27,6 +27,7 @@ Three **different** surfaces — do not mix them up:
 
 | Script | What it measures |
 |--------|------------------|
+| `scripts/run_product_benchmark_suite.sh` | Runs **native LLM bench** first; runs **enterprise /v1/chat** only if `AZL_API_TOKEN` is set (one command for ops sweeps). |
 | `scripts/run_native_engine_llm_bench.sh` | Builds and starts **C `azl-native-engine`**, then runs the Ollama comparison (needs `ollama serve` + a model). |
 | `scripts/benchmark_llm_ollama.sh` | Python vs curl vs **C engine** `POST /api/ollama/generate` (only if `GET /api/llm/capabilities` reports the proxy). |
 | `scripts/benchmark_enterprise_v1_chat.sh` | **Enterprise daemon** `POST /v1/chat` with `AZL_API_TOKEN` (not the C Ollama proxy). |

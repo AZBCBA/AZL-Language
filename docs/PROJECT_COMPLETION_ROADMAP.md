@@ -17,6 +17,7 @@ This is the **honest** map from **today’s repository** to the **contract goals
 
 - `AZL_RUNTIME_SPINE=c_minimal` (default): `scripts/azl_c_interpreter_runtime.sh` → `azl-interpreter-minimal` (C).
 - `AZL_RUNTIME_SPINE=azl_interpreter` or `semantic`: `scripts/azl_azl_interpreter_runtime.sh` → `tools/azl_runtime_spine_host.py` → **`tools/azl_semantic_engine/`** (`minimal_runtime.py`), a **Python** executor with **execution parity** to the C minimal contract (say / set / emit / link / component init+behavior / quoted `listen for`). **Gate F2** in `check_azl_native_gates.sh` asserts **byte-identical stdout** vs C on `azl/tests/c_minimal_link_ping.azl`.
+- **Gate H:** `scripts/verify_p0_interpreter_tokenizer_boundary.sh` — same tokenizer ingests a **prefix** of `azl/runtime/interpreter/azl_interpreter.azl` (lex-only milestone toward loading the full interpreter as source).
 
 **Still open (full P0):**
 

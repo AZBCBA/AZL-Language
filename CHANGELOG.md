@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+- **P0 gate H:** `scripts/verify_p0_interpreter_tokenizer_boundary.sh` — semantic minimal tokenizer ingests `azl/runtime/interpreter/azl_interpreter.azl` (full file today; lex milestone toward executing it). Wired into `scripts/check_azl_native_gates.sh`.
+- **Product benchmark suite:** `scripts/run_product_benchmark_suite.sh` — runs native LLM bench + optional enterprise `/v1/chat` when `AZL_API_TOKEN` is set; documented in `RELEASE_READY.md`, `README.md`, `OPERATIONS.md`, `CONTRIBUTING.md`.
 - **Enterprise chat benchmark:** `scripts/benchmark_enterprise_v1_chat.sh` — `POST /v1/chat` latency against the enterprise HTTP stack (requires `AZL_API_TOKEN`; rejects C-native ports). Documented in `LLM_INFRASTRUCTURE_AUDIT.md`, `CONTRIBUTING.md`, `README.md`, `OPERATIONS.md`, `docs/README.md`; `PROJECT_COMPLETION_ROADMAP.md` Layer 2 updated with shipped instrumentation vs open “canonical profile” choice.
 - **Advanced topology handshake:** `on initialize_advanced_topology` now validates payload strictly (`advanced_topology` must be boolean `true`, `consciousness_integration` must be boolean); on failure emits `quantum.mathematics.advanced_topology.error` plus `log_error` (no silent defaults).
 - **LLM bench automation:** `scripts/run_native_engine_llm_bench.sh` — build/start C `azl-native-engine` with minimal bootstrap, then run `benchmark_llm_ollama.sh`; documented in `docs/LLM_INFRASTRUCTURE_AUDIT.md` §5.

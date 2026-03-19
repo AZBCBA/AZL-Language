@@ -57,6 +57,8 @@ Broader / historical spec draft: [../azl/docs/AZL_LANGUAGE_SPECIFICATION.md](../
 
 Workflows live under `.github/workflows/` — including **`test-and-deploy.yml`** (tests, native matrix, benchmarks, coverage artifact, Docker → GHCR, optional staging webhook).
 
+**Native gates** (`scripts/check_azl_native_gates.sh`) include **gate H**: `scripts/verify_p0_interpreter_tokenizer_boundary.sh` (semantic tokenizer over `azl_interpreter.azl`). **Product LLM benches:** `scripts/run_product_benchmark_suite.sh` (see `RELEASE_READY.md` optional section).
+
 **`scripts/test_azl_use_vm_path.sh`** (from `run_all_tests.sh`) checks `AZL_USE_VM` docs + wiring, **source-level parity** between `vm_run_bytecode_program` and tree-walker say/emit (`check_azl_vm_tree_parity.py`), and the eligible fixture `azl/tests/fixtures/vm_parity_minimal.azl`.
 
 **LSP:** `tools/azl_lsp.py` provides diagnostics and **`textDocument/definition`** (jump to `component ::…`, matching `emit`/`listen` sites, `fn` / `function`). Integration tests: `scripts/verify_lsp_smoke.sh`, `scripts/test_lsp_jump_to_def.sh` (fixture `azl/tests/lsp_definition_resolution.azl`).
