@@ -106,36 +106,32 @@ static const char *var_get(const char *k) {
 static void var_set(const char *k, const char *v) {
   for (int i = 0; i < g_nvars; i++)
     if (strcmp(g_vars[i].k, k) == 0) {
-      strncpy(g_vars[i].v, v, sizeof(g_vars[i].v) - 1);
-      g_vars[i].v[sizeof(g_vars[i].v) - 1] = '\0';
+      (void)snprintf(g_vars[i].v, sizeof(g_vars[i].v), "%s", v ? v : "");
       return;
     }
   if (g_nvars < MAX_VARS) {
-    strncpy(g_vars[g_nvars].k, k, sizeof(g_vars[g_nvars].k) - 1);
-    g_vars[g_nvars].k[sizeof(g_vars[g_nvars].k) - 1] = '\0';
-    strncpy(g_vars[g_nvars].v, v, sizeof(g_vars[g_nvars].v) - 1);
-    g_vars[g_nvars].v[sizeof(g_vars[g_nvars].v) - 1] = '\0';
+    (void)snprintf(g_vars[g_nvars].k, sizeof(g_vars[g_nvars].k), "%s", k ? k : "");
+    (void)snprintf(g_vars[g_nvars].v, sizeof(g_vars[g_nvars].v), "%s", v ? v : "");
     g_nvars++;
   }
 }
 static void queue_push(const char *ev) {
   if ((g_queue_tail + 1) % MAX_EVENTS != g_queue_head) {
-    strncpy(g_event_queue[g_queue_tail], ev, 63);
-    g_event_queue[g_queue_tail][63] = '\0';
+    (void)snprintf(g_event_queue[g_queue_tail], sizeof(g_event_queue[g_queue_tail]), "%s",
+                   ev ? ev : "");
     g_queue_tail = (g_queue_tail + 1) % MAX_EVENTS;
   }
 }
 static int queue_pop(char *ev) {
   if (g_queue_head == g_queue_tail) return 0;
-  strncpy(ev, g_event_queue[g_queue_head], 63);
-  ev[63] = '\0';
+  (void)snprintf(ev, 64, "%s", g_event_queue[g_queue_head]);
   g_queue_head = (g_queue_head + 1) % MAX_EVENTS;
   return 1;
 }
 static void register_listener(const char *ev, int start, int end) {
   if (g_nlisteners < MAX_LISTENERS) {
-    strncpy(g_listeners[g_nlisteners].event, ev, 63);
-    g_listeners[g_nlisteners].event[63] = '\0';
+    (void)snprintf(g_listeners[g_nlisteners].event, sizeof(g_listeners[g_nlisteners].event),
+                   "%s", ev ? ev : "");
     g_listeners[g_nlisteners].block_start = start;
     g_listeners[g_nlisteners].block_end = end;
     g_nlisteners++;
@@ -191,12 +187,12 @@ static void exec_set(int *i) {
       val[n] = '\0';
     }
   } else if (v && (isdigit((unsigned char)v[0]) || (v[0] == '-' && v[1]))) {
-    strncpy(val, v, sizeof(val) - 1);
+    (void)snprintf(val, sizeof(val), "%s", v);
   } else if (v && v[0] == ':' && v[1] == ':') {
     const char *vv = var_get(v);
-    if (vv) strncpy(val, vv, sizeof(val) - 1);
+    if (vv) (void)snprintf(val, sizeof(val), "%s", vv);
   } else if (v) {
-    strncpy(val, v, sizeof(val) - 1);
+    (void)snprintf(val, sizeof(val), "%s", v);
   }
   var_set(k, val);
   (*i)++;
@@ -219,8 +215,7 @@ static void exec_emit(int *i) {
       have_ev = 1;
     }
   } else if (s && s[0] != '\0') {
-    strncpy(ev, s, sizeof(ev) - 1);
-    ev[sizeof(ev) - 1] = '\0';
+    (void)snprintf(ev, sizeof(ev), "%s", s);
     have_ev = 1;
   }
   if (!have_ev) return;
