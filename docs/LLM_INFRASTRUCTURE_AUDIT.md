@@ -68,6 +68,7 @@ When implemented, update **`GET /api/llm/capabilities`** to set `gguf_in_process
 - **API latency:** `scripts/benchmark_azl_vs_python.sh` (healthz / status / exec_state).
 - **LLM proxy:** `scripts/benchmark_llm_ollama.sh` — compares Python → Ollama, curl → Ollama, and **C native engine** → `POST /api/ollama/generate` only when `GET /api/llm/capabilities` reports `"ollama_http_proxy":true` (avoids mistaking the enterprise HTTP stack on :8080 for the C proxy).
 - **One-shot C engine + LLM bench:** `scripts/run_native_engine_llm_bench.sh` — builds `azl-native-engine`, starts it with minimal bootstrap (`azl/tests/c_minimal_link_ping.azl`), waits for capabilities, runs `benchmark_llm_ollama.sh` with matching `AZL_BENCH_PORT` / `AZL_BENCH_TOKEN`. Requires `ollama serve` and a pulled model (e.g. `llama3.2:1b`).
+- **Enterprise HTTP stack (different surface):** when the combined daemon serves `azl/system/http_server.azl`, chat may be exposed as **`POST /v1/chat`** (or `/chat`) — not the same as **`POST /api/ollama/generate`** on the C engine. Benchmark or curl that route separately if that is the integration under test.
 
 ---
 
