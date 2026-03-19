@@ -36,26 +36,10 @@ Thumbs.db
 # Logs
 *.log
 logs/
-.azl/*.log
-.azl/*.log.*
-.azl/*.out
-.azl/*.err
-.azl/*.gz
 
-# AZL build artifacts
-.azl/bin/
-
-# AZL runtime / daemon (local only)
-.azl/daemon.*
-.azl/sysproxy
-.azl/sysproxy.*
-.azl/syswire.*
-.azl/wire.*
-.azl/*.pid
-.azl/api*.token
-.azl/daemon_status.json
-.azl/tmp/
-.azl/_lat
+# AZL project-local directory (build outputs, daemon, sysproxy, benchmarks, API probes)
+# Nothing under .azl/ should be versioned; use `git add -f .azl/...` only if you truly need an exception.
+.azl/
 .azl_setup/
 
 # Training / local data (do not commit)
@@ -67,10 +51,6 @@ weights
 mnt/
 quarantine/
 *.pid
-
-# Benchmark artifacts (local)
-.azl/benchmark_*.txt
-.azl/benchmark_*.lat
 
 # Test outputs
 test_output.txt
@@ -84,6 +64,3 @@ output.txt
 
 # Built .azlpack tarballs (scripts/build_azlpack.sh)
 packages/registry/**/pkg.tar.gz
-
-# Installed packages from verify / azl install
-.azl/packages/

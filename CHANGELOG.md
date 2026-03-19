@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+- **Repository hygiene:** `.gitignore` now ignores the entire `.azl/` directory; all previously tracked paths under `.azl/` were removed from the index (`git rm --cached`). Local builds and daemons keep using `.azl/` on disk; it is no longer part of the Git tree. Use `git add -f .azl/...` only for deliberate exceptions.
 - **Runtime spine (source of truth):** [docs/RUNTIME_SPINE_DECISION.md](docs/RUNTIME_SPINE_DECISION.md) — C engine orchestrates; AZL interpreter is the decided semantic core; documents **current vs target**, **P0 not done** on default `start_azl_native_mode.sh` path, ordered **P0–P5** obligations with file pointers; quantum core-language one-liner; GGUF deferred unless product requires it.
 - Documentation and GitHub readiness: LICENSE, CONTRIBUTING (Python + AZL), AZL_LANGUAGE_RULES, GRAMMAR reference, updated README and project structure, clarified advanced_features as future-only.
 - Documentation cleanup: removed obsolete root/`reports`/`azl/docs` status and “supervisor” markdown that contradicted the native AZL stack (stale Rust-runtime claims, duplicate completion reports). Canonical index: `docs/README.md`; CI truth: `docs/CI_CD_PIPELINE.md`; short status: `docs/STATUS.md`.
