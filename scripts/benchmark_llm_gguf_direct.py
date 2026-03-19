@@ -50,12 +50,19 @@ def run_llama_cli(prompt: str, n_predict: int) -> tuple[bool, float, str]:
         cmd = [cli, "-m", gguf, "-f", pfile, "-n", str(n_predict)]
         if not skip_no_cnv:
             cmd.append("-no-cnv")
-        cmd.append("--log-disable")
+        if (os.environ.get("AZL_LLAMA_SIMPLE_IO") or "").strip() == "1":
+            cmd.append("--simple-io")
         t0 = time.perf_counter()
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        r = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=600,
+        )
         dt = (time.perf_counter() - t0) * 1e6
         ok = r.returncode == 0
-        out = (r.stdout or "") + (r.stderr or "")
+        out = r.stdout or ""
         return ok, dt, out[:2000] if ok else out[:500]
     finally:
         try:

@@ -354,14 +354,25 @@ static void handle_gguf_infer(int cfd, const char *req, ssize_t n, EngineState *
   }
   if (pid == 0) {
     close(pipefd[0]);
+    int dn = open("/dev/null", O_WRONLY);
+    if (dn >= 0) {
+      (void)dup2(dn, STDERR_FILENO);
+      close(dn);
+    }
     if (dup2(pipefd[1], STDOUT_FILENO) < 0) _exit(126);
-    if (dup2(pipefd[1], STDERR_FILENO) < 0) _exit(126);
     close(pipefd[1]);
     const char *use_no_cnv = getenv("AZL_LLAMA_SKIP_NO_CNV");
+    const char *simple_io = getenv("AZL_LLAMA_SIMPLE_IO");
     if (use_no_cnv && use_no_cnv[0] == '1') {
-      execlp(cli, cli, "-m", gguf, "-f", tpl, "-n", nbuf, "--log-disable", (char *)NULL);
+      if (simple_io && simple_io[0] == '1')
+        execlp(cli, cli, "-m", gguf, "-f", tpl, "-n", nbuf, "--simple-io", (char *)NULL);
+      else
+        execlp(cli, cli, "-m", gguf, "-f", tpl, "-n", nbuf, (char *)NULL);
     } else {
-      execlp(cli, cli, "-m", gguf, "-f", tpl, "-n", nbuf, "-no-cnv", "--log-disable", (char *)NULL);
+      if (simple_io && simple_io[0] == '1')
+        execlp(cli, cli, "-m", gguf, "-f", tpl, "-n", nbuf, "-no-cnv", "--simple-io", (char *)NULL);
+      else
+        execlp(cli, cli, "-m", gguf, "-f", tpl, "-n", nbuf, "-no-cnv", (char *)NULL);
     }
     _exit(127);
   }
