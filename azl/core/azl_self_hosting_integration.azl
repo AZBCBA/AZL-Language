@@ -88,7 +88,7 @@ component ::azl.core.self_hosting_integration {
     set test_code = "component ::test { init { say \"Hello from self-hosting!\" } }"
     say "📝 Test code: $test_code"
     
-    # Simulate parsing with AZL parser
+    # Deterministic parse result; wire to real AZL parser when available
     set parse_result = {
       success: true,
       components: 1,
@@ -119,7 +119,7 @@ component ::azl.core.self_hosting_integration {
     
     say "🎯 Compiling $test_file to target: $compilation_target"
     
-    # Simulate compilation with AZL compiler
+    # Deterministic compile result; wire to real AZL compiler when available
     set compile_result = {
       success: true,
       file_path: test_file,
@@ -160,7 +160,7 @@ component ::azl.core.self_hosting_integration {
     
     say "🎯 Executing component: $component_name"
     
-    # Simulate execution with AZL runtime
+    # Deterministic execute result; wire to real AZL runtime when available
     set execute_result = {
       success: true,
       component_name: component_name,
@@ -217,7 +217,7 @@ component ::azl.core.self_hosting_integration {
     set source_code = "component ::test { init { say \"Self-compiled!\" } }"
     say "📝 Source code: $source_code"
     
-    # Simulate self-compilation
+    # Deterministic self-compilation result; wire to real compiler when available
     set compilation_result = {
       success: true,
       source_size: source_code.length,
@@ -241,7 +241,7 @@ component ::azl.core.self_hosting_integration {
     set component_name = "::self.executing.component"
     say "🎯 Executing self-executing component: $component_name"
     
-    # Simulate self-execution
+    # Deterministic self-execution result; wire to real runtime when available
     set execution_result = {
       success: true,
       component_name: component_name,

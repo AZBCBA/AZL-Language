@@ -9,7 +9,7 @@ echo "🎯 Canonical path: scripts/run_enterprise_daemon.sh"
 echo ""
 
 export AZL_NATIVE_ONLY="${AZL_NATIVE_ONLY:-1}"
-export AZL_NATIVE_RUNTIME_CMD="${AZL_NATIVE_RUNTIME_CMD:-bash scripts/azl_native_runtime_loop.sh}"
+export AZL_NATIVE_RUNTIME_CMD="${AZL_NATIVE_RUNTIME_CMD:-bash scripts/azl_c_interpreter_runtime.sh}"
 export AZL_API_TOKEN="${AZL_API_TOKEN:-$(openssl rand -hex 32)}"
 export AZL_BUILD_API_PORT="${AZL_BUILD_API_PORT:-8080}"
 export AZL_STRICT="${AZL_STRICT:-1}"

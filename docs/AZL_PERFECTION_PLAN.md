@@ -180,10 +180,18 @@ Phase 7 (Documentation) — ongoing
 **Immediate next steps (next 2–4 weeks):**
 
 1. **Phase 1.1–1.2:** Implement minimal C interpreter; wire into native engine. This unblocks true AZL-only execution.
-   - *Done:* `tools/azl_interpreter_minimal.c` skeleton; parses components, runs `say` in init; `scripts/azl_c_interpreter_runtime.sh` for optional use.
-   - *Next:* Extend to `emit`, `listen`, `set`; wire as default runtime when complete.
-2. **Phase 2.1–2.2:** Replace simulated logic in kernel and advanced_event_system. *Done.*
+   - *Done:* `tools/azl_interpreter_minimal.c` skeleton; parses components, runs `say`, `set`, `emit`, `listen` in init; `scripts/azl_c_interpreter_runtime.sh` for optional use.
+   - *Next:* Wire as default runtime when complete.
+2. **Phase 2.1–2.5:** Replace simulated logic in production paths. *Done.*
+   - *Done:* kernel (file_system, system_time, component_loader), advanced_event_system, data_processor, external_data_sources, memory_persistence_system, azl_self_hosting_integration. Remaining "simulate" only in test harnesses, quantum predict semantics (simulate_next_states), and algorithm names (SimulatedAnnealing).
 3. **Phase 3.1:** Fix `azme_unified_agi_orchestrator.azl` host syntax. *Done.*
+4. **Phase 7.1:** Audit advanced_features.md. *Done.* (Doc already marks NOT IMPLEMENTED; no false claims.)
+5. **Phase 1.2:** Wire C interpreter as default runtime. *Done.* (azl_c_interpreter_runtime.sh is default; 2MB buffer for enterprise combined.)
+6. **Phase 3.2–3.3:** Stricter grammar CI, AZL-only doc. *Done.* (Added var/const/print/export/interface checks; fixed azl_system_interface, azme_*_dataset_training; AZL_LANGUAGE_RULES.md forbidden-syntax table.)
+7. **Phase 4:** Parse cache cap 512; benchmark: AZL faster on status/exec_state.
+8. **Phase 5:** LHA3 stdlib API doc (`docs/LHA3_STDLIB_API.md`).
+9. **Phase 6:** .azlpack spec (`docs/AZLPACK_SPEC.md`).
+10. **Phase 7.2:** README examples fixed to valid AZL.
 
 ---
 

@@ -14,9 +14,26 @@
 2. **Events** drive behavior: `emit event_name with payload` and `listen for "event_name" then { }`.
 3. **Variables**: `set` for assignment, `let` for declare-and-assign. Variables can be component-scoped with `::name`.
 4. **Control flow**: `if`/`else`, `while`, `for`, `loop while`, `loop for item in collection`; `break` and `continue` as in the current spec.
-5. **Functions**: `fn name(params) { body }`; lexical scoping, `return`.
+5. **Functions**: `fn name(params) { body }` or `function name(params) { body }`; lexical scoping, `return`.
 6. **Output**: `say message` (not `print` from Java/JS).
 7. **No implicit Java/TS**: No `class`, `interface`, `export default`, or npm/package semantics unless explicitly added to the AZL spec.
+
+## Forbidden host syntax (CI-blocked)
+
+The grammar conformance gate (`scripts/verify_azl_grammar_conformance.sh`) blocks these host-language patterns in the combined runtime:
+
+| Pattern | Host | Use instead |
+|---------|------|--------------|
+| `class X {` | Java/JS | `component ::X { }` |
+| `import X from` | JS/TS | AZL `link` or component composition |
+| `constructor(` | JS | `init { }` block |
+| `def name` | Python | `fn name` or `function name` |
+| `lambda` | Python | `fn` or inline |
+| `var x` | JS | `set x` or `let x` |
+| `const x` | JS/TS | `set x` or `let x` |
+| `print(` | Python/JS | `say` |
+| `export default` | JS/TS | AZL export if added to spec |
+| `interface Foo {` | TS | AZL types if added to spec |
 
 ## Where the rules are defined
 

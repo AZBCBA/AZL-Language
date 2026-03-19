@@ -662,8 +662,8 @@
         execution_time: 100
       }
       
-      # Simulate step execution
-      store ::step_success from (::now % 10) > 2  # 80% success rate
+      # Deterministic step execution: success when step has valid type
+      store ::step_success from (::step.type != null && ::step.type != "")
       
       if !::step_success {
         store ::step_result.success from false

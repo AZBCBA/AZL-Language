@@ -28,8 +28,8 @@ To enforce AZL-native deployment direction (no Python/JS bootstrap paths), use:
 ```bash
 # Optional: provide your own native executor command
 # export AZL_NATIVE_EXEC_CMD=/path/to/azl-native-engine
-# Optional: provide runtime process launched by native engine
-# export AZL_NATIVE_RUNTIME_CMD="bash scripts/azl_native_runtime_loop.sh"
+# Optional: provide runtime process launched by native engine (default: C interpreter)
+# export AZL_NATIVE_RUNTIME_CMD="bash scripts/azl_c_interpreter_runtime.sh"
 bash scripts/start_azl_native_mode.sh
 ```
 
@@ -76,51 +76,42 @@ Run full native validation: `./scripts/run_all_tests.sh`.
 ### Hello World
 
 ```azl
-say("Hello, AZL!");
+component ::hello {
+  init {
+    say "Hello, AZL!"
+  }
+}
 ```
 
 ### Variables and Functions
 
 ```azl
-let name = "AZL";
-let greet = fn(name) {
-    return "Hello, " + name + "!";
-};
-say(greet(name));
+component ::greet {
+  init {
+    set name = "AZL"
+    say greet(name)
+  }
+  fn greet(name) {
+    return "Hello, " + name + "!"
+  }
+}
 ```
 
-### Arrays and Functional Programming
+### Components and Events
 
 ```azl
-import { map, filter, reduce } from "stdlib/core/array.azl";
-
-let numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-
-// Double all numbers
-let doubled = map(numbers, fn(x) { return x * 2; });
-
-// Filter even numbers
-let evens = filter(numbers, fn(x) { return x % 2 == 0; });
-
-// Sum all numbers
-let sum = reduce(numbers, fn(acc, x) { return acc + x; }, 0);
-
-say("Doubled: " + doubled);
-say("Evens: " + evens);
-say("Sum: " + sum);
-```
-
-### String Processing
-
-```azl
-import { split, join, to_upper } from "stdlib/string.azl";
-
-let text = "hello,world,azl,programming";
-let words = split(text, ",");
-let upper_words = map(words, fn(word) { return to_upper(word); });
-let result = join(upper_words, " ");
-
-say("Result: " + result);
+component ::counter {
+  init {
+    set ::count = 0
+    emit "tick"
+  }
+  behavior {
+    listen for "tick" then {
+      set ::count = ::count + 1
+      say "Count: " + ::count
+    }
+  }
+}
 ```
 
 ## 📚 Language Reference
@@ -129,59 +120,46 @@ say("Result: " + result);
 
 #### Variables
 ```azl
-let x = 42;
-let name = "AZL";
-let is_active = true;
-let items = [1, 2, 3, 4, 5];
+set x = 42
+set name = "AZL"
+set is_active = true
+set items = [1, 2, 3, 4, 5]
 ```
 
 #### Functions
 ```azl
-// Function declaration
-let add = fn(a, b) {
-    return a + b;
-};
-
-// Arrow function (shorthand)
-let multiply = fn(a, b) => a * b;
-
-// Function call
-let result = add(5, 3);
+fn add(a, b) {
+  return a + b
+}
+set result = add(5, 3)
 ```
 
 #### Control Flow
 ```azl
-// If statements
-if (x > 10) {
-    say("x is greater than 10");
+if x > 10 {
+  say "x is greater than 10"
 } else {
-    say("x is 10 or less");
+  say "x is 10 or less"
 }
 
-// While loops
-let i = 0;
-while (i < 5) {
-    say("Count: " + i);
-    i = i + 1;
+set i = 0
+while i < 5 {
+  say "Count: " + i
+  set i = i + 1
 }
 
-// For loops
-for (let j = 0; j < 5; j = j + 1) {
-    say("For count: " + j);
+for j from 0 to 4 {
+  say "For count: " + j
 }
 ```
 
 #### Arrays
 ```azl
-let arr = [1, 2, 3, 4, 5];
-
-// Access elements
-let first = arr[0];
-let last = arr[arr.length - 1];
-
-// Modify arrays
-arr.push(6);
-arr[0] = 10;
+set arr = [1, 2, 3, 4, 5]
+set first = arr[0]
+set last = arr[arr.length - 1]
+arr.push(6)
+arr[0] = 10
 ```
 
 ### Components and Events (current runtime)
@@ -200,16 +178,7 @@ component ::demo.app {
 
 ### Error Handling
 
-```azl
-try {
-    let result = risky_operation();
-    say("Success: " + result);
-} catch (error) {
-    say("Error: " + error);
-} finally {
-    say("Cleanup completed");
-}
-```
+Use the error system: `emit "error" with { message: "..." }` and `listen for "error" then { }`. See `azl/core/error_system.azl`.
 
 ## 📖 Standard Library
 

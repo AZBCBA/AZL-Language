@@ -52,6 +52,16 @@ if rg -n "def\\s+[A-Za-z_]|lambda\\s+|__name__\\s*==\\s*['\\\"]__main__['\\\"]" 
   cat /tmp/azl_grammar_py_hits.out
   exit 105
 fi
+if rg -n "\\bvar\\s+[A-Za-z_]|\\bconst\\s+[A-Za-z_]|(?<![a-zA-Z0-9_])print\\s*\\(" "$COMBINED_PATH" >/tmp/azl_grammar_var_hits.out 2>&1; then
+  echo "ERROR: combined runtime contains host syntax (var/const/print); use set/let/say"
+  cat /tmp/azl_grammar_var_hits.out
+  exit 106
+fi
+if rg -n "export\\s+default|^[^#]*\\binterface\\s+[A-Z][A-Za-z0-9_]*\\s*\\{" "$COMBINED_PATH" >/tmp/azl_grammar_export_hits.out 2>&1; then
+  echo "ERROR: combined runtime contains JS/TS export/interface syntax"
+  cat /tmp/azl_grammar_export_hits.out
+  exit 107
+fi
 
 echo "[verify-grammar] success"
 echo "  port: ${PORT}"

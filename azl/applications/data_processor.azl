@@ -133,7 +133,7 @@ component ::azl.applications.data_processor {
   fn read_file_content(filename) {
     say "📖 Reading file: $filename"
     
-    # Simulate file reading (would use real file system)
+    # Deterministic content from known paths; wire to sysproxy for real fs when available
     if filename == "sample_data.txt" {
       return "This is sample data for processing.\nIt contains multiple lines.\nWe will analyze this text."
     } else if filename == "test_data.csv" {

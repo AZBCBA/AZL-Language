@@ -132,7 +132,7 @@ component ::stdlib.mini {
   }
 
   # time: monotonic counter (pure AZL, explicit)
-  var tick_ms = 0
+  set tick_ms = 0
   fn time_now_ms() {
     # best-effort: returns growing integer; if you have a real clock, replace this.
     return tick_ms
@@ -1236,7 +1236,7 @@ component ::azl.system_interface {
   }
 
   # ===== sysproxy bridge =====
-  var sysproxy_seq = 0
+  set sysproxy_seq = 0
 
   fn sysproxy_call(op, args) {
     set id = (sysproxy_seq + 1)

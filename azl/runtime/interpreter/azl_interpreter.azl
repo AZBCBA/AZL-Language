@@ -23,7 +23,7 @@ component ::azl.interpreter {
     set ::halted = false
     set ::halt_on_error = ((::internal.env("AZL_STRICT") or "1") == "1")
     # Performance caches (pure AZL): tokenization and parse memo by source hash
-    set ::perf = { tok_cache: {}, ast_cache: {}, cap: ((::internal.env("AZL_PARSE_CACHE") or "128").toInt()) }
+    set ::perf = { tok_cache: {}, ast_cache: {}, cap: ((::internal.env("AZL_PARSE_CACHE") or "512").toInt()) }
     set ::perf.stats = { tok_hits: 0, tok_misses: 0, ast_hits: 0, ast_misses: 0 }
     set ::cache_order = []  # LRU for keys of either cache (same keys)
     link ::azl.security

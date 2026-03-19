@@ -17,7 +17,7 @@ export AZL_HTTP_PORT="${AZL_HTTP_PORT:-}"  # optional separate AZL http server p
 export AZL_WIRE_MANAGED=1
 export AZL_NATIVE_ONLY="${AZL_NATIVE_ONLY:-1}"
 export AZL_ENABLE_LEGACY_HOST="${AZL_ENABLE_LEGACY_HOST:-0}"
-export AZL_NATIVE_RUNTIME_CMD="${AZL_NATIVE_RUNTIME_CMD:-bash scripts/azl_native_runtime_loop.sh}"
+export AZL_NATIVE_RUNTIME_CMD="${AZL_NATIVE_RUNTIME_CMD:-bash scripts/azl_c_interpreter_runtime.sh}"
 
 echo "🔑 API Token: $AZL_API_TOKEN"
 echo "📁 Config: $AZL_BUILD_CONFIG"

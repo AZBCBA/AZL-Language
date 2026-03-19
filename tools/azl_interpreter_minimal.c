@@ -14,8 +14,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#define BUF_SIZE  (256 * 1024)
-#define MAX_TOKS  16384
+#define BUF_SIZE  (2 * 1024 * 1024)   /* 2MB for enterprise combined files */
+#define MAX_TOKS  65536
 #define MAX_VARS  256
 #define MAX_LISTENERS 64
 #define MAX_EVENTS 32
