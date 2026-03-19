@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-- **P0c interpreter slice:** `azl/tests/p0_semantic_interpreter_slice.azl` + native gate **F3** (C↔Python stdout match); `scripts/run_semantic_interpreter_slice.sh`. `RUNTIME_SPINE_DECISION.md` P0c; `WORK_QUEUE` / roadmap updated.
+- **P0c interpreter slice:** Widened `azl/tests/p0_semantic_interpreter_slice.azl` toward `::azl.interpreter` init (`::azl.security` stub, many `set ::… = []`/`{}`, `link ::azl.security`, boot `say` lines + `P0_SEMANTIC_INTERPRETER_SLICE_OK`). **Minimal `exec_set`:** RHS starting with `[` or `{` consumes a **balanced** literal and stores `"[]"` or `"{}"` so `init` `}` depth is not corrupted (`tools/azl_interpreter_minimal.c`, `tools/azl_semantic_engine/minimal_runtime.py`). Native gate **F3** (byte-identical C↔Python stdout); `scripts/run_semantic_interpreter_slice.sh`. `RUNTIME_SPINE_DECISION.md` P0c updated.
 - **Full verification:** `scripts/run_full_repo_verification.sh` — `RELEASE_READY` sequence + `run_all_tests.sh` + optional Ollama + enterprise `/v1/chat` benches (`RUN_OPTIONAL_BENCHES=0` to skip). `RELEASE_READY.md`, `README.md`, `OPERATIONS.md`, `WORK_QUEUE.md` updated.
 - **Work queue + HTTP profile:** `docs/WORK_QUEUE.md` (ordered checklist); `docs/CANONICAL_HTTP_PROFILE.md` (C engine vs enterprise `http_server`). Roadmap “next actions” points at WORK_QUEUE; docs index updated.
 - **Gate H extended:** `verify_p0_interpreter_tokenizer_boundary.sh` — full-file **`{`/`}` token balance** + `component ::azl.interpreter` anchor on `azl_interpreter.azl`.

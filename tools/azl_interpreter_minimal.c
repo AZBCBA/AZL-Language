@@ -166,6 +166,23 @@ static void exec_say(int *i) {
   }
 }
 
+/* Skip a balanced [...] or {...} starting at g_tok[*i] (inclusive). */
+static void consume_agg_literal(int *i) {
+  if (*i >= g_ntok) return;
+  const char *open = g_tok[*i];
+  const char *close = NULL;
+  if (strcmp(open, "[") == 0) close = "]";
+  else if (strcmp(open, "{") == 0) close = "}";
+  else return;
+  int d = 1;
+  (*i)++;
+  while (*i < g_ntok && d > 0) {
+    if (strcmp(g_tok[*i], open) == 0) d++;
+    else if (strcmp(g_tok[*i], close) == 0) d--;
+    (*i)++;
+  }
+}
+
 /* Execute set ::var = value */
 static void exec_set(int *i) {
   (*i)++;
@@ -178,6 +195,18 @@ static void exec_set(int *i) {
   if (*i >= g_ntok) return;
   const char *v = g_tok[*i];
   char val[256] = {0};
+  if (v && strcmp(v, "[") == 0) {
+    consume_agg_literal(i);
+    (void)snprintf(val, sizeof(val), "[]");
+    var_set(k, val);
+    return;
+  }
+  if (v && strcmp(v, "{") == 0) {
+    consume_agg_literal(i);
+    (void)snprintf(val, sizeof(val), "{}");
+    var_set(k, val);
+    return;
+  }
   if (v && strlen(v) >= 2 && (v[0] == '"' || v[0] == '\'')) {
     size_t len = strlen(v);
     if (len >= 2) {

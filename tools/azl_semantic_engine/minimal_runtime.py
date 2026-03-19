@@ -189,6 +189,26 @@ class MinimalAZLRuntime:
         else:
             i[0] += 1
 
+    def _consume_agg_literal(self, i: list[int]) -> None:
+        if i[0] >= self.ntok:
+            return
+        open_t = self.tok[i[0]]
+        if open_t == "[":
+            close_t = "]"
+        elif open_t == "{":
+            close_t = "}"
+        else:
+            return
+        d = 1
+        i[0] += 1
+        while i[0] < self.ntok and d > 0:
+            t = self.tok[i[0]]
+            if t == open_t:
+                d += 1
+            elif t == close_t:
+                d -= 1
+            i[0] += 1
+
     def exec_set(self, i: list[int]) -> None:
         i[0] += 1
         if i[0] >= self.ntok:
@@ -204,6 +224,14 @@ class MinimalAZLRuntime:
         if i[0] >= self.ntok:
             return
         v = self.tok[i[0]]
+        if v == "[":
+            self._consume_agg_literal(i)
+            self.var_set(k, "[]")
+            return
+        if v == "{":
+            self._consume_agg_literal(i)
+            self.var_set(k, "{}")
+            return
         val = ""
         if len(v) >= 2 and v[0] in "\"'":
             val = v[1:-1] if len(v) >= 2 else ""
