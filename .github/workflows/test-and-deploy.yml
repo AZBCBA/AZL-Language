@@ -1,0 +1,244 @@
+# Unified CI/CD: tests (PR + main), multi-config native engine build, benchmark regression gate,
+# GCC coverage report for tools/azl_native_engine.c, Docker build, GHCR push on main, optional staging webhook.
+#
+# Setup (GitHub):
+#   - Packages: allow GITHUB_TOKEN to publish (default for same-repo workflows).
+#   - Secret STAGING_DEPLOY_WEBHOOK: POST URL to roll staging (optional; skipped with notice if unset).
+#   - Environment "staging" (optional): add URL / protection rules in repo Settings → Environments.
+#
+# Note: This overlaps parts of ci.yml, azl-ci.yml, and native-release-gates.yml; disable those if you want
+# a single pipeline to save Actions minutes.
+
+name: Test and Deploy
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: test-and-deploy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+env:
+  AZL_BENCH_BASELINE_healthz: "6000"
+  AZL_BENCH_BASELINE_status: "5500"
+  AZL_BENCH_BASELINE_exec_state: "5500"
+  AZL_BENCH_REGRESSION_THRESHOLD: "10"
+
+jobs:
+  gate-and-test:
+    name: Gates and full test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y gcc curl ripgrep jq iproute2 openssl
+
+      - name: Check no placeholders (.azl / .rs)
+        run: |
+          chmod +x scripts/check_no_placeholders.sh || true
+          ./scripts/check_no_placeholders.sh
+
+      - name: Run full AZL test suite
+        run: |
+          chmod +x scripts/run_all_tests.sh || true
+          ./scripts/run_all_tests.sh
+
+  native-engine-matrix:
+    name: Native engine (${{ matrix.name }})
+    needs: [gate-and-test]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: release-O2
+            flags: "-O2 -Wall -Wextra -Werror"
+          - name: debug-O0
+            flags: "-O0 -g -Wall -Wextra -Werror"
+          - name: size-Os
+            flags: "-Os -Wall -Wextra -Werror"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install gcc
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y gcc
+
+      - name: Build azl-native-engine
+        run: |
+          mkdir -p .azl/bin
+          gcc ${{ matrix.flags }} -o ".azl/bin/azl-native-engine-${{ matrix.name }}" tools/azl_native_engine.c
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-engine-${{ matrix.name }}
+          path: .azl/bin/azl-native-engine-${{ matrix.name }}
+
+  benchmark-regression:
+    name: Benchmarks and regression gate
+    needs: [gate-and-test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y gcc curl ripgrep jq iproute2 openssl
+
+      - name: Make scripts executable
+        run: |
+          chmod +x scripts/benchmark_gate.sh scripts/benchmark_azl_vs_python.sh scripts/benchmark_native_api.sh \
+            scripts/build_azl_native_engine.sh 2>/dev/null || true
+
+      - name: Build default native engine
+        run: bash scripts/build_azl_native_engine.sh
+
+      - name: Benchmark gate (block if regression exceeds threshold)
+        run: bash scripts/benchmark_gate.sh
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-native-api
+          path: .azl/benchmark_native_api_*.txt
+          if-no-files-found: warn
+
+      - name: Write benchmark summary
+        run: |
+          f="$(ls -t .azl/benchmark_native_api_*.txt 2>/dev/null | head -1 || true)"
+          if [ -z "$f" ] || [ ! -f "$f" ]; then
+            echo "No benchmark result file for summary" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "### Native API benchmark (latest)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          head -50 "$f" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  native-engine-coverage:
+    name: Native engine coverage (GCC / lcov)
+    needs: [gate-and-test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y gcc lcov curl ripgrep openssl
+
+      - name: Generate coverage (instrumented engine + live verify)
+        run: |
+          chmod +x scripts/ci_native_engine_coverage.sh scripts/verify_native_runtime_live.sh \
+            scripts/start_azl_native_mode.sh scripts/build_azl_native_engine.sh 2>/dev/null || true
+          bash scripts/ci_native_engine_coverage.sh
+
+      - name: Upload coverage HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html-native-engine
+          path: .azl/coverage-html/
+
+      - name: Upload lcov info
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov-info
+          path: .azl/coverage.info
+
+  container-image:
+    name: Docker image (build; push to GHCR on main)
+    needs: [gate-and-test]
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Image name (lowercase for GHCR)
+        id: meta
+        run: |
+          owner_lc=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          name_lc=$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${owner_lc}/${name_lc}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    name: Deploy staging
+    needs: [container-image]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install curl and jq
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y curl jq
+
+      - name: Trigger staging rollout
+        env:
+          WEBHOOK: ${{ secrets.STAGING_DEPLOY_WEBHOOK }}
+          IMAGE: ${{ needs.container-image.outputs.image }}
+        run: |
+          if [ -z "${WEBHOOK}" ]; then
+            echo "::notice title=Staging deploy::STAGING_DEPLOY_WEBHOOK is not set; skipping staging trigger. Set the repo secret to POST your orchestrator."
+            exit 0
+          fi
+          payload="$(jq -n \
+            --arg repo "${{ github.repository }}" \
+            --arg sha "${{ github.sha }}" \
+            --arg ref "${{ github.ref_name }}" \
+            --arg image "${IMAGE}" \
+            --arg tag "${{ github.sha }}" \
+            '{repository:$repo, sha:$sha, ref:$ref, image:($image + ":" + $tag)}')"
+          curl -fsS -X POST "$WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "$payload"
