@@ -83,6 +83,7 @@ COMPONENTS=(
   "azl/build/cache_manager.azl"
   "azl/system/azl_system_interface.azl"
   "azl/stdlib/core/azl_stdlib.azl"
+  "azl/stdlib/core/simd.azl"
   "azl/core/error_system.azl"
   "azl/runtime/interpreter/azl_interpreter.azl"
   "azl/bootstrap/azl_pure_launcher.azl"

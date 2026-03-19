@@ -1,0 +1,88 @@
+# AZL SIMD Primitives - Vectorized array operations for AI workloads
+# Pure AZL implementation; wire to native SIMD when available
+
+component ::azl.stdlib.simd {
+  init {
+    set ::status = "ready"
+  }
+
+  # Element-wise add: result[i] = a[i] + b[i]
+  function simd_add(a, b) {
+    if a == null || b == null { return [] }
+    set len = a.length < b.length ? a.length : b.length
+    set result = []
+    set i = 0
+    while (i < len) {
+      result.push(a[i] + b[i])
+      set i = i + 1
+    }
+    return result
+  }
+
+  # Element-wise multiply: result[i] = a[i] * b[i]
+  function simd_mul(a, b) {
+    if a == null || b == null { return [] }
+    set len = a.length < b.length ? a.length : b.length
+    set result = []
+    set i = 0
+    while (i < len) {
+      result.push(a[i] * b[i])
+      set i = i + 1
+    }
+    return result
+  }
+
+  # Element-wise max: result[i] = max(a[i], b[i])
+  function simd_max(a, b) {
+    if a == null || b == null { return [] }
+    set len = a.length < b.length ? a.length : b.length
+    set result = []
+    set i = 0
+    while (i < len) {
+      set va = a[i]
+      set vb = b[i]
+      if va > vb { result.push(va) } else { result.push(vb) }
+      set i = i + 1
+    }
+    return result
+  }
+
+  # Element-wise min: result[i] = min(a[i], b[i])
+  function simd_min(a, b) {
+    if a == null || b == null { return [] }
+    set len = a.length < b.length ? a.length : b.length
+    set result = []
+    set i = 0
+    while (i < len) {
+      set va = a[i]
+      set vb = b[i]
+      if va < vb { result.push(va) } else { result.push(vb) }
+      set i = i + 1
+    }
+    return result
+  }
+
+  # Scalar add to vector: result[i] = a[i] + s
+  function simd_add_scalar(a, s) {
+    if a == null { return [] }
+    set result = []
+    set i = 0
+    while (i < a.length) {
+      result.push(a[i] + s)
+      set i = i + 1
+    }
+    return result
+  }
+
+  # Scalar multiply: result[i] = a[i] * s
+  function simd_mul_scalar(a, s) {
+    if a == null { return [] }
+    set result = []
+    set i = 0
+    while (i < a.length) {
+      result.push(a[i] * s)
+      set i = i + 1
+    }
+    return result
+  }
+}

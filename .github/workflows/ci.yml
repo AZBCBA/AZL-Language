@@ -40,6 +40,16 @@ jobs:
       - name: Perf smoke
         run: bash scripts/perf_smoke.sh
 
+      - name: Benchmark gate (block if >10% regression)
+        env:
+          AZL_BENCH_BASELINE_healthz: "6000"
+          AZL_BENCH_BASELINE_status: "5500"
+          AZL_BENCH_BASELINE_exec_state: "5500"
+          AZL_BENCH_REGRESSION_THRESHOLD: "10"
+        run: |
+          chmod +x scripts/benchmark_gate.sh || true
+          bash scripts/benchmark_gate.sh
+
       - name: Run all AZL tests (strict)
         run: |
           chmod +x scripts/run_all_tests.sh || true

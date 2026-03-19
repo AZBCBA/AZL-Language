@@ -63,8 +63,15 @@ elif [ "$cmd" = "build" ]; then
   echo "Build manifest written: $MANIFEST"
   echo "NOTE: Invoke your AZL runtime to read manifest and call ::azl.runtime_integration.build_project"
   exit 0
+elif [ "$cmd" = "install" ]; then
+  PKG="${2:-}"
+  if [ -z "$PKG" ]; then
+    echo "Usage: scripts/azl install <package>" >&2
+    exit 1
+  fi
+  exec bash "$(dirname "$0")/azl_install.sh" "$PKG"
 else
-  echo "Usage: scripts/azl run <file.azl> | build <dir_or_file1> [file2 ...] [--native] [--workers N]" >&2
+  echo "Usage: scripts/azl run <file.azl> | build <dir_or_file1> [file2 ...] [--native] [--workers N] | install <package>" >&2
   exit 1
 fi
 

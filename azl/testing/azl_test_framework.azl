@@ -1,0 +1,58 @@
+# AZL Unit Test Framework - assert_eq, assert_true, run_tests
+# Usage: link ::azl.test_framework, then call run_tests with test components
+
+component ::azl.test_framework {
+  init {
+    set ::passed = 0
+    set ::failed = 0
+    set ::tests = []
+  }
+
+  function assert_eq(name, actual, expected) {
+    if actual == expected {
+      set ::passed = ::passed + 1
+      say "✅ " + name
+      return true
+    }
+    set ::failed = ::failed + 1
+    say "❌ " + name + " expected=" + expected + " got=" + actual
+    return false
+  }
+
+  function assert_true(name, value) {
+    if value {
+      set ::passed = ::passed + 1
+      say "✅ " + name
+      return true
+    }
+    set ::failed = ::failed + 1
+    say "❌ " + name + " expected true got false"
+    return false
+  }
+
+  function assert_false(name, value) {
+    if !value {
+      set ::passed = ::passed + 1
+      say "✅ " + name
+      return true
+    }
+    set ::failed = ::failed + 1
+    say "❌ " + name + " expected false got true"
+    return false
+  }
+
+  function assert_not_null(name, value) {
+    if value != null {
+      set ::passed = ::passed + 1
+      say "✅ " + name
+      return true
+    }
+    set ::failed = ::failed + 1
+    say "❌ " + name + " expected non-null"
+    return false
+  }
+
+  function get_summary() {
+    return { passed: ::passed, failed: ::failed, total: ::passed + ::failed }
+  }
+}
