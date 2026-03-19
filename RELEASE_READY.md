@@ -16,7 +16,15 @@ This document defines the release path for the AZL-native profile.
 
 ## Required Pre-Release Gates
 
-Run in this exact order:
+**One shot (recommended):**
+
+```bash
+RUN_OPTIONAL_BENCHES=0 bash scripts/run_full_repo_verification.sh
+```
+
+Use `RUN_OPTIONAL_BENCHES=1` (default) to also run native + enterprise LLM benches when backends are available.
+
+**Or** run in this exact order:
 
 1. `bash scripts/enforce_canonical_stack.sh`
 2. `bash scripts/check_azl_native_gates.sh`

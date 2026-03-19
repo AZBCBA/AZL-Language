@@ -1,24 +1,32 @@
-# Work queue (run in order)
+# Work queue (status)
 
-Single checklist for the **next actions** from [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md). Update row **Status** as you go.
+Single checklist tied to [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md).
 
-| # | Task | Owner | Status |
-|---|------|--------|--------|
-| 1 | **Product benchmark suite** — `ollama serve` + model; `bash scripts/run_enterprise_daemon.sh`; align `AZL_ENTERPRISE_PORT` with daemon; token in env or `.azl/local_api_token`; `bash scripts/run_product_benchmark_suite.sh` | ops | ☐ |
-| 2 | **P0 spine — automated gates** — `bash scripts/check_azl_native_gates.sh` includes **H** (tokenizer + brace tokens on `azl_interpreter.azl`). Next engineering slice: execute interpreter under `AZL_RUNTIME_SPINE=azl_interpreter` beyond minimal fixture | eng | ☐ (gate H partial) |
-| 3 | **Canonical HTTP profile** — Read [CANONICAL_HTTP_PROFILE.md](CANONICAL_HTTP_PROFILE.md); pick **C-only** vs **enterprise `http_server`** per deployment; align startup docs | arch | ☐ |
-| 4 | **GGUF / GPU** — Only if product requires; [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md); keep `GET /api/llm/capabilities` honest | product | ☐ deferred |
-
-## Quick commands
+## One command (automation)
 
 ```bash
-# Stability (release order)
+# Release order from RELEASE_READY.md + run_all_tests.sh + optional benches
+bash scripts/run_full_repo_verification.sh
+```
+
+- **Optional benches** (Ollama + enterprise `/v1/chat` when possible): **on** by default. Disable: `RUN_OPTIONAL_BENCHES=0 bash scripts/run_full_repo_verification.sh`
+
+## Row status
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | **Product benchmarks** — Native LLM + enterprise chat | **Automated** in `run_full_repo_verification.sh` when Ollama + Profile B exist; else skipped with log lines. Manual override: `bash scripts/run_product_benchmark_suite.sh` |
+| 2 | **P0 spine** — Gate **H** (tokenizer + brace balance on `azl_interpreter.azl`) | **☑ Done** in `check_azl_native_gates.sh`. **Not done:** execute full interpreter on spine (major project) |
+| 3 | **Canonical HTTP** — C engine vs enterprise `http_server` | **☑ Documented** — [CANONICAL_HTTP_PROFILE.md](CANONICAL_HTTP_PROFILE.md); per-deploy choice is yours |
+| 4 | **GGUF / GPU** | **☑ Policy** — deferred; `GET /api/llm/capabilities` verified honest in `verify_native_runtime_live.sh` |
+
+## Manual commands (same as before)
+
+```bash
 bash scripts/enforce_canonical_stack.sh
 bash scripts/check_azl_native_gates.sh
 bash scripts/enforce_legacy_entrypoint_blocklist.sh
 bash scripts/verify_native_runtime_live.sh
 bash scripts/run_all_tests.sh
-
-# Product suite (after daemon + Ollama)
 bash scripts/run_product_benchmark_suite.sh
 ```

@@ -15,6 +15,7 @@ This runbook documents how to run the enterprise daemon and validate host integr
   - `tail -f .azl/daemon.out | grep '@sysproxy'`
 
 ## Native Smoke Tests
+- **`bash scripts/run_full_repo_verification.sh`** — `RELEASE_READY.md` order + `run_all_tests.sh` + optional LLM benches (`RUN_OPTIONAL_BENCHES=0` to skip benches)
 - `./scripts/run_tests.sh` — runs canonical native checks
 - `./scripts/run_all_tests.sh` — runs strict native suite + benchmark gates
 - `bash scripts/benchmark_native_api.sh` — native API latency benchmark

@@ -48,6 +48,8 @@ bash scripts/enforce_legacy_entrypoint_blocklist.sh
 bash scripts/verify_native_runtime_live.sh
 ```
 
+**Full verification (release order + all tests):** `bash scripts/run_full_repo_verification.sh` — set `RUN_OPTIONAL_BENCHES=0` to skip LLM benches.
+
 Release profile details: `RELEASE_READY.md` and `release/native/manifest.json`.
 
 ## Installation (clone and run)

@@ -56,14 +56,14 @@ Explicitly **deferred** unless product requires in-process weights; capabilities
 
 ## Next actions (do in order)
 
-Tracked checklist (checkboxes + commands): **[WORK_QUEUE.md](WORK_QUEUE.md)**.
+Tracked checklist: **[WORK_QUEUE.md](WORK_QUEUE.md)**. **Automation:** `bash scripts/run_full_repo_verification.sh` (see [RELEASE_READY.md](../RELEASE_READY.md)).
 
 Summary:
 
-1. **Product benchmark suite** — Enterprise daemon + Ollama; see WORK_QUEUE.
-2. **P0** — Gate **H** in `check_azl_native_gates.sh` (tokenizer + brace balance on `azl_interpreter.azl`); next: **execute** interpreter on spine beyond minimal fixture.
-3. **Canonical HTTP profile** — **[CANONICAL_HTTP_PROFILE.md](CANONICAL_HTTP_PROFILE.md)** (C engine vs enterprise `http_server`).
-4. **GGUF / GPU** — Deferred unless product requires; capabilities endpoint stays honest.
+1. **Product benchmarks** — Run via full verification (optional) or `run_product_benchmark_suite.sh`.
+2. **P0** — Gate **H** shipped (tokenizer + brace balance). **Open:** execute full `azl_interpreter.azl` on semantic spine (large effort).
+3. **Canonical HTTP** — **[CANONICAL_HTTP_PROFILE.md](CANONICAL_HTTP_PROFILE.md)**.
+4. **GGUF / GPU** — Deferred; honesty verified in native live check.
 
 ---
 

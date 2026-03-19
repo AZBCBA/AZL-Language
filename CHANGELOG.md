@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+- **Full verification:** `scripts/run_full_repo_verification.sh` — `RELEASE_READY` sequence + `run_all_tests.sh` + optional Ollama + enterprise `/v1/chat` benches (`RUN_OPTIONAL_BENCHES=0` to skip). `RELEASE_READY.md`, `README.md`, `OPERATIONS.md`, `WORK_QUEUE.md` updated.
 - **Work queue + HTTP profile:** `docs/WORK_QUEUE.md` (ordered checklist); `docs/CANONICAL_HTTP_PROFILE.md` (C engine vs enterprise `http_server`). Roadmap “next actions” points at WORK_QUEUE; docs index updated.
 - **Gate H extended:** `verify_p0_interpreter_tokenizer_boundary.sh` — full-file **`{`/`}` token balance** + `component ::azl.interpreter` anchor on `azl_interpreter.azl`.
 - **Product suite step 1:** optional **`.azl/local_api_token`** (first line) for `AZL_API_TOKEN`; **`benchmark_enterprise_v1_chat.sh`** probes **`POST /v1/chat`** and exits **95** on **404** (wrong server on port). **Next actions (ordered)** in `docs/PROJECT_COMPLETION_ROADMAP.md`.
