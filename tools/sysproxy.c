@@ -255,6 +255,19 @@ static void process_requests(void) {
         fprintf(stderr,"[sysproxy] KEEPALIVE pid=%d\n", getpid());
         fprintf(stdout,"{\"id\":%ld,\"ok\":true,\"pid\":%d}\n", id, getpid());
       }
+      else if(strcmp(op,"getenv")==0){
+        char name[512]; name[0]=0;
+        if(!jget_string(line,"name",name,sizeof(name)) || !name[0]){
+          fprintf(stderr,"[sysproxy] GETENV missing name id=%ld\n", id);
+          fprintf(stdout,"{\"id\":%ld,\"ok\":true,\"value\":\"\"}\n", id);
+          continue;
+        }
+        const char *v = getenv(name);
+        if(!v) v = "";
+        fprintf(stdout,"{\"id\":%ld,\"ok\":true,\"value\":\"", id);
+        json_escape_print(v, (ssize_t)strlen(v));
+        fputs("\"}\n",stdout);
+      }
       else if(strcmp(op,"http_client")==0){
         char url[2048]; url[0]=0;
         char method[16]="GET";

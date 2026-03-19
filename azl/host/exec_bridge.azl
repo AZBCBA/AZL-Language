@@ -7,62 +7,57 @@ component ::host.exec_bridge {
     say "🚀 BRIDGING HOST ENVIRONMENT TO AZL RUNTIME!"
     say "⚡ REAL SYSTEM INTEGRATION!"
     say "🎯 ENTERPRISE DAEMON LAUNCHER!"
-    
-    # Set up environment variables
+
+    link ::azl.system_interface
+    ::merge_host_env_into_internal()
+
+    # Set up environment variables (host-backed keys merged into ::internal above)
     set ::combined_path = get_env("AZL_COMBINED_PATH") || "unknown"
     set ::entry_point = get_env("AZL_ENTRY") || "::build.daemon.enterprise"
     set ::api_token = get_env("AZL_API_TOKEN") || "default_token"
     set ::api_port = parseInt(get_env("AZL_BUILD_API_PORT") || "8080")
-    
+
     say "📁 Combined path: ::combined_path"
     say "🎯 Entry point: ::entry_point"
     say "🔑 API Token: ::api_token"
     say "🌐 Port: ::api_port"
-    
+
     # PROVE THE ENGINE CAN EMIT @sysproxy LINES - one-time, loud signal
     say "@sysproxy {\"id\":42,\"op\":\"keepalive\"}"
-    
+
     # Initialize the pure launcher
     set ok = ::azl.pure_launcher.run_file(::combined_path, ::entry_point)
-    
+
     if (ok) {
       say "✅ Pure launcher executed successfully"
       say "exec_bridge: emitting daemon.enterprise.start"
       emit daemon.enterprise.start with {}
     } else {
       say "❌ Pure launcher execution failed"
+      emit log_error with { type: "exec_bridge_launch_failed", message: "pure_launcher.run_file returned false", context: { combined_path: ::combined_path, entry_point: ::entry_point } }
     }
+  }
+
+  ::pull_env_if_set = (key) => {
+    set v = ::azl.system_interface.host_getenv(key)
+    if (v != null && ("" + v).length > 0) {
+      ::internal.set_env(key, "" + v)
     }
-  init {
-    say "🔥🔥🔥 AZL EXEC BRIDGE INITIALIZING 🔥🔥🔥"
-    say "🚀 BRIDGING HOST ENVIRONMENT TO AZL RUNTIME!"
-    say "⚡ REAL SYSTEM INTEGRATION!"
-    say "🎯 ENTERPRISE DAEMON LAUNCHER!"
-    
-    # Set up environment variables
-    set ::combined_path = get_env("AZL_COMBINED_PATH") || "unknown"
-    set ::entry_point = get_env("AZL_ENTRY") || "::build.daemon.enterprise"
-    set ::api_token = get_env("AZL_API_TOKEN") || "default_token"
-    set ::api_port = parseInt(get_env("AZL_BUILD_API_PORT") || "8080")
-    
-    say "📁 Combined path: ::combined_path"
-    say "🎯 Entry point: ::entry_point"
-    say "🔑 API Token: ::api_token"
-    say "🌐 Port: ::api_port"
-    
-    # PROVE THE ENGINE CAN EMIT @sysproxy LINES - one-time, loud signal
-    say "@sysproxy {\"id\":42,\"op\":\"keepalive\"}"
-    
-    # Initialize the pure launcher
-    set ok = ::azl.pure_launcher.run_file(::combined_path, ::entry_point)
-    
-    if (ok) {
-      say "✅ Pure launcher executed successfully"
-      log.info("exec_bridge: emitting daemon.enterprise.start")
-      ::core.events.emit("daemon.enterprise.start", {})
-    } else {
-      say "❌ Pure launcher execution failed"
-    }
+  }
+
+  # Pull process environment from sysproxy (libc getenv) into ::internal for ::internal.env / get_env.
+  ::merge_host_env_into_internal = () => {
+    ::pull_env_if_set("AZL_COMBINED_PATH")
+    ::pull_env_if_set("AZL_ENTRY")
+    ::pull_env_if_set("AZL_API_TOKEN")
+    ::pull_env_if_set("AZL_BUILD_CONFIG")
+    ::pull_env_if_set("AZL_BUILD_API_PORT")
+    ::pull_env_if_set("AZL_BUILD_API_ENABLED")
+    ::pull_env_if_set("AZL_BIND_HOST")
+    ::pull_env_if_set("OLLAMA_HOST")
+    ::pull_env_if_set("AZL_GGUF_PATH")
+    ::pull_env_if_set("AZL_LLAMA_SERVER_URL")
+    ::pull_env_if_set("AZL_FILE_CACHE")
   }
   
   behavior {

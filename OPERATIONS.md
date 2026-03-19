@@ -3,6 +3,8 @@
 ## Overview
 This runbook documents how to run the enterprise daemon and validate host integrations via the sysproxy bridge using only the pure AZL engine.
 
+**sysproxy ops (subset):** socket **`listen` / `accept` / `read` / `write` / `close`**, **`keepalive`**, **`http_client`**, **`getenv`** (reads the **sysproxy process** environment via libc `getenv`; AZL uses it through **`::azl.system_interface.host_getenv`** and exec-bridge seeding of **`::internal`**).
+
 ## Quick Start (Local)
 - Build sysproxy:
   - `gcc -O2 -Wall -o .azl/sysproxy tools/sysproxy.c`

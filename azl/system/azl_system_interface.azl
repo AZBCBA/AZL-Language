@@ -332,6 +332,21 @@ component ::azl.system_interface {
         set conn = a.conn
         set ok = direct_close(conn)
         emit syscall.response with { request_id: rid, type: t, ok: ok }
+      } else if t == "proc.getenv" {
+        if ::azl.security && ::azl.security.require("proc.env") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
+        set ename = a.name || ""
+        if ename == "" {
+          emit log_error with { type: "invalid_syscall", message: "proc.getenv: name required", context: { request_id: rid } }
+          emit syscall.response with { request_id: rid, type: t, error: "name_required", value: "" }
+        } else {
+          set gr = sysproxy_call("getenv", { name: ename })
+          if (gr.ok == true) {
+            emit syscall.response with { request_id: rid, type: t, value: (gr.value != null) ? ("" + gr.value) : "" }
+          } else {
+            emit log_error with { type: "proc_getenv_failed", message: "sysproxy getenv failed", context: { name: ename, errno: (gr.errno || -1) } }
+            emit syscall.response with { request_id: rid, type: t, error: (gr.msg || gr.error || "getenv_failed"), value: "" }
+          }
+        }
       } else {
         emit syscall.response with { request_id: rid, type: t, error: "unknown_syscall" }
       }
@@ -1283,6 +1298,20 @@ component ::azl.system_interface {
         return { ok:false, errno:110, msg:"sysproxy timeout", id:id }
       }
     }
+  }
+
+  # Host process environment (libc getenv in sysproxy); used by exec_bridge to seed ::internal.
+  export fn host_getenv(name) {
+    if (name == null || ("" + name).length == 0) {
+      emit log_error with { type: "invalid_argument", message: "host_getenv: name required", context: {} }
+      return ""
+    }
+    set r = sysproxy_call("getenv", { name: ("" + name) })
+    if (r.ok == true) {
+      return (r.value != null) ? ("" + r.value) : ""
+    }
+    emit log_error with { type: "host_getenv_sysproxy", message: "getenv via sysproxy failed", context: { name: name, errno: (r.errno || -1), detail: (r.msg || r.error || "") } }
+    return ""
   }
 
   # ===== real net ops using sysproxy =====

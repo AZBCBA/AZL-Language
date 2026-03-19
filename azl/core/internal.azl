@@ -8,26 +8,18 @@ component ::internal {
     # Initialize environment storage
     set ::env_vars = {}
     
-    # Try to read from actual environment (simulated)
+    # Defaults for in-memory env; host values are merged by ::host.exec_bridge (sysproxy getenv) after link ::azl.system_interface.
     ::load_environment()
     
     say "✅ Internal component ready"
   }
   
-  # Load environment variables
+  # In-memory defaults only (no fake host values). OS-backed values: ::azl.system_interface.host_getenv + ::internal.set_env from exec_bridge.
   ::load_environment = () => {
-    say "🔧 Loading environment variables..."
-    
-    # Try to read from actual environment variables
-    # These will be set by the executor script
-    set ::env_vars["AZL_COMBINED_PATH"] = ""
-    set ::env_vars["AZL_ENTRY"] = ""
-    set ::env_vars["AZL_API_TOKEN"] = ""
-    set ::env_vars["AZL_BUILD_CONFIG"] = ""
+    say "🔧 Loading environment variable defaults (in-memory)..."
     set ::env_vars["AZL_BUILD_API_PORT"] = "8080"
     set ::env_vars["AZL_BUILD_API_ENABLED"] = "true"
-    
-    say "🔧 Environment variables loaded"
+    say "🔧 Environment defaults ready"
   }
   
   # Get environment variable
