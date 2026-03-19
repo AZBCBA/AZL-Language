@@ -114,6 +114,10 @@ COMPONENTS=(
   "azl/memory/memory_optimization_system.azl"
   "azl/memory/fractal_memory_compression.azl"
   "azl/quantum/processor/quantum_processor.azl"
+  "azl/quantum/processor/quantum_core.azl"
+  "azl/quantum/processor/quantum_ai_pipeline.azl"
+  "azl/quantum/processor/quantum_behavior_modeling.azl"
+  "azl/quantum/memory/quantum_entanglement_network.azl"
   "azl/quantum/processor/quantum_encryption.azl"
   "azl/quantum/real_quantum_processor.azl"
   "azl/quantum/optimizer/quantum_optimizer.azl"
@@ -121,6 +125,8 @@ COMPONENTS=(
   "azl/quantum/mathematics/quantum_geometry.azl"
   "azl/monitoring/quantum_dashboard.azl"
   "azl/monitoring/performance_analytics_system.azl"
+  "azl/security/capabilities.azl"
+  "azl/observability/runtime_inspector.azl"
   "azl/weights/registry.azl"
   # AZME interfaces
   "azme/core/agi_core.azl"
@@ -128,9 +134,13 @@ COMPONENTS=(
   "azme/learning/azme_actual_dataset_training.azl"
   "azme/learning/azme_clean_dataset_training.azl"
   "azme/interface/azme_chat_interface.azl"
+  "azme/interface/azme_command_interface.azl"
+  "azme/interface/azme_voice_event_bridge.azl"
   "azme/interface/azme_action_decider.azl"
   "azme/cognitive/azme_cognitive_loop.azl"
   "azme/consciousness/azme_belief_system.azl"
+  "azme/collaboration/azme_message_router.azl"
+  "azme/collaboration/azme_peer_registry.azl"
 )
 
 for component in "${COMPONENTS[@]}"; do
@@ -193,6 +203,29 @@ component ::native.performance.activation {
     emit "initialize_hyperdimensional_vectors" to ::quantum.memory.lha3_quantum_engine with {
       vector_count: 16,
       dimensions: 64
+    }
+    emit "quantum.core.initialize" to ::quantum.core with {
+      mode: "canonical_native"
+    }
+    emit "initialize_quantum_entanglement_network" to ::quantum.entanglement.network with {
+      network_id: "native_quantum_mesh",
+      config: { topology: "mesh", coherence_mode: "stable" }
+    }
+    emit "inspector.snapshot" to ::azl.runtime_inspector with {}
+    emit "register_peer" to ::azme.peer_registry with {
+      peer_id: "azme_local_core",
+      capabilities: ["quantum_enhanced", "communication", "routing", "command_execution"],
+      metadata: { role: "core", status: "active" }
+    }
+    emit "send_message" to ::azme.message_router with {
+      peer_id: "azme_local_core",
+      message: {
+        type: "status_update",
+        timestamp: ::internal.now(),
+        quantum_enhanced: true,
+        sender_id: "native.performance.activation",
+        session_id: "bootstrap"
+      }
     }
   }
 }
