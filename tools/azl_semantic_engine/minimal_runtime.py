@@ -5,6 +5,7 @@ Single source of behavioral truth: keep in sync with C when changing the minimal
 
 from __future__ import annotations
 
+import os
 import sys
 from dataclasses import dataclass, field
 
@@ -72,7 +73,17 @@ def tokenize_source(src: str) -> list[str]:
             pos[0] = p
             continue
 
-        if ch in "{}();=,[]":
+        if ch == "=" and p + 1 < n and src[p + 1] == "=":
+            tokens.append("==")
+            p += 2
+            pos[0] = p
+            continue
+        if ch == "!" and p + 1 < n and src[p + 1] == "=":
+            tokens.append("!=")
+            p += 2
+            pos[0] = p
+            continue
+        if ch in "{}();=,[]!":
             tokens.append(ch)
             p += 1
             pos[0] = p
@@ -209,6 +220,117 @@ class MinimalAZLRuntime:
                 d -= 1
             i[0] += 1
 
+    def _values_eq(self, l_nullish: int, l: str, r_nullish: int, r: str) -> bool:
+        if l_nullish and r_nullish:
+            return True
+        if l_nullish or r_nullish:
+            return False
+        return l == r
+
+    def _eval_primary(self, i: list[int]) -> tuple[str, int]:
+        if i[0] >= self.ntok:
+            raise SemanticEngineError(5, "azl_semantic_engine: expression primary: eof")
+        t = self.tok[i[0]]
+        if t == "(":
+            i[0] += 1
+            inner = self._eval_or(i)
+            if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                raise SemanticEngineError(5, "azl_semantic_engine: expected )")
+            i[0] += 1
+            return inner, 0
+        if len(t) >= 2 and t[0] in "\"'":
+            inner = t[1:-1] if len(t) >= 2 else ""
+            i[0] += 1
+            return inner, 0
+        if t and (
+            t[0].isdigit()
+            or (t[0] == "-" and len(t) > 1 and t[1].isdigit())
+        ):
+            i[0] += 1
+            return t, 0
+        if t == "null":
+            i[0] += 1
+            return "", 1
+        if t in ("false", "true"):
+            i[0] += 1
+            return t, 0
+        if t.startswith("::"):
+            if t == "::internal.env":
+                i[0] += 1
+                if i[0] >= self.ntok or self.tok[i[0]] != "(":
+                    raise SemanticEngineError(5, "azl_semantic_engine: env ( expected")
+                i[0] += 1
+                if i[0] >= self.ntok:
+                    raise SemanticEngineError(5, "azl_semantic_engine: env key expected")
+                ts = self.tok[i[0]]
+                if len(ts) < 2 or ts[0] not in "\"'":
+                    raise SemanticEngineError(5, "azl_semantic_engine: env key must be string")
+                key = ts[1:-1] if len(ts) >= 2 else ""
+                i[0] += 1
+                if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                    raise SemanticEngineError(5, "azl_semantic_engine: env ) expected")
+                i[0] += 1
+                return os.environ.get(key, ""), 0
+            vv = self.var_get(t)
+            i[0] += 1
+            if vv is None:
+                return "", 1
+            return vv, 0
+        raise SemanticEngineError(5, f"azl_semantic_engine: bad primary {t!r}")
+
+    def _eval_eq(self, i: list[int]) -> tuple[str, int]:
+        left, ln = self._eval_primary(i)
+        if i[0] >= self.ntok or self.tok[i[0]] not in ("==", "!="):
+            return left, ln
+        op = self.tok[i[0]]
+        i[0] += 1
+        right, rn = self._eval_primary(i)
+        eq = self._values_eq(ln, left, rn, right)
+        if op == "!=":
+            eq = not eq
+        return ("true" if eq else "false"), 0
+
+    def _eval_or(self, i: list[int]) -> str:
+        acc, acc_nullish = self._eval_eq(i)
+        while i[0] < self.ntok and self.tok[i[0]] == "or":
+            i[0] += 1
+            nxt, nn = self._eval_eq(i)
+            if acc_nullish or acc == "":
+                acc = nxt
+                acc_nullish = nn
+        return acc
+
+    def eval_expr(self, i: list[int]) -> str:
+        return self._eval_or(i)
+
+    def _cond_is_true(self, s: str) -> bool:
+        return s in ("true", "1")
+
+    def _skip_braced_block(self, i: list[int]) -> None:
+        if i[0] >= self.ntok or self.tok[i[0]] != "{":
+            return
+        d = 1
+        i[0] += 1
+        while i[0] < self.ntok and d > 0:
+            if self.tok[i[0]] == "{":
+                d += 1
+            elif self.tok[i[0]] == "}":
+                d -= 1
+            i[0] += 1
+
+    def exec_if(self, i: list[int]) -> None:
+        i[0] += 1
+        cond = self.eval_expr(i)
+        if i[0] >= self.ntok or self.tok[i[0]] != "{":
+            raise SemanticEngineError(5, "azl_semantic_engine: if missing {")
+        if self._cond_is_true(cond):
+            i[0] += 1
+            self.exec_init_block(i)
+            if i[0] < self.ntok and self.tok[i[0]] == "}":
+                i[0] += 1
+        else:
+            self._skip_braced_block(i)
+
     def exec_set(self, i: list[int]) -> None:
         i[0] += 1
         if i[0] >= self.ntok:
@@ -232,19 +354,8 @@ class MinimalAZLRuntime:
             self._consume_agg_literal(i)
             self.var_set(k, "{}")
             return
-        val = ""
-        if len(v) >= 2 and v[0] in "\"'":
-            val = v[1:-1] if len(v) >= 2 else ""
-        elif v and (v[0].isdigit() or (v[0] == "-" and len(v) > 1 and v[1].isdigit())):
-            val = v
-        elif v.startswith("::"):
-            vv = self.var_get(v)
-            if vv:
-                val = vv
-        else:
-            val = v
+        val = self.eval_expr(i)
         self.var_set(k, val)
-        i[0] += 1
 
     def exec_emit(self, i: list[int]) -> None:
         i[0] += 1
@@ -389,6 +500,10 @@ class MinimalAZLRuntime:
                 ii = [i]
                 self.exec_link(ii)
                 i = ii[0]
+            elif depth == 1 and t == "if":
+                ii = [i]
+                self.exec_if(ii)
+                i = ii[0]
             else:
                 i += 1
 
@@ -423,6 +538,8 @@ class MinimalAZLRuntime:
                 self.process_events()
             elif depth == 1 and t == "link":
                 self.exec_link(i)
+            elif depth == 1 and t == "if":
+                self.exec_if(i)
             else:
                 i[0] += 1
 
@@ -523,7 +640,12 @@ def run_file(path: str, entry: str | None, *, daemon: bool = False) -> int:
     except SemanticEngineError as e:
         sys.stderr.write(f"{e.message}\n")
         return e.code
-    rc = rt.run(entry)
+    try:
+        rc = rt.run(entry)
+    except SemanticEngineError as e:
+        sys.stderr.write(f"{e.message}\n")
+        sys.stderr.flush()
+        return e.code
     if rc != 0:
         return rc
     if daemon:

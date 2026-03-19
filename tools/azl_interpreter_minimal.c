@@ -79,7 +79,23 @@ static int tokenize(void) {
       g_tok[g_ntok++] = s;
       continue;
     }
-    if (*p == '{' || *p == '}' || *p == '(' || *p == ')' || *p == ';' || *p == '=' || *p == ',' || *p == '[' || *p == ']') {
+    if (*p == '=' && p[1] == '=') {
+      char *s = malloc(3);
+      if (!s) return -1;
+      s[0] = '='; s[1] = '='; s[2] = '\0';
+      g_tok[g_ntok++] = s;
+      p += 2;
+      continue;
+    }
+    if (*p == '!' && p[1] == '=') {
+      char *s = malloc(3);
+      if (!s) return -1;
+      s[0] = '!'; s[1] = '='; s[2] = '\0';
+      g_tok[g_ntok++] = s;
+      p += 2;
+      continue;
+    }
+    if (*p == '{' || *p == '}' || *p == '(' || *p == ')' || *p == ';' || *p == '=' || *p == ',' || *p == '[' || *p == ']' || *p == '!') {
       char *s = malloc(2);
       if (!s) return -1;
       s[0] = *p++;
@@ -143,6 +159,8 @@ static void register_behavior_listeners(int start, int end);
 static void exec_init_block(int *i);
 static void exec_link(int *i);
 static void run_linked_component(const char *link_target);
+static void exec_if(int *i);
+static int eval_expr(int *i, char *out, size_t outsz);
 
 /* Execute say "string" or say ::var - print to stdout */
 static void exec_say(int *i) {
@@ -183,6 +201,173 @@ static void consume_agg_literal(int *i) {
   }
 }
 
+static void mini_expr_error(const char *ctx) {
+  fprintf(stderr, "azl_interpreter_minimal: expression error: %s\n", ctx ? ctx : "parse");
+}
+
+static int values_eq(int l_nullish, const char *l, int r_nullish, const char *r) {
+  if (l_nullish && r_nullish) return 1;
+  if (l_nullish || r_nullish) return 0;
+  return strcmp(l, r) == 0;
+}
+
+static int eval_primary(int *i, char *out, size_t outsz, int *nullish);
+
+static int eval_eq(int *i, char *out, size_t outsz, int *nullish_out) {
+  char left[256], right[256];
+  int ln = 0, rn = 0;
+  if (eval_primary(i, left, sizeof(left), &ln) != 0) return -1;
+  if (*i >= g_ntok ||
+      (strcmp(g_tok[*i], "==") != 0 && strcmp(g_tok[*i], "!=") != 0)) {
+    (void)snprintf(out, outsz, "%s", left);
+    *nullish_out = ln;
+    return 0;
+  }
+  const char *op = g_tok[*i];
+  (*i)++;
+  if (eval_primary(i, right, sizeof(right), &rn) != 0) return -1;
+  int eq = values_eq(ln, left, rn, right);
+  if (strcmp(op, "!=") == 0) eq = !eq;
+  (void)snprintf(out, outsz, "%s", eq ? "true" : "false");
+  *nullish_out = 0;
+  return 0;
+}
+
+static int eval_or(int *i, char *out, size_t outsz) {
+  char acc[256];
+  int acc_nullish = 0;
+  if (eval_eq(i, acc, sizeof(acc), &acc_nullish) != 0) return -1;
+  while (*i < g_ntok && strcmp(g_tok[*i], "or") == 0) {
+    (*i)++;
+    char next[256];
+    int nn = 0;
+    if (eval_eq(i, next, sizeof(next), &nn) != 0) return -1;
+    int use_right = (acc_nullish || acc[0] == '\0');
+    if (use_right) {
+      (void)snprintf(acc, sizeof(acc), "%s", next);
+      acc_nullish = nn;
+    }
+  }
+  (void)snprintf(out, outsz, "%s", acc);
+  return 0;
+}
+
+static int eval_primary(int *i, char *out, size_t outsz, int *nullish) {
+  *nullish = 0;
+  out[0] = '\0';
+  if (*i >= g_ntok) return -1;
+  const char *t = g_tok[*i];
+  if (!t) return -1;
+
+  if (strcmp(t, "(") == 0) {
+    (*i)++;
+    if (eval_or(i, out, outsz) != 0) return -1;
+    if (*i >= g_ntok || strcmp(g_tok[*i], ")") != 0) return -1;
+    (*i)++;
+    *nullish = 0;
+    return 0;
+  }
+
+  if (strlen(t) >= 2 && (t[0] == '"' || t[0] == '\'')) {
+    size_t len = strlen(t);
+    size_t n = (len >= 2) ? len - 2 : 0;
+    if (n >= outsz) n = outsz - 1;
+    memcpy(out, t + 1, n);
+    out[n] = '\0';
+    (*i)++;
+    return 0;
+  }
+
+  if (isdigit((unsigned char)t[0]) || (t[0] == '-' && t[1] && isdigit((unsigned char)t[1]))) {
+    (void)snprintf(out, outsz, "%s", t);
+    (*i)++;
+    return 0;
+  }
+
+  if (strcmp(t, "null") == 0) {
+    *nullish = 1;
+    (*i)++;
+    return 0;
+  }
+
+  if (strcmp(t, "false") == 0 || strcmp(t, "true") == 0) {
+    (void)snprintf(out, outsz, "%s", t);
+    (*i)++;
+    return 0;
+  }
+
+  if (t[0] == ':' && t[1] == ':') {
+    if (strcmp(t, "::internal.env") == 0) {
+      (*i)++;
+      if (*i >= g_ntok || strcmp(g_tok[*i], "(") != 0) return -1;
+      (*i)++;
+      if (*i >= g_ntok) return -1;
+      const char *ts = g_tok[*i];
+      if (strlen(ts) < 2 || (ts[0] != '"' && ts[0] != '\'')) return -1;
+      char key[128] = {0};
+      size_t L = strlen(ts);
+      size_t n = (L >= 2) ? L - 2 : 0;
+      if (n >= sizeof(key)) n = sizeof(key) - 1;
+      memcpy(key, ts + 1, n);
+      key[n] = '\0';
+      (*i)++;
+      if (*i >= g_ntok || strcmp(g_tok[*i], ")") != 0) return -1;
+      (*i)++;
+      const char *ev = getenv(key);
+      if (ev) (void)snprintf(out, outsz, "%s", ev);
+      else out[0] = '\0';
+      *nullish = 0;
+      return 0;
+    }
+    const char *vv = var_get(t);
+    if (!vv) *nullish = 1;
+    else (void)snprintf(out, outsz, "%s", vv);
+    (*i)++;
+    return 0;
+  }
+
+  return -1;
+}
+
+static int eval_expr(int *i, char *out, size_t outsz) {
+  return eval_or(i, out, outsz);
+}
+
+static int cond_is_true(const char *s) {
+  return s && (strcmp(s, "true") == 0 || strcmp(s, "1") == 0);
+}
+
+static void skip_braced_block(int *i) {
+  if (*i >= g_ntok || strcmp(g_tok[*i], "{") != 0) return;
+  int d = 1;
+  (*i)++;
+  while (*i < g_ntok && d > 0) {
+    if (strcmp(g_tok[*i], "{") == 0) d++;
+    else if (strcmp(g_tok[*i], "}") == 0) d--;
+    (*i)++;
+  }
+}
+
+static void exec_if(int *i) {
+  (*i)++;
+  char cond[256] = {0};
+  if (eval_expr(i, cond, sizeof(cond)) != 0) {
+    mini_expr_error("if condition");
+    exit(5);
+  }
+  if (*i >= g_ntok || strcmp(g_tok[*i], "{") != 0) {
+    mini_expr_error("if missing {");
+    exit(5);
+  }
+  if (cond_is_true(cond)) {
+    (*i)++;
+    exec_init_block(i);
+    if (*i < g_ntok && strcmp(g_tok[*i], "}") == 0) (*i)++;
+  } else {
+    skip_braced_block(i);
+  }
+}
+
 /* Execute set ::var = value */
 static void exec_set(int *i) {
   (*i)++;
@@ -207,24 +392,11 @@ static void exec_set(int *i) {
     var_set(k, val);
     return;
   }
-  if (v && strlen(v) >= 2 && (v[0] == '"' || v[0] == '\'')) {
-    size_t len = strlen(v);
-    if (len >= 2) {
-      size_t n = len - 2;
-      if (n >= sizeof(val)) n = sizeof(val) - 1;
-      memcpy(val, v + 1, n);
-      val[n] = '\0';
-    }
-  } else if (v && (isdigit((unsigned char)v[0]) || (v[0] == '-' && v[1]))) {
-    (void)snprintf(val, sizeof(val), "%s", v);
-  } else if (v && v[0] == ':' && v[1] == ':') {
-    const char *vv = var_get(v);
-    if (vv) (void)snprintf(val, sizeof(val), "%s", vv);
-  } else if (v) {
-    (void)snprintf(val, sizeof(val), "%s", v);
+  if (eval_expr(i, val, sizeof(val)) != 0) {
+    mini_expr_error("set RHS");
+    exit(5);
   }
   var_set(k, val);
-  (*i)++;
 }
 
 /* Execute emit "event" or emit event (unquoted identifier) */
@@ -327,6 +499,7 @@ static void exec_block(int start, int end) {
     else if (strcmp(t, "}") == 0) { depth--; if (depth <= 0) break; i++; }
     else if (depth == 1 && strcmp(t, "say") == 0) exec_say(&i);
     else if (depth == 1 && strcmp(t, "set") == 0) exec_set(&i);
+    else if (depth == 1 && strcmp(t, "if") == 0) exec_if(&i);
     else if (depth == 1 && strcmp(t, "emit") == 0) exec_emit(&i);
     else if (depth == 1 && strcmp(t, "link") == 0) exec_link(&i);
     else i++;
@@ -356,6 +529,7 @@ static void exec_init_block(int *i) {
     else if (strcmp(t, "}") == 0) { depth--; if (depth <= 0) break; (*i)++; }
     else if (depth == 1 && strcmp(t, "say") == 0) exec_say(i);
     else if (depth == 1 && strcmp(t, "set") == 0) exec_set(i);
+    else if (depth == 1 && strcmp(t, "if") == 0) exec_if(i);
     else if (depth == 1 && strcmp(t, "emit") == 0) { exec_emit(i); process_events(); }
     else if (depth == 1 && strcmp(t, "link") == 0) exec_link(i);
     else (*i)++;

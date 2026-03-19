@@ -15,6 +15,7 @@ Exit codes:
   72 — ERR_AZL_ENTRY_MISSING
   73 — ERR_AZL_BOOTSTRAP_BUNDLE_INVALID (set but not a file)
   2–4 — engine I/O / tokenize (see azl_semantic_engine.minimal_runtime)
+  5 — expression / if parse error (minimal contract)
 """
 
 from __future__ import annotations

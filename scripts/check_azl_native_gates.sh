@@ -96,7 +96,7 @@ if [ "$MINI_OUT" != "$PY_OUT" ]; then
   exit 27
 fi
 
-echo "[gate] F3: C vs Python — P0 interpreter slice (set + [] + {} + link + say)"
+echo "[gate] F3: C vs Python — P0 interpreter slice (set + expr + if + [] + {} + link + say)"
 SLICE="${ROOT_DIR}/azl/tests/p0_semantic_interpreter_slice.azl"
 set +e
 SLICE_C_OUT="$("$MINI_BIN" "$SLICE" boot.entry 2>&1)"

@@ -22,7 +22,15 @@ component ::p0.interpreter.slice {
     set ::recursion_depth = 0
     set ::halted = false
     set ::cache_order = []
+    set ::halt_on_error = ((::internal.env("AZL_STRICT") or "1") == "1")
+    set ::perf = { tok_cache: {}, ast_cache: {}, cap: 512 }
     link ::azl.security
+    if ::perf == null {
+      set ::perf = {}
+    }
+    if ::error_count == 0 {
+      set ::p0_init_branch_ok = 1
+    }
     say "🧠 Pure AZL Interpreter Initialized"
     say "🚀 NO RUST DEPENDENCIES!"
     say "🚀 FULL AZL SELF-HOSTING!"
