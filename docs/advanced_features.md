@@ -4,6 +4,8 @@
 
 For the **current** AZL language (syntax, components, events, stdlib), see [AZL_CURRENT_SPECIFICATION.md](language/AZL_CURRENT_SPECIFICATION.md) and [AZL_LANGUAGE_RULES.md](language/AZL_LANGUAGE_RULES.md). The runtime path is native-first AZL (`scripts/start_azl_native_mode.sh`) with pure AZL interpreter/parser in `azl/`.
 
+**Single home for “advanced / not implemented” optimizer fiction:** the old `ADVANCED_OPTIMIZATION_FEATURES.md` was removed as a duplicate; keep hypothetical JIT/LTO/etc. material here only.
+
 ---
 
 **🚨 STATUS: THEORETICAL / PLACEHOLDER**

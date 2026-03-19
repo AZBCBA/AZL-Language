@@ -72,8 +72,7 @@ Workflows live under `.github/workflows/` — including **`test-and-deploy.yml`*
 |----------|-----|
 | [AZLPACK_SPEC.md](AZLPACK_SPEC.md) | Package format; first-party dogfood pack `packages/src/azl-hello/` |
 | [TRAIN_IN_PURE_AZL.md](TRAIN_IN_PURE_AZL.md) | Training in AZL |
-| [AZME_PRODUCTION_RUNBOOK.md](AZME_PRODUCTION_RUNBOOK.md) | AZME operations |
-| [PRODUCTION_RUN.md](PRODUCTION_RUN.md) | Production run notes |
+| [AZME_PRODUCTION_RUNBOOK.md](AZME_PRODUCTION_RUNBOOK.md) | AZME operations (theoretical / verify before use) |
 | [../README_PREPARE_AZME_TRAINING.md](../README_PREPARE_AZME_TRAINING.md) | Prepare AZME training env |
 | [../AZL_AZME_TRAINING_GUIDE.md](../AZL_AZME_TRAINING_GUIDE.md) | AZL/AZME training guide |
 | [../AZME_USAGE_GUIDE.md](../AZME_USAGE_GUIDE.md) | AZME ask/spawn usage examples |
@@ -92,8 +91,7 @@ Workflows live under `.github/workflows/` — including **`test-and-deploy.yml`*
 | [AZL_LSP_SETUP.md](AZL_LSP_SETUP.md) | LSP: diagnostics + go to definition |
 | [STRICT_AZL_GRAMMAR_CONFORMANCE_CHECKLIST.md](STRICT_AZL_GRAMMAR_CONFORMANCE_CHECKLIST.md) | Grammar conformance |
 | [reflection_flow.md](reflection_flow.md) | Reflection flow |
-| [ENTERPRISE_BUILD_SYSTEM.md](ENTERPRISE_BUILD_SYSTEM.md) | Enterprise build |
-| [AZL_ENTERPRISE_SETUP.md](AZL_ENTERPRISE_SETUP.md) | Enterprise setup |
+| [ENTERPRISE_BUILD_SYSTEM.md](ENTERPRISE_BUILD_SYSTEM.md) | Enterprise build daemon (includes quick start; former `AZL_ENTERPRISE_SETUP.md` merged here) |
 
 `azl/docs/README.md` describes layout under `azl/` and links back here.
 

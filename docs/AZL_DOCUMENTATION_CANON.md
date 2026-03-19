@@ -90,6 +90,9 @@ bash scripts/verify_azl_strength_bar.sh   # rg, python3, gcc required
 | `docs/WORK_QUEUE.md` | §1.6 + §1.1 commands |
 | `docs/STATUS.md` | §1.8 + §3 |
 | `docs/AZL_STRENGTH_BAR.md` | §1.7 |
+| `docs/AZL_ENTERPRISE_SETUP.md` | [ENTERPRISE_BUILD_SYSTEM.md](ENTERPRISE_BUILD_SYSTEM.md) (quick start + ops) |
+| `docs/PRODUCTION_RUN.md` | Removed — duplicated [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md) / stale `cargo` path; use [OPERATIONS.md](../OPERATIONS.md), [RELEASE_READY.md](../RELEASE_READY.md) |
+| `docs/ADVANCED_OPTIMIZATION_FEATURES.md` | Removed — contradicted [advanced_features.md](advanced_features.md) (honest “not implemented”); use **advanced_features.md** only for future-only optimizer/JIT fiction |
 
 ---
 
@@ -163,8 +166,7 @@ Full phased map: [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md).
 |----------|---------|
 | [AZLPACK_SPEC.md](AZLPACK_SPEC.md) | Pack format |
 | [TRAIN_IN_PURE_AZL.md](TRAIN_IN_PURE_AZL.md) | Training in AZL |
-| [AZME_PRODUCTION_RUNBOOK.md](AZME_PRODUCTION_RUNBOOK.md) | AZME ops |
-| [PRODUCTION_RUN.md](PRODUCTION_RUN.md) | Production notes |
+| [AZME_PRODUCTION_RUNBOOK.md](AZME_PRODUCTION_RUNBOOK.md) | AZME ops (theoretical — verify before use) |
 | [../README_PREPARE_AZME_TRAINING.md](../README_PREPARE_AZME_TRAINING.md) | AZME training prep |
 | [../AZL_AZME_TRAINING_GUIDE.md](../AZL_AZME_TRAINING_GUIDE.md) | AZL/AZME training |
 | [../AZME_USAGE_GUIDE.md](../AZME_USAGE_GUIDE.md) | AZME usage |
@@ -178,9 +180,7 @@ Full phased map: [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md).
 | [AZL_LSP_SETUP.md](AZL_LSP_SETUP.md) | LSP setup |
 | [STRICT_AZL_GRAMMAR_CONFORMANCE_CHECKLIST.md](STRICT_AZL_GRAMMAR_CONFORMANCE_CHECKLIST.md) | Grammar conformance |
 | [reflection_flow.md](reflection_flow.md) | Reflection |
-| [ENTERPRISE_BUILD_SYSTEM.md](ENTERPRISE_BUILD_SYSTEM.md) | Enterprise build |
-| [AZL_ENTERPRISE_SETUP.md](AZL_ENTERPRISE_SETUP.md) | Enterprise setup |
-| [ADVANCED_OPTIMIZATION_FEATURES.md](ADVANCED_OPTIMIZATION_FEATURES.md) | Optimization |
+| [ENTERPRISE_BUILD_SYSTEM.md](ENTERPRISE_BUILD_SYSTEM.md) | Enterprise build daemon + quick start (merged `AZL_ENTERPRISE_SETUP.md`) |
 | [AZL_VS_PYTHON_COMPARISON.md](AZL_VS_PYTHON_COMPARISON.md) | Comparison |
 
 ### Root / repo

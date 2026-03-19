@@ -2,6 +2,23 @@
 
 A production-grade, pure AZL build orchestration system with isolated worker pools, intelligent caching, and enterprise features.
 
+## Quick start and operations
+
+From repository root:
+
+```bash
+export AZL_API_TOKEN=$(openssl rand -hex 32)
+bash scripts/azl-buildd config/prod.azl.json
+```
+
+**Layout:** `azl/build/build_daemon_enterprise.azl`, `build_orchestrator.azl`, `worker_pool.azl`, `cache_manager.azl`, `config/prod.azl.json`, `scripts/azl-buildd`, `scripts/azl`.
+
+- **Foreground:** ensure `AZL_API_TOKEN` is set, then run `bash scripts/azl-buildd config/prod.azl.json` (add `--daemon` only if your launcher supports it).
+- **Systemd:** see `deployment/systemd/azl-buildd.service` — install and enable per your host policy.
+- **Health checks** (port from config, often `8080`): `curl -fsS http://127.0.0.1:8080/healthz`, `/readyz`; use `Authorization: Bearer $AZL_API_TOKEN` for protected routes such as `/status`.
+
+**Combined enterprise + native profile:** the usual path is **`scripts/run_enterprise_daemon.sh`** or **`scripts/start_azl_native_mode.sh`** — see [OPERATIONS.md](../OPERATIONS.md) and [AZL_NATIVE_RUNTIME_CONTRACT.md](AZL_NATIVE_RUNTIME_CONTRACT.md).
+
 ## 🏗️ Architecture Overview
 
 The AZL Enterprise Build System consists of several interconnected components:
@@ -366,10 +383,10 @@ rm -rf build/.azl_cache.json
 
 ## 📚 Related Documentation
 
-- [AZL Language Specification](../language/AZL_CURRENT_SPECIFICATION.md)
-- [Build System Architecture](../ARCHITECTURE_OVERVIEW.md)
-- [Pure AZL Runtime](../docs/PURE_AZL_RUNTIME.md)
-- [Performance Benchmarks](../docs/PERFORMANCE_BENCHMARKS.md)
+- [AZL current specification](language/AZL_CURRENT_SPECIFICATION.md)
+- [Architecture overview](ARCHITECTURE_OVERVIEW.md)
+- [Native runtime contract](AZL_NATIVE_RUNTIME_CONTRACT.md)
+- [Operations runbook](../OPERATIONS.md)
 
 ---
 
