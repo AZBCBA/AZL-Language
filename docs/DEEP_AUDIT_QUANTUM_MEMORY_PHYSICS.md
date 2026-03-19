@@ -150,17 +150,18 @@
 | **Fractal** | Mandelbrot, Julia iteration, box-counting | — |
 | **Entanglement** | Bell pairs, teleportation protocol, coherence | Physical qubits |
 | **Quantum topology** | Persistent homology, Betti numbers | — |
-| **p-adic** | — | **Host syntax** (TypeScript) — needs port |
+| **p-adic** | Pure AZL `::quantum.processor.p_adic` (events + int/add/mul/distance) | Hypercomplex 4D from old TS not ported |
 | **Neural** | Event scaffolding, GPU policy | Real transformer inference |
+| **HTTP (external)** | Sysproxy `http_client` + syscall `http` for `http://` / `https://`; `ffi.http` delegates for those URLs | Stdlib `http_get`/`http_post` still simulated for non-URL keys |
 
 ---
 
 ## 4. Gaps Identified
 
-1. **p_adic_processor.azl** — Uses TypeScript/JS; must be ported to pure AZL.
-2. **Real HTTP** — `ffi.http` and stdlib `http_get`/`http_post` are simulated (no real network).
-3. **Quantum math** — Several modules (integrator, geometry, chaos, category, algebra) need audit.
-4. **Native tensor** — `azl/core/types/tensor.azl` is pure AZL arrays; no GPU/ONNX.
+1. **Hypercomplex p-adic (4D)** — Old TypeScript processor had it; not reimplemented in pure AZL yet.
+2. **Quantum math** — `quantum_integrator`, `quantum_geometry`, `quantum_chaos`, `quantum_category`, `quantum_algebra`: need per-file audit (doc §2.2).
+3. **Native tensor** — `azl/core/types/tensor.azl` is pure AZL arrays; no GPU/ONNX binding.
+4. **Rename / clarify** — `azl/quantum/mathematics/quantum_math.azl` content is topology; consider rename or split file to match path.
 
 ---
 
@@ -172,3 +173,12 @@ See `docs/LHA3_STDLIB_API.md` for:
 - `store_quantum_state`
 - `lha3.store.processing_queue`
 - `memory.lha3.ready`, `memory.lha3.compressed`, `memory.lha3.optimized`
+
+---
+
+## 6. Using this doc in the project
+
+- **What it is:** A map of quantum / LHA3 / fractal / entanglement / math modules—not a tutorial.
+- **When to open it:** Planning work on memory, quantum stack, or “what’s real vs symbolic.”
+- **Next work from here (pick one):** (a) audit `quantum_integrator` … `quantum_algebra`, (b) port hypercomplex p-adic, (c) GPU/tensor bridge, (d) rename `quantum_math.azl` vs topology.
+- **Pair with:** `docs/LHA3_STDLIB_API.md`, `docs/LLM_INFRASTRUCTURE_AUDIT.md` for HTTP/LLM vs quantum-memory layers.
