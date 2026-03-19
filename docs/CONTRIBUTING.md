@@ -65,7 +65,7 @@ Please avoid large, conflicting edits in these areas without coordination. Add t
 2. Create a feature branch (`git checkout -b feature/your-feature`).
 3. Make changes; update specs/docs under `docs/` when changing behavior.
 4. Add or adjust tests under `azl/testing/` and runtime gate scripts.
-5. Ensure the project runs (`scripts/run_tests.sh`, `scripts/run_all_tests.sh` for the full suite, and `scripts/verify_native_runtime_live.sh` where relevant).
+5. Ensure the project runs — **`bash scripts/run_full_repo_verification.sh`** (or `RUN_OPTIONAL_BENCHES=0` for CI-style without LLM benches), or individually: `scripts/run_tests.sh`, `scripts/run_all_tests.sh`, `scripts/verify_native_runtime_live.sh`.
 6. Push and open a Pull Request. Keep PRs small and reviewable.
 
 ## Documentation

@@ -59,7 +59,7 @@ Broader / historical spec draft: [../azl/docs/AZL_LANGUAGE_SPECIFICATION.md](../
 
 Workflows live under `.github/workflows/` — including **`test-and-deploy.yml`** (tests, native matrix, benchmarks, coverage artifact, Docker → GHCR, optional staging webhook).
 
-**Native gates** (`scripts/check_azl_native_gates.sh`) include **gate H**: `scripts/verify_p0_interpreter_tokenizer_boundary.sh` (semantic tokenizer over `azl_interpreter.azl`). **Product LLM benches:** `scripts/run_product_benchmark_suite.sh` (see `RELEASE_READY.md` optional section).
+**Native gates** (`scripts/check_azl_native_gates.sh`) include **gate H**: `scripts/verify_p0_interpreter_tokenizer_boundary.sh` (semantic tokenizer over `azl_interpreter.azl`). **Full tree:** `scripts/run_full_repo_verification.sh` (release order + `run_all_tests.sh` + optional LLM benches). **Product LLM benches:** `scripts/run_product_benchmark_suite.sh` (see `RELEASE_READY.md`).
 
 **`scripts/test_azl_use_vm_path.sh`** (from `run_all_tests.sh`) checks `AZL_USE_VM` docs + wiring, **source-level parity** between `vm_run_bytecode_program` and tree-walker say/emit (`check_azl_vm_tree_parity.py`), and the eligible fixture `azl/tests/fixtures/vm_parity_minimal.azl`.
 
