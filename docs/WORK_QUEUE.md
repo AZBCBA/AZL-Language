@@ -16,7 +16,7 @@ bash scripts/run_full_repo_verification.sh
 | # | Task | Status |
 |---|------|--------|
 | 1 | **Product benchmarks** — Native LLM + enterprise chat | **Automated** in `run_full_repo_verification.sh` when Ollama + Profile B exist; else skipped with log lines. Manual override: `bash scripts/run_product_benchmark_suite.sh` |
-| 2 | **P0 spine** — Gate **H** (tokenizer + brace balance on `azl_interpreter.azl`) | **☑ Done** in `check_azl_native_gates.sh`. **Not done:** execute full interpreter on spine (major project) |
+| 2 | **P0 spine** — Gates **F3** (interpreter slice C↔Py), **H** (tokenizer + braces on real `azl_interpreter.azl`) | **☑ Slice + lex/struct** in `check_azl_native_gates.sh`. **Next:** widen slice toward full `azl_interpreter.azl` init (`bash scripts/run_semantic_interpreter_slice.sh`) |
 | 3 | **Canonical HTTP** — C engine vs enterprise `http_server` | **☑ Documented** — [CANONICAL_HTTP_PROFILE.md](CANONICAL_HTTP_PROFILE.md); per-deploy choice is yours |
 | 4 | **GGUF / GPU** | **☑ Policy** — deferred; `GET /api/llm/capabilities` verified honest in `verify_native_runtime_live.sh` |
 
@@ -29,4 +29,5 @@ bash scripts/enforce_legacy_entrypoint_blocklist.sh
 bash scripts/verify_native_runtime_live.sh
 bash scripts/run_all_tests.sh
 bash scripts/run_product_benchmark_suite.sh
+bash scripts/run_semantic_interpreter_slice.sh
 ```

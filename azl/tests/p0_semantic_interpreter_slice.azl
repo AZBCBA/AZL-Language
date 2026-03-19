@@ -1,0 +1,17 @@
+# P0 semantic spine: first "interpreter-shaped" boot slice (minimal contract).
+# Same lexer/exec subset as c_minimal_link_ping — proves link + set + [] token pairing + say.
+# Full azl/runtime/interpreter/azl_interpreter.azl widens from here.
+
+component ::p0.interpreter.slice {
+  init {
+    set ::tokens = []
+    set ::phase = "p0_slice"
+    say "P0_SEMANTIC_INTERPRETER_SLICE_OK"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::p0.interpreter.slice
+  }
+}

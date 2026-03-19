@@ -96,6 +96,35 @@ if [ "$MINI_OUT" != "$PY_OUT" ]; then
   exit 27
 fi
 
+echo "[gate] F3: C vs Python — P0 interpreter slice (set + [] + link + say)"
+SLICE="${ROOT_DIR}/azl/tests/p0_semantic_interpreter_slice.azl"
+set +e
+SLICE_C_OUT="$("$MINI_BIN" "$SLICE" boot.entry 2>&1)"
+slice_c_rc=$?
+set -e
+if [ "$slice_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_interpreter_slice exited $slice_c_rc: $SLICE_C_OUT"
+  exit 28
+fi
+if ! printf '%s\n' "$SLICE_C_OUT" | rg -q 'P0_SEMANTIC_INTERPRETER_SLICE_OK'; then
+  echo "ERROR: expected P0_SEMANTIC_INTERPRETER_SLICE_OK in C output, got: $SLICE_C_OUT"
+  exit 28
+fi
+set +e
+SLICE_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$SLICE" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+slice_py_rc=$?
+set -e
+if [ "$slice_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_interpreter_slice exited $slice_py_rc: $SLICE_PY_OUT"
+  exit 29
+fi
+if [ "$SLICE_C_OUT" != "$SLICE_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_interpreter_slice" >&2
+  echo "C:  $SLICE_C_OUT" >&2
+  echo "Py: $SLICE_PY_OUT" >&2
+  exit 30
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh
@@ -107,7 +136,7 @@ bash scripts/verify_p0_interpreter_tokenizer_boundary.sh
 echo "[gate] E: legacy deploy profile blocked by default"
 if rg -q 'AZL_ENABLE_LEGACY_HOST="\$\{AZL_ENABLE_LEGACY_HOST:-1\}"' scripts/*.sh; then
   echo "ERROR: found script defaulting AZL_ENABLE_LEGACY_HOST to 1"
-  exit 30
+  exit 31
 fi
 
 echo "[gate] all gates passed"

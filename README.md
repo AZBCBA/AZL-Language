@@ -83,7 +83,7 @@ Run full native validation: `./scripts/run_all_tests.sh`.
 
 See [docs/LLM_INFRASTRUCTURE_AUDIT.md](docs/LLM_INFRASTRUCTURE_AUDIT.md).
 
-**Ordered backlog:** [docs/WORK_QUEUE.md](docs/WORK_QUEUE.md) · **HTTP profiles (C vs enterprise):** [docs/CANONICAL_HTTP_PROFILE.md](docs/CANONICAL_HTTP_PROFILE.md)
+**Ordered backlog:** [docs/WORK_QUEUE.md](docs/WORK_QUEUE.md) · **HTTP profiles (C vs enterprise):** [docs/CANONICAL_HTTP_PROFILE.md](docs/CANONICAL_HTTP_PROFILE.md) · **P0 semantic slice:** `bash scripts/run_semantic_interpreter_slice.sh`
 
 ## CI
 - **`test-and-deploy.yml`**: PR/main tests, native engine matrix, benchmark regression gate, C coverage artifacts, Docker (push to GHCR on `main`), optional staging webhook — see [docs/CI_CD_PIPELINE.md](docs/CI_CD_PIPELINE.md)

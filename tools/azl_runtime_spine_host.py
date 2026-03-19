@@ -7,6 +7,9 @@ Full AZL-in-AZL self-host (azl/runtime/interpreter/azl_interpreter.azl as source
 remains a widening track; this host is the production integration point for
 native mode when AZL_RUNTIME_SPINE=azl_interpreter|semantic.
 
+P0 widening: `azl/tests/p0_semantic_interpreter_slice.azl` is parity-gated vs C
+(gate F3 in check_azl_native_gates.sh). Run: `bash scripts/run_semantic_interpreter_slice.sh`.
+
 Exit codes:
   71 — ERR_AZL_COMBINED_PATH_INVALID
   72 — ERR_AZL_ENTRY_MISSING
