@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+- **Rename:** `azl/quantum/mathematics/quantum_math.azl` → `advanced_topology.azl` (matches `::quantum.mathematics.advanced_topology`). `train_real_models.azl`, `azl.build.json`, reorganizer plan, architecture docs, and inventory/audit markdown updated; `on initialize_advanced_topology` added for orchestration handshake.
 - **Quantum mathematics audit:** `docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md` §8 — per-file verdicts for `azl/quantum/mathematics/*.azl` (scaffold vs partial real stepping in chaos module); `DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md` gaps list updated. Audit script lists `quantum/mathematics` line counts.
 - **GitHub-facing docs:** `README.md` rewritten for accurate native spine, LLM proxy honesty, library-vs-default-runtime scope; removed marketing tagline; `docs/CONTRIBUTING.md` links research-library policy.
 - **Capability inventory:** `docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md` maps GPU/device/neural/LHA3/quantum `.azl` surfaces vs default native runtime; `scripts/audit_gpu_neural_quantum_surfaces.sh` prints counts and GPU-pattern file hits. Clarified headers: `azl/quantum/real_quantum_processor.azl` (CPU state-vector sim), `azl/core/types/tensor.azl` (no GPU binding).

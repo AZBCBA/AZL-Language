@@ -98,15 +98,15 @@
 
 | File | Status | Content |
 |------|--------|---------|
-| `quantum_mathematics/quantum_math.azl` | ⚠️ Misnamed | Actually `quantum_topology` (advanced_topology) |
-| `quantum_mathematics/quantum_topology.azl` | ✅ | Persistent homology, barcode, Betti numbers |
-| `quantum_mathematics/quantum_integrator.azl` | ? | Needs audit |
-| `quantum_mathematics/quantum_geometry.azl` | ? | Needs audit |
-| `quantum_mathematics/quantum_chaos.azl` | ? | Needs audit |
-| `quantum_mathematics/quantum_category.azl` | ? | Needs audit |
-| `quantum_mathematics/quantum_algebra.azl` | ? | Needs audit |
+| `quantum_mathematics/advanced_topology.azl` | ✅ | `::quantum.mathematics.advanced_topology`; topology events + train handshake (`initialize_advanced_topology`) |
+| `quantum_mathematics/quantum_topology.azl` | ✅ | `::quantum.mathematics.topological_intelligence`; scaffold homology tuples |
+| `quantum_mathematics/quantum_integrator.azl` | ✅ | See [AZL_GPU_NEURAL_QUANTUM_INVENTORY.md §8](AZL_GPU_NEURAL_QUANTUM_INVENTORY.md) |
+| `quantum_mathematics/quantum_geometry.azl` | ✅ | See §8 |
+| `quantum_mathematics/quantum_chaos.azl` | ✅ | See §8 |
+| `quantum_mathematics/quantum_category.azl` | ✅ | See §8 |
+| `quantum_mathematics/quantum_algebra.azl` | ✅ | See §8 |
 
-**quantum_topology (in quantum_math.azl):**
+**Advanced topology (`advanced_topology.azl`):**
 - Persistent homology: birth/death, dimension, multiplicity
 - Betti numbers, torsion coefficients
 - Homology groups
@@ -161,7 +161,7 @@
 1. **Hypercomplex p-adic (4D)** — Old TypeScript processor had it; not reimplemented in pure AZL yet.
 2. **Quantum mathematics (`azl/quantum/mathematics/`)** — File- and component-level audit: **`docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md` §8**; most helpers are illustrative or simplified; **chaos** module has real Lorenz/Rossler stepping with stubbed Lyapunov/fractal/bifurcation returns.
 3. **Native tensor** — `azl/core/types/tensor.azl` is pure AZL arrays; no GPU/ONNX binding.
-4. **Rename / clarify** — `quantum_math.azl` defines `::quantum.mathematics.advanced_topology`; align filename with component or keep cross-reference in inventory §8.
+4. ~~**Rename / clarify**~~ — **Done:** `quantum_math.azl` → `advanced_topology.azl` (matches `::quantum.mathematics.advanced_topology`).
 
 ---
 
@@ -180,6 +180,6 @@ See `docs/LHA3_STDLIB_API.md` for:
 
 - **What it is:** A map of quantum / LHA3 / fractal / entanglement / math modules—not a tutorial.
 - **When to open it:** Planning work on memory, quantum stack, or “what’s real vs symbolic.”
-- **Next work from here (pick one):** (a) harden mathematics helpers (real TDA / group checks) where product needs it, (b) port hypercomplex p-adic, (c) GPU/tensor bridge, (d) rename `quantum_math.azl` to match `advanced_topology`.
+- **Next work from here (pick one):** (a) harden mathematics helpers (real TDA / group checks) where product needs it, (b) port hypercomplex p-adic, (c) GPU/tensor bridge.
 - **Pair with:** `docs/LHA3_STDLIB_API.md`, `docs/LLM_INFRASTRUCTURE_AUDIT.md` for HTTP/LLM vs quantum-memory layers; **`docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md`** for GPU/device/neural files not on the default native spine; **`scripts/audit_gpu_neural_quantum_surfaces.sh`** to refresh path counts.
 - **Doc index:** `docs/README.md` lists all maintained project documentation (this file included).

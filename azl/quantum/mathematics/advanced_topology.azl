@@ -28,6 +28,15 @@ component ::quantum.mathematics.advanced_topology {
     say "🔬 Advanced Topological Intelligence initializing with max dimension ::max_dimension"
   }
 
+  on initialize_advanced_topology {
+    set ::status = "initialized"
+    say "🔬 Advanced topology handshake (initialize_advanced_topology)"
+    emit quantum.mathematics.advanced_topology.initialized with {
+      status: ::status,
+      consciousness_integration: $1.consciousness_integration || false
+    }
+  }
+
   # Link to other quantum mathematics systems
   link ::quantum.mathematics.algebraic_structures
   link ::quantum.mathematics.category_theory

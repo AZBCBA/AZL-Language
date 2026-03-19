@@ -52,7 +52,7 @@ azl/quantum/
 │   ├── quantum_memory.azl      # Quantum memory
 │   └── lha3_quantum_engine.azl # LHA3 quantum storage
 ├── mathematics/
-│   ├── quantum_math.azl        # Quantum mathematics
+│   ├── advanced_topology.azl   # Advanced topology (`::quantum.mathematics.advanced_topology`)
 │   └── quantum_algebra.azl     # Quantum algebra
 ├── neural/
 │   ├── quantum_neural.azl      # Quantum neural networks

@@ -90,11 +90,11 @@
 
 ## 8. Quantum mathematics stack (`azl/quantum/mathematics/`) — audited
 
-**Note:** File names do not always match the **declared component** (e.g. `quantum_math.azl` defines `::quantum.mathematics.advanced_topology`). None of these modules are implied to run on the **default native enterprise** child unless bundled and reached by a full interpreter.
+**Note:** On-disk filenames still differ from some **legacy** `quantum_*` aliases in older scripts; canonical advanced topology is `advanced_topology.azl` → `::quantum.mathematics.advanced_topology`. None of these modules are implied to run on the **default native enterprise** child unless bundled and reached by a full interpreter.
 
 | File | Component | What runs | Verdict |
 |------|-----------|-----------|---------|
-| `quantum_math.azl` | `::quantum.mathematics.advanced_topology` | `on topology.*` handlers; `_advanced_persistent_homology` returns a **fixed** diagram/barcode (does not compute from `data`) | **Scaffold + illustrative outputs**; misnamed file vs content |
+| `advanced_topology.azl` | `::quantum.mathematics.advanced_topology` | `on topology.*`, `on initialize_advanced_topology`; `_advanced_persistent_homology` returns a **fixed** diagram/barcode (does not compute from `data`) | **Scaffold + illustrative outputs** |
 | `quantum_topology.azl` | `::quantum.mathematics.topological_intelligence` | `_compute_persistent_homology` / homology **fixed** tuples | **Scaffold** |
 | `quantum_integrator.azl` | `::quantum.mathematics.integrator` | Registers framework names; `_create_unified_structure` etc. | **Integration shell** |
 | `quantum_geometry.azl` | `::quantum.mathematics.geometric_structures` | Manifold definition flow with axiom checks via helpers | **Structural**; verify helpers for rigor |
@@ -104,7 +104,7 @@
 
 **Cross-links:** Components `link` each other (`algebraic_structures`, `category_theory`, `advanced_topology`, `integrator`, etc.); loading order matters if you mount this stack in a test bundle.
 
-**Rename debt:** Consider renaming `quantum_math.azl` → `advanced_topology.azl` (or similar) to match `::quantum.mathematics.advanced_topology` — tracked in [DEEP_AUDIT §4](DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md).
+**Filename alignment:** `quantum_math.azl` was renamed to `advanced_topology.azl` (2026-03-19) to match `::quantum.mathematics.advanced_topology`.
 
 ---
 
