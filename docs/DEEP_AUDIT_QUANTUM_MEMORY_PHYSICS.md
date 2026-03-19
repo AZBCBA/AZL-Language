@@ -159,9 +159,9 @@
 ## 4. Gaps Identified
 
 1. **Hypercomplex p-adic (4D)** — Old TypeScript processor had it; not reimplemented in pure AZL yet.
-2. **Quantum math** — `quantum_integrator`, `quantum_geometry`, `quantum_chaos`, `quantum_category`, `quantum_algebra`: need per-file audit (doc §2.2).
+2. **Quantum mathematics (`azl/quantum/mathematics/`)** — File- and component-level audit: **`docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md` §8**; most helpers are illustrative or simplified; **chaos** module has real Lorenz/Rossler stepping with stubbed Lyapunov/fractal/bifurcation returns.
 3. **Native tensor** — `azl/core/types/tensor.azl` is pure AZL arrays; no GPU/ONNX binding.
-4. **Rename / clarify** — `azl/quantum/mathematics/quantum_math.azl` content is topology; consider rename or split file to match path.
+4. **Rename / clarify** — `quantum_math.azl` defines `::quantum.mathematics.advanced_topology`; align filename with component or keep cross-reference in inventory §8.
 
 ---
 
@@ -180,6 +180,6 @@ See `docs/LHA3_STDLIB_API.md` for:
 
 - **What it is:** A map of quantum / LHA3 / fractal / entanglement / math modules—not a tutorial.
 - **When to open it:** Planning work on memory, quantum stack, or “what’s real vs symbolic.”
-- **Next work from here (pick one):** (a) audit `quantum_integrator` … `quantum_algebra`, (b) port hypercomplex p-adic, (c) GPU/tensor bridge, (d) rename `quantum_math.azl` vs topology.
+- **Next work from here (pick one):** (a) harden mathematics helpers (real TDA / group checks) where product needs it, (b) port hypercomplex p-adic, (c) GPU/tensor bridge, (d) rename `quantum_math.azl` to match `advanced_topology`.
 - **Pair with:** `docs/LHA3_STDLIB_API.md`, `docs/LLM_INFRASTRUCTURE_AUDIT.md` for HTTP/LLM vs quantum-memory layers; **`docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md`** for GPU/device/neural files not on the default native spine; **`scripts/audit_gpu_neural_quantum_surfaces.sh`** to refresh path counts.
 - **Doc index:** `docs/README.md` lists all maintained project documentation (this file included).

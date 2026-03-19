@@ -1,17 +1,21 @@
-## One-command run (full AZME on AZL)
+# AZL Language
+
+AZL is a **component–event** language: programs are built from named `component` blocks with `init` and `behavior` sections, asynchronous coordination uses `emit` / `listen`, and failures are intended to flow through an explicit error system rather than silent degradation. Grammar, parser, interpreter, stdlib, and much of the tooling live as **AZL source** under `azl/`. Authoritative syntax and behavior are [AZL_CURRENT_SPECIFICATION.md](docs/language/AZL_CURRENT_SPECIFICATION.md) and [AZL_LANGUAGE_RULES.md](docs/language/AZL_LANGUAGE_RULES.md).
+
+**Native runtime (today):** the HTTP supervisor in `tools/azl_native_engine.c` forks a child that runs a **concatenated** `.azl` bundle. That child is either the **minimal C interpreter** or a **Python runtime** with the same subset (`AZL_RUNTIME_SPINE`); full semantics are specified in `azl/runtime/interpreter/azl_interpreter.azl`, and making that path the default enterprise semantic owner is **ongoing** ([RUNTIME_SPINE_DECISION.md](docs/RUNTIME_SPINE_DECISION.md), [PROJECT_COMPLETION_ROADMAP.md](docs/PROJECT_COMPLETION_ROADMAP.md)).
+
+**Broader library surface:** LHA3-style memory, quantum- and topology-flavored **software** modules, neural orchestration, optional Torch FFI (`AZL_ENABLE_TORCH_FFI`), and HTTP bridges for LLMs. Most of this is **not** exercised by the default native child; boundaries are documented in [AZL_GPU_NEURAL_QUANTUM_INVENTORY.md](docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md) and [DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md](docs/DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md). Native LLM access is designed around an **Ollama-compatible HTTP proxy**; in-process GGUF is **not** implemented and is reported via `GET /api/llm/capabilities`.
+
+Canonical repo: **https://github.com/AZBCBA/AZL-Language** — [Contributing](docs/CONTRIBUTING.md) · [Issues](https://github.com/AZBCBA/AZL-Language/issues)
+
+## One-command native startup
 
 ```bash
 export AZL_STRICT=1 AZL_LOG_LEVEL=debug AZL_DAEMON=1
 bash scripts/start_azl_native_mode.sh
 ```
 
-The driver emits `azl.begin` and `system.boot`; all phases advance automatically until ready.
-
-# AZL Language
-
-**AZL** is a unified, component-based, event-driven programming language. It has its own syntax, grammar, and rules — **this is AZL, not Java, not TypeScript.** The runtime target is native AZL execution; see [docs/language/AZL_LANGUAGE_RULES.md](docs/language/AZL_LANGUAGE_RULES.md) and [docs/language/AZL_CURRENT_SPECIFICATION.md](docs/language/AZL_CURRENT_SPECIFICATION.md).
-
-**This repository is the full project.** Work from here: clone from GitHub, make changes, push, and open Pull Requests. Contributions are welcome — see [Contributing](docs/CONTRIBUTING.md) and [GitHub Issues](https://github.com/AZBCBA/AZL-Language/issues).
+The driver emits `azl.begin` and `system.boot`; phases advance until the stack reports ready.
 
 ## Getting Started
 - Native startup:
@@ -76,7 +80,7 @@ Run full native validation: `./scripts/run_all_tests.sh`.
 
 Documentation index: [docs/README.md](docs/README.md).
 
-## 🎯 Quick Start
+## Syntax samples
 
 ### Hello World
 
@@ -119,9 +123,9 @@ component ::counter {
 }
 ```
 
-## 📚 Language Reference
+## Language reference
 
-### Basic Syntax
+### Basic syntax
 
 #### Variables
 ```azl
@@ -185,9 +189,9 @@ component ::demo.app {
 
 Use the error system: `emit "error" with { message: "..." }` and `listen for "error" then { }`. See `azl/core/error_system.azl`.
 
-## 📖 Standard Library
+## Standard library
 
-AZL comes with a comprehensive standard library organized into modules:
+The tree under `azl/stdlib/` and related core modules provides shared utilities. Examples (non-exhaustive):
 
 ### Core Array Module (`stdlib/core/array.azl`)
 
@@ -249,11 +253,11 @@ File and directory operations:
 - `create_directory(path)` - Create directory
 - `delete_directory(path)` - Delete directory
 
-## 🧪 Testing
+## Testing
 
-Use AZL components to assert behavior via emitted events and stdlib operations. A pure-AZL test harness is under `azl/testing`.
+Use AZL components to assert behavior via emitted events and stdlib operations. A pure-AZL test harness lives under `azl/testing`. CI and release gates use `scripts/run_tests.sh` and `scripts/run_all_tests.sh`.
 
-## 📁 Project Structure (native-first AZL)
+## Repository layout (native-first)
 
 ```
 azl-language/
@@ -282,9 +286,9 @@ azl-language/
 └── azl/testing/                 # Pure AZL tests
 ```
 
-## 🛠️ Development
+## Development
 
-### Building (Pure AZL)
+### Building (pure AZL)
 
 See `build_azl.azl` for the virtual build pipeline using the system interface’s syscalls.
 
@@ -303,22 +307,16 @@ AZL is its own language; follow [docs/language/AZL_LANGUAGE_RULES.md](docs/langu
 - Descriptive names; guard edge cases; deterministic behavior
 - Write tests for new features
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).
 
-## 🤝 Acknowledgments
+## Acknowledgments
 
-- Inspired by modern functional programming languages
-- Built in AZL; a Rust bootstrap existed historically but is no longer required for core execution
-- Standard library design influenced by JavaScript and Python
+AZL draws ideas from event-driven and functional idioms familiar from other ecosystems; the **language semantics are AZL-specific** and must be read from the spec, not assumed from JavaScript or Python. A historical Rust bootstrap path is deprecated for core execution.
 
-## 📞 Support
+## Support
 
-- **Issues**: [GitHub Issues](https://github.com/AZBCBA/AZL-Language/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/AZBCBA/AZL-Language/discussions)
-- **Documentation**: [docs/](docs/)
-
----
-
-**AZL** - Where clarity meets power in programming. 🚀 
+- [GitHub Issues](https://github.com/AZBCBA/AZL-Language/issues)
+- [GitHub Discussions](https://github.com/AZBCBA/AZL-Language/discussions)
+- [Documentation index](docs/README.md)

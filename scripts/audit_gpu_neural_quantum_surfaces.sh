@@ -25,6 +25,13 @@ count_dir "azl/quantum" "quantum/"
 count_dir "azl/neural" "neural/"
 count_dir "azl/memory" "memory/"
 count_dir "azl/orchestrator" "orchestrator/"
+count_dir "azl/quantum/mathematics" "quantum/mathematics/"
+echo ""
+
+echo "--- quantum/mathematics/*.azl (line counts) ---"
+if [ -d azl/quantum/mathematics ]; then
+  wc -l azl/quantum/mathematics/*.azl 2>/dev/null | sort -n || true
+fi
 echo ""
 
 echo "--- rg: GPU | CUDA | VRAM | cuda (azl/*.azl) ---"

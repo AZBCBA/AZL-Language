@@ -11,6 +11,16 @@ Thank you for contributing to **AZL** — the component-based, event-driven prog
 
 There is **no** `src/lib.rs` or `Cargo.toml` at repo root. The release runtime path is native-first AZL.
 
+## Research and capability libraries
+
+Subtrees such as `azl/quantum/`, `azl/memory/`, `azl/neural/`, and `azl/ffi/` contain **event-driven modules** that may not be executed by the **default native runtime child** (minimal C / Python subset on the enterprise combined file). Before treating a file as “what AZL does in production,” read:
+
+- [AZL_GPU_NEURAL_QUANTUM_INVENTORY.md](AZL_GPU_NEURAL_QUANTUM_INVENTORY.md) — GPU/device/neural/quantum **file map** and mathematics stack audit (§8)
+- [DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md](DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md) — symbolic vs implemented quantum/memory claims
+- [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md) — which stack owns semantics on the canonical command
+
+Refresh local counts: `bash scripts/audit_gpu_neural_quantum_surfaces.sh`
+
 ## Active work areas (coordinate before changing)
 
 - **`azl/core/parser/azl_parser.azl`** — Token types, keywords, operators, punctuation, `tokenize`, `parse_azl_code`, AST.
