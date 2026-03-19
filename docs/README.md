@@ -18,6 +18,7 @@ Single entry point for **accurate** project docs. Older “status report”, “
 | [AZL_PERFECTION_PLAN.md](AZL_PERFECTION_PLAN.md) | Strategic gaps and phased goals |
 | [DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md](DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md) | Quantum / LHA3 / memory: real vs symbolic |
 | [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md) | LLM / HTTP / proxy stack; includes **`GET /api/llm/capabilities`** on native engine |
+| [INTEGRATIONS_HOST_VS_NATIVE.md](INTEGRATIONS_HOST_VS_NATIVE.md) | AnythingLLM / `azl/integrations`: pure AZL vs host-shaped reference |
 | [AUDIT_STRENGTH_ITEMS.md](AUDIT_STRENGTH_ITEMS.md) | Focused strength / risk audit |
 | [STATUS.md](STATUS.md) | Short **verified** runtime snapshot |
 

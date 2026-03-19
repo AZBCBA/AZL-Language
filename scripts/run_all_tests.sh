@@ -18,6 +18,9 @@ bash scripts/verify_azl_grammar_conformance.sh
 chmod +x scripts/verify_azl_use_vm_path.sh || true
 bash scripts/verify_azl_use_vm_path.sh
 
+chmod +x scripts/verify_native_bundle_excludes_host_integrations.sh 2>/dev/null || true
+bash scripts/verify_native_bundle_excludes_host_integrations.sh
+
 chmod +x scripts/build_azlpack.sh scripts/verify_azlpack_local.sh scripts/verify_lsp_smoke.sh 2>/dev/null || true
 bash scripts/verify_azlpack_local.sh
 bash scripts/verify_lsp_smoke.sh

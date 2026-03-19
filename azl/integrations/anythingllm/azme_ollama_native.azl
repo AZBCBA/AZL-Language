@@ -1,0 +1,33 @@
+# Pure AZL path to Ollama: POST /api/generate via syscall http (sysproxy http_client for real URLs).
+# Upstream base: OLLAMA_HOST or AZL_OLLAMA_HTTP_BASE (default http://127.0.0.1:11434).
+# Callers must handle syscall.response (request_id correlation) in their own listeners.
+
+component ::integrations.anythingllm.ollama_native {
+  init {
+    say "integrations.anythingllm.ollama_native — use event integrations.anythingllm.ollama_post_json"
+  }
+
+  behavior {
+    listen for "integrations.anythingllm.ollama_post_json" then {
+      set ::payload = ::event.data.json
+      if ::payload == null {
+        emit log_error with { type: "integrations", code: "ERR_OLLAMA_JSON_REQUIRED", message: "event.data.json required" }
+        emit integrations.anythingllm.ollama_error with { code: "ERR_OLLAMA_JSON_REQUIRED" }
+        return
+      }
+      set ::base = ::internal.env("AZL_OLLAMA_HTTP_BASE")
+      if ::base == null || ::base.toString().length == 0 {
+        set ::base = ::internal.env("OLLAMA_HOST")
+      }
+      if ::base == null || ::base.toString().length == 0 {
+        set ::base = "http://127.0.0.1:11434"
+      }
+      set ::b = ::base.toString()
+      if ::b.length > 0 && ::b.substring(::b.length - 1, ::b.length) == "/" {
+        set ::b = ::b.substring(0, ::b.length - 1)
+      }
+      set ::url = ::b + "/api/generate"
+      emit syscall with { type: "http", args: { url: ::url, method: "POST", body: ::payload.toString() } }
+    }
+  }
+}
