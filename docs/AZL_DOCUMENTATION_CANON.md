@@ -24,7 +24,7 @@
 | Default spine | `AZL_RUNTIME_SPINE=c_minimal` → `scripts/azl_c_interpreter_runtime.sh` → `azl-interpreter-minimal` |
 | Semantic spine (Python, parity subset) | `AZL_RUNTIME_SPINE=azl_interpreter` → `tools/azl_runtime_spine_host.py` / `tools/azl_semantic_engine/` |
 | Byte parity C vs Python | Gate **F2** on `azl/tests/c_minimal_link_ping.azl` |
-| P0 interpreter-shaped slice | Gate **F3** on `azl/tests/p0_semantic_interpreter_slice.azl` |
+| P0 interpreter-shaped slice | Gate **F3** on `azl/tests/p0_semantic_interpreter_slice.azl` (includes **`.toInt()`**, dotted **`::perf.*`**, aligned with `azl_interpreter.azl` init prefix) |
 | Tokenizer + `{`/`}` balance on real interpreter file | Gate **H** — `scripts/verify_p0_interpreter_tokenizer_boundary.sh` |
 | Spine resolver + error surface | Gate **G** — `scripts/verify_runtime_spine_contract.sh` |
 

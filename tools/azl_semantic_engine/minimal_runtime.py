@@ -237,7 +237,24 @@ class MinimalAZLRuntime:
             if i[0] >= self.ntok or self.tok[i[0]] != ")":
                 raise SemanticEngineError(5, "azl_semantic_engine: expected )")
             i[0] += 1
-            return inner, 0
+            s, nn = inner, 0
+            while (
+                i[0] + 2 < self.ntok
+                and self.tok[i[0]] == "."
+                and self.tok[i[0] + 1] == "toInt"
+                and self.tok[i[0] + 2] == "("
+            ):
+                i[0] += 3
+                if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                    raise SemanticEngineError(5, "azl_semantic_engine: toInt() expected )")
+                i[0] += 1
+                raw = "" if nn else s.strip()
+                try:
+                    s = str(int(raw)) if raw else "0"
+                except ValueError:
+                    s = "0"
+                nn = 0
+            return s, nn
         if len(t) >= 2 and t[0] in "\"'":
             inner = t[1:-1] if len(t) >= 2 else ""
             i[0] += 1

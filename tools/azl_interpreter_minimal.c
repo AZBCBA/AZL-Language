@@ -252,6 +252,25 @@ static int eval_or(int *i, char *out, size_t outsz) {
   return 0;
 }
 
+/* After a primary value, consume optional `.toInt()` calls (AZL interpreter init). */
+static int apply_to_int_suffixes(int *i, char *out, size_t outsz, int *nullish) {
+  while (*i + 2 < g_ntok && strcmp(g_tok[*i], ".") == 0 && strcmp(g_tok[*i + 1], "toInt") == 0 &&
+         strcmp(g_tok[*i + 2], "(") == 0) {
+    *i += 3;
+    if (*i >= g_ntok || strcmp(g_tok[*i], ")") != 0) return -1;
+    (*i)++;
+    char *endp = NULL;
+    long n = 0;
+    if (!*nullish && out[0] != '\0') {
+      n = strtol(out, &endp, 10);
+      if (endp == out || (endp && *endp != '\0')) n = 0;
+    }
+    (void)snprintf(out, outsz, "%ld", n);
+    *nullish = 0;
+  }
+  return 0;
+}
+
 static int eval_primary(int *i, char *out, size_t outsz, int *nullish) {
   *nullish = 0;
   out[0] = '\0';
@@ -264,7 +283,7 @@ static int eval_primary(int *i, char *out, size_t outsz, int *nullish) {
     if (eval_or(i, out, outsz) != 0) return -1;
     if (*i >= g_ntok || strcmp(g_tok[*i], ")") != 0) return -1;
     (*i)++;
-    *nullish = 0;
+    if (apply_to_int_suffixes(i, out, outsz, nullish) != 0) return -1;
     return 0;
   }
 

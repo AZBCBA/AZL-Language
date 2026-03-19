@@ -21,13 +21,15 @@ component ::p0.interpreter.slice {
     set ::dispatch_stack = []
     set ::recursion_depth = 0
     set ::halted = false
-    set ::cache_order = []
     set ::halt_on_error = ((::internal.env("AZL_STRICT") or "1") == "1")
-    set ::perf = { tok_cache: {}, ast_cache: {}, cap: 512 }
+    set ::perf = { tok_cache: {}, ast_cache: {}, cap: ((::internal.env("AZL_PARSE_CACHE") or "512").toInt()) }
+    set ::perf.stats = { tok_hits: 0, tok_misses: 0, ast_hits: 0, ast_misses: 0 }
+    set ::cache_order = []
     link ::azl.security
     if ::perf == null {
       set ::perf = {}
     }
+    set ::perf.expr_cache = {}
     if ::error_count == 0 {
       set ::p0_init_branch_ok = 1
     }

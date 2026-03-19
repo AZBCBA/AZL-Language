@@ -17,8 +17,6 @@ component ::azl.interpreter {
     set ::error_count = 0
     set ::dispatch_stack = []
     set ::recursion_depth = 0
-    set ::dispatch_stack = []
-    set ::recursion_depth = 0
     # hard error policy
     set ::halted = false
     set ::halt_on_error = ((::internal.env("AZL_STRICT") or "1") == "1")
