@@ -774,8 +774,8 @@ component ::quantum.behavior_modeling {
       }
     }
 
-    # Predict next states function
-    on simulate_next_states {
+    # Predict next states (deterministic; no random simulation)
+    on predict_next_states {
       set ::simulation_request = $1
       say "🌐 Simulating next quantum world states"
       
@@ -922,7 +922,7 @@ component ::quantum.behavior_modeling {
       set ::simulation_request = $1
       say "🔮 Agent requesting future simulation"
       
-      emit simulate_next_states with {
+      emit predict_next_states with {
         quantum_enhanced: true
       }
     }
@@ -4087,7 +4087,7 @@ component ::quantum.behavior_modeling {
       set ::target = ::validation_request.target
       
       # Evaluate mutation outcome deterministically against current target state.
-      set ::validation_score = simulate_mutation_outcome(::mutation, ::target)
+      set ::validation_score = predict_mutation_outcome(::mutation, ::target)
       
       # Store mutation score
       set ::mutation_scores[::mutation.id] = ::validation_score
@@ -4313,7 +4313,7 @@ component ::quantum.behavior_modeling {
       }
     }
 
-    on simulate_mutation_outcome {
+    on predict_mutation_outcome {
       set ::simulation_request = $1
       say "🧪 Evaluating mutation outcome"
       

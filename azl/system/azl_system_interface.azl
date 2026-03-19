@@ -252,17 +252,28 @@ component ::azl.system_interface {
         if ::azl.security && ::azl.security.require("net.http") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }
         set url = a.url || ""
         set method = (a.method || "GET").to_upper()
-        if method == "GET" {
-          set body = ::http_store[url] || ""
-          emit syscall.response with { request_id: rid, type: t, status: 200, headers: {}, body: body }
-        } else if method == "POST" || method == "PUT" {
-          set ::http_store[url] = (a.body || "")
-          emit syscall.response with { request_id: rid, type: t, status: 200, headers: {}, body: "OK" }
-        } else if method == "DELETE" {
-          set ::http_store[url] = null
-          emit syscall.response with { request_id: rid, type: t, status: 200, headers: {}, body: "OK" }
+        # Real HTTP via sysproxy when URL is external (http:// or https://)
+        if (url.starts_with("http://") || url.starts_with("https://")) {
+          set r = sysproxy_call("http_client", { url: url, method: method, body: (a.body || "") })
+          if r.ok == true && r.data != null {
+            emit syscall.response with { request_id: rid, type: t, status: 200, headers: {}, body: r.data }
+          } else {
+            emit syscall.response with { request_id: rid, type: t, status: 502, error: (r.error || r.msg || "http_client_failed"), body: "" }
+          }
         } else {
-          emit syscall.response with { request_id: rid, type: t, status: 405, error: "METHOD_NOT_ALLOWED" }
+          # Local/simulated: http_store for non-URL keys
+          if method == "GET" {
+            set body = ::http_store[url] || ""
+            emit syscall.response with { request_id: rid, type: t, status: 200, headers: {}, body: body }
+          } else if method == "POST" || method == "PUT" {
+            set ::http_store[url] = (a.body || "")
+            emit syscall.response with { request_id: rid, type: t, status: 200, headers: {}, body: "OK" }
+          } else if method == "DELETE" {
+            set ::http_store[url] = null
+            emit syscall.response with { request_id: rid, type: t, status: 200, headers: {}, body: "OK" }
+          } else {
+            emit syscall.response with { request_id: rid, type: t, status: 405, error: "METHOD_NOT_ALLOWED" }
+          }
         }
       } else if t == "exec" {
         if ::azl.security && ::azl.security.require("proc.spawn") != true { emit syscall.response with { request_id: rid, type: t, error: "capability_denied" }; return }

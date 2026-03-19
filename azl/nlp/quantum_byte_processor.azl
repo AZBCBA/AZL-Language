@@ -38,27 +38,26 @@ component ::nlp.quantum_byte_processor {
       say "⚛️ Quantum processing: " + prompt
       
       # Gate heavy quantum subsystems behind env flag for latency
-      let enable_q = ::internal.env("AZL_ENABLE_QUANTUM") or "0"
-      if enable_q == "1" {
+      set ::enable_q = ::internal.env("AZL_ENABLE_QUANTUM") or "0"
+      branch when ::enable_q == "1" {
         # Step 1: Initialize quantum core
         emit quantum.core.initialize with "quantum_enhanced"
-        
         # Step 2: Start comprehensive training if needed
         emit start_comprehensive_training with prompt
-        
         # Step 3: Process through quantum AI pipeline
         emit quantum.ai_pipeline.start_training with prompt
-        
-        # Step 4: Process through quantum behavior modeling
+        # Step 4: Process through quantum behavior modeling (emits stream.utf8 on analysis_complete)
         emit quantum.behavior_modeling.analyze_behavior with prompt
-        
         # Step 5: Calculate ABA reward
         emit calculate_aba_reward with prompt
+      } else {
+        emit log_error with {
+          type: "quantum_disabled",
+          message: "generate.text.bytes requires AZL_ENABLE_QUANTUM=1; no fallback",
+          context: { prompt: ::event.data }
+        }
+        emit "stream.utf8.error" with { reason: "quantum_disabled", prompt: ::event.data }
       }
-
-      # Low-latency fallback to guarantee response even if downstream subsystems are not loaded
-      set ::response = "[QBP] Generated response for: " + prompt
-      emit "stream.utf8" with ::response
     }
     
     # Handle quantum core initialization

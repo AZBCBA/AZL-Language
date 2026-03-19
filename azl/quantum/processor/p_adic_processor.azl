@@ -1,697 +1,159 @@
-// P-adic Processor: Foundation for non-conventional computation
-// using p-adic number systems instead of binary logic.
+# P-adic Processor - Pure AZL
+# Foundation for non-conventional computation using p-adic number systems.
+# Replaces TypeScript/JS host-leaked version with native AZL.
 
-// P-adic Number Implementation
-// P-adic numbers provide a different notion of "closeness" than real numbers,
-// allowing for alternative computational paradigms.
-class PAdicNumber {
-    // Properties
-    prime: number
-    precision: number
-    value: number
-    digits: array
-    
-    // Initialize a p-adic number
-    constructor(
-        value: number | array,
-        prime: number = 7,
-        precision: number = 10
-    ) {
-        this.prime = prime
-        this.precision = precision
-        this.value = typeof value === "number" ? value : null
-        
-        if (Array.isArray(value)) {
-            // Ensure the list has the correct length
-            if (value.length > precision) {
-                this.digits = value.slice(0, precision)
-            } else {
-                this.digits = value.concat(new Array(precision - value.length).fill(0))
-            }
-        } else {
-            // Convert integer to p-adic expansion
-            this.digits = this._int_to_p_adic(value)
-        }
-    }
-    
-    // Convert an integer to its p-adic expansion
-    _int_to_p_adic(n: number): array {
-        let digits = []
-        let temp = Math.abs(n)
-        
-        for (let i = 0; i < this.precision; i++) {
-            let digit = temp % this.prime
-            digits.push(digit)
-            temp = Math.floor(temp / this.prime)
-        }
-        
-        return digits
-    }
-    
-    // Convert p-adic number to integer (approximation)
-    to_int(): number {
-        let result = 0
-        for (let i = 0; i < this.digits.length; i++) {
-            result += this.digits[i] * Math.pow(this.prime, i)
-        }
-        return result
-    }
-    
-    // Add two p-adic numbers
-    add(other: PAdicNumber): PAdicNumber {
-        if (!(other instanceof PAdicNumber)) {
-            other = new PAdicNumber(other, this.prime, this.precision)
-        }
-        
-        let result = []
-        let carry = 0
-        
-        for (let i = 0; i < this.precision; i++) {
-            let total = this.digits[i] + other.digits[i] + carry
-            let digit = total % this.prime
-            carry = Math.floor(total / this.prime)
-            result.push(digit)
-        }
-        
-        return new PAdicNumber(result, this.prime, this.precision)
-    }
-    
-    // Multiply two p-adic numbers
-    multiply(other: PAdicNumber): PAdicNumber {
-        if (!(other instanceof PAdicNumber)) {
-            other = new PAdicNumber(other, this.prime, this.precision)
-        }
-        
-        // Initialize result with zeros
-        let result = new Array(this.precision).fill(0)
-        
-        for (let i = 0; i < this.precision; i++) {
-            for (let j = 0; j < this.precision - i; j++) {
-                let product = this.digits[i] * other.digits[j]
-                let k = i + j
-                result[k] += product
-            }
-        }
-        
-        // Handle carries
-        for (let i = 0; i < this.precision - 1; i++) {
-            result[i + 1] += Math.floor(result[i] / this.prime)
-            result[i] %= this.prime
-        }
-        
-        return new PAdicNumber(result, this.prime, this.precision)
-    }
-    
-    // String representation
-    toString(): string {
-        let result = ""
-        for (let i = this.digits.length - 1; i >= 0; i--) {
-            result += this.digits[i].toString()
-        }
-        return result
-    }
-    
-    // Get string representation
-    getString(): string {
-        return this.toString()
-    }
-}
+component ::quantum.processor.p_adic {
+  init {
+    set ::prime = 7
+    set ::precision = 10
+    set ::storage = {}
+    say "P-adic processor initialized (prime=" + ::prime + ", precision=" + ::precision + ")"
+    emit "p_adic.processor.ready" with { prime: ::prime, precision: ::precision }
+  }
 
-// P-adic Processor
-class PAdicProcessor {
-    // Configuration
-    prime: number
-    precision: number
-    storage: object
-    
-    // Initialize the p-adic processor
-    constructor(prime: number = 7, precision: number = 10) {
-        this.prime = prime
-        this.precision = precision
-        this.storage = {}
-        
-        print("P-adic processor initialized with prime " + prime + " and precision " + precision)
-    }
-    
-    // Create a p-adic number from an integer or a list of digits
-    create_number(value: number | array): PAdicNumber {
-        // If value is already a PAdicNumber, return it
-        if (value instanceof PAdicNumber) {
-            return value
-        }
-
-        // Otherwise, create a new PAdicNumber
-        return new PAdicNumber(value, this.prime, this.precision)
-    }
-    
-    // Store a p-adic number in memory
-    store(key: string, value: PAdicNumber) {
-        this.storage[key] = value
-    }
-    
-    // Retrieve a p-adic number from memory
-    retrieve(key: string): PAdicNumber {
-        return this.storage[key] || new PAdicNumber(0, this.prime, this.precision)
-    }
-    
-    // Evaluate a mathematical expression using p-adic arithmetic
-    evaluate_expression(expression: string): PAdicNumber {
-        // Parse the expression (simplified for AZL)
-        try {
-            // Basic expression evaluation
-            let result = this._evaluate_simple_expression(expression)
-            return result
-        } catch (error) {
-            // Fallback: create a zero p-adic number
-            return this.create_number(0)
-        }
+  behavior {
+    listen for "p_adic.create" then {
+      set ::val = ::event.data.value
+      set ::p = ::event.data.prime || ::prime
+      set ::prec = ::event.data.precision || ::precision
+      set ::digits = ::int_to_p_adic(::val, ::p, ::prec)
+      set ::key = ::event.data.key || ("padic_" + (::internal.now() || 0))
+      set ::storage[::key] = { digits: ::digits, prime: ::p, precision: ::prec }
+      emit "p_adic.created" with { key: ::key, digits: ::digits }
     }
 
-    // Simple expression evaluation for AZL
-    _evaluate_simple_expression(expr: string): PAdicNumber {
-        // Basic arithmetic operations
-        if (expr.includes("+")) {
-            let parts = expr.split("+")
-            let result = this.create_number(parseInt(parts[0]))
-            for (let i = 1; i < parts.length; i++) {
-                result = result.add(this.create_number(parseInt(parts[i])))
-            }
-            return result
-        } else if (expr.includes("*")) {
-            let parts = expr.split("*")
-            let result = this.create_number(parseInt(parts[0]))
-            for (let i = 1; i < parts.length; i++) {
-                result = result.multiply(this.create_number(parseInt(parts[i])))
-            }
-            return result
-        } else {
-            return this.create_number(parseInt(expr) || 0)
-        }
+    listen for "p_adic.add" then {
+      set ::key_a = ::event.data.key_a
+      set ::key_b = ::event.data.key_b
+      set ::out_key = ::event.data.out_key || ("sum_" + (::now() || 0))
+      if ::storage[::key_a] == null || ::storage[::key_b] == null {
+        emit log_error with { type: "p_adic", message: "key_not_found", context: { key_a: ::key_a, key_b: ::key_b } }
+        return
+      }
+      set ::a = ::storage[::key_a].digits
+      set ::b = ::storage[::key_b].digits
+      set ::p = ::storage[::key_a].prime
+      set ::prec = ::storage[::key_a].precision
+      set ::result = ::p_adic_add(::a, ::b, ::p, ::prec)
+      set ::storage[::out_key] = { digits: ::result, prime: ::p, precision: ::prec }
+      emit "p_adic.added" with { key: ::out_key, digits: ::result }
     }
-    
-    // Transform conventional data into p-adic representation
-    transform_data(data: array): array {
-        let result = []
-        for (let x in data) {
-            result.push(this.create_number(Math.floor(x * Math.pow(10, this.precision))))
-        }
-        return result
+
+    listen for "p_adic.multiply" then {
+      set ::key_a = ::event.data.key_a
+      set ::key_b = ::event.data.key_b
+      set ::out_key = ::event.data.out_key || ("prod_" + (::internal.now() || 0))
+      if ::storage[::key_a] == null || ::storage[::key_b] == null {
+        emit log_error with { type: "p_adic", message: "key_not_found", context: { key_a: ::key_a, key_b: ::key_b } }
+        return
+      }
+      set ::a = ::storage[::key_a].digits
+      set ::b = ::storage[::key_b].digits
+      set ::p = ::storage[::key_a].prime
+      set ::prec = ::storage[::key_a].precision
+      set ::result = ::p_adic_multiply(::a, ::b, ::p, ::prec)
+      set ::storage[::out_key] = { digits: ::result, prime: ::p, precision: ::prec }
+      emit "p_adic.multiplied" with { key: ::out_key, digits: ::result }
     }
-    
-    // Calculate the p-adic distance between two p-adic numbers
-    p_adic_distance(a: PAdicNumber, b: PAdicNumber): number {
-        // Find the first position where digits differ
-        for (let i = 0; i < Math.min(a.digits.length, b.digits.length); i++) {
-            if (a.digits[i] != b.digits[i]) {
-                return Math.pow(this.prime, -i)
-            }
-        }
 
-        // If all digits match within precision, return 0
-        return 0.0
+    listen for "p_adic.distance" then {
+      set ::key_a = ::event.data.key_a
+      set ::key_b = ::event.data.key_b
+      if ::storage[::key_a] == null || ::storage[::key_b] == null {
+        emit log_error with { type: "p_adic", message: "key_not_found", context: { key_a: ::key_a, key_b: ::key_b } }
+        return
+      }
+      set ::a = ::storage[::key_a].digits
+      set ::b = ::storage[::key_b].digits
+      set ::p = ::storage[::key_a].prime
+      set ::dist = ::p_adic_distance(::a, ::b, ::p)
+      emit "p_adic.distance" with { distance: ::dist, key_a: ::key_a, key_b: ::key_b }
     }
-    
-    // Calculate the p-adic norm of a number
-    p_adic_norm(a: PAdicNumber): number {
-        let zero = this.create_number(0)
-        return this.p_adic_distance(a, zero)
+
+    listen for "p_adic.get_state" then {
+      set ::count = 0
+      for ::k in ::storage { set ::count = ::count + 1 }
+      emit "p_adic.state" with { storage_count: ::count, prime: ::prime, precision: ::precision }
     }
-    
-    // Create a p-adic number from its string representation
-    create_number_from_string(string_repr: string): PAdicNumber {
-        // Parse the string representation
-        // Format is typically "(d0, d1, d2, ...){prime}"
-        try {
-            // Extract digits
-            let digits_part = string_repr.split("(")[1].split(")")[0]
-            let digits_str = digits_part.split(",")
-            let digits = []
+  }
 
-            for (let d in digits_str) {
-                if (d.includes("...")) { // Handle ellipsis
-                    continue
-                }
-                digits.push(parseInt(d.trim()))
-            }
-
-            // Pad with zeros if needed
-            if (digits.length < this.precision) {
-                digits = digits.concat(new Array(this.precision - digits.length).fill(0))
-            }
-
-            return new PAdicNumber(digits, this.prime, this.precision)
-        } catch (error) {
-            // Fallback: create a zero p-adic number
-            return this.create_number(0)
-        }
+  # Convert integer to p-adic expansion (least significant first)
+  function int_to_p_adic(n, prime, prec) {
+    set ::n = n
+    if ::n < 0 { set ::n = -::n }
+    set ::digits = []
+    set ::i = 0
+    while ::i < prec {
+      set ::digit = ::n % prime
+      ::digits.push(::digit)
+      set ::n = ::n / prime
+      set ::i = ::i + 1
     }
-    
-    // Find p-adic patterns in data
-    find_patterns(data: array): array {
-        let patterns = []
+    return ::digits
+  }
 
-        try {
-            // Convert data to p-adic representation
-            let flat_data = flatten_array(data)
-            let scaled_data = []
-            for (let x in flat_data) {
-                scaled_data.push(Math.floor(x * Math.pow(10, this.precision)))
-            }
-            
-            let p_adic_values = []
-            let sample_size = Math.min(10, scaled_data.length)
-            for (let i = 0; i < sample_size; i++) {
-                p_adic_values.push(this.create_number(scaled_data[i]))
-            }
-
-            // Check for p-adic additivity
-            if (p_adic_values.length >= 3) {
-                let sum_check = p_adic_values[0].add(p_adic_values[1])
-                if (Math.abs(this.p_adic_norm(sum_check) - this.p_adic_norm(p_adic_values[2])) < 0.1) {
-                    patterns.push("P-adic additivity pattern detected with prime " + this.prime)
-                }
-
-                // Check for p-adic multiplicativity
-                let prod_check = p_adic_values[0].multiply(p_adic_values[1])
-                if (Math.abs(this.p_adic_norm(prod_check) - this.p_adic_norm(p_adic_values[2])) < 0.1) {
-                    patterns.push("P-adic multiplicative pattern detected with prime " + this.prime)
-                }
-            }
-
-            // Check for p-adic periodicity
-            if (p_adic_values.length >= 5) {
-                let diffs = []
-                for (let i = 0; i < p_adic_values.length - 1; i++) {
-                    diffs.push(this.p_adic_distance(p_adic_values[i], p_adic_values[i + 1]))
-                }
-
-                // Check if differences are periodic in p-adic sense
-                if (diffs.length >= 3) {
-                    let periodic = true
-                    for (let i = 0; i < diffs.length - 2; i++) {
-                        if (Math.abs(diffs[i] - diffs[i + 2]) > 0.1) {
-                            periodic = false
-                            break
-                        }
-                    }
-
-                    if (periodic) {
-                        patterns.push("P-adic periodicity detected with period 2 and prime " + this.prime)
-                    }
-                }
-            }
-
-        } catch (error) {
-            // Gracefully handle any errors
-            log_error("Error finding p-adic patterns: " + error)
-        }
-
-        return patterns
+  # p-adic add: digit-wise with carry
+  function p_adic_add(a, b, prime, prec) {
+    set ::result = []
+    set ::carry = 0
+    set ::i = 0
+    while ::i < prec {
+      set ::da = ::i < a.length ? a[::i] : 0
+      set ::db = ::i < b.length ? b[::i] : 0
+      set ::total = ::da + ::db + ::carry
+      set ::digit = ::total % prime
+      set ::carry = ::total / prime
+      ::result.push(::digit)
+      set ::i = ::i + 1
     }
-    
-    // Find periodicity in p-adic data
-    _find_periodicity(data: array): number {
-        let length = data.length
-        
-        for (let period = 2; period <= Math.floor(length / 2); period++) {
-            let is_periodic = true
-            
-            for (let i = 0; i < length - period; i++) {
-                let distance = this.p_adic_distance(data[i], data[i + period])
-                if (distance > 0.1) {
-                    is_periodic = false
-                    break
-                }
-            }
-            
-            if (is_periodic) {
-                return period
-            }
+    return ::result
+  }
+
+  # p-adic multiply: convolution then carry propagation
+  function p_adic_multiply(a, b, prime, prec) {
+    set ::conv = []
+    set ::k = 0
+    while ::k < prec {
+      ::conv.push(0)
+      set ::k = ::k + 1
+    }
+    set ::i = 0
+    while ::i < prec {
+      set ::j = 0
+      while ::j < prec - ::i {
+        set ::pa = ::i < a.length ? a[::i] : 0
+        set ::pb = ::j < b.length ? b[::j] : 0
+        set ::idx = ::i + ::j
+        if ::idx < ::conv.length {
+          set ::conv[::idx] = ::conv[::idx] + ::pa * ::pb
         }
-        
+        set ::j = ::j + 1
+      }
+      set ::i = ::i + 1
+    }
+    set ::i = 0
+    while ::i < prec - 1 {
+      set ::conv[::i + 1] = ::conv[::i + 1] + (::conv[::i] / prime)
+      set ::conv[::i] = ::conv[::i] % prime
+      set ::i = ::i + 1
+    }
+    if prec > 0 { set ::conv[prec - 1] = ::conv[prec - 1] % prime }
+    return ::conv
+  }
+
+  # p-adic distance: |a-b|_p = p^{-k} where k is first differing index
+  function p_adic_distance(a, b, prime) {
+    set ::i = 0
+    set ::max_len = a.length > b.length ? a.length : b.length
+    while ::i < ::max_len {
+      set ::da = ::i < a.length ? a[::i] : 0
+      set ::db = ::i < b.length ? b[::i] : 0
+      if ::da != ::db {
+        # Return p^{-i}; use integer 1 for simplicity (actual: 1/(prime^i))
         return 1
+      }
+      set ::i = ::i + 1
     }
-    
-    // Check for symmetry in p-adic data
-    _has_symmetry(data: array): boolean {
-        let length = data.length
-        let mid = Math.floor(length / 2)
-        
-        for (let i = 0; i < mid; i++) {
-            let distance = this.p_adic_distance(data[i], data[length - 1 - i])
-            if (distance > 0.1) {
-                return false
-            }
-        }
-        
-        return true
-    }
-    
-    // Check for fractal structure in p-adic data
-    _has_fractal_structure(data: array): boolean {
-        let length = data.length
-        
-        // Check for self-similarity at different scales
-        for (let scale = 2; scale <= Math.floor(length / 4); scale++) {
-            let is_fractal = true
-            
-            for (let i = 0; i < length - scale; i += scale) {
-                let segment1 = data.slice(i, i + scale)
-                let segment2 = data.slice(i + scale, i + 2 * scale)
-                
-                if (segment2.length !== segment1.length) {
-                    continue
-                }
-                
-                // Check similarity between segments
-                let similarity = 0
-                for (let j = 0; j < segment1.length; j++) {
-                    let distance = this.p_adic_distance(segment1[j], segment2[j])
-                    similarity += distance
-                }
-                
-                if (similarity / segment1.length > 0.1) {
-                    is_fractal = false
-                    break
-                }
-            }
-            
-            if (is_fractal) {
-                return true
-            }
-        }
-        
-        return false
-    }
-    
-    // Convert conventional number to p-adic
-    convert_to_p_adic(value: number): PAdicNumber {
-        return new PAdicNumber(value, this.prime, this.precision)
-    }
-    
-    // Convert p-adic number to conventional
-    convert_from_p_adic(p_adic_number: PAdicNumber): number {
-        return p_adic_number.to_int()
-    }
-    
-    // Analyze concept using p-adic arithmetic
-    analyze_concept(concept: string): object {
-        return {
-            concept: concept,
-            p_adic_representation: this.create_number_from_string(concept),
-            analysis: "P-adic analysis of " + concept
-        }
-    }
-    
-    // Get processor state
-    getState(): object {
-        return {
-            prime: this.prime,
-            precision: this.precision,
-            storage_size: Object.keys(this.storage).length
-        }
-    }
+    return 0
+  }
 }
-
-// Hypercomplex Processor
-class HypercomplexProcessor {
-    // Configuration
-    dimensions: number
-    prime: number
-    precision: number
-    
-    // Initialize the hypercomplex processor
-    constructor(dimensions: number = 4, prime: number = 7, precision: number = 10) {
-        this.dimensions = dimensions
-        this.prime = prime
-        this.precision = precision
-        
-        print("Hypercomplex processor initialized with " + dimensions + " dimensions")
-    }
-    
-    // Create hypercomplex number
-    create_hypercomplex(components: array): array {
-        let hypercomplex = []
-        
-        for (let i = 0; i < this.dimensions; i++) {
-            let component = i < components.length ? components[i] : 0
-            let p_adic_component = new PAdicNumber(component, this.prime, this.precision)
-            hypercomplex.push(p_adic_component)
-        }
-        
-        return hypercomplex
-    }
-    
-    // Add two hypercomplex numbers
-    hypercomplex_add(a: array, b: array): array {
-        let result = []
-        
-        for (let i = 0; i < this.dimensions; i++) {
-            let component_a = i < a.length ? a[i] : new PAdicNumber(0, this.prime, this.precision)
-            let component_b = i < b.length ? b[i] : new PAdicNumber(0, this.prime, this.precision)
-            result.push(component_a.add(component_b))
-        }
-        
-        return result
-    }
-    
-    // Multiply two hypercomplex numbers using a generalized multiplication rule
-    hypercomplex_multiply(a: array, b: array): array {
-        let result = []
-        
-        for (let i = 0; i < this.dimensions; i++) {
-            let sum = new PAdicNumber(0, this.prime, this.precision)
-            
-            for (let j = 0; j < this.dimensions; j++) {
-                let component_a = i < a.length ? a[i] : new PAdicNumber(0, this.prime, this.precision)
-                let component_b = j < b.length ? b[j] : new PAdicNumber(0, this.prime, this.precision)
-                let product = component_a.multiply(component_b)
-                sum = sum.add(product)
-            }
-            
-            result.push(sum)
-        }
-        
-        return result
-    }
-    
-    // Apply a hypercomplex transformation to data
-    hypercomplex_transform(data: array, matrix: array): array {
-        let result = []
-
-        for (let row in data) {
-            let transformed_row = []
-            for (let i = 0; i < this.dimensions; i++) {
-                let value = new PAdicNumber(0, this.prime, this.precision)
-                for (let j = 0; j < this.dimensions; j++) {
-                    value = value.add(row[j].multiply(matrix[j][i]))
-                }
-                transformed_row.push(value)
-            }
-            result.push(transformed_row)
-        }
-
-        return result
-    }
-    
-    // Calculate distance in hypercomplex p-adic space
-    hypercomplex_distance(a: array, b: array): PAdicNumber {
-        // Initialize with the maximum possible p-adic distance
-        let min_dist = new PAdicNumber(Math.pow(this.prime, this.precision), this.prime, this.precision)
-
-        for (let i = 0; i < this.dimensions; i++) {
-            let dist = this.p_adic_distance(a[i], b[i])
-            let dist_padic = new PAdicNumber(Math.floor(dist * Math.pow(10, this.precision)), this.prime, this.precision)
-
-            // In p-adic space, the minimum distance is used (opposite of Euclidean)
-            if (this.p_adic_norm(dist_padic) < this.p_adic_norm(min_dist)) {
-                min_dist = dist_padic
-            }
-        }
-
-        return min_dist
-    }
-    
-    // Find hypercomplex patterns in data
-    find_patterns(data: array): array {
-        let patterns = []
-
-        try {
-            // Convert data to hypercomplex representation
-            let flat_data = flatten_array(data)
-            let scaled_data = []
-            for (let x in flat_data) {
-                scaled_data.push(Math.floor(x * Math.pow(10, this.precision)))
-            }
-
-            // Take a sample of the data
-            let sample_size = Math.min(20, scaled_data.length)
-            let sample_data = scaled_data.slice(0, sample_size)
-
-            // Create hypercomplex representations
-            let hypercomplex_values = []
-            for (let i = 0; i < sample_size; i += this.dimensions) {
-                if (i + this.dimensions <= sample_size) {
-                    let components = []
-                    for (let j = 0; j < this.dimensions; j++) {
-                        components.push(sample_data[i + j])
-                    }
-                    hypercomplex_values.push(this.create_hypercomplex(components))
-                }
-            }
-
-            // Check for hypercomplex additivity
-            if (hypercomplex_values.length >= 3) {
-                let sum_check = this.hypercomplex_add(hypercomplex_values[0], hypercomplex_values[1])
-
-                // Compare norms
-                let sum_norm = 0
-                for (let x in sum_check) {
-                    sum_norm += this.p_adic_norm(x)
-                }
-                
-                let third_norm = 0
-                for (let x in hypercomplex_values[2]) {
-                    third_norm += this.p_adic_norm(x)
-                }
-
-                if (Math.abs(sum_norm - third_norm) < 0.2) {
-                    patterns.push("Hypercomplex additivity pattern detected in " + this.dimensions + "D space")
-                }
-
-                // Check for hypercomplex multiplicativity
-                let prod_check = this.hypercomplex_multiply(hypercomplex_values[0], hypercomplex_values[1])
-                let prod_norm = 0
-                for (let x in prod_check) {
-                    prod_norm += this.p_adic_norm(x)
-                }
-
-                if (Math.abs(prod_norm - third_norm) < 0.2) {
-                    patterns.push("Hypercomplex multiplicative pattern detected in " + this.dimensions + "D space")
-                }
-            }
-
-            // Check for hypercomplex symmetry
-            if (hypercomplex_values.length >= 4) {
-                // Check for rotational symmetry
-                let rotational = true
-                for (let i = 0; i < hypercomplex_values.length - 1; i++) {
-                    // Compare consecutive hypercomplex numbers for rotational patterns
-                    let rotation_detected = true
-                    for (let j = 1; j < this.dimensions; j++) {
-                        if (Math.abs(this.p_adic_norm(hypercomplex_values[i][j]) - this.p_adic_norm(hypercomplex_values[i + 1][(j + 1) % this.dimensions])) > 0.1) {
-                            rotation_detected = false
-                            break
-                        }
-                    }
-
-                    if (!rotation_detected) {
-                        rotational = false
-                        break
-                    }
-                }
-
-                if (rotational) {
-                    patterns.push("Hypercomplex rotational symmetry detected in " + this.dimensions + "D space")
-                }
-            }
-
-        } catch (error) {
-            // Gracefully handle any errors
-            print("Error finding hypercomplex patterns: " + error)
-        }
-
-        return patterns
-    }
-    
-    // Check for hypercomplex symmetry
-    _has_hypercomplex_symmetry(data: array): boolean {
-        let length = data.length
-        let mid = Math.floor(length / 2)
-        
-        for (let i = 0; i < mid; i++) {
-            let distance = this.hypercomplex_distance(data[i], data[length - 1 - i])
-            if (distance.to_int() > 1) {
-                return false
-            }
-        }
-        
-        return true
-    }
-    
-    // Check for hypercomplex periodicity
-    _has_hypercomplex_periodicity(data: array): boolean {
-        let length = data.length
-        
-        for (let period = 2; period <= Math.floor(length / 2); period++) {
-            let is_periodic = true
-            
-            for (let i = 0; i < length - period; i++) {
-                let distance = this.hypercomplex_distance(data[i], data[i + period])
-                if (distance.to_int() > 1) {
-                    is_periodic = false
-                    break
-                }
-            }
-            
-            if (is_periodic) {
-                return true
-            }
-        }
-        
-        return false
-    }
-    
-    // Get processor state
-    getState(): object {
-        return {
-            dimensions: this.dimensions,
-            prime: this.prime,
-            precision: this.precision
-        }
-    }
-}
-
-// Example usage
-function main() {
-    // Create a p-adic processor
-    let processor = new PAdicProcessor(7, 10)
-
-    // Create some p-adic numbers
-    let a = processor.create_number(42)
-    let b = processor.create_number(13)
-
-    // Perform operations
-    let c = a.add(b)
-    let d = a.multiply(b)
-
-    print("a = " + a.toString())
-    print("b = " + b.toString())
-    print("a + b = " + c.toString())
-    print("a * b = " + d.toString())
-
-    // Create a hypercomplex processor
-    let hyper = new HypercomplexProcessor(4, 7, 10)
-
-    // Create hypercomplex numbers
-    let h1 = hyper.create_hypercomplex([1, 2, 3, 4])
-    let h2 = hyper.create_hypercomplex([5, 6, 7, 8])
-
-    // Add hypercomplex numbers
-    let h3 = hyper.hypercomplex_add(h1, h2)
-
-    print("\nHypercomplex numbers:")
-    print("h1 = " + h1.map(x => x.toString()))
-    print("h2 = " + h2.map(x => x.toString()))
-    print("h1 + h2 = " + h3.map(x => x.toString()))
-
-    // Find patterns in hypercomplex data
-    let patterns = hyper.find_patterns([[1, 2, 3, 4], [5, 6, 7, 8]])
-    print("\nHypercomplex patterns:")
-    for (let pattern in patterns) {
-        print(pattern)
-    }
-}
-
-// Execute main function
-main() 

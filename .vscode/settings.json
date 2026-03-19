@@ -1,0 +1,8 @@
+{
+  "azl.languageServerPath": "python3",
+  "azl.languageServerArgs": ["tools/azl_lsp.py"],
+  "files.associations": {
+    "*.azl": "azl"
+  },
+  "AZL_REGISTRY_DIR": "${workspaceFolder}/.azl/packages"
+}

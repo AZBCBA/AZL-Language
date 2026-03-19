@@ -59,30 +59,43 @@ component ::ffi.http {
     return { ok: true, data: "DELETE request processed successfully" }
   }
 
-  # HTTP request handler
+  # HTTP request handler - uses real HTTP via sysproxy when URL is http(s)://
   listen for "http_request" {
     set ::method = $1
     set ::url = $2
     set ::data = $3
     
-    say "🌐 HTTP Request: "
-    say ::method
-    say " "
-    say ::url
+    say "🌐 HTTP Request: " + ::method + " " + ::url
     
-    if ::method == "GET" {
-      set ::result = ::ffi_http_get(::url)
-    } else if ::method == "POST" {
-      set ::result = ::ffi_http_post(::url, ::data)
-    } else if ::method == "PUT" {
-      set ::result = ::ffi_http_put(::url, ::data)
-    } else if ::method == "DELETE" {
-      set ::result = ::ffi_http_delete(::url)
+    if (::url.starts_with("http://") || ::url.starts_with("https://")) {
+      set ::req_id = "http_" + (::internal.now() || 0)
+      link ::azl.system_interface
+      emit syscall to ::azl.system_interface with {
+        type: "http",
+        request_id: ::req_id,
+        args: { url: ::url, method: ::method, body: (::data || "") }
+      }
+      listen for "syscall.response" then {
+        set resp = ::event.data
+        if resp.request_id == ::req_id {
+          set ::result = { ok: (resp.status == 200), data: (resp.body || ""), status: resp.status, error: resp.error }
+          emit "http_response" with ::url ::result
+        }
+      }
     } else {
-      set ::result = { ok: false, error: "Unsupported HTTP method: " + ::method }
+      if ::method == "GET" {
+        set ::result = ::ffi_http_get(::url)
+      } else if ::method == "POST" {
+        set ::result = ::ffi_http_post(::url, ::data)
+      } else if ::method == "PUT" {
+        set ::result = ::ffi_http_put(::url, ::data)
+      } else if ::method == "DELETE" {
+        set ::result = ::ffi_http_delete(::url)
+      } else {
+        set ::result = { ok: false, error: "Unsupported HTTP method: " + ::method }
+      }
+      emit "http_response" with ::url ::result
     }
-    
-    emit "http_response" with ::url ::result
   }
 
   # Get HTTP statistics

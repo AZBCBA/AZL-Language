@@ -255,6 +255,42 @@ static void process_requests(void) {
         fprintf(stderr,"[sysproxy] KEEPALIVE pid=%d\n", getpid());
         fprintf(stdout,"{\"id\":%ld,\"ok\":true,\"pid\":%d}\n", id, getpid());
       }
+      else if(strcmp(op,"http_client")==0){
+        char url[2048]; url[0]=0;
+        char method[16]="GET";
+        char body[65536]; body[0]=0;
+        jget_string(line,"url",url,sizeof(url));
+        jget_string(line,"method",method,sizeof(method));
+        jget_string(line,"body",body,sizeof(body));
+        if(!url[0]){ respond_err(id,"http_client: no url"); continue; }
+        char cmd[8192];
+        if(strcmp(method,"POST")==0 && body[0]){
+          char tmp[64]; snprintf(tmp,sizeof(tmp),"/tmp/sysproxy_http_%d",(int)getpid());
+          FILE*f=fopen(tmp,"w"); if(f){ fputs(body,f); fclose(f); }
+          snprintf(cmd,sizeof(cmd),"curl -sS -m 30 -X POST -H 'Content-Type: application/json' -d @%s '%s' 2>/dev/null", tmp, url);
+          FILE*pipe=popen(cmd,"r");
+          if(pipe){
+            char resp[65536]; size_t rn=0;
+            while(rn<sizeof(resp)-1){ int c=fgetc(pipe); if(c==EOF)break; resp[rn++]=(char)c; }
+            resp[rn]=0; pclose(pipe);
+            fprintf(stdout,"{\"id\":%ld,\"ok\":true,\"data\":\"",id);
+            json_escape_print(resp,(ssize_t)rn);
+            fputs("\"}\n",stdout);
+          } else { respond_err(id,"http_client: popen failed"); }
+          unlink(tmp);
+        } else {
+          snprintf(cmd,sizeof(cmd),"curl -sS -m 30 '%s' 2>/dev/null", url);
+          FILE*pipe=popen(cmd,"r");
+          if(pipe){
+            char resp[65536]; size_t rn=0;
+            while(rn<sizeof(resp)-1){ int c=fgetc(pipe); if(c==EOF)break; resp[rn++]=(char)c; }
+            resp[rn]=0; pclose(pipe);
+            fprintf(stdout,"{\"id\":%ld,\"ok\":true,\"data\":\"",id);
+            json_escape_print(resp,(ssize_t)rn);
+            fputs("\"}\n",stdout);
+          } else { respond_err(id,"http_client: popen failed"); }
+        }
+      }
       else {
         respond_err(id,"unknown_op");
       }

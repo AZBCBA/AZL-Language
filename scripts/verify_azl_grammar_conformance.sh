@@ -62,6 +62,18 @@ if rg -n "export\\s+default|^[^#]*\\binterface\\s+[A-Z][A-Za-z0-9_]*\\s*\\{" "$C
   cat /tmp/azl_grammar_export_hits.out
   exit 107
 fi
+# this.property (JS) - require property name after dot
+if rg -n "\\bthis\\.[a-zA-Z0-9_]" "$COMBINED_PATH" >/tmp/azl_grammar_js2_hits.out 2>&1; then
+  echo "ERROR: combined runtime contains JS this.property syntax"
+  cat /tmp/azl_grammar_js2_hits.out
+  exit 108
+fi
+# new Constructor() - JS constructor call
+if rg -n "\\bnew\\s+[A-Za-z_][A-Za-z0-9_]*\\s*\\(" "$COMBINED_PATH" >/tmp/azl_grammar_new_hits.out 2>&1; then
+  echo "ERROR: combined runtime contains JS new Constructor() syntax"
+  cat /tmp/azl_grammar_new_hits.out
+  exit 108
+fi
 
 echo "[verify-grammar] success"
 echo "  port: ${PORT}"

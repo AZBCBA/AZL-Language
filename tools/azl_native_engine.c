@@ -322,6 +322,53 @@ static void handle_conn(int cfd, EngineState *st) {
     return;
   }
 
+  /* POST /api/ollama/generate: proxy to Ollama for LLM benchmark */
+  if (strcmp(path, "/api/ollama/generate") == 0 && strcmp(method, "POST") == 0) {
+    const char *ollama_host = getenv("OLLAMA_HOST");
+    if (!ollama_host || ollama_host[0] == '\0') ollama_host = "http://127.0.0.1:11434";
+    const char *body_start = strstr(req, "\r\n\r\n");
+    if (body_start) body_start += 4;
+    else {
+      body_start = strstr(req, "\n\n");
+      if (body_start) body_start += 2;
+      else body_start = req;
+    }
+    size_t body_len = (size_t)(req + n - body_start);
+    if (body_len > 8192) body_len = 8192;
+    char tmp_path[64];
+    snprintf(tmp_path, sizeof(tmp_path), "/tmp/azl_ollama_%d.json", (int)getpid());
+    FILE *tf = fopen(tmp_path, "w");
+    if (tf) {
+      fwrite(body_start, 1, body_len, tf);
+      fclose(tf);
+      char cmd[1024];
+      snprintf(cmd, sizeof(cmd),
+               "curl -sS -m 120 -X POST -H 'Content-Type: application/json' -d @%s '%s/api/generate' 2>/dev/null",
+               tmp_path, ollama_host);
+      FILE *curl_pipe = popen(cmd, "r");
+      if (curl_pipe) {
+        char resp[65536];
+        size_t rn = fread(resp, 1, sizeof(resp) - 1, curl_pipe);
+        resp[rn] = '\0';
+        pclose(curl_pipe);
+        if (rn > 0) {
+          write_response(cfd, 200, "OK", resp);
+        } else {
+          write_response(cfd, 502, "Bad Gateway",
+                        "{\"ok\":false,\"error\":\"ollama_no_response\"}");
+        }
+      } else {
+        write_response(cfd, 502, "Bad Gateway",
+                      "{\"ok\":false,\"error\":\"ollama_curl_failed\"}");
+      }
+      unlink(tmp_path);
+    } else {
+      write_response(cfd, 500, "Internal Server Error",
+                    "{\"ok\":false,\"error\":\"ollama_tmpfile_failed\"}");
+    }
+    return;
+  }
+
   snprintf(body, sizeof(body), "{\"ok\":false,\"error\":\"not_found\",\"path\":\"%s\"}", path);
   write_response(cfd, 404, "Not Found", body);
 }
