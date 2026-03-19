@@ -54,6 +54,10 @@ if ! rg -q "missing AZL_NATIVE_RUNTIME_CMD" tools/azl_native_engine.c; then
   echo "ERROR: native engine is not enforcing AZL_NATIVE_RUNTIME_CMD"
   exit 21
 fi
+if ! rg -q "/api/llm/capabilities" tools/azl_native_engine.c; then
+  echo "ERROR: native engine missing GET /api/llm/capabilities (native LLM honesty contract)"
+  exit 22
+fi
 
 echo "[gate] E: legacy deploy profile blocked by default"
 if rg -q 'AZL_ENABLE_LEGACY_HOST="\$\{AZL_ENABLE_LEGACY_HOST:-1\}"' scripts/*.sh; then

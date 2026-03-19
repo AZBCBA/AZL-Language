@@ -66,6 +66,25 @@ if ! echo "$EXEC_JSON" | rg -q '"running":true'; then
   echo "ERROR: exec_state runtime not running: ${EXEC_JSON}"
   exit 71
 fi
+
+CAP_JSON="$(curl -fsS "http://127.0.0.1:${PORT}/api/llm/capabilities")"
+if ! echo "$CAP_JSON" | rg -q '"ok":true'; then
+  echo "ERROR: /api/llm/capabilities not ok: ${CAP_JSON}"
+  exit 74
+fi
+if ! echo "$CAP_JSON" | rg -q '"ollama_http_proxy":true'; then
+  echo "ERROR: /api/llm/capabilities missing ollama_http_proxy: ${CAP_JSON}"
+  exit 75
+fi
+if ! echo "$CAP_JSON" | rg -q '"gguf_in_process":false'; then
+  echo "ERROR: /api/llm/capabilities expected gguf_in_process false until native GGUF exists: ${CAP_JSON}"
+  exit 76
+fi
+if ! echo "$CAP_JSON" | rg -q 'ERR_NATIVE_GGUF_NOT_IMPLEMENTED'; then
+  echo "ERROR: /api/llm/capabilities missing ERR_NATIVE_GGUF_NOT_IMPLEMENTED: ${CAP_JSON}"
+  exit 77
+fi
+
 echo "live-native-api-ok"
 
 set +e
@@ -85,3 +104,4 @@ echo "  healthz: ${HEALTH_JSON}"
 echo "  readyz: ${READY_JSON}"
 echo "  status: ${STATUS_JSON}"
 echo "  api/exec_state: ${EXEC_JSON}"
+echo "  api/llm/capabilities: ${CAP_JSON}"

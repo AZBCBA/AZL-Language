@@ -1,6 +1,6 @@
 # LLM Infrastructure Audit
 
-**Purpose:** What exists for running LLMs in AZL vs what's missing. Created vs not created.
+**Purpose:** What exists for running LLMs in AZL vs what's missing. Updated to match the **native** stack (C engine, sysproxy, pure AZL syscall path).
 
 ---
 
@@ -8,12 +8,12 @@
 
 | Format | Created? | Location | Notes |
 |--------|----------|----------|-------|
-| **GGUF** | ❌ No | — | No loader. Ollama uses GGUF internally; AZL does not. |
+| **GGUF** | ❌ No | — | No in-process loader. Ollama holds GGUF internally; AZL does not mmap weights. |
 | **ONNX** | ❌ No | — | No ONNX runtime bridge. |
 | **Safetensors** | ❌ No | — | No loader. |
-| **PyTorch .pt** | ⚠️ Via FFI | `azl/ffi/torch.azl` | Spawns Python `mini_llm_train.py`; training only, not inference. |
+| **PyTorch .pt** | ⚠️ Via FFI | `azl/ffi/torch.azl` | Spawns Python `mini_llm_train.py`; training-oriented, not production inference. |
 
-**Conclusion:** No native model loading. All inference is via external services (Ollama HTTP API).
+**Honesty API:** `GET /api/llm/capabilities` on the native engine returns `gguf_in_process: false` and `error.code: ERR_NATIVE_GGUF_NOT_IMPLEMENTED` until a real loader exists.
 
 ---
 
@@ -21,49 +21,50 @@
 
 | Path | Created? | How it works |
 |------|----------|--------------|
-| **Ollama HTTP** | ✅ Yes | `azme_bridge.azl`, `azme_anythingllm_provider.azl` call `http_post(ollama + "/api/generate", ...)` |
-| **FFI Torch** | ✅ Yes | Spawns Python for training; no inference. |
-| **Quantum byte processor** | ⚠️ Symbolic | Hardcoded response; not real LLM. |
-| **Neural core** | ⚠️ Scaffolding | `load_model` stores config; no weights, no forward pass. |
-
-**Ollama integration:** Uses `http_get`/`http_post` from host runtime. The pure AZL stdlib `http_get`/`http_post` are **simulated** (no real network). The integrations (`azme_bridge`, etc.) use JavaScript/TypeScript syntax (`class`, `http_get`) — likely run in a host that provides real HTTP.
+| **Ollama via C engine proxy** | ✅ Yes | `POST /api/ollama/generate` on `tools/azl_native_engine.c` forwards JSON body to `$OLLAMA_HOST/api/generate` (default `http://127.0.0.1:11434`) using `curl`. |
+| **Ollama / HTTP from integrations** | ✅ Yes | `azme_bridge.azl`, `azme_anythingllm_provider.azl` — host-style HTTP when run outside strict native-only paths. |
+| **Virtual OS → sysproxy `http_client`** | ✅ Yes | `azl/system/azl_system_interface.azl` issues `sysproxy_call("http_client", { url, method, body })` for real HTTP when sysproxy implements it. |
+| **Syscall `http`** | ✅ Yes | Kernel/sysproxy path used in tests (`azl/kernel/azl_kernel.azl`, integration tests). |
+| **FFI Torch** | ✅ Yes | Python subprocess for training; not inference. |
+| **Quantum byte / neural scaffolding** | ⚠️ Symbolic | Not a substitute for loaded weights + forward pass. |
 
 ---
 
-## 3. Real HTTP in AZL
+## 3. Real HTTP vs Simulated HTTP
 
 | Component | Real HTTP? | Notes |
 |-----------|------------|-------|
-| `azl/stdlib/core/azl_stdlib.azl` | ❌ No | `http_store`; localhost returns "OK: url" |
-| `azl/ffi/http.azl` | ❌ No | Caches in `http_store`; no network |
-| **sysproxy** | ❌ No | Sockets (listen/accept/read/write); no HTTP client |
-| **C engine** | ❌ No | Serves HTTP; does not make outbound HTTP |
+| `azl/stdlib/core/azl_stdlib.azl` `http_get` / `http_post` | ❌ Simulated | Backing store / stubs for non-URL keys. |
+| `azl/ffi/http.azl` | ❌ Simulated | Cache layer; not a network client by itself. |
+| **sysproxy** + **`http_client`** | ✅ Yes | Outbound HTTP when wired (see `azl_system_interface.azl`). |
+| **C native engine** | ✅ Outbound | `curl` to Ollama from `/api/ollama/generate`. |
+| **C native engine** | ✅ Inbound | Serves HTTP API (health, status, LLM proxy, capabilities). |
 
-**Conclusion:** AZL cannot make real HTTP requests to Ollama in pure/native mode. Ollama integration exists only in host-backed runtimes (AnythingLLM, JS bridge).
-
----
-
-## 4. What Needs to Be Created
-
-### 4.1 For Native AZL → Ollama
-
-1. **Ollama proxy in C engine** — Add `POST /api/ollama/generate` that forwards to `http://127.0.0.1:11434/api/generate` (via libcurl or `popen`+curl).
-2. **Or:** Extend sysproxy with `http_client` op that performs GET/POST to a URL.
-
-### 4.2 For Native LLM Inference (no Ollama)
-
-1. **GGUF loader** — C or Rust library; AZL would call via FFI/sysproxy.
-2. **Transformer kernels** — Matrix multiply, attention; typically CUDA/cuBLAS.
-3. **Tokenization** — BPE/SPM; `tokenizer_bpe32k.json` exists for training.
+**Conclusion:** Native mode **can** reach Ollama through the **engine proxy** without a Python host. Pure AZL code can reach HTTP through **syscall / sysproxy** when that path is enabled.
 
 ---
 
-## 5. Benchmark Implications
+## 4. What Still Needs to Be Built
 
-- **Current benchmarks** (`benchmark_azl_vs_python.sh`): Compare AZL native API vs Python API for healthz/status/exec_state. AZL wins ~10–15%.
-- **LLM benchmark:** To compare AZL vs Python for LLM:
-  - **Option A:** Both call Ollama (Python script + curl). Measures client overhead.
-  - **Option B:** Add Ollama proxy to C engine; compare latency through AZL API vs direct curl to Ollama.
+### 4.1 In-process native LLM (GGUF)
+
+1. **GGUF loader + inference** — e.g. llama.cpp (or equivalent) in C/C++; AZL invokes via FFI, syscall bridge, or a dedicated engine subcommand.
+2. **Kernels** — matmul, attention; GPU optional (CUDA/cuBLAS).
+3. **Tokenization** — BPE/SPM; `tokenizer_bpe32k.json` exists for training pipelines.
+
+When implemented, update **`GET /api/llm/capabilities`** to set `gguf_in_process: true` and remove or narrow `ERR_NATIVE_GGUF_NOT_IMPLEMENTED`.
+
+### 4.2 Optional hardening
+
+- TLS for Ollama upstream (today: whatever `curl` + URL provide).
+- Auth between AZL engine and Ollama beyond network isolation.
+
+---
+
+## 5. Benchmarks
+
+- **API latency:** `scripts/benchmark_azl_vs_python.sh` (healthz / status / exec_state).
+- **LLM proxy:** `scripts/benchmark_llm_ollama.sh` — compares direct Ollama vs `http://127.0.0.1:$AZL_PORT/api/ollama/generate` (requires `ollama serve` + a small model).
 
 ---
 
@@ -71,9 +72,20 @@
 
 | File | Purpose |
 |------|---------|
-| `azl/integrations/anythingllm/azme_bridge.azl` | Ollama client (host HTTP) |
-| `azl/integrations/anythingllm/azme_anythingllm_provider.azl` | Ollama provider |
-| `azl/ffi/torch.azl` | PyTorch training via Python subprocess |
-| `azl/core/neural/neural.azl` | Neural scaffolding, GPU policy |
-| `azl/core/types/tensor.azl` | Pure AZL tensor (no GPU) |
-| `tokenizer_bpe32k.json` | BPE tokenizer for training |
+| `tools/azl_native_engine.c` | HTTP server, `POST /api/ollama/generate`, **`GET /api/llm/capabilities`** |
+| `scripts/benchmark_llm_ollama.sh` | LLM latency benchmark through native API |
+| `azl/system/azl_system_interface.azl` | `http_client` sysproxy integration |
+| `azl/integrations/anythingllm/azme_bridge.azl` | Ollama client (integration / host contexts) |
+| `azl/integrations/anythingllm/azme_anythingllm_provider.azl` | AnythingLLM-oriented provider |
+| `azl/ffi/torch.azl` | PyTorch training via subprocess |
+| `azl/neural/model_loader.azl` | Model registry / config (not GGUF bytes) |
+| `azl/core/neural/neural.azl` | Neural scaffolding |
+| `azl/core/types/tensor.azl` | Pure AZL tensor |
+| `tokenizer_bpe32k.json` | BPE tokenizer asset |
+
+---
+
+## 7. Verification
+
+- `scripts/verify_native_runtime_live.sh` — asserts `/api/llm/capabilities` returns `ok`, `ollama_http_proxy: true`, `gguf_in_process: false`, and `ERR_NATIVE_GGUF_NOT_IMPLEMENTED`.
+- `scripts/check_azl_native_gates.sh` — requires the capabilities route to exist in the C source.

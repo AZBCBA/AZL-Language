@@ -211,7 +211,8 @@ static void write_response(int fd, int status, const char *status_text, const ch
 
 static bool is_public_path(const char *path) {
   return strcmp(path, "/healthz") == 0 || strcmp(path, "/health") == 0 || strcmp(path, "/readyz") == 0 ||
-         strcmp(path, "/status") == 0 || strcmp(path, "/segment") == 0;
+         strcmp(path, "/status") == 0 || strcmp(path, "/segment") == 0 ||
+         strcmp(path, "/api/llm/capabilities") == 0;
 }
 
 static bool needs_runtime_poll(const char *path) {
@@ -318,6 +319,18 @@ static void handle_conn(int cfd, EngineState *st) {
   }
   if (strcmp(path, "/segment") == 0) {
     snprintf(body, sizeof(body), "{\"status\":\"segment_ready\",\"engine\":\"native\"}");
+    write_response(cfd, 200, "OK", body);
+    return;
+  }
+  /* GET /api/llm/capabilities — honest native LLM surface (orchestration / audits) */
+  if (strcmp(path, "/api/llm/capabilities") == 0 && strcmp(method, "GET") == 0) {
+    snprintf(body, sizeof(body),
+             "{\"ok\":true,\"engine\":\"azl-native-engine\","
+             "\"ollama_http_proxy\":true,\"ollama_proxy_path\":\"/api/ollama/generate\","
+             "\"ollama_upstream_env\":\"OLLAMA_HOST\","
+             "\"gguf_in_process\":false,"
+             "\"error\":{\"code\":\"ERR_NATIVE_GGUF_NOT_IMPLEMENTED\","
+             "\"message\":\"No in-process GGUF weights; use Ollama proxy or external runtime\"}}");
     write_response(cfd, 200, "OK", body);
     return;
   }
