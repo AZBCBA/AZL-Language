@@ -11,20 +11,18 @@ This is the **honest** map from **today’s repository** to the **contract goals
 
 ## Layer 1 — P0 spine (in progress)
 
-**Target:** The runtime child selected for canonical native mode must be able to apply **full** language semantics from `azl_interpreter.azl` to the enterprise combined program.
+**Target (full P0):** The runtime child must be able to apply **full** language semantics from `azl_interpreter.azl` to the enterprise combined program (AZL-in-AZL self-host or equivalent).
 
-**Blocker:** There is **no in-tree host** that executes arbitrary AZL source at the level that file requires. The C minimal engine cannot parse or run it.
+**Done (phase 1 — shipped):**
 
-**Shipped integration (this repo):**
+- `AZL_RUNTIME_SPINE=c_minimal` (default): `scripts/azl_c_interpreter_runtime.sh` → `azl-interpreter-minimal` (C).
+- `AZL_RUNTIME_SPINE=azl_interpreter` or `semantic`: `scripts/azl_azl_interpreter_runtime.sh` → `tools/azl_runtime_spine_host.py` → **`tools/azl_semantic_engine/`** (`minimal_runtime.py`), a **Python** executor with **execution parity** to the C minimal contract (say / set / emit / link / component init+behavior / quoted `listen for`). **Gate F2** in `check_azl_native_gates.sh` asserts **byte-identical stdout** vs C on `azl/tests/c_minimal_link_ping.azl`.
 
-- `AZL_RUNTIME_SPINE=c_minimal` (default): `scripts/azl_c_interpreter_runtime.sh` → `azl-interpreter-minimal`.
-- `AZL_RUNTIME_SPINE=azl_interpreter` or `semantic`: `scripts/azl_azl_interpreter_runtime.sh` → `tools/azl_runtime_spine_host.py`, which **fails fast** with `ERR_AZL_SEMANTIC_HOST_UNIMPLEMENTED` until a real executor is implemented behind that hook.
+**Still open (full P0):**
 
-**Next engineering work (required to close P0):**
-
-1. Implement an **embedded executor** (or complete **self-host bootstrap**) that runs `azl_interpreter.azl` as data + executes it — likely a substantial host (or a verified transpilation path).
-2. Replace the body of `tools/azl_runtime_spine_host.py` (or delegate from it) with that executor; keep **explicit** errors for missing env / IO / policy violations.
-3. Flip default `AZL_RUNTIME_SPINE` only when the semantic path is **proven** by integration tests; update [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md) and this file in the same change.
+1. Widen the semantic engine until it can **load and run** `azl/runtime/interpreter/azl_interpreter.azl` as source (or introduce a verified compile path to the same semantics).
+2. Only then flip **default** `AZL_RUNTIME_SPINE` to `azl_interpreter` if product wants the Python (or future native) semantic child as canonical over C minimal.
+3. Keep [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md) and [AZL_NATIVE_RUNTIME_CONTRACT.md](AZL_NATIVE_RUNTIME_CONTRACT.md) aligned with each change.
 
 ## Layer 2 — P1 HTTP / API parity
 

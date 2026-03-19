@@ -79,6 +79,23 @@ if ! printf '%s\n' "$MINI_OUT" | rg -q 'C_MINIMAL_LINK_PING_OK'; then
   exit 25
 fi
 
+echo "[gate] F2: Python semantic engine parity vs C minimal (same fixture)"
+export PYTHONPATH="${ROOT_DIR}/tools${PYTHONPATH:+:${PYTHONPATH}}"
+set +e
+PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="${ROOT_DIR}/azl/tests/c_minimal_link_ping.azl" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+py_rc=$?
+set -e
+if [ "$py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host c_minimal_link_ping exited $py_rc: $PY_OUT"
+  exit 26
+fi
+if [ "$MINI_OUT" != "$PY_OUT" ]; then
+  echo "ERROR: C vs Python semantic output mismatch" >&2
+  echo "C:    $MINI_OUT" >&2
+  echo "Py:   $PY_OUT" >&2
+  exit 27
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

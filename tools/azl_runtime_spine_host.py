@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 """
-Semantic runtime spine host (integration shell).
+Semantic runtime spine host: runs the Python AZL subset engine (parity with
+tools/azl_interpreter_minimal.c) on AZL_COMBINED_PATH + AZL_ENTRY.
 
-The decided semantic core is azl/runtime/interpreter/azl_interpreter.azl — implemented in AZL.
-Executing it requires an engine that runs AZL with full language semantics. The default
-enterprise child remains tools/azl_interpreter_minimal.c (narrow subset).
-
-This process is the stable hook for AZL_RUNTIME_SPINE=azl_interpreter|semantic. Until a
-self-hosting or embedded executor ships in-tree, we exit with ERR_AZL_SEMANTIC_HOST_UNIMPLEMENTED
-so deployments never confuse C minimal with the full interpreter.
+Full AZL-in-AZL self-host (azl/runtime/interpreter/azl_interpreter.azl as source)
+remains a widening track; this host is the production integration point for
+native mode when AZL_RUNTIME_SPINE=azl_interpreter|semantic.
 
 Exit codes:
   71 — ERR_AZL_COMBINED_PATH_INVALID
   72 — ERR_AZL_ENTRY_MISSING
-  78 — ERR_AZL_SEMANTIC_HOST_UNIMPLEMENTED
+  73 — ERR_AZL_BOOTSTRAP_BUNDLE_INVALID (set but not a file)
+  2–4 — engine I/O / tokenize (see azl_semantic_engine.minimal_runtime)
 """
 
 from __future__ import annotations
@@ -49,28 +47,14 @@ def main() -> int:
         )
         return 73
 
-    print(
-        "azl_runtime_spine_host: ERR_AZL_SEMANTIC_HOST_UNIMPLEMENTED",
-        file=sys.stderr,
-    )
-    print(
-        "  Full semantics live in azl/runtime/interpreter/azl_interpreter.azl (AZL-in-AZL).",
-        file=sys.stderr,
-    )
-    print(
-        "  This repository does not yet ship an in-tree executor that runs that source as code.",
-        file=sys.stderr,
-    )
-    print(
-        "  Default spine: unset AZL_RUNTIME_SPINE or AZL_RUNTIME_SPINE=c_minimal "
-        "(see scripts/azl_resolve_native_runtime_cmd.sh).",
-        file=sys.stderr,
-    )
-    print(
-        "  Track: implement or embed the executor behind this hook; then replace this stub.",
-        file=sys.stderr,
-    )
-    return 78
+    tools_dir = os.path.dirname(os.path.abspath(__file__))
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+
+    from azl_semantic_engine.minimal_runtime import run_file
+
+    daemon = "AZL_INTERPRETER_DAEMON" in os.environ
+    return run_file(combined, entry, daemon=daemon)
 
 
 if __name__ == "__main__":

@@ -40,16 +40,17 @@ if ! printf '%s\n' "$out" | rg -q 'ERR_AZL_COMBINED_PATH_INVALID'; then
 fi
 
 FIXTURE="${ROOT_DIR}/azl/tests/c_minimal_link_ping.azl"
+export PYTHONPATH="${ROOT_DIR}/tools${PYTHONPATH:+:${PYTHONPATH}}"
 set +e
-out2="$(AZL_COMBINED_PATH="$FIXTURE" AZL_ENTRY='boot.entry' python3 tools/azl_runtime_spine_host.py 2>&1)"
+out2="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$FIXTURE" AZL_ENTRY='boot.entry' python3 tools/azl_runtime_spine_host.py 2>&1)"
 rc2=$?
 set -e
-if [ "$rc2" -ne 78 ]; then
-  echo "ERROR: spine host must exit 78 (unimplemented) for valid env until executor ships, got rc=$rc2 out=$out2" >&2
+if [ "$rc2" -ne 0 ]; then
+  echo "ERROR: spine host must exit 0 on c_minimal_link_ping.azl, got rc=$rc2 out=$out2" >&2
   exit 95
 fi
-if ! printf '%s\n' "$out2" | rg -q 'ERR_AZL_SEMANTIC_HOST_UNIMPLEMENTED'; then
-  echo "ERROR: expected ERR_AZL_SEMANTIC_HOST_UNIMPLEMENTED in stderr" >&2
+if ! printf '%s\n' "$out2" | rg -q 'C_MINIMAL_LINK_PING_OK'; then
+  echo "ERROR: expected C_MINIMAL_LINK_PING_OK on stdout" >&2
   printf '%s\n' "$out2" >&2
   exit 96
 fi

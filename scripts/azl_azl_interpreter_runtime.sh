@@ -19,4 +19,5 @@ if [ ! -f "$HOST_PY" ]; then
 fi
 
 export AZL_INTERPRETER_DAEMON="${AZL_INTERPRETER_DAEMON:-1}"
+export PYTHONPATH="${ROOT_DIR}/tools${PYTHONPATH:+:${PYTHONPATH}}"
 exec python3 "$HOST_PY"
