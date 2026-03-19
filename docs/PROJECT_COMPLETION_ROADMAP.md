@@ -54,4 +54,13 @@ Explicitly **deferred** unless product requires in-process weights; capabilities
 
 ---
 
+## Next actions (do in order)
+
+1. **Full product benchmark suite** — Start the **combined enterprise daemon** so `POST /v1/chat` exists: `bash scripts/run_enterprise_daemon.sh` (note the printed `AZL_API_TOKEN` and port). Optionally persist the token for local runs only: `printf '%s\n' "$AZL_API_TOKEN" > .azl/local_api_token && chmod 600 .azl/local_api_token` (`.azl/` is gitignored). Ensure **`ollama serve`** for leg 1. Then: `bash scripts/run_product_benchmark_suite.sh`. If you get **exit 95** / “404 on /v1/chat”, the process on `AZL_ENTERPRISE_PORT` is **not** the enterprise `http_server` stack (e.g. a minimal stub on 8080).
+2. **P0 — execute the real interpreter** — Extend the semantic spine beyond **gate H** (tokenizer only) until `AZL_RUNTIME_SPINE=azl_interpreter` can **run** `azl/runtime/interpreter/azl_interpreter.azl` on growing fixtures, then the enterprise combined program.
+3. **Canonical HTTP profile** — Per deployment, choose and document whether **C-only** supervision or **AZL `http_server.azl`** is authoritative; align startup scripts and expectations.
+4. **GGUF / GPU** — Only if product requires; keep **`GET /api/llm/capabilities`** honest.
+
+---
+
 **Rule of thumb:** If a milestone claims “full AZL semantics on the enterprise path,” the **process trace** must show the **AZL interpreter** executing user/combined code, not only the C minimal binary. Until then, documentation and env flags must **not** imply parity.

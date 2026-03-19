@@ -32,6 +32,8 @@ Three **different** surfaces — do not mix them up:
 | `scripts/benchmark_llm_ollama.sh` | Python vs curl vs **C engine** `POST /api/ollama/generate` (only if `GET /api/llm/capabilities` reports the proxy). |
 | `scripts/benchmark_enterprise_v1_chat.sh` | **Enterprise daemon** `POST /v1/chat` with `AZL_API_TOKEN` (not the C Ollama proxy). |
 
+For local runs only, you may store the daemon token in **`.azl/local_api_token`** (first line; `chmod 600`); **`run_product_benchmark_suite.sh`** and **`benchmark_enterprise_v1_chat.sh`** read it if **`AZL_API_TOKEN`** is unset.
+
 Details and honesty contract: [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md).
 
 ## Active work areas (coordinate before changing)

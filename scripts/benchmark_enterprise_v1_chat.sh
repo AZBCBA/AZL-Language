@@ -12,6 +12,8 @@
 #   LLM_BENCH_REQS       — default 10
 #   LLM_BENCH_PROMPT     — plain-text body sent as the chat message
 #
+# Optional: .azl/local_api_token — first line used as AZL_API_TOKEN if env unset (.azl/ is gitignored).
+#
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -21,6 +23,11 @@ PORT="${AZL_ENTERPRISE_PORT:-8080}"
 REQS="${LLM_BENCH_REQS:-10}"
 PROMPT="${LLM_BENCH_PROMPT:-Say hello in one word.}"
 mkdir -p .azl
+
+if [ -z "${AZL_API_TOKEN:-}" ] && [ -f .azl/local_api_token ]; then
+  export AZL_API_TOKEN="$(head -1 .azl/local_api_token | tr -d '\r\n')"
+  echo "[bench] AZL_API_TOKEN loaded from .azl/local_api_token"
+fi
 
 if [ -z "${AZL_API_TOKEN:-}" ]; then
   echo "ERROR: AZL_API_TOKEN is required (Bearer for /v1/chat)." >&2
@@ -45,6 +52,19 @@ fi
 if curl -fsS --max-time 2 "http://127.0.0.1:${PORT}/api/llm/capabilities" 2>/dev/null | grep -q '"ollama_http_proxy":true'; then
   echo "ERROR: port ${PORT} exposes C native GET /api/llm/capabilities; this script targets enterprise POST /v1/chat only." >&2
   exit 93
+fi
+
+# Route must exist (401 with bad token is OK; 404 means not enterprise http_server.azl)
+probe="$(curl -sS -o /dev/null -w "%{http_code}" -m 5 -X POST \
+  -H "Authorization: Bearer __invalid_probe__" \
+  -H "Content-Type: text/plain; charset=utf-8" \
+  --data-binary "ping" \
+  "http://127.0.0.1:${PORT}/v1/chat" 2>/dev/null || echo "000")"
+if [ "$probe" = "404" ]; then
+  echo "ERROR: POST /v1/chat returned 404 on 127.0.0.1:${PORT}." >&2
+  echo "  Nothing is serving the enterprise HTTP routes (see azl/system/http_server.azl)." >&2
+  echo "  Start: bash scripts/run_enterprise_daemon.sh  (check AZL_BUILD_API_PORT matches AZL_ENTERPRISE_PORT)" >&2
+  exit 95
 fi
 
 echo "=== Enterprise /v1/chat benchmark ==="
