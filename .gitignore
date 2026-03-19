@@ -65,6 +65,10 @@ mnt/
 quarantine/
 *.pid
 
+# Benchmark artifacts (local)
+.azl/benchmark_*.txt
+.azl/benchmark_*.lat
+
 # Test outputs
 test_output.txt
 test_results.txt

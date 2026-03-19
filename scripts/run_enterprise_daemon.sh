@@ -113,6 +113,8 @@ COMPONENTS=(
   "azl/quantum/memory/lha3_quantum_engine.azl"
   "azl/memory/memory_optimization_system.azl"
   "azl/memory/fractal_memory_compression.azl"
+  "azl/storage/memory_persistence_system.azl"
+  "azl/system/advanced_event_system.azl"
   "azl/quantum/processor/quantum_processor.azl"
   "azl/quantum/processor/quantum_core.azl"
   "azl/quantum/processor/quantum_ai_pipeline.azl"
@@ -204,6 +206,9 @@ component ::native.performance.activation {
       vector_count: 16,
       dimensions: 64
     }
+    emit "initialize_memory_persistence" with { system_id: "native_enterprise", config: {} }
+    emit "initialize_advanced_event_system" with { system_id: "native_enterprise", config: {} }
+    emit "start_performance_measurement" with {}
     emit "quantum.core.initialize" to ::quantum.core with {
       mode: "canonical_native"
     }
