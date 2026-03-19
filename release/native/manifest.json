@@ -1,0 +1,56 @@
+{
+  "release_profile": "native",
+  "version": "2026.03.native",
+  "description": "Canonical AZL-native release manifest",
+  "entrypoints": {
+    "start": "scripts/start_azl_native_mode.sh",
+    "daemon": "scripts/run_enterprise_daemon.sh",
+    "native_engine_build": "scripts/build_azl_native_engine.sh"
+  },
+  "gates": [
+    "scripts/check_azl_native_gates.sh",
+    "scripts/verify_native_runtime_live.sh",
+    "scripts/run_all_tests.sh"
+  ],
+  "canonical_core": {
+    "runtime": [
+      "azl/runtime/interpreter/azl_interpreter.azl",
+      "azl/runtime/vm/azl_vm.azl",
+      "azl/system/http_server.azl",
+      "azl/system/azl_system_interface.azl"
+    ],
+    "compiler_ir": [
+      "azl/core/compiler/azl_parser.azl",
+      "azl/core/compiler/azl_compiler.azl",
+      "azl/core/compiler/azl_bytecode.azl"
+    ],
+    "native_infrastructure": [
+      "tools/azl_native_engine.c",
+      "tools/sysproxy.c"
+    ],
+    "release_scripts": [
+      "scripts/start_azl_native_mode.sh",
+      "scripts/start_enterprise_daemon.sh",
+      "scripts/run_enterprise_daemon.sh",
+      "scripts/enforce_canonical_stack.sh",
+      "scripts/check_azl_native_gates.sh",
+      "scripts/verify_native_runtime_live.sh"
+    ]
+  },
+  "deprecated_bootstrap_paths": [],
+  "required_environment": {
+    "AZL_NATIVE_ONLY": "1",
+    "AZL_ENABLE_LEGACY_HOST": "0"
+  },
+  "api_contract": {
+    "required_endpoints": [
+      "/healthz",
+      "/readyz",
+      "/status",
+      "/api/exec_state"
+    ],
+    "auth_required_endpoints": [
+      "/api/exec_state"
+    ]
+  }
+}

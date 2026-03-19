@@ -1,0 +1,16 @@
+[Unit]
+Description=AZME 24h Autonomous Runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__AZME_ROOT__
+ExecStart=/usr/bin/env bash __AZME_ROOT__/scripts/run_azme_24h_foreground.sh
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target
+

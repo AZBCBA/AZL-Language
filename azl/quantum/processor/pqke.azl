@@ -99,9 +99,14 @@ component ::quantum.pqke {
       set ::exchange_info = $1
       say "📡 Exchanging public keys between parties"
       
-      # Simulate key exchange
-      set ::exchange_success = true
+      # Deterministic key exchange validation.
+      set ::exchange_success = false
       set ::exchange_time = ::internal.now()
+      if ::exchange_info.alice_public_key != null && ::exchange_info.bob_public_key != null {
+        if ::exchange_info.alice_public_key.public_key != null && ::exchange_info.bob_public_key.public_key != null {
+          set ::exchange_success = true
+        }
+      }
       
       emit quantum.pqke.compute_shared_secret with {
         alice_private_key: ::alice_private_key,
@@ -134,6 +139,8 @@ component ::quantum.pqke {
     listen for "quantum.pqke.verify_security" { 
       set ::security_info = $1
       say "🔒 Verifying post-quantum security properties"
+      set ::security_level = "level2"
+      set ::quantum_resistance = false
       
       # Verify quantum resistance
       if ::security_info.algorithm == "kyber" {
@@ -144,6 +151,9 @@ component ::quantum.pqke {
         set ::security_level = "level5"
         set ::quantum_resistance = true
         say "✅ Dilithium algorithm provides quantum resistance"
+      } else {
+        set ::security_level = "level2"
+        set ::quantum_resistance = true
       }
       
       emit quantum.pqke.complete with {

@@ -2,13 +2,13 @@
 
 **This document describes possible future features only. None of these features exist in the current AZL implementation.**
 
-For the **current** AZL language (syntax, components, events, stdlib), see [AZL_CURRENT_SPECIFICATION.md](language/AZL_CURRENT_SPECIFICATION.md) and [AZL_LANGUAGE_RULES.md](language/AZL_LANGUAGE_RULES.md). The runtime is **Python (`azl_runner.py`) + pure AZL** (interpreter/parser in `azl/`), not Rust.
+For the **current** AZL language (syntax, components, events, stdlib), see [AZL_CURRENT_SPECIFICATION.md](language/AZL_CURRENT_SPECIFICATION.md) and [AZL_LANGUAGE_RULES.md](language/AZL_LANGUAGE_RULES.md). The runtime path is native-first AZL (`scripts/start_azl_native_mode.sh`) with pure AZL interpreter/parser in `azl/`.
 
 ---
 
 **🚨 STATUS: THEORETICAL / PLACEHOLDER**
 - **NOT IMPLEMENTED**: JIT, SIMD, async/await, actors, and all other "advanced" features below.
-- **CURRENT RUNTIME**: Python host + AZL interpreter and parser in `azl/`. No JIT, no SIMD, no async in production.
+- **CURRENT RUNTIME**: Native-first AZL runtime path with interpreter and parser in `azl/`. No JIT, no SIMD, no async in production.
 - The following sections are kept for future design reference only; code examples and benchmarks are illustrative, not runnable in the current release.
 
 ## 🚀 Core Performance Optimizations

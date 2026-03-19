@@ -13,7 +13,7 @@ echo ""
 # Check if AZL is available
 if ! command -v azl &> /dev/null; then
     echo "❌ AZL not found. Please install AZL first."
-    echo "   You can use: ./azl_runner.py"
+    echo "   Use native startup: bash scripts/start_azl_native_mode.sh"
     exit 1
 fi
 

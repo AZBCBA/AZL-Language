@@ -14,18 +14,16 @@ This runbook documents how to run the enterprise daemon and validate host integr
   - `curl http://127.0.0.1:8080/status`
   - `tail -f .azl/daemon.out | grep '@sysproxy'`
 
-## JS/Python Smoke Tests
-- Python runner (recommended):
-  - `python3 azl_runner.py smoke_test.azl`
-  - `./scripts/run_tests.sh` — runs smoke + test_hello + test_arithmetic
-- Single integration test:
-  - `python3 azl_runner.py azl/testing/integration/test_hello.azl`
+## Native Smoke Tests
+- `./scripts/run_tests.sh` — runs canonical native checks
+- `./scripts/run_all_tests.sh` — runs strict native suite + benchmark gates
+- `bash scripts/benchmark_native_api.sh` — native API latency benchmark
 
 ## CI
 - Main CI (`.github/workflows/ci.yml`):
   - Fails on any placeholders/TODO/FIXME in `.azl`
   - Fails on any stale v2 references
-  - Runs JS + Python smoke
+  - Runs native gate and live runtime verification
 - Nightly sysproxy E2E (`.github/workflows/nightly.yml`):
   - Builds sysproxy, runs `scripts/test_sysproxy_setup.sh`, uploads logs
 

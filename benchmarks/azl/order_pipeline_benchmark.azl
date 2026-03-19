@@ -1,0 +1,28 @@
+component ::benchmark.order_pipeline {
+  init {
+    emit "benchmark.run"
+  }
+
+  behavior {
+    listen for "benchmark.run" then {
+      set n = parseInt(::internal.env("AZL_BENCH_N"))
+      if n == 0 {
+        set n = 100000
+      }
+
+      set i = 0
+      set processed = 0
+      set checksum = 0
+
+      while i < n {
+        set processed = processed + 1
+        set checksum = checksum + i
+        set i = i + 1
+      }
+
+      say "BENCH_N=" + n.toString()
+      say "BENCH_PROCESSED=" + processed.toString()
+      say "BENCH_CHECKSUM=" + checksum.toString()
+    }
+  }
+}

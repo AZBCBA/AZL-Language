@@ -5,7 +5,7 @@
 **AZL** is its own programming language. It has its own syntax, semantics, and rules. Do not assume Java, TypeScript, JavaScript, or C semantics when reading or writing AZL code or documentation.
 
 - **File extension**: `.azl`
-- **Execution**: Component-based, event-driven; runs via the AZL runtime (Python host `azl_runner.py` + pure AZL interpreter/parser in `azl/`).
+- **Execution**: Component-based, event-driven; runs via the AZL native runtime path (`scripts/start_azl_native_mode.sh`) with pure AZL interpreter/parser components in `azl/`.
 - **Grammar and parser**: Defined and implemented in AZL (see `azl/core/parser/azl_parser.azl` and `docs/language/GRAMMAR.md`).
 
 ## Core rules

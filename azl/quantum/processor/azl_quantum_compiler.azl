@@ -240,7 +240,7 @@ class AzlQuantumCompiler {
     measureQuantumState(register) {
         let measurement = {}
         measurement.register = register
-        measurement.value = Math.random()
+        measurement.value = (((register && register.length) || 5) % 10) / 10
         measurement.collapsed = true
         return measurement
     }

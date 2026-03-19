@@ -8,7 +8,7 @@
 ## ✅ **ACHIEVEMENTS UNLOCKED**
 
 ### **Phase 1: Pure AZL Runtime Foundation** ✅ COMPLETE
-- Enhanced `azl_runner.py` with advanced language features
+- Enhanced AZL runtime foundation with native-first execution features
 - Full support for `fn` keyword, function definitions and calls
 - Working `let` and `set` statements with proper variable management
 - Complete event system with behavior handlers

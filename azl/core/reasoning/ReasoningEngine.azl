@@ -297,7 +297,8 @@ class DefaultReasoningEngine implements ReasoningEngine {
      * @return A unique ID
      */
     private function generateId(): string {
-        return `reasoning-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+        const seq = this.contexts.size + this.cache.size + this.metrics.totalReasoningContexts;
+        return `reasoning-${Date.now()}-${seq}`;
     }
 
     /**

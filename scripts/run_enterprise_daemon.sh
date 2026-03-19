@@ -15,17 +15,25 @@ export AZL_BUILD_API_ENABLED="${AZL_BUILD_API_ENABLED:-true}"
 export AZL_BUILD_API_PORT="${AZL_BUILD_API_PORT:-8080}"
 export AZL_HTTP_PORT="${AZL_HTTP_PORT:-}"  # optional separate AZL http server port
 export AZL_WIRE_MANAGED=1
+export AZL_NATIVE_ONLY="${AZL_NATIVE_ONLY:-1}"
+export AZL_ENABLE_LEGACY_HOST="${AZL_ENABLE_LEGACY_HOST:-0}"
+export AZL_NATIVE_RUNTIME_CMD="${AZL_NATIVE_RUNTIME_CMD:-bash scripts/azl_native_runtime_loop.sh}"
 
 echo "🔑 API Token: $AZL_API_TOKEN"
 echo "📁 Config: $AZL_BUILD_CONFIG"
 echo "🌐 Port: $AZL_BUILD_API_PORT"
 
 # Ensure sysproxy is running and listening (start locally if not)
-{
-  exec 5<>/dev/tcp/127.0.0.1/9099
-  ok=$?
-  exec 5>&-
-} 2>/dev/null || ok=1
+ok=1
+if command -v timeout >/dev/null 2>&1; then
+  timeout 1 bash -lc 'exec 5<>/dev/tcp/127.0.0.1/9099; exec 5>&-' >/dev/null 2>&1 && ok=0 || ok=1
+else
+  {
+    exec 5<>/dev/tcp/127.0.0.1/9099
+    ok=$?
+    exec 5>&-
+  } 2>/dev/null || ok=1
+fi
 if [ "${ok}" != "0" ]; then
   echo "🔧 Starting local sysproxy on 127.0.0.1:9099"
   mkdir -p .azl || true
@@ -64,7 +72,7 @@ AZL
 # Add all the required components
 COMPONENTS=(
   "azl/host/exec_bridge.azl"
-  "azl/runtime/bootstrap.azl"
+  "azl/runtime/bootstrap/azl_pure_azme_runtime.azl"
   "azl/core/events.azl"
   "azl/core/internal.azl"
   "azl/api/endpoints.azl"
@@ -80,19 +88,41 @@ COMPONENTS=(
   "azl/bootstrap/azl_pure_launcher.azl"
   "azl/diag/env_probe.azl"
   "azl/diag/net_probe.azl"
+  # Core wiring for command/training/runtime integration
+  "azl/core/execution/command_processor.azl"
+  "azl/extensions/training_plugin_manager.azl"
+  "azl/runtime/integration/azl_runtime_integration.azl"
+  "azl/orchestrator/parallel_training_orchestrator.azl"
+  "azl/orchestrator/training_worker_pool.azl"
+  "azl/orchestrator/metrics.azl"
+  "azme/system/azme_plugin_host.azl"
+  "azme/integrations/azme_plugin_registry.azl"
+  "azme/security/security_policy_rules.azl"
+  "azme/interface/azme_speech_synthesis.azl"
+  "azme/perception/azme_vision_processor.azl"
   # Full training stack (AZME/AZL/Quantum/LHA3)
   "azl/orchestrator/comprehensive_training_controller.azl"
   "azl/nlp/advanced_training_system.azl"
   "azl/neural/model_loader.azl"
   "azl/neural/real_neural_network.azl"
   "azl/neural/qwen_72b_quantum_attention.azl"
+  "azl/core/neural/neural.azl"
+  "azl/core/memory/memory.azl"
   "azl/memory/lha3_memory_system.azl"
-  "azl/memory/lha3_adaptive_quantum_engine.azl"
+  "azl/memory/lha3_quantum_memory.azl"
+  "azl/quantum/memory/lha3_quantum_engine.azl"
+  "azl/memory/memory_optimization_system.azl"
+  "azl/memory/fractal_memory_compression.azl"
+  "azl/quantum/processor/quantum_processor.azl"
+  "azl/quantum/processor/quantum_encryption.azl"
   "azl/quantum/real_quantum_processor.azl"
+  "azl/quantum/optimizer/quantum_optimizer.azl"
+  "azl/quantum/mathematics/quantum_topology.azl"
+  "azl/quantum/mathematics/quantum_geometry.azl"
   "azl/monitoring/quantum_dashboard.azl"
+  "azl/monitoring/performance_analytics_system.azl"
   "azl/weights/registry.azl"
-  # AZME memory and interfaces
-  "azme/memory/azme_unified_memory_system.azl"
+  # AZME interfaces
   "azme/core/agi_core.azl"
   "azme/core/autonomous_brain.azl"
   "azme/learning/azme_actual_dataset_training.azl"
@@ -129,6 +159,45 @@ component ::e2e.azme_provider_launcher {
 }
 AZL
 
+# Canonical native bootstrap entry expected by seed/native launcher.
+cat >> "$COMBINED" <<'AZL'
+# ===== EMBEDDED: Native Boot Entry =====
+component ::boot.entry {
+  init {
+    emit "build.daemon.enterprise.start"
+  }
+}
+AZL
+
+# Activate memory/quantum optimization modules early in startup.
+cat >> "$COMBINED" <<'AZL'
+# ===== EMBEDDED: Native Performance Activation =====
+component ::native.performance.activation {
+  init {
+    emit "initialize_memory_optimization"
+    emit "initialize_fractal_compression"
+    emit "initialize_performance_analytics"
+    emit "start_quantum_monitoring"
+    emit "initialize_lha3_memory" to ::memory.lha3_quantum with {
+      p_adic_prime: 7,
+      precision: 10,
+      max_dimensions: 64,
+      ram_limit_gb: 2
+    }
+    emit "initialize_lha3_quantum_engine" to ::quantum.memory.lha3_quantum_engine with {
+      p_adic_prime: 7,
+      precision: 10,
+      max_dimensions: 64,
+      target_compression_ratio: 0.85
+    }
+    emit "initialize_hyperdimensional_vectors" to ::quantum.memory.lha3_quantum_engine with {
+      vector_count: 16,
+      dimensions: 64
+    }
+  }
+}
+AZL
+
 # Set environment for execution bridge
 export AZL_COMBINED_PATH="$COMBINED"
 export AZL_ENTRY="::build.daemon.enterprise"
@@ -139,14 +208,21 @@ echo "🎯 Entry point: $AZL_ENTRY"
 echo ""
 
 echo "🧠 Loading and executing AZL components..."
+DAEMON_LOG_PATH=".azl/daemon.out"
+# Some environments may leave a root-owned daemon.out from prior runs.
+# Fall back to a user-owned log file if daemon.out is not writable.
+if ! (touch "$DAEMON_LOG_PATH" >/dev/null 2>&1); then
+  DAEMON_LOG_PATH=".azl/daemon.${USER:-user}.out"
+  touch "$DAEMON_LOG_PATH"
+fi
 if [ "${AZL_SYSTEMD:-0}" = "1" ]; then
   # Under systemd: avoid extra tee/stdbuf processes; log directly
-  scripts/azl_bootstrap.sh "$COMBINED" "::build.daemon.enterprise" >> .azl/daemon.out 2>&1 &
+  scripts/azl_bootstrap.sh "$COMBINED" "::build.daemon.enterprise" >> "$DAEMON_LOG_PATH" 2>&1 &
   echo $! > .azl/daemon.pid
 else
   # Interactive/dev mode: keep previous behavior with tees
   stdbuf -oL -eL scripts/azl_bootstrap.sh "$COMBINED" "::build.daemon.enterprise" 2>&1 \
-    | stdbuf -oL tee .azl/daemon.out \
+    | stdbuf -oL tee "$DAEMON_LOG_PATH" \
     | stdbuf -oL tee .azl/engine.out \
     >/dev/null &
   echo $! > .azl/daemon.pid

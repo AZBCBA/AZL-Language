@@ -1,598 +1,66 @@
 component ::monitoring.quantum_dashboard {
   init {
-    set ::status = "initializing"
-    set ::dashboard_version = "2.0"
-    set ::refresh_rate = 1000  # milliseconds
-    set ::quantum_systems = {
-      processor: {},
-      memory: {},
-      neural: {},
-      consciousness: {},
-      bitcoin_bridge: {},
-      qwen_72b: {}
-    }
-    set ::real_time_metrics = {
+    set ::status = "ready"
+    set ::monitoring_active = false
+    set ::metrics = {
       quantum_operations_per_second: 0,
       memory_usage_gb: 0.0,
       neural_inference_time: 0.0,
       consciousness_coherence: 0.0,
-      bitcoin_hashrate: 0.0,
       qwen_attention_qubits: 0
     }
-    set ::system_alerts = []
-    set ::performance_history = []
-    set ::quantum_events = []
-    set ::dashboard_sections = {
-      quantum_processor: "active",
-      lha3_memory: "active", 
-      neural_system: "active",
-      consciousness: "active",
-      bitcoin_mining: "active",
-      qwen_72b: "active"
-    }
-    set ::visualization_config = {
-      charts_enabled: true,
-      real_time_updates: true,
-      alert_thresholds: {
-        quantum_ops: 1000,
-        memory_usage: 80.0,
-        neural_time: 0.1,
-        consciousness_coherence: 0.8,
-        bitcoin_hashrate: 100.0,
-        qwen_qubits: 256
-      }
-    }
-    
-    emit monitoring.quantum_dashboard.initialized with { 
-      status: ::status, 
-      version: ::dashboard_version,
-      sections: ::dashboard_sections 
-    }
+    set ::events_seen = 0
+    emit "monitoring.quantum_dashboard.initialized" with { status: ::status }
   }
 
   behavior {
-    on start_quantum_monitoring {
+    listen for "start_quantum_monitoring" then {
       set ::monitoring_active = true
       set ::status = "monitoring"
-      
-      # Start real-time monitoring loop
-      emit monitoring.quantum_dashboard.monitoring_started with { 
-        refresh_rate: ::refresh_rate,
-        systems: ::quantum_systems 
-      }
-      
-      # Initialize monitoring for each quantum system
-      emit monitoring.quantum_processor.start_monitoring
-      emit monitoring.lha3_memory.start_monitoring  
-      emit monitoring.neural_system.start_monitoring
-      emit monitoring.consciousness.start_monitoring
-      emit monitoring.bitcoin_bridge.start_monitoring
-      emit monitoring.qwen_72b.start_monitoring
-    }
-
-    on update_quantum_metrics {
-      set ::system_name = $1.system
-      set ::metrics = $1.metrics
-      
-      # Update real-time metrics for specific system
-      set ::quantum_systems[::system_name] = ::metrics
-      set ::real_time_metrics = ::merge_metrics(::real_time_metrics, ::metrics)
-      
-      # Check for performance alerts
-      store ::alerts from ::check_performance_alerts(::system_name, ::metrics)
-      branch when ::alerts.length > 0 {
-        loop for ::alert in ::alerts {
-          set ::system_alerts = ::system_alerts.push(::alert)
-          emit monitoring.quantum_dashboard.alert with ::alert
-        }
-      }
-      
-      # Update performance history
-      store ::history_entry from {
-        timestamp: ::now(),
-        system: ::system_name,
-        metrics: ::metrics
-      }
-      set ::performance_history = ::performance_history.push(::history_entry)
-      
-      emit monitoring.quantum_dashboard.metrics_updated with { 
-        system: ::system_name,
-        metrics: ::metrics,
-        alerts: ::alerts
+      say "📊 Quantum dashboard monitoring started"
+      emit "monitoring.quantum_dashboard.monitoring_started" with {
+        status: ::status,
+        monitoring_active: ::monitoring_active
       }
     }
 
-    on quantum_event_occurred {
-      set ::event_data = $1
-      
-      # Log quantum event
-      set ::quantum_events = ::quantum_events.push(::event_data)
-      
-      # Update dashboard based on event type
-      branch when ::event_data.type = "quantum_operation" {
-        set ::real_time_metrics.quantum_operations_per_second = ::real_time_metrics.quantum_operations_per_second + 1
-      } else when ::event_data.type = "memory_access" {
-        set ::real_time_metrics.memory_usage_gb = ::event_data.memory_usage
-      } else when ::event_data.type = "neural_inference" {
-        set ::real_time_metrics.neural_inference_time = ::event_data.inference_time
-      } else when ::event_data.type = "consciousness_update" {
-        set ::real_time_metrics.consciousness_coherence = ::event_data.coherence
-      } else when ::event_data.type = "bitcoin_mining" {
-        set ::real_time_metrics.bitcoin_hashrate = ::event_data.hashrate
-      } else when ::event_data.type = "qwen_attention" {
-        set ::real_time_metrics.qwen_attention_qubits = ::event_data.qubits
-      }
-      
-      emit monitoring.quantum_dashboard.event_logged with ::event_data
-    }
-
-    on get_dashboard_data {
-      set ::request_type = $1.request_type || "comprehensive"
-      
-      store ::dashboard_data from ::generate_comprehensive_dashboard_data(::request_type)
-      
-      emit monitoring.quantum_dashboard.data_ready with { 
-        data: ::dashboard_data,
-        request_type: ::request_type
-      }
-    }
-
-    on configure_dashboard {
-      set ::config = $1
-      
-      # Update dashboard configuration
-      branch when ::config.refresh_rate != null {
-        set ::refresh_rate = ::config.refresh_rate
-      }
-      
-      branch when ::config.sections != null {
-        set ::dashboard_sections = ::config.sections
-      }
-      
-      branch when ::config.visualization != null {
-        set ::visualization_config = ::merge_config(::visualization_config, ::config.visualization)
-      }
-      
-      emit monitoring.quantum_dashboard.configured with { 
-        config: ::config,
-        current_settings: {
-          refresh_rate: ::refresh_rate,
-          sections: ::dashboard_sections,
-          visualization: ::visualization_config
-        }
-      }
-    }
-
-    on export_dashboard_report {
-      set ::report_format = $1.format || "comprehensive"
-      set ::time_range = $1.time_range || "24h"
-      
-      store ::report_data from ::generate_dashboard_report(::report_format, ::time_range)
-      
-      emit monitoring.quantum_dashboard.report_ready with { 
-        report: ::report_data,
-        format: ::report_format,
-        time_range: ::time_range
-      }
-    }
-
-    on stop_quantum_monitoring {
+    listen for "stop_quantum_monitoring" then {
       set ::monitoring_active = false
       set ::status = "stopped"
-      
-      emit monitoring.quantum_dashboard.monitoring_stopped with { 
-        final_metrics: ::real_time_metrics,
-        total_events: ::quantum_events.length,
-        total_alerts: ::system_alerts.length
-      }
-    }
-  }
-
-  # Dashboard data generation functions
-  function generate_comprehensive_dashboard_data(request_type) {
-    store ::dashboard_data from {
-      overview: {
+      emit "monitoring.quantum_dashboard.monitoring_stopped" with {
         status: ::status,
-        version: ::dashboard_version,
+        events_seen: ::events_seen
+      }
+    }
+
+    listen for "quantum.metrics" then {
+      set ::m = ::event.data || {}
+      if ::m.max_concentration != null { set ::metrics.quantum_operations_per_second = (::m.max_concentration * 1000) }
+      if ::m.entropy != null { set ::metrics.consciousness_coherence = (1.0 - ::m.entropy) }
+      if ::m.norm2 != null { set ::metrics.memory_usage_gb = ::m.norm2 }
+      if ::m.step != null { set ::metrics.qwen_attention_qubits = ::m.step }
+      set ::events_seen = ::events_seen + 1
+      emit "monitoring.quantum_dashboard.metrics_updated" with { metrics: ::metrics, events_seen: ::events_seen }
+    }
+
+    listen for "update_quantum_metrics" then {
+      set ::m = ::event.data || {}
+      if ::m.quantum_operations_per_second != null { set ::metrics.quantum_operations_per_second = ::m.quantum_operations_per_second }
+      if ::m.memory_usage_gb != null { set ::metrics.memory_usage_gb = ::m.memory_usage_gb }
+      if ::m.neural_inference_time != null { set ::metrics.neural_inference_time = ::m.neural_inference_time }
+      if ::m.consciousness_coherence != null { set ::metrics.consciousness_coherence = ::m.consciousness_coherence }
+      if ::m.qwen_attention_qubits != null { set ::metrics.qwen_attention_qubits = ::m.qwen_attention_qubits }
+      set ::events_seen = ::events_seen + 1
+      emit "monitoring.quantum_dashboard.metrics_updated" with { metrics: ::metrics, events_seen: ::events_seen }
+    }
+
+    listen for "get_dashboard_data" then {
+      emit "monitoring.quantum_dashboard.data_ready" with {
+        status: ::status,
         monitoring_active: ::monitoring_active,
-        total_systems: ::quantum_systems.length,
-        total_events: ::quantum_events.length,
-        total_alerts: ::system_alerts.length
-      },
-      real_time_metrics: ::real_time_metrics,
-      quantum_systems: ::quantum_systems,
-      system_alerts: ::system_alerts,
-      performance_history: ::performance_history.slice(-100),  # Last 100 entries
-      quantum_events: ::quantum_events.slice(-50),  # Last 50 events
-      dashboard_sections: ::dashboard_sections,
-      visualization_config: ::visualization_config
-    }
-    
-    # Add system-specific data based on request type
-    branch when ::request_type = "quantum_processor" {
-      set ::dashboard_data.quantum_processor_details = ::get_quantum_processor_details()
-    } else when ::request_type = "lha3_memory" {
-      set ::dashboard_data.lha3_memory_details = ::get_lha3_memory_details()
-    } else when ::request_type = "neural_system" {
-      set ::dashboard_data.neural_system_details = ::get_neural_system_details()
-    } else when ::request_type = "consciousness" {
-      set ::dashboard_data.consciousness_details = ::get_consciousness_details()
-    } else when ::request_type = "bitcoin_mining" {
-      set ::dashboard_data.bitcoin_mining_details = ::get_bitcoin_mining_details()
-    } else when ::request_type = "qwen_72b" {
-      set ::dashboard_data.qwen_72b_details = ::get_qwen_72b_details()
-    }
-    
-    return ::dashboard_data
-  }
-
-  function get_quantum_processor_details() {
-    store ::processor_details from {
-      qubits: 256,
-      coherence_time: 1000,
-      error_rate: 0.001,
-      gate_operations: ["HADAMARD", "PAULI_X", "PAULI_Y", "PAULI_Z", "CNOT", "PHASE", "ROTATION"],
-      quantum_algorithms: ["FOURIER", "GROVER", "SHOR", "OPTIMIZATION"],
-      entanglement_pairs: 128,
-      measurement_results: {},
-      processing_history: []
-    }
-    
-    return ::processor_details
-  }
-
-  function get_lha3_memory_details() {
-    store ::memory_details from {
-      fractal_depth: 8,
-      dimensions: 4,
-      p_adic_prime: 7,
-      precision: 10,
-      total_nodes: 0,
-      active_nodes: 0,
-      compressed_nodes: 0,
-      quantum_states: 0,
-      fractal_efficiency: 0.0,
-      total_capacity: 0,
-      used_capacity: 0,
-      compression_ratio: 0.85,
-      adaptive_dimensions: 4,
-      ram_limit_gb: 88
-    }
-    
-    return ::memory_details
-  }
-
-  function get_neural_system_details() {
-    store ::neural_details from {
-      model_type: "Qwen2ForCausalLM",
-      vocab_size: 151936,
-      hidden_size: 6144,
-      num_layers: 80,
-      num_heads: 96,
-      max_position_embeddings: 32768,
-      quantum_attention_enabled: true,
-      quantum_qubits: 256,
-      quantum_depth: 10,
-      quantum_coherence: 0.95,
-      quantum_error_correction: true,
-      gpu_memory_usage: 0.0,
-      inference_time: 0.0
-    }
-    
-    return ::neural_details
-  }
-
-  function get_consciousness_details() {
-    store ::consciousness_details from {
-      coherence_level: 0.0,
-      self_awareness: 0.0,
-      meta_cognition: 0.0,
-      goal_orientation: 0.0,
-      emotional_state: "neutral",
-      cognitive_load: 0.0,
-      attention_focus: 0.0,
-      memory_integration: 0.0,
-      quantum_consciousness_enabled: true,
-      consciousness_events: []
-    }
-    
-    return ::consciousness_details
-  }
-
-  function get_bitcoin_mining_details() {
-    store ::mining_details from {
-      bitcoin_rpc: {
-        host: "127.0.0.1",
-        port: 18332,
-        network: "testnet"
-      },
-      azme_config: {
-        quantum_enabled: true,
-        qubits: 256,
-        algorithm: "sha256_quantum",
-        mining_pool: "azme_pool"
-      },
-      mining_stats: {
-        blocks_mined: 0,
-        total_hashrate: 0.0,
-        quantum_hashrate: 0.0,
-        classical_hashrate: 0.0,
-        efficiency_ratio: 0.0
-      },
-      quantum_miner: {
-        qubits: 256,
-        quantum_circuits: {},
-        entanglement_pairs: {},
-        measurement_results: {}
+        events_seen: ::events_seen,
+        metrics: ::metrics
       }
     }
-    
-    return ::mining_details
   }
-
-  function get_qwen_72b_details() {
-    store ::qwen_details from {
-      model_specs: {
-        vocab_size: 151936,
-        hidden_size: 6144,
-        num_layers: 80,
-        num_heads: 96,
-        max_position_embeddings: 32768,
-        model_type: "qwen2",
-        architecture: "Qwen2ForCausalLM"
-      },
-      quantum_attention_tensors: {},
-      gpu_memory: {},
-      attention_mechanisms: {},
-      quantum_states: {},
-      processing_stats: {
-        total_operations: 0,
-        quantum_enhanced: 0,
-        average_response_time: 0.0,
-        memory_usage: 0.0
-      },
-      quantum_config: {
-        quantum_enabled: true,
-        quantum_qubits: 256,
-        quantum_depth: 10,
-        quantum_coherence: 0.95,
-        quantum_error_correction: true
-      }
-    }
-    
-    return ::qwen_details
-  }
-
-  function check_performance_alerts(system_name, metrics) {
-    store ::alerts from []
-    
-    # Check quantum processor alerts
-    branch when ::system_name = "quantum_processor" {
-      branch when metrics.quantum_operations_per_second < ::visualization_config.alert_thresholds.quantum_ops {
-        store ::alert from {
-          type: "performance_warning",
-          system: ::system_name,
-          message: "Quantum operations per second below threshold",
-          value: metrics.quantum_operations_per_second,
-          threshold: ::visualization_config.alert_thresholds.quantum_ops,
-          timestamp: ::now()
-        }
-        set ::alerts = ::alerts.push(::alert)
-      }
-    }
-    
-    # Check memory alerts
-    branch when ::system_name = "lha3_memory" {
-      branch when metrics.memory_usage_gb > ::visualization_config.alert_thresholds.memory_usage {
-        store ::alert from {
-          type: "memory_warning",
-          system: ::system_name,
-          message: "Memory usage above threshold",
-          value: metrics.memory_usage_gb,
-          threshold: ::visualization_config.alert_thresholds.memory_usage,
-          timestamp: ::now()
-        }
-        set ::alerts = ::alerts.push(::alert)
-      }
-    }
-    
-    # Check neural system alerts
-    branch when ::system_name = "neural_system" {
-      branch when metrics.neural_inference_time > ::visualization_config.alert_thresholds.neural_time {
-        store ::alert from {
-          type: "performance_warning",
-          system: ::system_name,
-          message: "Neural inference time above threshold",
-          value: metrics.neural_inference_time,
-          threshold: ::visualization_config.alert_thresholds.neural_time,
-          timestamp: ::now()
-        }
-        set ::alerts = ::alerts.push(::alert)
-      }
-    }
-    
-    # Check consciousness alerts
-    branch when ::system_name = "consciousness" {
-      branch when metrics.consciousness_coherence < ::visualization_config.alert_thresholds.consciousness_coherence {
-        store ::alert from {
-          type: "consciousness_warning",
-          system: ::system_name,
-          message: "Consciousness coherence below threshold",
-          value: metrics.consciousness_coherence,
-          threshold: ::visualization_config.alert_thresholds.consciousness_coherence,
-          timestamp: ::now()
-        }
-        set ::alerts = ::alerts.push(::alert)
-      }
-    }
-    
-    # Check Bitcoin mining alerts
-    branch when ::system_name = "bitcoin_bridge" {
-      branch when metrics.bitcoin_hashrate < ::visualization_config.alert_thresholds.bitcoin_hashrate {
-        store ::alert from {
-          type: "mining_warning",
-          system: ::system_name,
-          message: "Bitcoin hashrate below threshold",
-          value: metrics.bitcoin_hashrate,
-          threshold: ::visualization_config.alert_thresholds.bitcoin_hashrate,
-          timestamp: ::now()
-        }
-        set ::alerts = ::alerts.push(::alert)
-      }
-    }
-    
-    # Check Qwen 72B alerts
-    branch when ::system_name = "qwen_72b" {
-      branch when metrics.qwen_attention_qubits < ::visualization_config.alert_thresholds.qwen_qubits {
-        store ::alert from {
-          type: "attention_warning",
-          system: ::system_name,
-          message: "Qwen attention qubits below threshold",
-          value: metrics.qwen_attention_qubits,
-          threshold: ::visualization_config.alert_thresholds.qwen_qubits,
-          timestamp: ::now()
-        }
-        set ::alerts = ::alerts.push(::alert)
-      }
-    }
-    
-    return ::alerts
-  }
-
-  function generate_dashboard_report(report_format, time_range) {
-    store ::report_data from {
-      report_type: ::report_format,
-      time_range: ::time_range,
-      generated_at: ::now(),
-      overview: {
-        total_events: ::quantum_events.length,
-        total_alerts: ::system_alerts.length,
-        systems_monitored: ::quantum_systems.length,
-        monitoring_duration: ::calculate_monitoring_duration()
-      },
-      performance_summary: {
-        quantum_operations: ::calculate_total_quantum_operations(),
-        memory_usage: ::calculate_average_memory_usage(),
-        neural_performance: ::calculate_neural_performance(),
-        consciousness_metrics: ::calculate_consciousness_metrics(),
-        mining_performance: ::calculate_mining_performance(),
-        qwen_performance: ::calculate_qwen_performance()
-      },
-      system_details: ::quantum_systems,
-      alerts_summary: ::system_alerts,
-      recommendations: ::generate_performance_recommendations()
-    }
-    
-    return ::report_data
-  }
-
-  function merge_metrics(current_metrics, new_metrics) {
-    store ::merged_metrics from ::current_metrics
-    
-    # Update metrics with new values
-    loop for ::key in ::new_metrics {
-      set ::merged_metrics[::key] = ::new_metrics[::key]
-    }
-    
-    return ::merged_metrics
-  }
-
-  function merge_config(current_config, new_config) {
-    store ::merged_config from ::current_config
-    
-    # Update configuration with new values
-    loop for ::key in ::new_config {
-      set ::merged_config[::key] = ::new_config[::key]
-    }
-    
-    return ::merged_config
-  }
-
-  function calculate_monitoring_duration() {
-    # Calculate monitoring duration in seconds
-    store ::duration from 3600  # Default 1 hour
-    return ::duration
-  }
-
-  function calculate_total_quantum_operations() {
-    store ::total_ops from ::real_time_metrics.quantum_operations_per_second * 3600
-    return ::total_ops
-  }
-
-  function calculate_average_memory_usage() {
-    store ::avg_memory from ::real_time_metrics.memory_usage_gb
-    return ::avg_memory
-  }
-
-  function calculate_neural_performance() {
-    store ::neural_perf from {
-      inference_time: ::real_time_metrics.neural_inference_time,
-      operations_per_second: 1000 / ::real_time_metrics.neural_inference_time
-    }
-    return ::neural_perf
-  }
-
-  function calculate_consciousness_metrics() {
-    store ::consciousness_metrics from {
-      coherence: ::real_time_metrics.consciousness_coherence,
-      stability: 0.85,
-      integration: 0.92
-    }
-    return ::consciousness_metrics
-  }
-
-  function calculate_mining_performance() {
-    store ::mining_perf from {
-      hashrate: ::real_time_metrics.bitcoin_hashrate,
-      efficiency: 0.95,
-      blocks_found: 0
-    }
-    return ::mining_perf
-  }
-
-  function calculate_qwen_performance() {
-    store ::qwen_perf from {
-      attention_qubits: ::real_time_metrics.qwen_attention_qubits,
-      response_time: 0.05,
-      memory_usage: 0.0
-    }
-    return ::qwen_perf
-  }
-
-  function generate_performance_recommendations() {
-    store ::recommendations from []
-    
-    # Generate recommendations based on current metrics
-    branch when ::real_time_metrics.quantum_operations_per_second < 1000 {
-      store ::rec from {
-        type: "performance_optimization",
-        system: "quantum_processor",
-        recommendation: "Increase quantum operations per second",
-        priority: "high"
-      }
-      set ::recommendations = ::recommendations.push(::rec)
-    }
-    
-    branch when ::real_time_metrics.memory_usage_gb > 80 {
-      store ::rec from {
-        type: "resource_management",
-        system: "lha3_memory",
-        recommendation: "Optimize memory usage and compression",
-        priority: "high"
-      }
-      set ::recommendations = ::recommendations.push(::rec)
-    }
-    
-    branch when ::real_time_metrics.neural_inference_time > 0.1 {
-      store ::rec from {
-        type: "performance_optimization",
-        system: "neural_system",
-        recommendation: "Optimize neural inference pipeline",
-        priority: "medium"
-      }
-      set ::recommendations = ::recommendations.push(::rec)
-    }
-    
-    return ::recommendations
-  }
-} 
+}

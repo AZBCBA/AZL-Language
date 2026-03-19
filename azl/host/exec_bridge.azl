@@ -189,12 +189,14 @@ component ::host.exec_bridge {
   
   # Generate API token
   ::generate_token = () => {
-    # Generate a random hex token
+    # Generate deterministic hex token from runtime state.
     set ::chars = "0123456789abcdef"
     set ::token = ""
-    
+    set ::seed = (::internal.now() + ::api_port + (::combined_path.length || 0) + (::entry.length || 0))
+
     for i in range(32) {
-      set ::token = ::token + ::chars[random(0, ::chars.length - 1)]
+      set ::idx = ((::seed + (i * 13)) % ::chars.length)
+      set ::token = ::token + ::chars[::idx]
     }
     
     return ::token

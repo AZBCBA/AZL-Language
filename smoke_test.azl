@@ -1,4 +1,4 @@
-# Smoke test: run with python3 azl_runner.py smoke_test.azl
+# Smoke test: run via bash scripts/start_azl_native_mode.sh
 component ::smoke.test {
   init {
     say "AZL smoke test starting"

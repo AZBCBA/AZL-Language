@@ -2,19 +2,17 @@
 
 Thank you for contributing to **AZL** — the component-based, event-driven programming language. This project is **AZL language**, not Java, TypeScript, or any other language. Please follow AZL's rules and architecture.
 
-## Repository layout (Python + pure AZL)
+## Repository layout (native-first AZL)
 
-- **`azl_runner.py`** — Main entry: Python host that runs `.azl` files (component engine, expression evaluation, init/behavior execution).
 - **`azl/`** — Pure AZL runtime: interpreter, parser, compiler, stdlib, error system, security. Grammar and parsing live in AZL (e.g. `azl/core/parser/azl_parser.azl`).
-- **`scripts/azl`** — CLI to run AZL (e.g. `scripts/azl run <file.azl>`).
-- **`scripts/run_combined_azl.py`** — Builds and runs combined AZL (compiler + interpreter).
+- **`scripts/start_azl_native_mode.sh`** — Canonical native startup path.
+- **`scripts/run_enterprise_daemon.sh`** — Canonical combined runtime launcher.
 - **`docs/`** — All project documentation. Language spec: `docs/language/AZL_CURRENT_SPECIFICATION.md` and `docs/language/AZL_LANGUAGE_RULES.md`.
 
-There is **no** `src/lib.rs` or `Cargo.toml` at repo root. The runtime is **Python + pure AZL**.
+There is **no** `src/lib.rs` or `Cargo.toml` at repo root. The release runtime path is native-first AZL.
 
 ## Active work areas (coordinate before changing)
 
-- **`azl_runner.py`** — Component loading, event dispatch, `eval_expr`, `parse_azl_list`, init/behavior execution.
 - **`azl/core/parser/azl_parser.azl`** — Token types, keywords, operators, punctuation, `tokenize`, `parse_azl_code`, AST.
 - **`azl/core/compiler/`** — Compiler pipeline (parser, bytecode, optimizers).
 - **`azl/runtime/interpreter/`** — AZL interpreter.
@@ -41,8 +39,8 @@ Please avoid large, conflicting edits in these areas without coordination. Add t
 1. Fork the repository.
 2. Create a feature branch (`git checkout -b feature/your-feature`).
 3. Make changes; update specs/docs under `docs/` when changing behavior.
-4. Add or adjust tests (pure AZL tests under `azl/testing/`, Python tests as appropriate).
-5. Ensure the project runs (e.g. `python3 azl_runner.py <file.azl>` or `scripts/azl run <file.azl>`).
+4. Add or adjust tests under `azl/testing/` and runtime gate scripts.
+5. Ensure the project runs (`scripts/run_tests.sh` and `scripts/verify_native_runtime_live.sh`).
 6. Push and open a Pull Request. Keep PRs small and reviewable.
 
 ## Documentation

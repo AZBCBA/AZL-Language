@@ -99,21 +99,18 @@ if grep -q "component ::boot.entry" "$BUNDLE"; then
   export AZL_COMBINED_PATH="$COMBINED"
   export AZL_ENTRY="$ENTRY"
   
-  # Optionally execute the JavaScript runtime (can be disabled via AZL_NODE_RUNTIME=0)
-  if [ "${AZL_NODE_RUNTIME:-1}" = "1" ]; then
-    if [ -f "scripts/azl_runtime.js" ]; then
-      echo "✅ Found JavaScript runtime, executing bootstrap bundle..."
-      echo "🚀 Executing bootstrap bundle with JavaScript runtime..."
-      echo "🎯 Targeting component: ::boot.entry"
-      node scripts/azl_runtime.js "$BUNDLE" "::boot.entry"
-      echo "✅ Bootstrap bundle execution complete"
-    else
-      echo "❌ JavaScript runtime not found"
-      exit 1
-    fi
-  else
-    echo "⚙️  AZL_NODE_RUNTIME disabled; relying on AZL engine + sysproxy wire only"
+  if [ -z "${AZL_NATIVE_EXEC_CMD:-}" ]; then
+    echo "❌ No native executor command was provided."
+    echo "Provide AZL_NATIVE_EXEC_CMD to run pure AZL execution path."
+    echo "Example: AZL_NATIVE_EXEC_CMD=/path/to/azl-native-engine"
+    exit 65
   fi
+  if ! command -v "${AZL_NATIVE_EXEC_CMD}" >/dev/null 2>&1; then
+    echo "❌ AZL_NATIVE_EXEC_CMD not found in PATH: ${AZL_NATIVE_EXEC_CMD}"
+    exit 66
+  fi
+  echo "🚀 Executing bootstrap bundle with native AZL executor: ${AZL_NATIVE_EXEC_CMD}"
+  "${AZL_NATIVE_EXEC_CMD}" "$BUNDLE" "::boot.entry"
 
   echo "🚀 Bootstrap bundle execution complete"
 else

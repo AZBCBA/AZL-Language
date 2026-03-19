@@ -211,7 +211,7 @@ component ::net.http.server {
     say "📥 Request " + ::request_count + ": " + method + " " + path
     
     # Check authentication (allow select public endpoints)
-    if !(path == "/healthz" || path == "/readyz" || path == "/status") && !::authenticate_request(headers) {
+    if !(path == "/healthz" || path == "/health" || path == "/readyz" || path == "/status" || path == "/segment") && !::authenticate_request(headers) {
       return {
         status: 401,
         headers: { "Content-Type": "application/json" },
@@ -219,20 +219,18 @@ component ::net.http.server {
       }
     }
     
-    # Fast-path /chat for runner compatibility even when dynamic route registration is partial
-    if path == "/chat" {
-      return handle_chat(request)
-    }
-
     # Runner-compatible explicit route dispatch (no dynamic function pointer calls)
-    if path == "/chat" {
-        set rs = 200
-        set rb = '{"status":"ok","echo":"' + body + '"}'
-      } else if path == "/v1/chat" {
+    if path == "/chat" || path == "/v1/chat" {
       return handle_chat(::request)
     }
     if path == "/healthz" {
       return health_check(::request)
+    }
+    if path == "/health" {
+      return health_check(::request)
+    }
+    if path == "/segment" {
+      return segment_check(::request)
     }
     if path == "/readyz" {
       return ready_check(::request)
@@ -242,6 +240,30 @@ component ::net.http.server {
     }
     if path == "/build" {
       return handle_build(::request)
+    }
+    if path == "/command" {
+      return handle_command(::request)
+    }
+    if path == "/training/start" {
+      return handle_training_start(::request)
+    }
+    if path == "/training/status" {
+      return handle_training_status(::request)
+    }
+    if path == "/training/control" {
+      return handle_training_control(::request)
+    }
+    if path == "/training/config" {
+      return handle_training_config(::request)
+    }
+    if path == "/training/recover" {
+      return handle_training_recover(::request)
+    }
+    if path == "/training/checkpoint" {
+      return handle_training_checkpoint(::request)
+    }
+    if path == "/metrics/runtime" || path == "/metrics" || path == "/metrics/detailed" {
+      return get_runtime_metrics(::request)
     }
     if path == "/analytics" {
       return get_analytics(::request)
@@ -254,7 +276,7 @@ component ::net.http.server {
     return {
       status: 404,
       headers: { "Content-Type": "application/json" },
-      body: '{"error": "Not found"}'
+      body: '{"error": "not_found"}'
     }
   }
 
@@ -306,6 +328,14 @@ component ::net.http.server {
       status: 200,
       headers: { "Content-Type": "application/json" },
       body: '{"status": "ok", "daemon": "running", "request_count": ' + ::request_count + '}'
+    }
+  }
+
+  function segment_check(request) {
+    return {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+      body: '{"status": "segment_ready", "service": "azl-http"}'
     }
   }
 
@@ -372,6 +402,25 @@ component ::net.http.server {
     return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"accepted"}' }
   }
 
+  function handle_training_control(request) {
+    set body = ::parse_json(request.body) || {}
+    set action = body.action || ""
+    if action == "pause" { return handle_training_pause(request) }
+    if action == "resume" { return handle_training_resume(request) }
+    if action == "stop" { return handle_training_stop(request) }
+    return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"invalid_action"}' }
+  }
+
+  function handle_command(request) {
+    set body = ::parse_json(request.body) || {}
+    set cmd = body.command || ""
+    if cmd == "" {
+      return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"missing_command"}' }
+    }
+    emit "process_command" to ::core.command_processor with cmd (body.params || {})
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"accepted","kind":"command"}' }
+  }
+
   function handle_training_pause(request) {
     emit "pause_training" to ::orchestrator.comprehensive_training_controller
     return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"paused"}' }
@@ -401,6 +450,16 @@ component ::net.http.server {
     set s = captured.s
     if s == null { set s = { mode: null, step: null, epoch: null, error: "pending" } }
     return { status: 200, headers: { "Content-Type": "application/json" }, body: ::azl.stdlib.json_stringify(s) }
+  }
+
+  function handle_training_recover(request) {
+    emit "attempt_recovery" to ::orchestrator.comprehensive_training_controller
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"accepted","kind":"recover"}' }
+  }
+
+  function handle_training_checkpoint(request) {
+    emit "maybe_checkpoint" to ::orchestrator.comprehensive_training_controller
+    return { status: 202, headers: { "Content-Type": "application/json" }, body: '{"status":"accepted","kind":"checkpoint"}' }
   }
   
   function get_analytics(request) {

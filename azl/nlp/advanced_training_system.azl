@@ -912,7 +912,7 @@ component ::nlp.advanced_training {
       }
     }
 
-    # Real quantum neural training: use quantum neural layers and simulated training
+    # Real quantum neural training: hybrid quantum/classical layers with dynamic loss.
     function quantum_train_neural_real(neural_data) {
       # Load or prepare a small quantum neural model
       emit "load_quantum_neural" to ::neural.model_loader with "adv_qnn" { layers: 2, hidden_size: 8, quantum_bits: 4 }

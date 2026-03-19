@@ -80,14 +80,14 @@ model = torch.load('weights/trained_agi_model.pt')
 ./scripts/train_real_agi.sh
 
 # Train on available data:
-python3 python_helpers/train_available_data.py
+bash scripts/start_azl_native_mode.sh
 ```
 
 ### **3. AGI System Integration**
 ```bash
 # Launch full AGI system with trained models:
 ./scripts/launch_working_agi.sh
-python3 azl_runner.py /tmp/azl_working_agi_XXXXX.azl
+AZL_TARGET_FILE=/tmp/azl_working_agi_XXXXX.azl bash scripts/start_azl_native_mode.sh
 ```
 
 ---
@@ -116,8 +116,7 @@ Your system can now train on:
 ### **Quick Training on Available Data**
 ```bash
 # Train immediately on whatever data is available:
-cd python_helpers
-python3 train_available_data.py
+bash scripts/start_azl_native_mode.sh
 ```
 
 ### **Full Dataset Acquisition**

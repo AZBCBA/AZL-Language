@@ -1,0 +1,9 @@
+native_api_benchmark
+port=41632
+requests_per_endpoint=150
+concurrency=1
+unit=us
+endpoint,count,mean,p50,p95
+healthz,150,7599.79,6782,12544
+status,150,5291.25,5150,8111
+exec_state,150,5337.38,5118,8673

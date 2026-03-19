@@ -8,9 +8,9 @@ echo "🚀 Starting Background Real Training System"
 # Create weights directory if it doesn't exist
 mkdir -p weights/continuous_training
 
-# Run the continuous training system
+# Run the continuous training system via native runtime
 echo "📊 Starting continuous training..."
-python3 azl_runner.py continuous_real_training.azl > logs/real_training.log 2>&1 &
+bash scripts/start_azl_native_mode.sh > logs/real_training.log 2>&1 &
 
 # Get the process ID
 TRAINING_PID=$!

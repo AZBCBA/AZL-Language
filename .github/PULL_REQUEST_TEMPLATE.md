@@ -13,4 +13,4 @@ Brief description of the change.
 - [ ] No placeholders or mocks in production paths; error handling used where appropriate.
 
 ## How was this tested?
-How did you verify the change (e.g. `python3 azl_runner.py ...`, tests)?
+How did you verify the change (e.g. `bash scripts/check_azl_native_gates.sh`, `bash scripts/verify_native_runtime_live.sh`, `bash scripts/run_all_tests.sh`)?

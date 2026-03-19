@@ -152,7 +152,7 @@ component ::azl.memory.lha3_memory_system {
       return ::retrieve_code(query, max_results)
     }
     
-    # Simulate quantum superposition of memory states
+    # Build quantum superposition state from query+context hash.
     set ::superposition = ::create_quantum_superposition(query, context)
     set ::enhanced_results = []
     
@@ -210,7 +210,8 @@ component ::azl.memory.lha3_memory_system {
   
   # Helper functions
   function generate_id() {
-    return "mem_" + ::current_timestamp() + "_" + ::Math.random().toString(36).substr(2, 9)
+    set ::seq = (::memory_stats.total_stored || 0) + (::event_memory.length || 0) + (::context_memory.length || 0)
+    return "mem_" + ::current_timestamp() + "_" + ::seq
   }
   
   function current_timestamp() {
@@ -241,7 +242,7 @@ component ::azl.memory.lha3_memory_system {
   }
   
   function compute_quantum_similarity(superposition: object, embedding: list) {
-    # Simulate quantum interference patterns
+    # Compute interference score from phase and embedding values.
     set ::interference = 0.0
     for i in range(0, embedding.length) {
       set ::interference = ::interference + ::Math.sin(superposition.phase + embedding[i])

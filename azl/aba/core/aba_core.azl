@@ -575,7 +575,7 @@ component ::aba.aba_analytics {
 
   # Helper functions
   function generate_trial_id() {
-    return "trial_" + now() + "_" + Math.floor(Math.random() * 1000)
+    return "trial_" + now() + "_" + (::trial_history.length || 0)
   }
 
   function calculate_pattern_accuracy() {

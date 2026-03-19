@@ -257,8 +257,8 @@ component ::azl.pure_azme_runtime {
   # Generate correlation ID
   function generate_correlation_id() {
     set ::timestamp = ::time.now()
-    set ::random = ::math.random()
-    return "corr_" + ::timestamp + "_" + ::random
+    set ::seq = (::stats.messages_sent || 0) + (::stats.agents_created || 0) + (::messages.length || 0)
+    return "corr_" + ::timestamp + "_" + ::seq
   }
 
   memory {

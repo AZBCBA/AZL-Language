@@ -11,9 +11,7 @@ A clear description of the bug (AZL is its own language — not Java/TypeScript;
 
 ## Environment
 - OS:
-- Python version:
-- Node version (if using JS harness):
-- How you run AZL: `azl_runner.py` / `scripts/azl` / other
+- How you run AZL: `scripts/start_azl_native_mode.sh` / `scripts/run_tests.sh` / other
 
 ## Steps to reproduce
 1. Run: `...`

@@ -815,12 +815,25 @@ component ::api.endpoints {
       return { status: 400, headers: { "Content-Type": "application/json" }, body: '{"error":"message_required"}' }
     }
 
-    # For now, return a simple response since we're in the simplified runner
-    # In the full runtime, this would emit to ::azme.chat_interface and wait for response
-    return { 
-      status: 200, 
-      headers: { "Content-Type": "application/json" }, 
-      body: '{"response":"I received your message: \'' + msg + '\'. (Simplified AZME response)"}' 
+    link ::azme.chat_interface
+    emit "process_message" to ::azme.chat_interface with {
+      message: ::msg,
+      user_id: ::uid,
+      session_id: ::sid
+    }
+    set ::resp = { text: "Echo: " + ::msg, user_id: ::uid, session_id: ::sid }
+    listen for "azme.chat.response_generated" then { set ::resp = ::event.data || ::resp }
+    set ::txt = ::resp.text || ::resp.response || ""
+    if ::txt == "" && ::resp.response != null { set ::txt = ::resp.response.final_response || "" }
+    if ::txt == "" { set ::txt = "Echo: " + ::msg }
+    return {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+      body: ::azl.stdlib.json_stringify({
+        response: ::txt,
+        user_id: ::uid,
+        session_id: ::sid
+      })
     }
   }
 

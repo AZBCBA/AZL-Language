@@ -3,6 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 export AZL_STRICT=1
+export AZL_TARGET_FILE="${AZL_TARGET_FILE:-azl/ui/chat_console.azl}"
 
 : "${TMPDIR:=/tmp}"; mkdir -p "$TMPDIR"
 COMBINED="${TMPDIR}/azl_chat_console_$$.azl"
@@ -11,6 +12,6 @@ cat azl/ui/chat_console.azl \
     azl/core/error_system.azl \
     > "$COMBINED"
 
-echo "Running chat console... (Ctrl+C to exit)"
-/usr/bin/env python3 azl_runner.py "$COMBINED"
+echo "Running chat console via native runtime... (Ctrl+C to exit)"
+bash scripts/start_azl_native_mode.sh
 

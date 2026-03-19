@@ -325,7 +325,7 @@ class QuantumConsciousnessBridge {
         for (let qubit of qubits) {
             // Probabilistic measurement based on amplitude
             let measurement_prob = qubit.amplitude * qubit.amplitude
-            let random_val = Math.random()
+            let random_val = (((Math.abs(qubit.amplitude) * 1000) % 100) / 100)
             
             let measurement = random_val < measurement_prob ? qubit.amplitude : qubit.phase
             measurements.push(measurement)

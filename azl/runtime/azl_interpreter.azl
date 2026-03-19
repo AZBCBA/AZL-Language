@@ -30,7 +30,7 @@ component ::azl.interpreter {
   }
 
   behavior {
-    # Main entry point - replaces python3 azl_runner.py
+    # Main entry point for native runtime execution
     listen for "interpret_file" then {
       set file_path = ::event.data.file_path
       say "📖 Parsing AZL file: $file_path"

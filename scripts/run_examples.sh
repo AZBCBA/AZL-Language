@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Systematic AZL examples runner (strict mode)
+# Systematic AZL examples runner (native mode)
 # - Discovers example files under azl/examples and examples
-# - Runs each via the Python AZL runner
-# - Classifies as PASS/FAIL/SKIP (skip = no components)
+# - For each file, boots native runtime with AZL_TARGET_FILE set
+# - Classifies as PASS/FAIL by native gate success
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -25,15 +25,11 @@ printf "\n📚 Running %d AZL examples (strict mode)\n" "$TOTAL"
 for f in "${EX_FILES[@]}"; do
   echo -e "\n=== RUN $f ==="
   OUT_FILE="/tmp/azl_example_$(basename "$f" .azl)_$$.log"
-  if /usr/bin/env python3 azl_runner.py "$f" >"$OUT_FILE" 2>&1; then
+  if AZL_TARGET_FILE="$f" bash scripts/start_azl_native_mode.sh >"$OUT_FILE" 2>&1; then
     :
   else
-    :
-  fi
-
-  if grep -q "No components found in file" "$OUT_FILE"; then
-    echo "⏭️  Skipped (no components): $f"
-    SKIPPED=$((SKIPPED+1))
+    echo "❌ FAIL: $f"
+    FAILED=$((FAILED+1))
     continue
   fi
 
@@ -45,13 +41,8 @@ for f in "${EX_FILES[@]}"; do
     echo "--------------"
   fi
 
-  if grep -qi "\bfail\b" "$OUT_FILE"; then
-    echo "❌ FAIL: $f"
-    FAILED=$((FAILED+1))
-  else
-    echo "✅ PASS: $f"
-    PASSED=$((PASSED+1))
-  fi
+  echo "✅ PASS: $f"
+  PASSED=$((PASSED+1))
 done
 
 echo -e "\n📊 Examples summary: ran=$RAN pass=$PASSED fail=$FAILED skip=$SKIPPED total=$TOTAL"

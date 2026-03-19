@@ -161,9 +161,9 @@ component ::quantum.error_correction {
 
     listen for "quantum.error_correction.inject_error" { 
       set ::injection_info = $1
-      say "⚠️ Injecting simulated error into encoded state"
+      say "⚠️ Injecting deterministic error into encoded state"
       
-      # Simulate bit flip error on second qubit
+      # Deterministic bit-flip error on qubit 2 for syndrome validation.
       set ::error_injected_state = {
         "000": {real: 0.0, imag: 0.0},
         "001": {real: 0.0, imag: 0.0},

@@ -153,8 +153,15 @@ component ::azl.vm {
         output: null
       }
       
+      # Accept both bytecode schemas:
+      # 1) { opcode: "SAY", operand: "x" }
+      # 2) { opcode: { type: "Say", ... } }
       set ::opcode = ::instruction.opcode
       set ::operand = ::instruction.operand
+      if ::opcode && ::opcode.type {
+        set ::operand = ::opcode
+        set ::opcode = ::opcode.type
+      }
       
       say "🔧 Executing: ::opcode ::operand"
       
@@ -180,6 +187,26 @@ component ::azl.vm {
         set ::result = ::execute_end_section_op()
       } else if ::opcode == "END_LISTEN" {
         set ::result = ::execute_end_listen_op()
+      } else if ::opcode == "Store" || ::opcode == "STORE" {
+        set ::result = ::execute_store_op(::operand)
+      } else if ::opcode == "Pop" || ::opcode == "POP" {
+        set ::result = ::execute_pop_op()
+      } else if ::opcode == "JumpIfFalse" || ::opcode == "JUMP_IF_FALSE" {
+        set ::result = ::execute_jump_if_false_op(::operand)
+      } else if ::opcode == "Jump" || ::opcode == "JUMP" {
+        set ::result = ::execute_jump_op(::operand)
+      } else if ::opcode == "Call" || ::opcode == "CALL" {
+        set ::result = ::execute_call_op(::operand)
+      } else if ::opcode == "Return" || ::opcode == "RETURN" {
+        set ::result = ::execute_return_op()
+      } else if ::opcode == "Add" || ::opcode == "ADD" {
+        set ::result = ::execute_binary_math_op("add")
+      } else if ::opcode == "Sub" || ::opcode == "SUB" {
+        set ::result = ::execute_binary_math_op("sub")
+      } else if ::opcode == "Mul" || ::opcode == "MUL" {
+        set ::result = ::execute_binary_math_op("mul")
+      } else if ::opcode == "Div" || ::opcode == "DIV" {
+        set ::result = ::execute_binary_math_op("div")
       } else {
         set ::result.success = false
         set ::result.error = "Unknown opcode: ::opcode"
@@ -220,6 +247,70 @@ component ::azl.vm {
       set ::variables[::variable] = ::value
       say "💾 Set ::variable = ::value"
       return { success: true, error: null, output: "Set ::variable = ::value" }
+    }
+
+    ::execute_store_op = (operand) => {
+      set ::target = operand.name || operand.target || operand
+      set ::value = ::stack.pop()
+      set ::variables[::target] = ::value
+      return { success: true, error: null, output: "Stored ::target" }
+    }
+
+    ::execute_pop_op = () => {
+      if ::stack.length > 0 {
+        set ::stack.pop()
+      }
+      return { success: true, error: null, output: null }
+    }
+
+    ::execute_jump_if_false_op = (operand) => {
+      set ::cond = ::stack.pop()
+      if !::cond {
+        set ::instruction_pointer = operand.address - 1
+      }
+      return { success: true, error: null, output: null }
+    }
+
+    ::execute_jump_op = (operand) => {
+      set ::instruction_pointer = operand.address - 1
+      return { success: true, error: null, output: null }
+    }
+
+    ::execute_call_op = (operand) => {
+      set ::target = operand.name || operand.callee || "anonymous"
+      set ::call_stack.push(::instruction_pointer)
+      say "📞 Calling: ::target"
+      return { success: true, error: null, output: "Called ::target" }
+    }
+
+    ::execute_return_op = () => {
+      if ::call_stack.length == 0 {
+        return { success: true, error: null, output: "Return at top-level" }
+      }
+      set ::return_ip = ::call_stack.pop()
+      set ::instruction_pointer = ::return_ip
+      return { success: true, error: null, output: "Returned" }
+    }
+
+    ::execute_binary_math_op = (kind) => {
+      if ::stack.length < 2 {
+        return { success: false, error: "Stack underflow for math operation", output: null }
+      }
+      set ::b = ::stack.pop()
+      set ::a = ::stack.pop()
+      if kind == "add" {
+        set ::stack.push(::a + ::b)
+      } else if kind == "sub" {
+        set ::stack.push(::a - ::b)
+      } else if kind == "mul" {
+        set ::stack.push(::a * ::b)
+      } else if kind == "div" {
+        if ::b == 0 {
+          return { success: false, error: "Division by zero", output: null }
+        }
+        set ::stack.push(::a / ::b)
+      }
+      return { success: true, error: null, output: null }
     }
     
     # Execute EMIT instruction
@@ -361,6 +452,9 @@ component ::azl.vm {
       
       for ::instruction in ::bytecode {
         set ::opcode = ::instruction.opcode
+        if ::opcode && ::opcode.type {
+          set ::opcode = ::opcode.type
+        }
         
         if ::profile.opcode_counts[::opcode] {
           set ::profile.opcode_counts[::opcode] = ::profile.opcode_counts[::opcode] + 1
@@ -396,7 +490,11 @@ component ::azl.vm {
         if ::opcode != "COMPONENT" && ::opcode != "SECTION" && ::opcode != "SAY" && 
            ::opcode != "SET" && ::opcode != "LOAD" && ::opcode != "EMIT" && 
            ::opcode != "LISTEN" && ::opcode != "END_COMPONENT" && 
-           ::opcode != "END_SECTION" && ::opcode != "END_LISTEN" {
+           ::opcode != "END_SECTION" && ::opcode != "END_LISTEN" &&
+           ::opcode != "Store" && ::opcode != "Pop" &&
+           ::opcode != "JumpIfFalse" && ::opcode != "Jump" &&
+           ::opcode != "Call" && ::opcode != "Return" &&
+           ::opcode != "Add" && ::opcode != "Sub" && ::opcode != "Mul" && ::opcode != "Div" {
           set ::errors.push("Invalid opcode at instruction ::i: ::opcode")
         }
         

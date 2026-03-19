@@ -1,36 +1,49 @@
 ## One-command run (full AZME on AZL)
 
-```
+```bash
 export AZL_STRICT=1 AZL_LOG_LEVEL=debug AZL_DAEMON=1
-./scripts/run_full.sh
-python3 azl_runner.py $(tail -n1 /tmp/azl_run_build_*.out 2>/dev/null | awk -F': ' '/Prepared:/ {print $2}' || true)
-```
-
-Or run and copy the Prepared path printed by `run_full.sh`:
-
-```
-./scripts/run_full.sh
-python3 azl_runner.py /tmp/azl_full_XXXX.azl.run
+bash scripts/start_azl_native_mode.sh
 ```
 
 The driver emits `azl.begin` and `system.boot`; all phases advance automatically until ready.
 
 # AZL Language
 
-**AZL** is a unified, component-based, event-driven programming language. It has its own syntax, grammar, and rules — **this is AZL, not Java, not TypeScript.** The runtime runs in pure AZL with a Python host; see [docs/language/AZL_LANGUAGE_RULES.md](docs/language/AZL_LANGUAGE_RULES.md) and [docs/language/AZL_CURRENT_SPECIFICATION.md](docs/language/AZL_CURRENT_SPECIFICATION.md).
+**AZL** is a unified, component-based, event-driven programming language. It has its own syntax, grammar, and rules — **this is AZL, not Java, not TypeScript.** The runtime target is native AZL execution; see [docs/language/AZL_LANGUAGE_RULES.md](docs/language/AZL_LANGUAGE_RULES.md) and [docs/language/AZL_CURRENT_SPECIFICATION.md](docs/language/AZL_CURRENT_SPECIFICATION.md).
 
 **This repository is the full project.** Work from here: clone from GitHub, make changes, push, and open Pull Requests. Contributions are welcome — see [Contributing](docs/CONTRIBUTING.md) and [GitHub Issues](https://github.com/AZBCBA/AZL-Language/issues).
 
 ## Getting Started
-- JS dev harness:
-  - `node scripts/azl_runtime.js test_core.azl ::test.core`
-- Python event harness:
-  - `python3 azl_runner.py test_integration_final.azl`
-- Sysproxy + daemon (host bridge):
-  - `gcc -O2 -Wall -o .azl/sysproxy tools/sysproxy.c`
+- Native startup:
+  - `bash scripts/start_azl_native_mode.sh`
+- Sysproxy + daemon bridge test:
   - `AZL_REQUIRE_API_TOKEN=true AZL_API_TOKEN=your-token bash scripts/test_sysproxy_setup.sh`
 
 See OPERATIONS.md for the full runbook.
+
+## Native-Only Deployment Mode
+
+To enforce AZL-native deployment direction (no Python/JS bootstrap paths), use:
+
+```bash
+# Optional: provide your own native executor command
+# export AZL_NATIVE_EXEC_CMD=/path/to/azl-native-engine
+# Optional: provide runtime process launched by native engine
+# export AZL_NATIVE_RUNTIME_CMD="bash scripts/azl_native_runtime_loop.sh"
+bash scripts/start_azl_native_mode.sh
+```
+
+When `AZL_NATIVE_ONLY=1`, Python legacy startup paths are blocked by design.
+
+Run native completion gates:
+
+```bash
+bash scripts/check_azl_native_gates.sh
+bash scripts/enforce_legacy_entrypoint_blocklist.sh
+bash scripts/verify_native_runtime_live.sh
+```
+
+Release profile details: `RELEASE_READY.md` and `release/native/manifest.json`.
 
 ## Installation (clone and run)
 
@@ -39,11 +52,10 @@ The canonical source is GitHub. Clone and run:
 ```bash
 git clone https://github.com/AZBCBA/AZL-Language.git
 cd AZL-Language
-# Python 3.8+ required; optional: pip install -r requirements.txt for extra scripts
-python3 azl_runner.py path/to/your.azl
+bash scripts/start_azl_native_mode.sh
 ```
 
-Or run the CLI: `./scripts/azl run path/to/your.azl`. Optional: Node for the JS harness. See [OPERATIONS.md](OPERATIONS.md) for the full runbook.
+See [OPERATIONS.md](OPERATIONS.md) for the full runbook.
 
 **Contributing:** Fork the repo, make changes on a branch, then open a [Pull Request](https://github.com/AZBCBA/AZL-Language/pulls). See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
@@ -53,7 +65,7 @@ Or run the CLI: `./scripts/azl run path/to/your.azl`. Optional: Node for the JS 
 ./scripts/run_tests.sh
 ```
 
-Or run a single file: `python3 azl_runner.py smoke_test.azl` or `python3 azl_runner.py azl/testing/integration/test_hello.azl`.
+Run full native validation: `./scripts/run_all_tests.sh`.
 
 ## CI
 - `ci.yml`: placeholder/v2 guards, smoke tests, perf smoke, full tests
@@ -267,11 +279,10 @@ File and directory operations:
 
 Use AZL components to assert behavior via emitted events and stdlib operations. A pure-AZL test harness is under `azl/testing`.
 
-## 📁 Project Structure (pure AZL + Python host)
+## 📁 Project Structure (native-first AZL)
 
 ```
 azl-language/
-├── azl_runner.py              # Main entry: Python host for .azl execution
 ├── azl/
 │   ├── core/
 │   │   ├── parser/azl_parser.azl   # Grammar & parser (written in AZL)
@@ -291,8 +302,9 @@ azl-language/
 │   ├── stdlib.md
 │   └── VIRTUAL_OS_API.md
 ├── scripts/
-│   ├── azl                      # CLI: scripts/azl run <file.azl>
-│   └── run_combined_azl.py       # Combined compiler + interpreter run
+│   ├── start_azl_native_mode.sh  # Canonical native startup
+│   ├── run_enterprise_daemon.sh  # Canonical combined component launcher
+│   └── verify_native_runtime_live.sh
 └── azl/testing/                 # Pure AZL tests
 ```
 

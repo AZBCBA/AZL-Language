@@ -17,6 +17,6 @@ We will acknowledge your report and work with you to understand and address the 
 
 ## Scope
 
-- AZL runtime and interpreter (`azl_runner.py`, `azl/`), parser, compiler, and standard library.
+- AZL runtime and interpreter (`scripts/start_azl_native_mode.sh`, `azl/`), parser, compiler, and standard library.
 - System interface, sysproxy bridge, and any host-facing APIs.
 - Out of scope: third-party dependencies; please report to their maintainers.

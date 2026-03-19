@@ -17,14 +17,8 @@ echo "🚀 AZL Execute Script"
 echo "📁 File: $AZL_FILE"
 
 # Create a simple test execution environment
-echo "🔧 Setting up execution environment..."
-
-# Real execution using Python AZL runner (pure AZL interpreter path)
-if command -v python3 >/dev/null 2>&1; then
-  echo "🧠 Executing via azl_runner.py"
-  exec python3 azl_runner.py "$AZL_FILE"
-fi
-
-echo "❌ python3 not found; cannot execute AZL file"
-exit 1
+echo "🔧 Setting up native execution environment..."
+export AZL_TARGET_FILE="$AZL_FILE"
+echo "🧠 Executing via canonical native runtime"
+exec bash scripts/start_azl_native_mode.sh
 

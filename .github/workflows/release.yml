@@ -17,8 +17,8 @@ jobs:
         run: |
           mkdir -p dist
           # Bundle core examples
-          cat test_core.azl > dist/test_core.azl
-          cat test_integration_final.azl > dist/test_integration_final.azl
+          cat smoke_test.azl > dist/smoke_test.azl
+          cat azl/testing/system/test_canonical_azl.azl > dist/test_canonical_azl.azl
           # Include runbooks
           cp README.md OPERATIONS.md dist/
 
@@ -26,8 +26,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/test_core.azl
-            dist/test_integration_final.azl
+            dist/smoke_test.azl
+            dist/test_canonical_azl.azl
             dist/README.md
             dist/OPERATIONS.md
         env:

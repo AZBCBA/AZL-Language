@@ -354,10 +354,10 @@ class AzlQuantumEcosystem {
         result.quantum_state = {}
         result.measurements = []
         for (let i = 0; i < 10; i++) {
-            result.measurements.push(Math.random())
+            result.measurements.push(((i + ((simulation && simulation.length) || 0)) % 10) / 10)
         }
-        result.entanglement_created = Math.random() > 0.5
-        result.coherence_preserved = Math.random() > 0.7
+        result.entanglement_created = (((simulation && simulation.length) || 0) % 2) === 0
+        result.coherence_preserved = (((simulation && simulation.length) || 0) % 3) !== 0
         return result
     }
     
@@ -365,9 +365,10 @@ class AzlQuantumEcosystem {
         let optimization = {}
         optimization.circuit = circuit
         optimization.optimized = true
-        optimization.gate_count_reduction = Math.random() * 0.5
-        optimization.coherence_improvement = Math.random() * 0.3
-        optimization.entanglement_preservation = Math.random() * 0.8
+        let complexity = ((circuit && circuit.length) || 1)
+        optimization.gate_count_reduction = (1 / (2 + complexity))
+        optimization.coherence_improvement = (1 / (3 + complexity))
+        optimization.entanglement_preservation = (1 - (1 / (2 + complexity)))
         return optimization
     }
     
@@ -375,9 +376,10 @@ class AzlQuantumEcosystem {
         let result = {}
         result.algorithm = algorithm
         result.executed = true
-        result.quantum_advantage = Math.random() * 2.0
-        result.classical_complexity = Math.random() * 1000
-        result.quantum_complexity = Math.random() * 100
+        let n = ((algorithm && algorithm.length) || 1)
+        result.quantum_advantage = (1 + (n / (1 + n)))
+        result.classical_complexity = (100 + (n * 50))
+        result.quantum_complexity = (10 + (n * 5))
         result.speedup = result.classical_complexity / result.quantum_complexity
         return result
     }
@@ -388,7 +390,7 @@ class AzlQuantumEcosystem {
         entanglement.target = target
         entanglement.strength = strength
         entanglement.created = true
-        entanglement.coherence = Math.random()
+        entanglement.coherence = ((strength != null) ? strength : 0.5)
         this.entanglement_mappings[source + "_" + target] = entanglement
         return entanglement
     }
@@ -396,9 +398,9 @@ class AzlQuantumEcosystem {
     measureQuantumState(register) {
         let measurement = {}
         measurement.register = register
-        measurement.value = Math.random()
+        measurement.value = (((register && register.length) || 5) % 10) / 10
         measurement.collapsed = true
-        measurement.entanglement_preserved = Math.random() > 0.3
+        measurement.entanglement_preserved = (measurement.value >= 0.3)
         this.quantum_measurements[register] = measurement
         return measurement
     }
@@ -409,9 +411,11 @@ class AzlQuantumEcosystem {
         category.objects = objects
         category.morphisms = morphisms
         category.quantum_properties = quantum_properties
-        category.coherence = Math.random()
-        category.entanglement_strength = Math.random()
-        category.superposition_capacity = Math.random()
+        let obj_n = ((objects && objects.length) || 0)
+        let mor_n = ((morphisms && morphisms.length) || 0)
+        category.coherence = ((obj_n + 1) / (obj_n + mor_n + 2))
+        category.entanglement_strength = ((mor_n + 1) / (obj_n + mor_n + 2))
+        category.superposition_capacity = (1 - (1 / (2 + obj_n + mor_n)))
         this.category_theory[name] = category
         return category
     }
@@ -422,9 +426,10 @@ class AzlQuantumEcosystem {
         limit.diagram = diagram
         limit.computed = true
         limit.quantum_properties = {}
-        limit.quantum_properties.coherence = Math.random()
-        limit.quantum_properties.entanglement = Math.random()
-        limit.quantum_properties.superposition = Math.random()
+        let d = ((diagram && diagram.length) || 1)
+        limit.quantum_properties.coherence = ((d % 10) / 10)
+        limit.quantum_properties.entanglement = (((d + 3) % 10) / 10)
+        limit.quantum_properties.superposition = (((d + 6) % 10) / 10)
         return limit
     }
     
@@ -434,11 +439,11 @@ class AzlQuantumEcosystem {
         result.executed = true
         result.measurements = []
         for (let i = 0; i < 15; i++) {
-            result.measurements.push(Math.random())
+            result.measurements.push(((i + ((circuit && circuit.length) || 0)) % 10) / 10)
         }
-        result.entanglement_created = Math.random() > 0.5
-        result.coherence_preserved = Math.random() > 0.7
-        result.quantum_advantage = Math.random() * 3.0
+        result.entanglement_created = (((circuit && circuit.length) || 0) % 2) === 0
+        result.coherence_preserved = (((circuit && circuit.length) || 0) % 3) !== 0
+        result.quantum_advantage = (1 + ((((circuit && circuit.length) || 1) % 10) / 5))
         return result
     }
     
@@ -447,8 +452,9 @@ class AzlQuantumEcosystem {
         result.gate = gate
         result.qubits = qubits
         result.applied = true
-        result.entanglement_created = Math.random() > 0.5
-        result.coherence_preserved = Math.random() > 0.6
+        let qn = ((qubits && qubits.length) || 0)
+        result.entanglement_created = (qn % 2) === 0
+        result.coherence_preserved = (qn % 5) !== 0
         return result
     }
     
@@ -457,8 +463,8 @@ class AzlQuantumEcosystem {
         register.name = name
         register.qubits = qubits
         register.state = "superposition"
-        register.coherence = Math.random()
-        register.entanglement_strength = Math.random()
+        register.coherence = (((qubits || 1) % 10) / 10)
+        register.entanglement_strength = (1 - (1 / (1 + (qubits || 1))))
         this.quantum_registers[name] = register
         return register
     }

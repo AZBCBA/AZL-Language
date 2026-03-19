@@ -4,25 +4,18 @@
 
 ## How to run AZL
 
-There is **no** `cargo build` or `Cargo.toml` at the repository root. Use one of these:
+There is **no** `cargo build` or `Cargo.toml` at the repository root. Use native runtime:
 
-- **Python runner (main entry)**  
-  From the repo root:
-  ```bash
-  python3 azl_runner.py path/to/file.azl
-  ```
-- **CLI script**  
-  ```bash
-  ./scripts/azl run path/to/file.azl
-  ```
-- **Combined build (compiler + interpreter)**  
-  ```bash
-  python3 scripts/run_combined_azl.py ...
-  ```
-- **JS dev harness**  
-  ```bash
-  node scripts/azl_runtime.js test_core.azl ::test.core
-  ```
+```bash
+bash scripts/start_azl_native_mode.sh
+```
+
+and validate with:
+
+```bash
+bash scripts/check_azl_native_gates.sh
+bash scripts/verify_native_runtime_live.sh
+```
 
 See the root [README.md](../../README.md) and [OPERATIONS.md](../../OPERATIONS.md) for the full runbook.
 

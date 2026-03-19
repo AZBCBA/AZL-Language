@@ -1,0 +1,169 @@
+component ::orchestrator.comprehensive_training_controller {
+  init {
+    set ::status = "idle"
+    set ::active_mode = "none"
+    set ::current_dataset_path = ""
+    set ::current_checkpoint_path = ""
+    set ::training_config = {
+      device: "cpu",
+      gpu_limit: 0,
+      epochs: 1,
+      batch_size: 2,
+      strict: true
+    }
+    set ::last_event_ts = ::internal.now()
+  }
+
+  behavior {
+    on start_comprehensive_training {
+      set ::status = "running"
+      set ::active_mode = "comprehensive"
+      set ::last_event_ts = ::internal.now()
+      emit training.status.update with {
+        status: ::status,
+        mode: ::active_mode,
+        dataset_path: ::current_dataset_path,
+        checkpoint_path: ::current_checkpoint_path,
+        config: ::training_config,
+        ts: ::last_event_ts
+      }
+      emit azme.training_summary with {
+        mode: ::active_mode,
+        status: ::status,
+        dataset_path: ::current_dataset_path,
+        config: ::training_config,
+        ts: ::last_event_ts
+      }
+    }
+
+    on start_advanced_training_pipeline {
+      set ::req = $1
+      set ::status = "running"
+      set ::active_mode = (::req.mode || "supervised")
+      set ::current_dataset_path = (::req.dataset_path || ::current_dataset_path)
+      if ::req.config != null {
+        set ::training_config = ::req.config
+      }
+      set ::last_event_ts = ::internal.now()
+      emit training.status.update with {
+        status: ::status,
+        mode: ::active_mode,
+        dataset_path: ::current_dataset_path,
+        checkpoint_path: ::current_checkpoint_path,
+        config: ::training_config,
+        ts: ::last_event_ts
+      }
+      emit azme.training_summary with {
+        mode: ::active_mode,
+        status: ::status,
+        dataset_path: ::current_dataset_path,
+        config: ::training_config,
+        ts: ::last_event_ts
+      }
+    }
+
+    on pause_training {
+      if ::status == "running" {
+        set ::status = "paused"
+      }
+      set ::last_event_ts = ::internal.now()
+      emit training.status.update with {
+        status: ::status,
+        mode: ::active_mode,
+        dataset_path: ::current_dataset_path,
+        checkpoint_path: ::current_checkpoint_path,
+        config: ::training_config,
+        ts: ::last_event_ts
+      }
+    }
+
+    on resume_training {
+      if ::status == "paused" {
+        set ::status = "running"
+      }
+      set ::last_event_ts = ::internal.now()
+      emit training.status.update with {
+        status: ::status,
+        mode: ::active_mode,
+        dataset_path: ::current_dataset_path,
+        checkpoint_path: ::current_checkpoint_path,
+        config: ::training_config,
+        ts: ::last_event_ts
+      }
+    }
+
+    on resume_from_checkpoint {
+      set ::req = $1
+      set ::current_checkpoint_path = (::req.path || "")
+      set ::status = "running"
+      set ::last_event_ts = ::internal.now()
+      emit training.status.update with {
+        status: ::status,
+        mode: ::active_mode,
+        dataset_path: ::current_dataset_path,
+        checkpoint_path: ::current_checkpoint_path,
+        config: ::training_config,
+        ts: ::last_event_ts
+      }
+    }
+
+    on stop_training {
+      set ::status = "stopped"
+      set ::last_event_ts = ::internal.now()
+      emit training.status.update with {
+        status: ::status,
+        mode: ::active_mode,
+        dataset_path: ::current_dataset_path,
+        checkpoint_path: ::current_checkpoint_path,
+        config: ::training_config,
+        ts: ::last_event_ts
+      }
+      emit azme.training_summary with {
+        mode: ::active_mode,
+        status: ::status,
+        dataset_path: ::current_dataset_path,
+        config: ::training_config,
+        ts: ::last_event_ts
+      }
+    }
+
+    on set_training_config {
+      set ::cfg = $1
+      if ::cfg != null {
+        set ::training_config = ::cfg
+      }
+      set ::last_event_ts = ::internal.now()
+      emit training.status.update with {
+        status: ::status,
+        mode: ::active_mode,
+        dataset_path: ::current_dataset_path,
+        checkpoint_path: ::current_checkpoint_path,
+        config: ::training_config,
+        ts: ::last_event_ts
+      }
+    }
+
+    on azme.set_loss_strategy {
+      set ::req = $1
+      set ::last_event_ts = ::internal.now()
+      emit azme.loss_strategy_stats with {
+        selected_strategy: (::req.id || "default"),
+        status: "updated",
+        ts: ::last_event_ts
+      }
+    }
+
+    on azme.set_augmentation {
+      set ::req = $1
+      set ::last_event_ts = ::internal.now()
+      emit azme.training_summary with {
+        mode: ::active_mode,
+        status: ::status,
+        augmentation_level: (::req.level || 1.0),
+        dataset_path: ::current_dataset_path,
+        config: ::training_config,
+        ts: ::last_event_ts
+      }
+    }
+  }
+}

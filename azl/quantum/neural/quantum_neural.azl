@@ -222,7 +222,7 @@ class QuantumNeuralNetwork {
         let measurement = this._measure_quantum_state(quantum_state)
         
         // Use measurement to influence weight initialization
-        let base_weight = (Math.random() - 0.5) * 2.0
+        let base_weight = ((measurement ? 0.35 : -0.35) * 2.0)
         let quantum_factor = measurement ? 1.1 : 0.9
         
         return base_weight * quantum_factor
@@ -485,7 +485,7 @@ class QuantumNeuralNetwork {
     _measure_quantum_state(quantum_state: object): boolean {
         // Simplified quantum measurement
         let probability = quantum_state.alpha * quantum_state.alpha
-        return Math.random() < probability
+        return probability >= 0.5
     }
     
     // Train the quantum neural network
@@ -598,7 +598,7 @@ class QuantumNeuralNetwork {
         let quantum_state = this._create_quantum_state(parameter, 1.0 - parameter)
         let measurement = this._measure_quantum_state(quantum_state)
         
-        let base_gradient = (Math.random() - 0.5) * 2.0
+        let base_gradient = (parameter - 0.5) * 2.0
         let quantum_factor = measurement ? 1.1 : 0.9
         
         return base_gradient * quantum_factor

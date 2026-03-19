@@ -94,16 +94,17 @@ component ::quantum.entanglement.network {
       store ::state_b_id from ::event.data.state_b_id || "unknown"
       store ::entanglement_type from ::event.data.entanglement_type || "bell_pair"
       store ::coherence_time from ::event.data.coherence_time || 1000
+      store ::now_ts from ::internal.now()
       
       # Generate unique entanglement ID
-      store ::entanglement_id from "ent_" + ::state_a_id + "_" + ::state_b_id + "_" + "timestamp"
+      store ::entanglement_id from "ent_" + ::state_a_id + "_" + ::state_b_id + "_" + ::now_ts
       
       # Create Bell pair entanglement
       store ::bell_state from {
         state_a: ::state_a_id,
         state_b: ::state_b_id,
         type: ::entanglement_type,
-        created_at: "timestamp",
+        created_at: ::now_ts,
         coherence_time: ::coherence_time,
         state: "|00⟩ + |11⟩",  # Bell state representation
         amplitude: 0.707,  # 1/√2
@@ -134,7 +135,7 @@ component ::quantum.entanglement.network {
         name: ::network_name,
         type: ::network_type,
         nodes: ::node_list,
-        created_at: "timestamp",
+        created_at: ::internal.now(),
         connections: [],
         routing_table: {}
       }
@@ -183,7 +184,7 @@ component ::quantum.entanglement.network {
           target: ::target_state,
           entanglement_id: ::entanglement_id,
           data: ::data_to_teleport,
-          timestamp: "timestamp",
+          timestamp: ::internal.now(),
           protocol_steps: [
             "Bell state measurement",
             "Classical communication", 
@@ -217,17 +218,23 @@ component ::quantum.entanglement.network {
       store ::state_a from ::event.data.state_a || "unknown"
       store ::state_b from ::event.data.state_b || "unknown"
       store ::measurement_type from ::event.data.measurement_type || "bell_inequality"
+      store ::pair_count from ::entanglement_metrics.total_pairs
+      store ::net_count from ::entanglement_metrics.active_networks
+      store ::correlation_value from (0.5 + (1 / (2 + ::pair_count + ::net_count)))
+      branch when ::correlation_value > 0.99 {
+        store ::correlation_value from 0.99
+      }
       
       # Calculate quantum correlation
       store ::correlation_result from {
         state_a: ::state_a,
         state_b: ::state_b,
         measurement_type: ::measurement_type,
-        timestamp: "timestamp",
-        correlation_value: 0.85,  # Simulated quantum correlation
+        timestamp: ::internal.now(),
+        correlation_value: ::correlation_value,
         violation_of_bell: true,
         classical_limit: 2.0,
-        quantum_result: 2.83
+        quantum_result: (2.0 + ::correlation_value)
       }
       
       # Store correlation matrix
@@ -246,7 +253,10 @@ component ::quantum.entanglement.network {
       
       branch when ::entanglement_pairs[::entanglement_id] != null {
         store ::entanglement from ::entanglement_pairs[::entanglement_id]
-        store ::age from 1000 - ::entanglement.created_at
+        store ::age from (::internal.now() - ::entanglement.created_at)
+        branch when ::age < 0 {
+          store ::age from 0
+        }
         store ::coherence_remaining from ::entanglement.coherence_time - ::age
         
         branch when ::coherence_remaining <= 0 {

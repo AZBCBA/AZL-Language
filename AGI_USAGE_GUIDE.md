@@ -16,8 +16,8 @@ Your AZL system is now ready to operate as a **full AGI** with quantum processin
 # This will output a prepared path like:
 # Prepared: /tmp/azl_agi_system_12345.azl.run
 
-# Run the AGI system
-python3 azl_runner.py /tmp/azl_agi_system_12345.azl.run
+# Run the AGI system (native runtime)
+bash scripts/start_azl_native_mode.sh
 ```
 
 ### **2. What Gets Activated**

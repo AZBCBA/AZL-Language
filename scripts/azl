@@ -8,6 +8,11 @@ set -euo pipefail
 cmd="${1:-}"
 TARGET=""
 if [ "$cmd" = "run" ]; then
+  if [ "${AZL_NATIVE_ONLY:-0}" = "1" ]; then
+    echo "ERROR: 'scripts/azl run' uses Python host runner and is blocked by AZL_NATIVE_ONLY=1" >&2
+    echo "Use native startup path: bash scripts/start_azl_native_mode.sh" >&2
+    exit 64
+  fi
   if [ $# -lt 2 ]; then
     echo "Usage: scripts/azl run <file.azl>" >&2
     exit 1
@@ -162,8 +167,7 @@ AZL
 echo "🔥 Executing AZL host loader..."
 cd "$(dirname "$0")/.."
 
-# TODO: Need to use proper AZL execution method, not bash
-# The host loader contains AZL code that needs the AZL interpreter
+# Host loader contains AZL code and must run through canonical executor.
 echo "⚠️  Host loader created but needs AZL interpreter to execute"
 echo "📁 Host loader: $HOST_LOADER"
 echo "📁 Combined file: $COMBINED"

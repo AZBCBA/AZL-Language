@@ -291,7 +291,10 @@ function evaluate_reinforcement(response_data) {
 
 # Helper functions
 function random_int(min, max) {
-  return floor(random() * (max - min + 1)) + min
+  let span = (max - min + 1)
+  if span <= 0 { return min }
+  let seed = (::response_counter || 0) + (::reinforcement_history.length || 0) + (now() % 1000)
+  return (seed % span) + min
 }
 
 function add_to_history(decision) {
@@ -683,18 +686,17 @@ function apply_weighted_schedule() {
   }
   
   branch when total_weight > 0 {
-    # Select schedule based on weights
-    let random_value = random() * total_weight
-    let cumulative_weight = 0.0
-    
+    # Deterministically pick the highest-weight schedule.
+    let best_schedule = "continuous"
+    let best_weight = -1.0
     loop for schedule in ["continuous", "fixed_ratio", "variable_ratio", "fixed_interval", "variable_interval"] {
-      cumulative_weight = cumulative_weight + weights[schedule]
-      branch when random_value <= cumulative_weight {
-        set ::schedule_type = schedule
-        emit "weighted_schedule_applied" with { selected_schedule: schedule, weights: weights }
-        break
+      branch when weights[schedule] > best_weight {
+        set best_weight = weights[schedule]
+        set best_schedule = schedule
       }
     }
+    set ::schedule_type = best_schedule
+    emit "weighted_schedule_applied" with { selected_schedule: best_schedule, weights: weights }
   }
 }
 

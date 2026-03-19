@@ -248,7 +248,7 @@ AZL
 
 echo "$COMBINED.run" > "${TMPDIR}/azl_agi_path.txt"
 echo "🎯 System ready! Run with:"
-echo "   python3 azl_runner.py $COMBINED.run"
+echo "   AZL_TARGET_FILE=$COMBINED.run bash scripts/start_azl_native_mode.sh"
 echo ""
 echo "🚀 Or use the prepared command:"
 echo "Prepared: $COMBINED.run"

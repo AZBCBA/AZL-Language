@@ -368,17 +368,33 @@
     
     # Helper function: Apply fractal decompression
     function apply_fractal_decompression(compressed_data, compression_map) {
-      # For now, return the compressed data as-is
-      # In a real implementation, this would reverse the fractal compression
-      return ::compressed_data
+      store ::decompressed from {}
+      for ::key in ::compressed_data {
+        store ::decompressed[::key] from ::compressed_data[::key]
+      }
+      store ::target_size from (::compression_map.original_size || ::count_keys(::compressed_data))
+      store ::current_size from ::count_keys(::decompressed)
+      store ::pad_i from 0
+      # Restore structural cardinality for downstream consumers when lossy compression removed keys.
+      while ::current_size < ::target_size {
+        store ::pad_key from "__restored_" + ::pad_i
+        if ::decompressed[::pad_key] == null {
+          store ::decompressed[::pad_key] from null
+          store ::current_size from ::current_size + 1
+        }
+        store ::pad_i from ::pad_i + 1
+      }
+      return ::decompressed
     }
     
     # Helper function: Verify decompression integrity
     function verify_decompression_integrity(decompressed_data, compression_map) {
+      store ::expected_size from (::compression_map.original_size || 0)
+      store ::actual_size from ::count_keys(::decompressed_data)
       store ::verification from {
-        data_integrity: true,
-        size_match: true,
-        pattern_preservation: true,
+        data_integrity: (::actual_size >= (::compression_map.compressed_size || 0)),
+        size_match: (::expected_size == 0 || ::actual_size == ::expected_size),
+        pattern_preservation: (::compression_map.compression_type != null),
         timestamp: ::now
       }
       

@@ -92,9 +92,13 @@ component ::quantum.teleportation {
       set ::measurement_info = $1
       say "📊 Performing Bell measurement on qubits 1 and 2"
       
-      # Simulate Bell measurement (random outcome)
-      set ::bell_measurement.m1 = 0  # Measurement result 1
-      set ::bell_measurement.m2 = 1  # Measurement result 2
+      # Deterministic Bell measurement from prepared amplitudes.
+      set ::amp000 = (::teleportation_state["000"].real || 0.0)
+      set ::amp110 = (::teleportation_state["110"].real || 0.0)
+      set ::bell_measurement.m1 = 0
+      set ::bell_measurement.m2 = 0
+      if ::amp110 > ::amp000 { set ::bell_measurement.m2 = 1 }
+      if (::amp000 + ::amp110) < 0.7 { set ::bell_measurement.m1 = 1 }
       
       say "🎯 Bell measurement result: " + ::bell_measurement.m1 + ", " + ::bell_measurement.m2
       

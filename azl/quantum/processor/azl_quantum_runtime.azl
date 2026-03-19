@@ -272,16 +272,16 @@ class AzlQuantumRuntime {
         result.gate = gate
         result.qubits = qubits
         result.applied = true
-        result.entanglement_created = Math.random() > 0.5
+        result.entanglement_created = ((qubits && qubits.length) ? (qubits.length % 2 === 0) : true)
         return result
     }
     
     measureQuantumState(register) {
         let measurement = {}
         measurement.register = register
-        measurement.value = Math.random()
+        measurement.value = ((register && register.length) ? ((register.length % 10) / 10) : 0.5)
         measurement.collapsed = true
-        measurement.entanglement_preserved = Math.random() > 0.3
+        measurement.entanglement_preserved = (measurement.value >= 0.3)
         this.quantum_measurements[register] = measurement
         return measurement
     }
@@ -290,7 +290,7 @@ class AzlQuantumRuntime {
         let entanglement = {}
         entanglement.source = source
         entanglement.target = target
-        entanglement.strength = Math.random()
+        entanglement.strength = (((source || "").length + (target || "").length) % 10) / 10
         entanglement.created = true
         this.entanglement_mappings[source + "_" + target] = entanglement
         return entanglement
@@ -301,7 +301,7 @@ class AzlQuantumRuntime {
         category.name = name
         category.objects = objects
         category.morphisms = morphisms
-        category.quantum_coherence = Math.random()
+        category.quantum_coherence = (((objects && objects.length) || 0) + ((morphisms && morphisms.length) || 0)) / (1 + (((objects && objects.length) || 0) + ((morphisms && morphisms.length) || 0)))
         this.category_theory[name] = category
         return category
     }
@@ -312,8 +312,8 @@ class AzlQuantumRuntime {
         limit.diagram = diagram
         limit.computed = true
         limit.quantum_properties = {}
-        limit.quantum_properties.coherence = Math.random()
-        limit.quantum_properties.entanglement = Math.random()
+        limit.quantum_properties.coherence = (((diagram && diagram.length) || 0) % 10) / 10
+        limit.quantum_properties.entanglement = ((((diagram && diagram.length) || 0) + ((category && category.length) || 0)) % 10) / 10
         return limit
     }
     
@@ -323,7 +323,7 @@ class AzlQuantumRuntime {
         result.executed = true
         result.measurements = []
         for (let i = 0; i < 5; i++) {
-            result.measurements.push(Math.random())
+            result.measurements.push(((i + ((circuit && circuit.length) || 0)) % 10) / 10)
         }
         return result
     }
@@ -345,7 +345,7 @@ component ::quantum.syscall.adapter {
       let t = ::event.data.type
       let a = ::event.data.args || {}
       
-      # quantum-enhanced routing (simulated here)
+      # quantum-enhanced routing via deterministic syscall dispatch.
       if (t == "read_file") {
         # read from virtual store via system interface events
         emit fs.read with { path: a.path, request_id: rid }

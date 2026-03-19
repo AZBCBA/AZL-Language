@@ -1,0 +1,36 @@
+name: native-release-gates
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  native-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc ripgrep curl
+
+      - name: Canonical stack enforcement
+        run: bash scripts/enforce_canonical_stack.sh
+
+      - name: Native gate checks
+        run: bash scripts/check_azl_native_gates.sh
+
+      - name: Legacy entrypoint blocklist
+        run: bash scripts/enforce_legacy_entrypoint_blocklist.sh
+
+      - name: Live native runtime verification
+        run: bash scripts/verify_native_runtime_live.sh
+
+      - name: Full test suite
+        run: bash scripts/run_all_tests.sh
