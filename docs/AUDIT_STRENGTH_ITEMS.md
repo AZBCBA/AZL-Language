@@ -47,7 +47,7 @@ Audit of what exists vs what needs to be built to make AZL stronger.
 | .azlpack spec | **HAVE** | `docs/AZLPACK_SPEC.md` | Documented ✓ |
 | Package registry | **NEED** | — | HTTP registry, `azl install` |
 | pkg_manager | **PARTIAL** | lha3_memory_export (build.pkg_manager) | Extract to real component |
-| IDE/LSP | **NEED** | — | Language server for .azl |
+| IDE/LSP | **HAVE** | `tools/azl_lsp.py`, `scripts/verify_lsp_smoke.sh` | Expand features (refs, completion); keep smoke green |
 | Debugger | **NEED** | — | Breakpoints, step, inspect |
 | Profiler | **PARTIAL** | runtime_inspector, performance_analytics | Add event latency profiler |
 

@@ -9,13 +9,14 @@ CONC="${AZL_BENCH_CONCURRENCY:-1}"
 TOKEN="${AZL_BENCH_TOKEN:-azl_bench_token_2026}"
 
 pick_port() {
-  local p
+  local p code
   while :; do
     p="$(( (RANDOM % 20000) + 30000 ))"
-    if ! curl -fsS "http://127.0.0.1:${p}/healthz" >/dev/null 2>&1; then
-      echo "$p"
-      return 0
-    fi
+    code="$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 0.25 "http://127.0.0.1:${p}/healthz" 2>/dev/null || true)"
+    case "$code" in
+    000 | '') echo "$p"; return 0 ;;
+    *) continue ;;
+    esac
   done
 }
 

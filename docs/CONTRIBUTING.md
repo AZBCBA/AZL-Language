@@ -31,6 +31,7 @@ Three **different** surfaces — do not mix them up:
 | `scripts/run_native_engine_llm_bench.sh` | Builds and starts **C `azl-native-engine`**, then runs the Ollama comparison (needs `ollama serve` + a model). |
 | `scripts/benchmark_llm_ollama.sh` | Python vs curl vs **C engine** `POST /api/ollama/generate` (only if `GET /api/llm/capabilities` reports the proxy). |
 | `scripts/benchmark_enterprise_v1_chat.sh` | **Enterprise daemon** `POST /v1/chat` with `AZL_API_TOKEN` (not the C Ollama proxy). |
+| `scripts/run_benchmark_llama_server.sh` | **`llama-server`** with model loaded once: direct `/completion` vs **`POST /api/llm/llama_server/completion`** on the native engine (see `LLM_INFRASTRUCTURE_AUDIT.md`). |
 
 For local runs only, you may store the daemon token in **`.azl/local_api_token`** (first line; `chmod 600`); **`run_product_benchmark_suite.sh`** and **`benchmark_enterprise_v1_chat.sh`** read it if **`AZL_API_TOKEN`** is unset.
 
@@ -45,6 +46,18 @@ Details and honesty contract: [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_A
 - **`docs/language/AZL_CURRENT_SPECIFICATION.md`** — Single source of truth for **current** AZL syntax and behavior.
 
 Please avoid large, conflicting edits in these areas without coordination. Add tests and docs freely; for runtime/parser/compiler changes, discuss in issues or PRs.
+
+## Strength bar (provable claims)
+
+AZL’s “strength” is what you can **verify**, not adjectives in prose. The four pillars (semantics parity, operational gates, honest benchmarks, ecosystem hooks) are mapped to scripts and docs in **[AZL_STRENGTH_BAR.md](AZL_STRENGTH_BAR.md)**.
+
+Quick check before a PR (same tooling as native gates: **`rg`**, **`python3`**, **`gcc`**):
+
+```bash
+bash scripts/verify_azl_strength_bar.sh
+```
+
+That runs **`check_azl_native_gates.sh`** and **`verify_native_runtime_live.sh`**. It does **not** replace the full release sequence — use **`scripts/run_full_repo_verification.sh`** (see `RELEASE_READY.md`).
 
 ## Standards
 

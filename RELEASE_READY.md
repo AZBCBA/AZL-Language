@@ -34,6 +34,16 @@ Use `RUN_OPTIONAL_BENCHES=1` (default) to also run native + enterprise LLM bench
 
 All commands must pass with exit code `0`.
 
+## Contributor quick bar (subset of release)
+
+For a fast, scripted check that still exercises **native gates** (F2/F3/G/H, engine build) and the **live** `GET /api/llm/capabilities` probe:
+
+```bash
+bash scripts/verify_azl_strength_bar.sh
+```
+
+Documented in `docs/AZL_STRENGTH_BAR.md`. This **does not** replace the five-step block above (it omits `enforce_*` scripts and `run_all_tests.sh`).
+
 ## Optional — product / LLM benchmarks
 
 After gates are green, you can measure latency on real backends (not required for release exit code):

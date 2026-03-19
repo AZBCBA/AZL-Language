@@ -24,7 +24,8 @@ Single entry point for **accurate** project docs. Older “status report”, “
 | [AZL_GPU_NEURAL_QUANTUM_INVENTORY.md](AZL_GPU_NEURAL_QUANTUM_INVENTORY.md) | GPU / neural / LHA3 / quantum **file map** vs default runtime; `scripts/audit_gpu_neural_quantum_surfaces.sh` |
 | [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md) | LLM / HTTP / proxy stack; includes **`GET /api/llm/capabilities`** on native engine; benches: `scripts/run_native_engine_llm_bench.sh`, `scripts/benchmark_llm_ollama.sh`, `scripts/benchmark_enterprise_v1_chat.sh` |
 | [INTEGRATIONS_HOST_VS_NATIVE.md](INTEGRATIONS_HOST_VS_NATIVE.md) | AnythingLLM / `azl/integrations`: pure AZL vs host-shaped reference |
-| [AUDIT_STRENGTH_ITEMS.md](AUDIT_STRENGTH_ITEMS.md) | Focused strength / risk audit |
+| [AZL_STRENGTH_BAR.md](AZL_STRENGTH_BAR.md) | **Provable strength:** semantics, gates, honest benches, ecosystem — mapped to scripts; run `scripts/verify_azl_strength_bar.sh` |
+| [AUDIT_STRENGTH_ITEMS.md](AUDIT_STRENGTH_ITEMS.md) | Focused strength / risk audit (HAVE vs NEED) |
 | [STATUS.md](STATUS.md) | Short **verified** runtime snapshot |
 
 ## Language (syntax and rules)
@@ -59,7 +60,7 @@ Broader / historical spec draft: [../azl/docs/AZL_LANGUAGE_SPECIFICATION.md](../
 
 Workflows live under `.github/workflows/` — including **`test-and-deploy.yml`** (tests, native matrix, benchmarks, coverage artifact, Docker → GHCR, optional staging webhook).
 
-**Native gates** (`scripts/check_azl_native_gates.sh`) include **F3** (P0 interpreter slice C↔Python), **H** (`verify_p0_interpreter_tokenizer_boundary.sh` on `azl_interpreter.azl`). **Full tree:** `scripts/run_full_repo_verification.sh`. **P0 smoke:** `scripts/run_semantic_interpreter_slice.sh`. **Product LLM benches:** `scripts/run_product_benchmark_suite.sh` (see `RELEASE_READY.md`).
+**Native gates** (`scripts/check_azl_native_gates.sh`) include **F3** (P0 interpreter slice C↔Python), **H** (`verify_p0_interpreter_tokenizer_boundary.sh` on `azl_interpreter.azl`). **Strength bar (gates + live probe):** `scripts/verify_azl_strength_bar.sh` — see [AZL_STRENGTH_BAR.md](AZL_STRENGTH_BAR.md). **Full tree:** `scripts/run_full_repo_verification.sh`. **P0 smoke:** `scripts/run_semantic_interpreter_slice.sh`. **Product LLM benches:** `scripts/run_product_benchmark_suite.sh` (see `RELEASE_READY.md`).
 
 **`scripts/test_azl_use_vm_path.sh`** (from `run_all_tests.sh`) checks `AZL_USE_VM` docs + wiring, **source-level parity** between `vm_run_bytecode_program` and tree-walker say/emit (`check_azl_vm_tree_parity.py`), and the eligible fixture `azl/tests/fixtures/vm_parity_minimal.azl`.
 

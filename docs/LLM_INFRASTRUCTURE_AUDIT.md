@@ -102,5 +102,5 @@ When implemented, update **`GET /api/llm/capabilities`** to set `gguf_in_process
 
 ## 7. Verification
 
-- `scripts/verify_native_runtime_live.sh` — asserts `/api/llm/capabilities` returns `ok`, `ollama_http_proxy: true`, `gguf_in_process: false`, and `ERR_NATIVE_GGUF_NOT_IN_PROCESS`.
+- `scripts/verify_native_runtime_live.sh` — starts **`azl-native-engine`** with the **minimal** bootstrap bundle (`c_minimal_link_ping`, same family as `run_native_engine_llm_bench.sh`), waits for **`/healthz`** + **`/readyz`** HTTP 200, then asserts `/api/llm/capabilities` returns `ok`, `ollama_http_proxy: true`, `gguf_in_process: false`, and `ERR_NATIVE_GGUF_NOT_IN_PROCESS`. (Not the full enterprise combined daemon — that path is validated elsewhere.)
 - `scripts/check_azl_native_gates.sh` — requires the capabilities route to exist in the C source.

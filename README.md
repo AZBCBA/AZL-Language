@@ -48,6 +48,8 @@ bash scripts/enforce_legacy_entrypoint_blocklist.sh
 bash scripts/verify_native_runtime_live.sh
 ```
 
+**Strength bar (gates + live capabilities in one command):** `bash scripts/verify_azl_strength_bar.sh` — see [docs/AZL_STRENGTH_BAR.md](docs/AZL_STRENGTH_BAR.md).
+
 **Full verification (release order + all tests):** `bash scripts/run_full_repo_verification.sh` — set `RUN_OPTIONAL_BENCHES=0` to skip LLM benches.
 
 Release profile details: `RELEASE_READY.md` and `release/native/manifest.json`.

@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# Live HTTP checks against azl-native-engine + minimal bootstrap bundle (c_minimal_link_ping).
+# This matches the stack used by native gate F and scripts/run_native_engine_llm_bench.sh.
+#
+# Full enterprise combined startup (scripts/start_azl_native_mode.sh) is heavier and can fail
+# independently when the large interpreter slice errors; the C engine + LLM honesty API is
+# what release gates need to prove here.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -7,40 +13,64 @@ cd "$ROOT_DIR"
 TOKEN="${AZL_VERIFY_TOKEN:-azl_verify_token_2026}"
 LOG_PATH="${AZL_VERIFY_LOG:-.azl/verify_native_runtime.log}"
 
-mkdir -p .azl
+mkdir -p .azl/tmp
 
 pick_port() {
-  local p
+  local p code
   while :; do
     p="$(( (RANDOM % 20000) + 30000 ))"
-    if ! curl -fsS "http://127.0.0.1:${p}/healthz" >/dev/null 2>&1; then
-      echo "$p"
-      return 0
-    fi
+    code="$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 0.25 "http://127.0.0.1:${p}/healthz" 2>/dev/null || true)"
+    case "$code" in
+    000 | '') echo "$p"; return 0 ;;
+    *) continue ;;
+    esac
   done
 }
 
 PORT="${AZL_VERIFY_PORT:-$(pick_port)}"
 
-echo "[verify] starting native mode on 127.0.0.1:${PORT}"
-AZL_API_TOKEN="$TOKEN" \
-AZL_BUILD_API_PORT="$PORT" \
-AZL_BIND_HOST="127.0.0.1" \
-bash scripts/start_azl_native_mode.sh >"$LOG_PATH" 2>&1 &
+cleanup() {
+  if [ -n "${ENGINE_PID:-}" ] && kill -0 "$ENGINE_PID" 2>/dev/null; then
+    kill -TERM "$ENGINE_PID" 2>/dev/null || true
+    sleep 0.3
+    kill -KILL "$ENGINE_PID" 2>/dev/null || true
+    wait "$ENGINE_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
 
-wait_for_health() {
-  local deadline=$((SECONDS + 30))
+BIN="$(bash scripts/build_azl_native_engine.sh)"
+COMBINED="$(realpath azl/tests/c_minimal_link_ping.azl)"
+BUNDLE=".azl/tmp/verify_native_live_bundle.azl"
+bash scripts/build_azl_bootstrap_bundle.sh "$COMBINED" "::boot.entry" --out "$BUNDLE"
+
+export AZL_API_TOKEN="$TOKEN"
+export AZL_BUILD_API_PORT="$PORT"
+export AZL_BIND_HOST="${AZL_BIND_HOST:-127.0.0.1}"
+export AZL_NATIVE_RUNTIME_CMD="$(bash scripts/azl_resolve_native_runtime_cmd.sh)"
+
+echo "[verify] starting azl-native-engine on 127.0.0.1:${PORT} bundle=${BUNDLE}"
+: >"$LOG_PATH"
+"$BIN" "$BUNDLE" >>"$LOG_PATH" 2>&1 &
+ENGINE_PID=$!
+
+http_code() {
+  curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 2 "http://127.0.0.1:${PORT}${1}" 2>/dev/null || echo "000"
+}
+
+wait_for_engine_ready() {
+  local deadline=$((SECONDS + 90))
   while [ $SECONDS -lt $deadline ]; do
-    if curl -fsS "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1; then
+    if [ "$(http_code /healthz)" = "200" ] && [ "$(http_code /readyz)" = "200" ]; then
       return 0
     fi
-    sleep 1
+    sleep 0.3
   done
   return 1
 }
 
-if ! wait_for_health; then
-  echo "ERROR: native engine did not become healthy within timeout"
+if ! wait_for_engine_ready; then
+  echo "ERROR: native engine did not reach healthz+readyz HTTP 200 within timeout"
   echo "See log: ${LOG_PATH}"
   exit 70
 fi
