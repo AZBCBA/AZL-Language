@@ -1,0 +1,123 @@
+# AZL Tensor Type - First-class tensor for AI workloads
+# Syntax: tensor shape [n,m] or create_tensor(shape)
+# Provides native-like tensor operations; wire to SIMD/native when available
+
+component ::azl.types.tensor {
+  init {
+    set ::status = "ready"
+  }
+
+  # Create tensor with shape [d0, d1, ...]. Returns array of zeros.
+  function create_tensor(shape) {
+    if shape == null || shape.length == 0 { return [] }
+    if shape.length == 1 {
+      set n = shape[0]
+      set result = []
+      set i = 0
+      while (i < n) {
+        result.push(0)
+        set i = i + 1
+      }
+      return result
+    }
+    set dim = shape[0]
+    set rest = shape.slice(1)
+    set result = []
+    set i = 0
+    while (i < dim) {
+      result.push(create_tensor(rest))
+      set i = i + 1
+    }
+    return result
+  }
+
+  # Element-wise add: t1 + t2 (flatten and add, reshape to t1 shape)
+  function tensor_add(t1, t2) {
+    set flat1 = flatten(t1)
+    set flat2 = flatten(t2)
+    set len = flat1.length < flat2.length ? flat1.length : flat2.length
+    set result = []
+    set i = 0
+    while (i < len) {
+      result.push(flat1[i] + flat2[i])
+      set i = i + 1
+    }
+    return unflatten(result, shape_of(t1))
+  }
+
+  # Element-wise multiply
+  function tensor_mul(t1, t2) {
+    set flat1 = flatten(t1)
+    set flat2 = flatten(t2)
+    set len = flat1.length < flat2.length ? flat1.length : flat2.length
+    set result = []
+    set i = 0
+    while (i < len) {
+      result.push(flat1[i] * flat2[i])
+      set i = i + 1
+    }
+    return unflatten(result, shape_of(t1))
+  }
+
+  # Flatten tensor to 1D array
+  function flatten(t) {
+    if t == null { return [] }
+    if t.length == null { return [t] }
+    set result = []
+    set i = 0
+    while (i < t.length) {
+      set item = t[i]
+      if item.length != null {
+        set sub = flatten(item)
+        set j = 0
+        while (j < sub.length) {
+          result.push(sub[j])
+          set j = j + 1
+        }
+      } else {
+        result.push(item)
+      }
+      set i = i + 1
+    }
+    return result
+  }
+
+  # Get shape of tensor
+  function shape_of(t) {
+    if t == null { return [] }
+    if t.length == null { return [] }
+    set sh = [t.length]
+    if t[0] != null && t[0].length != null {
+      set rest = shape_of(t[0])
+      set i = 0
+      while (i < rest.length) {
+        sh.push(rest[i])
+        set i = i + 1
+      }
+    }
+    return sh
+  }
+
+  # Unflatten 1D to shape; 2D: [[r0c0,r0c1,...],[r1c0,...]]
+  function unflatten(arr, shape) {
+    if shape == null || shape.length == 0 { return arr }
+    if shape.length == 1 { return arr }
+    set rows = shape[0]
+    set cols = shape.length > 1 ? shape[1] : 1
+    set result = []
+    set idx = 0
+    set r = 0
+    while (r < rows) {
+      set sub = []
+      set c = 0
+      while (c < cols && idx < arr.length) {
+        sub.push(arr[idx])
+        set idx = idx + 1
+        set c = c + 1
+      }
+      result.push(sub)
+      set r = r + 1
+    }
+    return result
+  }
+}

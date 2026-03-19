@@ -41,6 +41,8 @@ An `.azlpack` is a tarball (`.tar.gz`) or zip containing:
 
 Simple HTTP registry: `GET https://registry.azl.dev/<name>/<version>` returns the .azlpack tarball.
 
+**Local registry:** `python3 tools/registry_server.py` serves from `AZL_REGISTRY_DIR` (default `.azl/packages`). Package layout: `<dir>/<name>/<version>/pkg.tar.gz`.
+
 ## Install Command (Future)
 
 ```bash

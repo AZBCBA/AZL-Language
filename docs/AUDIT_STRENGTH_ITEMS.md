@@ -105,4 +105,6 @@ Audit of what exists vs what needs to be built to make AZL stronger.
 3. **azl install** — Script that fetches .azlpack ✅ **DONE** (`scripts/azl_install.sh`, `scripts/azl install`)
 4. **SIMD stdlib** — simd_add, simd_mul (pure AZL first) ✅ **DONE** (`azl/stdlib/core/simd.azl`)
 5. **Unit test framework** — azl test with assert ✅ **DONE** (`azl/testing/azl_test_framework.azl`)
-6. **LSP skeleton** — Basic syntax server
+6. **LSP skeleton** — Basic syntax server ✅ **DONE** (`tools/azl_lsp.py`, `docs/AZL_LSP_SETUP.md`)
+7. **Tensor type** — create_tensor, tensor_add, tensor_mul ✅ **DONE** (`azl/core/types/tensor.azl`)
+8. **Package registry server** — HTTP server for .azlpack ✅ **DONE** (`tools/registry_server.py`)
