@@ -29,11 +29,53 @@ component ::quantum.mathematics.advanced_topology {
   }
 
   on initialize_advanced_topology {
+    # Strict handshake: no silent defaults for required fields (error system + domain event).
+    if $1 == null {
+      emit quantum.mathematics.advanced_topology.error with {
+        code: "missing_payload",
+        message: "initialize_advanced_topology requires a map payload",
+        field: "payload"
+      }
+      emit log_error with {
+        type: "quantum_mathematics",
+        message: "advanced_topology: missing payload for initialize_advanced_topology",
+        context: { component: "::quantum.mathematics.advanced_topology", event: "initialize_advanced_topology" }
+      }
+      return
+    }
+    if !($1.advanced_topology == true) {
+      emit quantum.mathematics.advanced_topology.error with {
+        code: "invalid_advanced_topology_flag",
+        message: "payload.advanced_topology must be boolean true",
+        field: "advanced_topology",
+        received: $1.advanced_topology
+      }
+      emit log_error with {
+        type: "quantum_mathematics",
+        message: "advanced_topology: advanced_topology flag must be true",
+        context: { component: "::quantum.mathematics.advanced_topology", received: $1.advanced_topology }
+      }
+      return
+    }
+    if !($1.consciousness_integration == true || $1.consciousness_integration == false) {
+      emit quantum.mathematics.advanced_topology.error with {
+        code: "invalid_consciousness_integration",
+        message: "payload.consciousness_integration must be boolean true or false",
+        field: "consciousness_integration",
+        received: $1.consciousness_integration
+      }
+      emit log_error with {
+        type: "quantum_mathematics",
+        message: "advanced_topology: consciousness_integration must be boolean",
+        context: { component: "::quantum.mathematics.advanced_topology", received: $1.consciousness_integration }
+      }
+      return
+    }
     set ::status = "initialized"
     say "🔬 Advanced topology handshake (initialize_advanced_topology)"
     emit quantum.mathematics.advanced_topology.initialized with {
       status: ::status,
-      consciousness_integration: $1.consciousness_integration || false
+      consciousness_integration: $1.consciousness_integration
     }
   }
 

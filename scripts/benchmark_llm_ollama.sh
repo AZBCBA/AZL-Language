@@ -86,7 +86,7 @@ fi
 
 AZL_LINE="generate,0,0,0,0"
 if [ -n "$AZL_PORT" ]; then
-  echo "[3/3] AZL native API -> Ollama (port $AZL_PORT)"
+  echo "[3/3] C native engine -> Ollama (port $AZL_PORT, POST /api/ollama/generate)"
   : > .azl/benchmark_llm_azl.lat
   for i in $(seq 1 "$REQS"); do
     start_ns="$(date +%s%N)"
