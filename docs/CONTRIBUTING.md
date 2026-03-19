@@ -34,7 +34,7 @@ Three **different** surfaces — do not mix them up:
 
 For local runs only, you may store the daemon token in **`.azl/local_api_token`** (first line; `chmod 600`); **`run_product_benchmark_suite.sh`** and **`benchmark_enterprise_v1_chat.sh`** read it if **`AZL_API_TOKEN`** is unset.
 
-Details and honesty contract: [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md).
+Details and honesty contract: [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md). **Ordered checklist:** [WORK_QUEUE.md](WORK_QUEUE.md) · **C vs enterprise HTTP:** [CANONICAL_HTTP_PROFILE.md](CANONICAL_HTTP_PROFILE.md).
 
 ## Active work areas (coordinate before changing)
 

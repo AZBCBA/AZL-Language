@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+- **Work queue + HTTP profile:** `docs/WORK_QUEUE.md` (ordered checklist); `docs/CANONICAL_HTTP_PROFILE.md` (C engine vs enterprise `http_server`). Roadmap “next actions” points at WORK_QUEUE; docs index updated.
+- **Gate H extended:** `verify_p0_interpreter_tokenizer_boundary.sh` — full-file **`{`/`}` token balance** + `component ::azl.interpreter` anchor on `azl_interpreter.azl`.
 - **Product suite step 1:** optional **`.azl/local_api_token`** (first line) for `AZL_API_TOKEN`; **`benchmark_enterprise_v1_chat.sh`** probes **`POST /v1/chat`** and exits **95** on **404** (wrong server on port). **Next actions (ordered)** in `docs/PROJECT_COMPLETION_ROADMAP.md`.
 - **P0 gate H:** `scripts/verify_p0_interpreter_tokenizer_boundary.sh` — semantic minimal tokenizer ingests `azl/runtime/interpreter/azl_interpreter.azl` (full file today; lex milestone toward executing it). Wired into `scripts/check_azl_native_gates.sh`.
 - **Product benchmark suite:** `scripts/run_product_benchmark_suite.sh` — runs native LLM bench + optional enterprise `/v1/chat` when `AZL_API_TOKEN` is set; documented in `RELEASE_READY.md`, `README.md`, `OPERATIONS.md`, `CONTRIBUTING.md`.

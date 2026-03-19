@@ -17,7 +17,7 @@ This is the **honest** map from **today’s repository** to the **contract goals
 
 - `AZL_RUNTIME_SPINE=c_minimal` (default): `scripts/azl_c_interpreter_runtime.sh` → `azl-interpreter-minimal` (C).
 - `AZL_RUNTIME_SPINE=azl_interpreter` or `semantic`: `scripts/azl_azl_interpreter_runtime.sh` → `tools/azl_runtime_spine_host.py` → **`tools/azl_semantic_engine/`** (`minimal_runtime.py`), a **Python** executor with **execution parity** to the C minimal contract (say / set / emit / link / component init+behavior / quoted `listen for`). **Gate F2** in `check_azl_native_gates.sh` asserts **byte-identical stdout** vs C on `azl/tests/c_minimal_link_ping.azl`.
-- **Gate H:** `scripts/verify_p0_interpreter_tokenizer_boundary.sh` — same tokenizer ingests a **prefix** of `azl/runtime/interpreter/azl_interpreter.azl` (lex-only milestone toward loading the full interpreter as source).
+- **Gate H:** `scripts/verify_p0_interpreter_tokenizer_boundary.sh` — tokenizer on interpreter prefix, **`component ::azl.interpreter` anchor**, and **`{` / `}` token balance** on the full file (structural milestone; not execution).
 
 **Still open (full P0):**
 
@@ -56,10 +56,14 @@ Explicitly **deferred** unless product requires in-process weights; capabilities
 
 ## Next actions (do in order)
 
-1. **Full product benchmark suite** — Start the **combined enterprise daemon** so `POST /v1/chat` exists: `bash scripts/run_enterprise_daemon.sh` (note the printed `AZL_API_TOKEN` and port). Optionally persist the token for local runs only: `printf '%s\n' "$AZL_API_TOKEN" > .azl/local_api_token && chmod 600 .azl/local_api_token` (`.azl/` is gitignored). Ensure **`ollama serve`** for leg 1. Then: `bash scripts/run_product_benchmark_suite.sh`. If you get **exit 95** / “404 on /v1/chat”, the process on `AZL_ENTERPRISE_PORT` is **not** the enterprise `http_server` stack (e.g. a minimal stub on 8080).
-2. **P0 — execute the real interpreter** — Extend the semantic spine beyond **gate H** (tokenizer only) until `AZL_RUNTIME_SPINE=azl_interpreter` can **run** `azl/runtime/interpreter/azl_interpreter.azl` on growing fixtures, then the enterprise combined program.
-3. **Canonical HTTP profile** — Per deployment, choose and document whether **C-only** supervision or **AZL `http_server.azl`** is authoritative; align startup scripts and expectations.
-4. **GGUF / GPU** — Only if product requires; keep **`GET /api/llm/capabilities`** honest.
+Tracked checklist (checkboxes + commands): **[WORK_QUEUE.md](WORK_QUEUE.md)**.
+
+Summary:
+
+1. **Product benchmark suite** — Enterprise daemon + Ollama; see WORK_QUEUE.
+2. **P0** — Gate **H** in `check_azl_native_gates.sh` (tokenizer + brace balance on `azl_interpreter.azl`); next: **execute** interpreter on spine beyond minimal fixture.
+3. **Canonical HTTP profile** — **[CANONICAL_HTTP_PROFILE.md](CANONICAL_HTTP_PROFILE.md)** (C engine vs enterprise `http_server`).
+4. **GGUF / GPU** — Deferred unless product requires; capabilities endpoint stays honest.
 
 ---
 
