@@ -118,8 +118,7 @@ component ::azl.kernel.system_time {
   # KERNEL TIME OPERATIONS
   
   fn get_kernel_time() {
-    # This would use actual kernel system calls
-    # For now, simulate system time with a counter
+    # Deterministic time from counter; wire to sysproxy/host when available
     
     if !::variables["__time_counter"] {
       set ::variables["__time_counter"] = 0
@@ -127,16 +126,14 @@ component ::azl.kernel.system_time {
     
     set ::variables["__time_counter"] = ::variables["__time_counter"] + 1
     
-    # Simulate realistic time progression
-    set base_time = 1640995200000  # January 1, 2022
-    set simulated_time = base_time + (::variables["__time_counter"] * 1000)  # 1 second intervals
+    set base_time = 1640995200000
+    set kernel_time = base_time + (::variables["__time_counter"] * 1000)
     
-    return simulated_time
+    return kernel_time
   }
 
   fn kernel_sleep(milliseconds) {
-    # This would use actual kernel sleep
-    # For now, simulate sleep by incrementing time counter
+    # Deterministic sleep: increment time counter
     set sleep_ticks = milliseconds / 1000
     for i in range(0, sleep_ticks) {
       set ::variables["__time_counter"] = ::variables["__time_counter"] + 1

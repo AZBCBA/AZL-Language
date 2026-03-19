@@ -378,8 +378,7 @@ component ::azl.kernel.component_loader {
   }
 
   fn get_system_time() {
-    # This would use actual system time
-    # For now, return a simulated timestamp
+    # Deterministic timestamp from counter; wire to ::internal.now() when available
     return "timestamp_" + (::variables["__counter"] || 0)
   }
 }

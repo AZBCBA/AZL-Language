@@ -1,8 +1,15 @@
 component ::boot.entry {
   init {
+    set ::count = 0
     say "AZL minimal C interpreter: init running"
-    say "Phase 1 skeleton operational"
+    set ::count = 1
+    emit "tick"
   }
-  behavior {}
+  behavior {
+    listen for "tick" then {
+      say "Phase 1: set, emit, listen operational"
+      set ::count = 2
+    }
+  }
   memory {}
 }
