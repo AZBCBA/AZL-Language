@@ -15,5 +15,7 @@ bash scripts/enforce_legacy_entrypoint_blocklist.sh
 bash scripts/verify_native_runtime_live.sh
 bash scripts/verify_quantum_lha3_stack.sh
 bash scripts/verify_azl_grammar_conformance.sh
+chmod +x scripts/verify_azl_use_vm_path.sh || true
+bash scripts/verify_azl_use_vm_path.sh
 
 echo "✅ All tests completed"

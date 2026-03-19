@@ -19,6 +19,10 @@ export AZL_NATIVE_ONLY="${AZL_NATIVE_ONLY:-1}"
 export AZL_ENABLE_LEGACY_HOST="${AZL_ENABLE_LEGACY_HOST:-0}"
 export AZL_NATIVE_RUNTIME_CMD="${AZL_NATIVE_RUNTIME_CMD:-bash scripts/azl_c_interpreter_runtime.sh}"
 
+if [ "${AZL_USE_VM:-0}" = "1" ]; then
+  echo "🖥️  AZL_USE_VM=1 — pure interpreter execute path compiles eligible AST to linear ops (say/emit + init-only components) then runs vm_run_bytecode_program (see docs/AZL_NATIVE_RUNTIME_CONTRACT.md)"
+fi
+
 echo "🔑 API Token: $AZL_API_TOKEN"
 echo "📁 Config: $AZL_BUILD_CONFIG"
 echo "🌐 Port: $AZL_BUILD_API_PORT"

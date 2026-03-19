@@ -10,6 +10,24 @@ AZL must converge to a standalone language stack for end users:
 - no required Python or JavaScript runtime for user execution paths
 - no dependency on external language hosts for canonical behavior
 
+## Bytecode VM hot path (optional)
+
+`AZL_USE_VM=1` is passed through the native shell/bootstrap like any other env var (the C native engine does not strip it). When set, **`::azl.interpreter`**’s `execute` handler **attempts** to compile the parsed AST into a small linear program (`SAY`, `EMIT`) and runs it via `vm_run_bytecode_program`, which reuses **`emit_event_resolved`** so **listener dispatch matches the tree-walking executor**.
+
+**Supported for VM compilation**
+
+- Top-level `say` / `emit`
+- `component` bodies whose **`init`** contains only `say` / `emit`, and whose **`behavior`** is empty or contains no statements (any `listen` or non-listen behavior statement is rejected with `vm_compile_error:…`)
+
+**Not supported**
+
+- `set` / `let`, `listen`, `fn`, calls, control flow in the compiled slice — use `AZL_USE_VM=0` (default) for full semantics.
+
+**Files**
+
+- Interpreter gate + opcode runner: `azl/runtime/interpreter/azl_interpreter.azl` (`vm_compile_ast`, `vm_run_bytecode_program`)
+- Reference VM (separate opcode surface): `azl/runtime/vm/azl_vm.azl`
+
 ## Native Mode Switch
 
 `AZL_NATIVE_ONLY=1` enables strict transition behavior:

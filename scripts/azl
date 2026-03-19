@@ -79,12 +79,11 @@ fi
 BOOT_FILE="${TMPDIR}/azl_boot_$$.azl"
 COMBINED="${TMPDIR}/azl_combined_$$.azl"
 
-# Bootstrap component: prefer interpreter path (VM/bytecode are design-only)
+# Bootstrap component: interpreter path; optional VM-style dispatch in interpreter when AZL_USE_VM=1
+# (see docs/AZL_NATIVE_RUNTIME_CONTRACT.md — not the same as ::azl.vm opcode table)
   cat > "$BOOT_FILE" <<AZL
 component ::azl.selfhost.runner {
   init {
-    # link ::azl.compiler   # design-only
-    # link ::azl.vm         # design-only
       link ::azl.system_interface
     emit compile_target with { path: "__TARGET__" }
   }

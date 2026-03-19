@@ -53,6 +53,8 @@ Broader / historical spec draft: [../azl/docs/AZL_LANGUAGE_SPECIFICATION.md](../
 
 Workflows live under `.github/workflows/` — including **`test-and-deploy.yml`** (tests, native matrix, benchmarks, coverage artifact, Docker → GHCR, optional staging webhook).
 
+Gate script **`scripts/verify_azl_use_vm_path.sh`** (run from `run_all_tests.sh`) checks that `AZL_USE_VM` is documented and wired in `azl_interpreter.azl` + enterprise daemon.
+
 ## Packages, training, runbooks
 
 | Document | Use |

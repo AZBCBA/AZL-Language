@@ -140,10 +140,29 @@ component ::azl.interpreter {
           }
         }
       }
-      set ::result = ::execute_ast(::ast, ::scope)
-      
-      say "⚡ Execution complete"
-      emit execute_complete with { result: ::result }
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if ::use_vm {
+        set ::vc = ::vm_compile_ast(::ast)
+        if ::vc.ok != true {
+          ::record_error("vm", ::vc.error, { scope: ::scope })
+          if ::halt_on_error { set ::halted = true }
+          emit execute_complete with { result: "vm_compile_error:" + ::vc.error }
+        } else {
+          if ::vc.bytecode.length == 0 {
+            ::record_error("vm", "vm_compile_empty", { scope: ::scope })
+            if ::halt_on_error { set ::halted = true }
+            emit execute_complete with { result: "vm_compile_error:vm_compile_empty" }
+          } else {
+            set ::result = ::vm_run_bytecode_program(::vc.bytecode)
+            say "⚡ VM execution complete"
+            emit execute_complete with { result: ::result }
+          }
+        }
+      } else {
+        set ::result = ::execute_ast(::ast, ::scope)
+        say "⚡ Execution complete"
+        emit execute_complete with { result: ::result }
+      }
     }
 
     # external halt signal
@@ -886,40 +905,120 @@ component ::azl.interpreter {
       return "Set " + ::variable + " = " + ::evaluated.toString()
     }
     
-    # Execute emit statement
-    ::execute_emit = (statement) => {
-      set ::event = ::statement.event
-      set ::payload_expr = ::statement.payload
-      set ::ev_name = ::evaluate_expression(::event).toString()
-      set ::payload_val = (::payload_expr != null) ? ::evaluate_expression(::payload_expr) : null
-      # recursion/cycle guard
-      if ::recursion_depth > 10 { say "⚠️ Recursion limit reached for event: " + ::ev_name; return "Recursion limit" }
-      if ::dispatch_stack.includes(::ev_name) { say "⚠️ Cycle detected on event: " + ::ev_name; return "Cycle detected" }
+    # Resolve event name + payload, then dispatch (shared by tree-walker and AZL_USE_VM bytecode path)
+    ::emit_event_resolved = (ev_name, payload_val) => {
+      if ::recursion_depth > 10 { say "⚠️ Recursion limit reached for event: " + ev_name; return "Recursion limit" }
+      if ::dispatch_stack.includes(ev_name) { say "⚠️ Cycle detected on event: " + ev_name; return "Cycle detected" }
       set ::recursion_depth = ::recursion_depth + 1
-      set ::dispatch_stack.push(::ev_name)
-      say "📡 Emitting event: " + ::ev_name
-      # Set standardized event context object for handlers using ::event.{name,data}
-      set ::variables["event"] = { name: ::ev_name, data: ::payload_val }
+      set ::dispatch_stack.push(ev_name)
+      say "📡 Emitting event: " + ev_name
+      set ::variables["event"] = { name: ev_name, data: payload_val }
+      set ::ev_name = ev_name
       emit ::ev_name
-      # Synchronously dispatch to registered listeners in this interpreter with owner context
-      if ::listeners && ::listeners[::ev_name] {
-        set ::actions = ::listeners[::ev_name]
+      if ::listeners && ::listeners[ev_name] {
+        set ::actions = ::listeners[ev_name]
         set ::prev_comp = ( ::azl.security ? ::azl.security.current_component : "" )
         for ::listener in ::actions {
           set ::target_owner = (::listener.owner || ::prev_comp)
           if ::azl.security { ::azl.security.set_current(::target_owner) }
-          set ::block = (::listener.body || ::listener)  # back-compat if old shape
+          set ::block = (::listener.body || ::listener)
           for ::stmt in ::block {
             ::execute_statement(::stmt)
           }
         }
         if ::azl.security { ::azl.security.set_current(::prev_comp) }
       }
-      # Clear event context and pop
       set ::variables["event"] = null
       set ::dispatch_stack = ::dispatch_stack.filter((x, i) => i < ::dispatch_stack.length - 1)
       set ::recursion_depth = ::recursion_depth - 1
-      return "Emitted: " + ::ev_name
+      return "Emitted: " + ev_name
+    }
+
+    # Execute emit statement
+    ::execute_emit = (statement) => {
+      set ::event = ::statement.event
+      set ::payload_expr = ::statement.payload
+      set ::ev_name = ::evaluate_expression(::event).toString()
+      set ::payload_val = (::payload_expr != null) ? ::evaluate_expression(::payload_expr) : null
+      return ::emit_event_resolved(::ev_name, ::payload_val)
+    }
+
+    # --- AZL_USE_VM=1: compile AST subset to linear opcodes; run with same emit/listener rules as above ---
+    ::vm_compile_statement_block = (statements) => {
+      set ::out = []
+      if statements == null { return { ok: true, bytecode: ::out } }
+      for ::st in statements {
+        if ::st.type == "say" {
+          ::out.push({ opcode: "SAY", operand: ::st.message })
+        } else if ::st.type == "emit" {
+          ::out.push({ opcode: "EMIT", operand: ::st.event, payload_src: ::st.payload })
+        } else {
+          return { ok: false, error: "vm_compile_unsupported_statement:" + ::st.type, bytecode: [] }
+        }
+      }
+      return { ok: true, bytecode: ::out }
+    }
+
+    ::vm_compile_component_for_vm = (node) => {
+      if node.sections && node.sections.behavior && node.sections.behavior.statements {
+        for ::bs in node.sections.behavior.statements {
+          if ::bs.type == "listen" {
+            return { ok: false, error: "vm_compile_behavior_listen_not_supported", bytecode: [] }
+          }
+          return { ok: false, error: "vm_compile_behavior_non_listen_not_supported:" + ::bs.type, bytecode: [] }
+        }
+      }
+      if node.sections && node.sections.init && node.sections.init.statements {
+        return ::vm_compile_statement_block(node.sections.init.statements)
+      }
+      return { ok: true, bytecode: [] }
+    }
+
+    ::vm_compile_ast = (ast) => {
+      set ::acc = []
+      if ast == null || ast.nodes == null {
+        return { ok: false, error: "vm_compile_invalid_ast", bytecode: [] }
+      }
+      for ::node in ast.nodes {
+        if ::node.type == "import" || ::node.type == "link" {
+        } else if ::node.type == "say" {
+          ::acc.push({ opcode: "SAY", operand: ::node.message })
+        } else if ::node.type == "emit" {
+          ::acc.push({ opcode: "EMIT", operand: ::node.event, payload_src: ::node.payload })
+        } else if ::node.type == "component" {
+          set ::inner = ::vm_compile_component_for_vm(::node)
+          if ::inner.ok != true { return ::inner }
+          for ::op in ::inner.bytecode { ::acc.push(::op) }
+        } else {
+          return { ok: false, error: "vm_compile_unsupported_root:" + ::node.type, bytecode: [] }
+        }
+      }
+      return { ok: true, bytecode: ::acc }
+    }
+
+    ::vm_run_bytecode_program = (program) => {
+      set ::idx = 0
+      while ::idx < program.length {
+        if ::halted { return "vm_halted" }
+        set ::ins = program[::idx]
+        set ::op = ::ins.opcode
+        if ::op == "SAY" {
+          set ::val = ::evaluate_expression(::ins.operand)
+          say "💬 " + ::val.toString()
+        } else if ::op == "EMIT" {
+          set ::evn = ::evaluate_expression(::ins.operand).toString()
+          set ::pl = null
+          if ::ins.payload_src != null {
+            set ::pl = ::evaluate_expression(::ins.payload_src)
+          }
+          ::emit_event_resolved(::evn, ::pl)
+        } else {
+          ::record_error("vm", "vm_unknown_opcode", { opcode: ::op })
+          return "vm_unknown_opcode"
+        }
+        set ::idx = ::idx + 1
+      }
+      return "vm_ok"
     }
     
     # Execute listen statement

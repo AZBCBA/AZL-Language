@@ -8,7 +8,7 @@ Short, **verified** snapshot of the pure-AZL path. For strategy and gaps, see [A
 - **Virtual OS:** `azl/system/azl_system_interface.azl` — `syscall` listener; in-memory fs/http/console/proc; deterministic behavior.
 - **Stdlib:** `azl/stdlib/core/azl_stdlib.azl` — core types, math, time, deterministic RNG hooks, helpers backed by the virtual OS.
 - **Native profile:** C HTTP engine `tools/azl_native_engine.c`, sysproxy, shell orchestration — gated by `scripts/check_azl_native_gates.sh`, `verify_native_runtime_live.sh`, and `run_all_tests.sh`.
-- **Compiler / VM (AZL):** bytecode pipeline exists under `azl/core/compiler/` and `azl/runtime/vm/`; **not** always the default hot path vs the C interpreter — see perfection plan.
+- **Compiler / VM (AZL):** bytecode pipeline exists under `azl/core/compiler/` and `azl/runtime/vm/`. Optional **`AZL_USE_VM=1`**: `::azl.interpreter` can compile a **restricted** AST slice to linear ops and run `vm_run_bytecode_program` (see `docs/AZL_NATIVE_RUNTIME_CONTRACT.md`). Default remains full tree execution.
 
 ## Deprecated / historical
 
