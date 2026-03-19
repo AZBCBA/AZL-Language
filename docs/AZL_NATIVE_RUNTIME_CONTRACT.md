@@ -32,7 +32,16 @@ AZL must converge to a standalone language stack for end users:
 
 ### Default enterprise runtime vs pure AZL interpreter
 
-Canonical **native enterprise** startup (`scripts/start_azl_native_mode.sh` → `run_enterprise_daemon.sh`) sets `AZL_NATIVE_RUNTIME_CMD` to **`scripts/azl_c_interpreter_runtime.sh`**, which runs the **C minimal interpreter** (`tools/azl_interpreter_minimal.c`) over the combined `.azl` bundle. That path **does not** load or execute `azl/runtime/interpreter/azl_interpreter.azl`, so it **never consults** `AZL_USE_VM`.
+Canonical **native enterprise** startup (`scripts/start_azl_native_mode.sh` → `run_enterprise_daemon.sh`) sets `AZL_NATIVE_RUNTIME_CMD` when unset using **`scripts/azl_resolve_native_runtime_cmd.sh`**, which reads **`AZL_RUNTIME_SPINE`**:
+
+| `AZL_RUNTIME_SPINE` | Default `AZL_NATIVE_RUNTIME_CMD` | Semantic owner |
+|---------------------|----------------------------------|----------------|
+| unset or `c_minimal` | `bash scripts/azl_c_interpreter_runtime.sh` | **C minimal** (`tools/azl_interpreter_minimal.c`) on the combined bundle |
+| `azl_interpreter` or `semantic` | `bash scripts/azl_azl_interpreter_runtime.sh` | Reserved hook → **`tools/azl_runtime_spine_host.py`** (must run full AZL-in-AZL interpreter when implemented) |
+
+The **C minimal** path **does not** load or execute `azl/runtime/interpreter/azl_interpreter.azl`, so it **never consults** `AZL_USE_VM`.
+
+The **semantic** path is the **decided** integration point for full semantics; today the Python host **exits 78** with **`ERR_AZL_SEMANTIC_HOST_UNIMPLEMENTED`** until an executor ships (see **`docs/PROJECT_COMPLETION_ROADMAP.md`**). Operators can still set **`AZL_NATIVE_RUNTIME_CMD`** explicitly to override both defaults.
 
 `AZL_USE_VM` matters when execution reaches **`::azl.interpreter`**’s **`execute`** handler (pure-AZL bootstrap, self-hosted paths, tests, or any future runtime that runs the AZL interpreter instead of the C skeleton).
 

@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+- **Runtime spine selector:** `AZL_RUNTIME_SPINE` (`c_minimal` default, or `azl_interpreter` / `semantic`) chooses default `AZL_NATIVE_RUNTIME_CMD` via `scripts/azl_resolve_native_runtime_cmd.sh`; semantic path uses `scripts/azl_azl_interpreter_runtime.sh` and `tools/azl_runtime_spine_host.py` (fails with `ERR_AZL_SEMANTIC_HOST_UNIMPLEMENTED` until an executor ships). Gate **G** + `scripts/verify_runtime_spine_contract.sh`. Roadmap: `docs/PROJECT_COMPLETION_ROADMAP.md`.
 - **Repository hygiene:** `.gitignore` now ignores the entire `.azl/` directory; all previously tracked paths under `.azl/` were removed from the index (`git rm --cached`). Local builds and daemons keep using `.azl/` on disk; it is no longer part of the Git tree. Use `git add -f .azl/...` only for deliberate exceptions.
 - **Runtime spine (source of truth):** [docs/RUNTIME_SPINE_DECISION.md](docs/RUNTIME_SPINE_DECISION.md) — C engine orchestrates; AZL interpreter is the decided semantic core; documents **current vs target**, **P0 not done** on default `start_azl_native_mode.sh` path, ordered **P0–P5** obligations with file pointers; quantum core-language one-liner; GGUF deferred unless product requires it.
 - Documentation and GitHub readiness: LICENSE, CONTRIBUTING (Python + AZL), AZL_LANGUAGE_RULES, GRAMMAR reference, updated README and project structure, clarified advanced_features as future-only.

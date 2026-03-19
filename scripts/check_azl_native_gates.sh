@@ -79,6 +79,10 @@ if ! printf '%s\n' "$MINI_OUT" | rg -q 'C_MINIMAL_LINK_PING_OK'; then
   exit 25
 fi
 
+echo "[gate] G: runtime spine resolver + semantic host error surface"
+chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
+bash scripts/verify_runtime_spine_contract.sh
+
 echo "[gate] E: legacy deploy profile blocked by default"
 if rg -q 'AZL_ENABLE_LEGACY_HOST="\$\{AZL_ENABLE_LEGACY_HOST:-1\}"' scripts/*.sh; then
   echo "ERROR: found script defaulting AZL_ENABLE_LEGACY_HOST to 1"

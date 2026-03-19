@@ -28,7 +28,8 @@ To enforce AZL-native deployment direction (no Python/JS bootstrap paths), use:
 ```bash
 # Optional: provide your own native executor command
 # export AZL_NATIVE_EXEC_CMD=/path/to/azl-native-engine
-# Optional: provide runtime process launched by native engine (default: C interpreter)
+# Optional: runtime child — unset uses AZL_RUNTIME_SPINE (default c_minimal → C interpreter)
+# export AZL_RUNTIME_SPINE=azl_interpreter   # reserved semantic hook (see docs/PROJECT_COMPLETION_ROADMAP.md)
 # export AZL_NATIVE_RUNTIME_CMD="bash scripts/azl_c_interpreter_runtime.sh"
 bash scripts/start_azl_native_mode.sh
 ```

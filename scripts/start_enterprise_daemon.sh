@@ -9,7 +9,9 @@ echo "🎯 Canonical path: scripts/run_enterprise_daemon.sh"
 echo ""
 
 export AZL_NATIVE_ONLY="${AZL_NATIVE_ONLY:-1}"
-export AZL_NATIVE_RUNTIME_CMD="${AZL_NATIVE_RUNTIME_CMD:-bash scripts/azl_c_interpreter_runtime.sh}"
+if [ -z "${AZL_NATIVE_RUNTIME_CMD:-}" ]; then
+  export AZL_NATIVE_RUNTIME_CMD="$(bash scripts/azl_resolve_native_runtime_cmd.sh)"
+fi
 export AZL_API_TOKEN="${AZL_API_TOKEN:-$(openssl rand -hex 32)}"
 export AZL_BUILD_API_PORT="${AZL_BUILD_API_PORT:-8080}"
 export AZL_STRICT="${AZL_STRICT:-1}"
@@ -18,6 +20,8 @@ export AZL_REQUIRE_API_TOKEN="${AZL_REQUIRE_API_TOKEN:-true}"
 echo "🔑 API token configured."
 echo "🌐 Port: $AZL_BUILD_API_PORT"
 echo "⚙️  AZL_NATIVE_ONLY=$AZL_NATIVE_ONLY"
+echo "⚙️  AZL_RUNTIME_SPINE=${AZL_RUNTIME_SPINE:-c_minimal}"
+echo "⚙️  AZL_NATIVE_RUNTIME_CMD=${AZL_NATIVE_RUNTIME_CMD}"
 echo ""
 
 exec bash scripts/run_enterprise_daemon.sh

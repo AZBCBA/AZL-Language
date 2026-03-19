@@ -18,8 +18,9 @@ export AZL_API_TOKEN="${AZL_API_TOKEN:-$(openssl rand -hex 32)}"
 echo "🔑 AZL_API_TOKEN set (value hidden)."
 
 if [ -z "${AZL_NATIVE_RUNTIME_CMD:-}" ]; then
-  export AZL_NATIVE_RUNTIME_CMD="bash scripts/azl_c_interpreter_runtime.sh"
+  export AZL_NATIVE_RUNTIME_CMD="$(bash scripts/azl_resolve_native_runtime_cmd.sh)"
 fi
+echo "⚙️  AZL_RUNTIME_SPINE=${AZL_RUNTIME_SPINE:-c_minimal}"
 echo "⚙️  AZL_NATIVE_RUNTIME_CMD=${AZL_NATIVE_RUNTIME_CMD}"
 
 if [ -z "${AZL_NATIVE_EXEC_CMD:-}" ]; then

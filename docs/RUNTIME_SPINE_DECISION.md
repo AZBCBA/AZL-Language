@@ -22,6 +22,8 @@ the trace today is: **`start_azl_native_mode.sh`** → **`run_enterprise_daemon.
 
 **P0a (C minimal correctness, 2026-03-19):** `link` and entry `run()` must scope `behavior` / `init` discovery to a single component body. A bug used `find_block_end(j)` where `j` pointed at the opening `{`; `find_block_end` expects the first token *inside* the block (`j+1`), which wrongly extended the body and could match the *next* component’s `init`, causing infinite `link` → `exec_init` recursion and SIGSEGV. **Fixed** in `tools/azl_interpreter_minimal.c`; regression coverage: `azl/tests/c_minimal_link_ping.azl` and **`scripts/check_azl_native_gates.sh`** gate **F**. This does **not** complete P0 (default path still uses C minimal as semantic engine).
 
+**P0b (spine selector + semantic hook, 2026-03-19):** `AZL_RUNTIME_SPINE` chooses the default `AZL_NATIVE_RUNTIME_CMD` when it is unset — see **`scripts/azl_resolve_native_runtime_cmd.sh`**. Values **`c_minimal`** (default) or unset → `scripts/azl_c_interpreter_runtime.sh`; **`azl_interpreter`** or **`semantic`** → `scripts/azl_azl_interpreter_runtime.sh` → **`tools/azl_runtime_spine_host.py`**, which **exits** with **`ERR_AZL_SEMANTIC_HOST_UNIMPLEMENTED`** until a real in-tree executor runs `azl_interpreter.azl`. Verified by **`scripts/verify_runtime_spine_contract.sh`** (native gate **G**). This wires the **integration seam**; it does **not** complete P0 until the host implements execution.
+
 **Partial / adjacent (not P0 complete):**
 
 - **`AZL_NATIVE_RUNTIME_CMD`** is intentionally pluggable; an operator can point it at a custom launcher without changing the C engine.
@@ -134,6 +136,7 @@ These map to **`docs/AZL_NATIVE_RUNTIME_CONTRACT.md`** (“Non-Negotiable Comple
 | [AZL_PERFECTION_PLAN.md](AZL_PERFECTION_PLAN.md) | Broader strategic phases (still valid; this doc narrows **spine**) |
 | [STATUS.md](STATUS.md) | Short verified snapshot |
 | [DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md](DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md) | Quantum / memory: real vs symbolic |
+| [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md) | Phased “whole project” work vs contract (P0–P5) |
 
 ---
 

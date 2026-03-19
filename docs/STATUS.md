@@ -16,6 +16,7 @@ Short, **verified** snapshot of the pure-AZL path. **Native spine (decided vs cu
 
 ## Open work (high level)
 
+- **P0 spine (blocking “full project” semantics on native path):** implement an executor behind **`tools/azl_runtime_spine_host.py`** (or replace it) so `AZL_RUNTIME_SPINE=azl_interpreter` actually runs **`azl/runtime/interpreter/azl_interpreter.azl`** on the combined program — see [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md) and [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md) **P0b**.
 - Raise automated **test coverage** (AZL tests under `azl/testing/`).
 - **Wire VM/bytecode** as an optional or default execution path (`AZL_USE_VM` or equivalent), documented in [AZL_NATIVE_RUNTIME_CONTRACT.md](AZL_NATIVE_RUNTIME_CONTRACT.md).
 - **Package ecosystem:** `.azlpack` spec in [AZLPACK_SPEC.md](AZLPACK_SPEC.md); publish and dogfood installs.
