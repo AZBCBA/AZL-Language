@@ -14,6 +14,8 @@ cd "$ROOT_DIR"
 
 OLLAMA_HOST="${OLLAMA_HOST:-http://127.0.0.1:11434}"
 REQS="${LLM_BENCH_REQS:-20}"
+WARMUP="${LLM_BENCH_WARMUP:-0}"
+NUM_PREDICT="${LLM_BENCH_NUM_PREDICT:-16}"
 MODEL="${LLM_BENCH_MODEL:-llama3.2:1b}"
 PROMPT="${LLM_BENCH_PROMPT:-Say hello in one word.}"
 TOKEN="${AZL_BENCH_TOKEN:-azl_bench_token_2026}"
@@ -27,20 +29,25 @@ if ! curl -sf --max-time 5 "${OLLAMA_HOST}/api/tags" >/dev/null 2>&1; then
 fi
 
 echo "=== LLM Benchmark (Ollama backend) ==="
-echo "  OLLAMA_HOST=$OLLAMA_HOST MODEL=$MODEL REQS=$REQS"
+echo "  OLLAMA_HOST=$OLLAMA_HOST MODEL=$MODEL REQS=$REQS WARMUP=$WARMUP num_predict=$NUM_PREDICT"
 echo ""
 
 # --- 1) Python client ---
 echo "[1/3] Python client -> Ollama"
 LLM_BENCH_LAT_FILE=".azl/benchmark_llm_python.lat" \
-OLLAMA_HOST="$OLLAMA_HOST" LLM_BENCH_REQS="$REQS" LLM_BENCH_MODEL="$MODEL" LLM_BENCH_PROMPT="$PROMPT" \
-  python3 scripts/benchmark_llm_python_client.py 2>/dev/null | tail -1 > .azl/llm_python_summary.txt || true
+OLLAMA_HOST="$OLLAMA_HOST" LLM_BENCH_REQS="$REQS" LLM_BENCH_WARMUP="$WARMUP" \
+LLM_BENCH_NUM_PREDICT="$NUM_PREDICT" LLM_BENCH_MODEL="$MODEL" LLM_BENCH_PROMPT="$PROMPT" \
+  python3 scripts/benchmark_llm_python_client.py 2>>.azl/benchmark_llm_python_run.log | tail -1 > .azl/llm_python_summary.txt || true
 PY_LINE="$(cat .azl/llm_python_summary.txt 2>/dev/null || echo "generate,0,0,0,0")"
 
 # --- 2) Curl baseline ---
 echo "[2/3] Curl -> Ollama"
 : > .azl/benchmark_llm_curl.lat
-PAYLOAD="$(printf '{"model":"%s","prompt":"%s","stream":false,"options":{"num_predict":16}}' "$MODEL" "$PROMPT")"
+PAYLOAD="$(printf '{"model":"%s","prompt":"%s","stream":false,"options":{"num_predict":%s}}' "$MODEL" "$PROMPT" "$NUM_PREDICT")"
+for _ in $(seq 1 "$WARMUP"); do
+  curl -sfS -m 120 -X POST -H "Content-Type: application/json" -d "$PAYLOAD" \
+    "${OLLAMA_HOST}/api/generate" >/dev/null 2>&1 || true
+done
 for i in $(seq 1 "$REQS"); do
   start_ns="$(date +%s%N)"
   curl -sfS -m 120 -X POST -H "Content-Type: application/json" -d "$PAYLOAD" \
@@ -88,10 +95,15 @@ AZL_LINE="generate,0,0,0,0"
 if [ -n "$AZL_PORT" ]; then
   echo "[3/3] C native engine -> Ollama (port $AZL_PORT, POST /api/ollama/generate)"
   : > .azl/benchmark_llm_azl.lat
+  for _ in $(seq 1 "$WARMUP"); do
+    curl -sfS -m 120 -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+      -d "{\"model\":\"$MODEL\",\"prompt\":\"$PROMPT\",\"stream\":false,\"options\":{\"num_predict\":$NUM_PREDICT}}" \
+      "http://127.0.0.1:${AZL_PORT}/api/ollama/generate" >/dev/null 2>&1 || true
+  done
   for i in $(seq 1 "$REQS"); do
     start_ns="$(date +%s%N)"
     curl -sfS -m 120 -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-      -d "{\"model\":\"$MODEL\",\"prompt\":\"$PROMPT\",\"stream\":false,\"options\":{\"num_predict\":16}}" \
+      -d "{\"model\":\"$MODEL\",\"prompt\":\"$PROMPT\",\"stream\":false,\"options\":{\"num_predict\":$NUM_PREDICT}}" \
       "http://127.0.0.1:${AZL_PORT}/api/ollama/generate" >/dev/null 2>&1 || true
     end_ns="$(date +%s%N)"
     dur_us=$(( (end_ns - start_ns) / 1000 ))
@@ -123,7 +135,7 @@ REPORT=".azl/benchmark_llm_ollama_$(date +%Y%m%d_%H%M%S).txt"
   echo "=============================================="
   echo "  LLM Benchmark: AZL vs Python vs Curl"
   echo "  Backend: Ollama @ $OLLAMA_HOST"
-  echo "  Model: $MODEL | Requests: $REQS"
+  echo "  Model: $MODEL | Warmup: $WARMUP | Requests: $REQS | num_predict: $NUM_PREDICT"
   echo "  Unit: microseconds (us)"
   echo "=============================================="
   echo ""

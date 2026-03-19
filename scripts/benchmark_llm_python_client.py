@@ -12,6 +12,8 @@ import urllib.request
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 REQS = int(os.environ.get("LLM_BENCH_REQS", "20"))
+WARMUP = int(os.environ.get("LLM_BENCH_WARMUP", "0"))
+NUM_PREDICT = int(os.environ.get("LLM_BENCH_NUM_PREDICT", "16"))
 MODEL = os.environ.get("LLM_BENCH_MODEL", "llama3.2:1b")
 PROMPT = os.environ.get("LLM_BENCH_PROMPT", "Say hello in one word.")
 LAT_FILE = os.environ.get("LLM_BENCH_LAT_FILE", ".azl/benchmark_llm_python.lat")
@@ -24,7 +26,7 @@ def call_ollama(prompt: str, model: str) -> tuple[float, bool]:
         "model": model,
         "prompt": prompt,
         "stream": False,
-        "options": {"num_predict": 16},
+        "options": {"num_predict": NUM_PREDICT},
     }).encode("utf-8")
     req = urllib.request.Request(
         url,
@@ -43,6 +45,9 @@ def call_ollama(prompt: str, model: str) -> tuple[float, bool]:
 
 def main():
     os.makedirs(os.path.dirname(LAT_FILE) or ".", exist_ok=True)
+    for w in range(WARMUP):
+        _, _ = call_ollama(PROMPT, MODEL)
+        print(f"[python-llm] warmup {w + 1}/{WARMUP}", file=sys.stderr)
     latencies = []
     ok = 0
     fail = 0
@@ -66,8 +71,10 @@ def main():
     else:
         s = sorted(latencies)
         mean = sum(latencies) / n
-        p50 = s[(n * 50) // 100] if n > 0 else 0
-        p95 = s[(n * 95) // 100] if n > 0 else 0
+        p50_i = max(0, (n * 50 + 99) // 100 - 1)
+        p95_i = max(0, (n * 95 + 99) // 100 - 1)
+        p50 = s[p50_i] if n > 0 else 0
+        p95 = s[p95_i] if n > 0 else 0
 
     print(f"generate,{n},{mean:.2f},{p50},{p95}")
     print(f"ok={ok} fail={fail}", file=sys.stderr)

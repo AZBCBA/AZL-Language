@@ -7,7 +7,7 @@
 # Env:
 #   AZL_API_TOKEN       — if unset, a random token is generated and used for engine + bench
 #   AZL_BENCH_NATIVE_PORT / AZL_BUILD_API_PORT — force port (default: first free 18080–18149)
-#   LLM_BENCH_*         — passed through to benchmark_llm_ollama.sh
+#   LLM_BENCH_*         — passed through to benchmark_llm_ollama.sh (e.g. REQS, WARMUP, NUM_PREDICT, PROMPT)
 #
 set -euo pipefail
 

@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+- **LLM bench:** `LLM_BENCH_WARMUP` + `LLM_BENCH_NUM_PREDICT` for `benchmark_llm_ollama.sh` / `benchmark_llm_python_client.py` (fairer Python vs curl vs AZL); Python p50/p95 index aligned with shell percentiles; run log `.azl/benchmark_llm_python_run.log`.
 - **P0c interpreter slice:** Widened `azl/tests/p0_semantic_interpreter_slice.azl` toward `::azl.interpreter` init: `::internal.env("…")` (real env), **`or` / `==` / `!=` / `(` `)` / `null`**, **`if EXPR { … }`**, keyed **`{ … }`** aggregate for `::perf` (still stored as minimal `"{}"`), plus prior `set`/`link`/`say`/`P0_SEMANTIC_INTERPRETER_SLICE_OK`. Tokenizer **`==`** / **`!=`**. **Minimal `exec_set`:** non-aggregate RHS uses the same expression evaluator as **`if`**; parse errors exit **5** (C) / **`SemanticEngineError(5)`** (Python, surfaced by `run_file`). Native gate **F3**; `RUNTIME_SPINE_DECISION.md` / `WORK_QUEUE.md` updated.
 - **Full verification:** `scripts/run_full_repo_verification.sh` — `RELEASE_READY` sequence + `run_all_tests.sh` + optional Ollama + enterprise `/v1/chat` benches (`RUN_OPTIONAL_BENCHES=0` to skip). `RELEASE_READY.md`, `README.md`, `OPERATIONS.md`, `WORK_QUEUE.md` updated.
 - **Work queue + HTTP profile:** `docs/WORK_QUEUE.md` (ordered checklist); `docs/CANONICAL_HTTP_PROFILE.md` (C engine vs enterprise `http_server`). Roadmap “next actions” points at WORK_QUEUE; docs index updated.
