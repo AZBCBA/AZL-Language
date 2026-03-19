@@ -14,6 +14,10 @@
 #include <time.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <strings.h>
+
+/* Max bytes stored for one HTTP/1.x request (headers + body); excludes trailing NUL. */
+#define ENGINE_HTTP_REQ_MAX (65535)
 
 static volatile sig_atomic_t g_running = 1;
 
@@ -71,6 +75,90 @@ static int write_all(int fd, const char *buf, size_t len) {
     off += (size_t)n;
   }
   return 0;
+}
+
+/* Scan request headers (including status line) for Content-Length. Returns -1 if absent. */
+static long header_block_content_length(const char *hdr, size_t hdr_len) {
+  const char *p = hdr;
+  const char *end = hdr + hdr_len;
+  while (p < end) {
+    const char *nl = memchr(p, '\n', (size_t)(end - p));
+    if (!nl) break;
+    size_t line_len = (size_t)(nl - p);
+    if (line_len > 0 && nl[-1] == '\r') line_len--;
+    if (line_len >= 15 && strncasecmp(p, "content-length:", 15) == 0) {
+      const char *v = p + 15;
+      const char *line_end = p + line_len;
+      while (v < line_end && (*v == ' ' || *v == '\t')) v++;
+      char *ep = NULL;
+      long x = strtol(v, &ep, 10);
+      if (ep != v && x >= 0) return x;
+    }
+    p = nl + 1;
+  }
+  return -1;
+}
+
+/*
+ * Read one HTTP/1.x request (headers + body per Content-Length) into buf, NUL-terminated.
+ * Returns total bytes stored, or -1 on I/O/protocol error.
+ */
+static ssize_t read_http_request_full(int cfd, char *buf, size_t cap) {
+  if (cap < 512) return -1;
+  const size_t max_body = cap > 8192 ? cap - 8192u : 0u;
+  size_t total = 0;
+  for (;;) {
+    if (total >= cap) return -1;
+    size_t chunk = cap - total;
+    ssize_t r = read(cfd, buf + total, chunk);
+    if (r < 0) {
+      if (errno == EINTR) continue;
+      return -1;
+    }
+    if (r == 0) {
+      return -1;
+    }
+    total += (size_t)r;
+    if (total > cap) return -1;
+    buf[total] = '\0';
+
+    const char *sep = strstr(buf, "\r\n\r\n");
+    size_t header_end = 0;
+    if (sep) {
+      header_end = (size_t)(sep - buf + 4);
+    } else {
+      sep = strstr(buf, "\n\n");
+      if (sep) header_end = (size_t)(sep - buf + 2);
+    }
+    if (header_end == 0) {
+      if (total > 8192) return -1;
+      continue;
+    }
+    if (header_end > total) return -1;
+
+    long cl = header_block_content_length(buf, header_end);
+    if (cl < 0) {
+      return (ssize_t)total;
+    }
+    if (cl > (long)max_body) return -1;
+    if ((size_t)cl > cap - header_end) return -1;
+    size_t need = header_end + (size_t)cl;
+    if (need > cap) return -1;
+    while (total < need) {
+      chunk = need - total;
+      if (chunk > cap - total) return -1;
+      r = read(cfd, buf + total, chunk);
+      if (r < 0) {
+        if (errno == EINTR) continue;
+        return -1;
+      }
+      if (r == 0) return -1;
+      total += (size_t)r;
+      if (total > cap) return -1;
+    }
+    buf[total] = '\0';
+    return (ssize_t)total;
+  }
 }
 
 static void ensure_azl_dir(void) {
@@ -447,6 +535,87 @@ static void write_response(int fd, int status, const char *status_text, const ch
   }
 }
 
+#define PROXY_LLSRV_RESP_MAX (512 * 1024)
+
+/* POST body -> llama.cpp llama-server /completion (model stays loaded in server). */
+static void handle_llama_server_completion_proxy(int cfd, const char *req, ssize_t n) {
+  const char *base = getenv("AZL_LLAMA_SERVER_URL");
+  if (!base || base[0] == '\0') {
+    write_response(
+        cfd, 503, "Service Unavailable",
+        "{\"ok\":false,\"error\":\"AZL_LLAMA_SERVER_URL_unset\","
+        "\"hint\":\"Run llama-server with your .gguf, then export AZL_LLAMA_SERVER_URL=http://127.0.0.1:PORT\"}");
+    return;
+  }
+  char url[2048];
+  size_t bl = strlen(base);
+  while (bl > 0 && (base[bl - 1] == '/' || base[bl - 1] == ' ')) bl--;
+  int un = snprintf(url, sizeof(url), "%.*s/completion", (int)bl, base);
+  if (un <= 0 || (size_t)un >= sizeof(url)) {
+    write_response(cfd, 500, "Internal Server Error",
+                  "{\"ok\":false,\"error\":\"llama_server_url_too_long\"}");
+    return;
+  }
+
+  const char *body_start = strstr(req, "\r\n\r\n");
+  if (body_start) body_start += 4;
+  else {
+    body_start = strstr(req, "\n\n");
+    if (body_start) body_start += 2;
+    else body_start = req;
+  }
+  size_t body_len = (size_t)(req + n - body_start);
+  if (body_len > 12000) body_len = 12000;
+
+  char tmp_path[80];
+  snprintf(tmp_path, sizeof(tmp_path), "/tmp/azl_llsrv_%d.json", (int)getpid());
+  FILE *tf = fopen(tmp_path, "w");
+  if (!tf) {
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"tmpfile_failed\"}");
+    return;
+  }
+  fwrite(body_start, 1, body_len, tf);
+  fclose(tf);
+
+  char cmd[4096];
+  (void)snprintf(cmd, sizeof(cmd),
+                 "curl -sS -g -m 300 -X POST -H 'Content-Type: application/json' -d @%s '%s' 2>/dev/null",
+                 tmp_path, url);
+  FILE *pipe = popen(cmd, "r");
+  if (!pipe) {
+    unlink(tmp_path);
+    write_response(cfd, 502, "Bad Gateway", "{\"ok\":false,\"error\":\"llama_server_curl_failed\"}");
+    return;
+  }
+  char *resp = malloc(PROXY_LLSRV_RESP_MAX + 1);
+  if (!resp) {
+    pclose(pipe);
+    unlink(tmp_path);
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+    return;
+  }
+  size_t total = 0;
+  for (;;) {
+    ssize_t rn = fread(resp + total, 1, PROXY_LLSRV_RESP_MAX - total, pipe);
+    if (rn <= 0) break;
+    total += (size_t)rn;
+    if (total >= PROXY_LLSRV_RESP_MAX) break;
+  }
+  (void)pclose(pipe);
+  unlink(tmp_path);
+  resp[total] = '\0';
+
+  if (total == 0) {
+    free(resp);
+    write_response(cfd, 502, "Bad Gateway",
+                  "{\"ok\":false,\"error\":\"llama_server_empty_response\","
+                  "\"hint\":\"Is llama-server running? Try GET $AZL_LLAMA_SERVER_URL/health\"}");
+    return;
+  }
+  write_response(cfd, 200, "OK", resp);
+  free(resp);
+}
+
 static bool is_public_path(const char *path) {
   return strcmp(path, "/healthz") == 0 || strcmp(path, "/health") == 0 || strcmp(path, "/readyz") == 0 ||
          strcmp(path, "/status") == 0 || strcmp(path, "/segment") == 0 ||
@@ -476,9 +645,10 @@ static bool has_valid_bearer(const char *req, const char *token) {
 }
 
 static void handle_conn(int cfd, EngineState *st) {
-  char req[16384];
-  ssize_t n = read(cfd, req, sizeof(req) - 1);
+  char req[ENGINE_HTTP_REQ_MAX + 1u];
+  ssize_t n = read_http_request_full(cfd, req, ENGINE_HTTP_REQ_MAX);
   if (n <= 0) return;
+  if ((size_t)n >= sizeof(req)) return;
   req[n] = '\0';
   st->requests_total++;
 
@@ -566,6 +736,8 @@ static void handle_conn(int cfd, EngineState *st) {
     int gp_ok = 0;
     struct stat gst;
     if (gp && gp[0] != '\0' && stat(gp, &gst) == 0 && S_ISREG(gst.st_mode)) gp_ok = 1;
+    const char *lsu = getenv("AZL_LLAMA_SERVER_URL");
+    int ls_ok = (lsu && lsu[0] != '\0');
     char cap[8192];
     int cn = snprintf(
         cap, sizeof(cap),
@@ -575,11 +747,15 @@ static void handle_conn(int cfd, EngineState *st) {
         "\"gguf_in_process\":false,"
         "\"gguf_cli_infer\":%s,\"gguf_infer_path\":\"/api/llm/gguf_infer\","
         "\"gguf_model_configured\":%s,"
+        "\"llama_server_http_proxy\":%s,\"llama_server_completion_path\":\"/api/llm/llama_server/completion\","
+        "\"llama_server_upstream_configured\":%s,"
         "\"error\":{\"code\":\"ERR_NATIVE_GGUF_NOT_IN_PROCESS\","
         "\"message\":\"Weights are not linked inside this binary; use POST /api/llm/gguf_infer "
         "(set AZL_GGUF_PATH to a .gguf file and install llama.cpp llama-cli) or "
+        "POST /api/llm/llama_server/completion (llama-server + AZL_LLAMA_SERVER_URL) or "
         "POST /api/ollama/generate (Ollama).\"}}",
-        gp_ok ? "true" : "false", gp_ok ? "true" : "false");
+        gp_ok ? "true" : "false", gp_ok ? "true" : "false", ls_ok ? "true" : "false",
+        ls_ok ? "true" : "false");
     if (cn > 0 && (size_t)cn < sizeof(cap))
       write_response(cfd, 200, "OK", cap);
     else
@@ -590,6 +766,12 @@ static void handle_conn(int cfd, EngineState *st) {
   /* POST /api/llm/gguf_infer: run local llama-cli on AZL_GGUF_PATH (no Ollama) */
   if (strcmp(path, "/api/llm/gguf_infer") == 0 && strcmp(method, "POST") == 0) {
     handle_gguf_infer(cfd, req, n, st);
+    return;
+  }
+
+  /* POST /api/llm/llama_server/completion -> llama-server /completion (model loaded once upstream) */
+  if (strcmp(path, "/api/llm/llama_server/completion") == 0 && strcmp(method, "POST") == 0) {
+    handle_llama_server_completion_proxy(cfd, req, n);
     return;
   }
 
