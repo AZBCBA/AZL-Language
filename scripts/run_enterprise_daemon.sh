@@ -153,6 +153,11 @@ COMPONENTS=(
   "azme/collaboration/azme_peer_registry.azl"
 )
 
+if [ "${AZL_BUNDLE_INCLUDE_OLLAMA_NATIVE:-0}" = "1" ]; then
+  echo "🔗 AZL_BUNDLE_INCLUDE_OLLAMA_NATIVE=1 — appending azl/integrations/anythingllm/azme_ollama_native.azl"
+  COMPONENTS+=( "azl/integrations/anythingllm/azme_ollama_native.azl" )
+fi
+
 for component in "${COMPONENTS[@]}"; do
   if [ -f "$component" ]; then
     echo "📦 Adding: $component"

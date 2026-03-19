@@ -51,6 +51,18 @@ component ::neural.model_loader {
     emit "init_neural_model" with ::model_name ::neural_config
   }
 
+  listen for "load_gguf_native" {
+    set ::path = $1
+    say "❌ Native GGUF load not implemented: "
+    say ::path
+    emit "log_error" with {
+      type: "ERR_NATIVE_GGUF_NOT_IMPLEMENTED",
+      message: "In-process GGUF is not implemented; use Ollama HTTP proxy (GET /api/llm/capabilities).",
+      context: { path: ::path, where: "neural.model_loader.load_gguf_native" }
+    }
+    emit "model_load_failed" with ::path "ERR_NATIVE_GGUF_NOT_IMPLEMENTED"
+  }
+
   listen for "load_qwen_quantum" {
     set ::model_name = $1
     set ::config = $2

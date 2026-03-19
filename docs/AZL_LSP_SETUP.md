@@ -1,6 +1,6 @@
 # AZL Language Server (LSP) Setup
 
-Minimal LSP server for `.azl` files. Provides hover and completion.
+Minimal LSP server for `.azl` files. Provides hover, completion, and **push diagnostics** after `textDocument/didOpen` / `didChange` (heuristic host-syntax hints: `class`, `import`, `def`).
 
 ## Usage
 
@@ -27,7 +27,7 @@ Or use a generic extension that allows custom LSP server paths.
 |---------|--------|
 | Hover | Basic (AZL info) |
 | Completion | AZL keywords (component, emit, listen, etc.) |
-| Diagnostics | Planned |
+| Diagnostics | Push via `textDocument/publishDiagnostics` (heuristic) |
 | Go to definition | Planned |
 
 ## Requirements
@@ -40,4 +40,4 @@ Or use a generic extension that allows custom LSP server paths.
 bash scripts/verify_lsp_smoke.sh
 ```
 
-Sends one `initialize` request and asserts `hoverProvider` in the response. Run from `scripts/run_all_tests.sh`.
+Sends `initialize`, then `textDocument/didOpen` with host-shaped sample text, and asserts `textDocument/publishDiagnostics` with expected diagnostic codes. Run from `scripts/run_all_tests.sh`.

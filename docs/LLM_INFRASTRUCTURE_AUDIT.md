@@ -15,6 +15,8 @@
 
 **Honesty API:** `GET /api/llm/capabilities` on the native engine returns `gguf_in_process: false` and `error.code: ERR_NATIVE_GGUF_NOT_IMPLEMENTED` until a real loader exists.
 
+**AZL surface:** `::neural.model_loader` listens for **`load_gguf_native`** with a path argument; it emits structured `log_error` (`ERR_NATIVE_GGUF_NOT_IMPLEMENTED`) and **`model_load_failed`** until an in-process loader exists.
+
 ---
 
 ## 2. Inference Paths

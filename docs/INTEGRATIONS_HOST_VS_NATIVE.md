@@ -29,3 +29,7 @@ Some files under `azl/integrations/` are **legacy / host-shaped** (JavaScript-li
 1. **C engine:** `POST /api/ollama/generate` (see `docs/LLM_INFRASTRUCTURE_AUDIT.md`).
 2. **Pure AZL + sysproxy:** `emit syscall` with `type: "http"` and an `http://` or `https://` URL (see `azl/system/azl_system_interface.azl`).
 3. **Component:** `::integrations.anythingllm.ollama_native` — event `integrations.anythingllm.ollama_post_json` with `event.data.json` body string for `POST …/api/generate`.
+
+### Optional enterprise bundle line
+
+Set **`AZL_BUNDLE_INCLUDE_OLLAMA_NATIVE=1`** when running `scripts/run_enterprise_daemon.sh` to append `azme_ollama_native.azl` to the combined bundle (still native-safe; not the blocked host-shaped paths).
