@@ -59,7 +59,7 @@ Gate script **`scripts/verify_azl_use_vm_path.sh`** (run from `run_all_tests.sh`
 
 | Document | Use |
 |----------|-----|
-| [AZLPACK_SPEC.md](AZLPACK_SPEC.md) | Package format |
+| [AZLPACK_SPEC.md](AZLPACK_SPEC.md) | Package format; first dogfood pack `packages/src/azl-hello/` |
 | [TRAIN_IN_PURE_AZL.md](TRAIN_IN_PURE_AZL.md) | Training in AZL |
 | [AZME_PRODUCTION_RUNBOOK.md](AZME_PRODUCTION_RUNBOOK.md) | AZME operations |
 | [PRODUCTION_RUN.md](PRODUCTION_RUN.md) | Production run notes |

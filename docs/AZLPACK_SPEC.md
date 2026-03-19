@@ -41,12 +41,22 @@ An `.azlpack` is a tarball (`.tar.gz`) or zip containing:
 
 Simple HTTP registry: `GET https://registry.azl.dev/<name>/<version>` returns the .azlpack tarball.
 
-**Local registry:** `python3 tools/registry_server.py` serves from `AZL_REGISTRY_DIR` (default `.azl/packages`). Package layout: `<dir>/<name>/<version>/pkg.tar.gz`.
+**Local registry directory** (no HTTP): `packages/registry/<name>/<version>/pkg.tar.gz`
 
-## Install Command (Future)
+- Build from source: `bash scripts/build_azlpack.sh` (defaults to `packages/src/azl-hello/` → `packages/registry/azl-hello/1.0.0/pkg.tar.gz`).
+- **HTTP server:** `python3 tools/registry_server.py` serves from `AZL_REGISTRY_DIR` (default `.azl/packages` — override to `packages/registry` for dogfood).
+
+## Install Command
 
 ```bash
-azl install azl-memory-lha3
-# Resolves to .azl/packages/azl-memory-lha3/
-# Adds to AZL_COMPONENT_PATH or equivalent
+# Local dogfood (first-party pack `azl-hello`)
+bash scripts/build_azlpack.sh
+AZL_REGISTRY_DIR="$PWD/packages/registry" bash scripts/azl_install.sh azl-hello
+
+# Remote (when registry is live)
+bash scripts/azl_install.sh <name>   # uses AZL_REGISTRY_URL
 ```
+
+Installed layout: `AZL_PACKAGES_DIR/<name>/` (default `.azl/packages/<name>/`) with flattened `manifest.json` and `azl/` tree.
+
+**Verification:** `scripts/verify_azlpack_local.sh` (invoked from `run_all_tests.sh`).

@@ -19,6 +19,7 @@ To save GitHub Actions minutes, consider **disabling or slimming** overlapping w
 
 - Tests: `./scripts/run_all_tests.sh` (see root `Makefile` `make test`).
 - Includes `scripts/verify_azl_use_vm_path.sh` (static check for `AZL_USE_VM` docs + interpreter wiring).
+- Includes `scripts/verify_azlpack_local.sh` (build + install `azl-hello` .azlpack) and `scripts/verify_lsp_smoke.sh` (`tools/azl_lsp.py` initialize).
 - Release order: `RELEASE_READY.md` (canonical gate sequence).
 
 ## Coverage

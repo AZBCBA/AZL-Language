@@ -33,3 +33,11 @@ Or use a generic extension that allows custom LSP server paths.
 ## Requirements
 
 - Python 3 (stdlib only; no pip packages)
+
+## CI smoke
+
+```bash
+bash scripts/verify_lsp_smoke.sh
+```
+
+Sends one `initialize` request and asserts `hoverProvider` in the response. Run from `scripts/run_all_tests.sh`.

@@ -81,3 +81,9 @@ output.txt
 *.tmp
 *.temp
 .cache/
+
+# Built .azlpack tarballs (scripts/build_azlpack.sh)
+packages/registry/**/pkg.tar.gz
+
+# Installed packages from verify / azl install
+.azl/packages/

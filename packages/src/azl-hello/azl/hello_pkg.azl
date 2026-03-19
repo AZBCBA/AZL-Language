@@ -1,0 +1,6 @@
+# azl-hello — minimal first-party .azlpack module (dogfood for azl install)
+component ::hello.pkg {
+  init {
+    say "azl-hello 1.0.0 — pack loaded (::hello.pkg)"
+  }
+}
