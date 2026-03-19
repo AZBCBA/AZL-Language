@@ -72,6 +72,14 @@ See [OPERATIONS.md](OPERATIONS.md) for the full runbook.
 
 Run full native validation: `./scripts/run_all_tests.sh`.
 
+## LLM and chat benchmarks (optional)
+
+- **C engine + Ollama:** `bash scripts/run_native_engine_llm_bench.sh` (starts a fresh `azl-native-engine`; requires `ollama serve` and a pulled model, e.g. `llama3.2:1b`).
+- **Three-way comparison** (Python / curl / C proxy): `bash scripts/benchmark_llm_ollama.sh` — set `AZL_BENCH_PORT` and `AZL_BENCH_TOKEN` if the engine is already running.
+- **Enterprise HTTP chat:** `AZL_API_TOKEN=… bash scripts/benchmark_enterprise_v1_chat.sh` with the combined daemon on `AZL_ENTERPRISE_PORT` (default `8080`).
+
+See [docs/LLM_INFRASTRUCTURE_AUDIT.md](docs/LLM_INFRASTRUCTURE_AUDIT.md).
+
 ## CI
 - **`test-and-deploy.yml`**: PR/main tests, native engine matrix, benchmark regression gate, C coverage artifacts, Docker (push to GHCR on `main`), optional staging webhook — see [docs/CI_CD_PIPELINE.md](docs/CI_CD_PIPELINE.md)
 - `ci.yml`: placeholder/v2 guards, smoke tests, perf smoke, full tests, AZME E2E

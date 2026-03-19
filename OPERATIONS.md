@@ -18,6 +18,10 @@ This runbook documents how to run the enterprise daemon and validate host integr
 - `./scripts/run_tests.sh` — runs canonical native checks
 - `./scripts/run_all_tests.sh` — runs strict native suite + benchmark gates
 - `bash scripts/benchmark_native_api.sh` — native API latency benchmark
+- **LLM / chat (optional, needs running backends):**
+  - `bash scripts/run_native_engine_llm_bench.sh` — C `azl-native-engine` + Ollama (`ollama serve` + model)
+  - `bash scripts/benchmark_llm_ollama.sh` — Python vs curl vs C Ollama proxy (detects proxy via `GET /api/llm/capabilities`)
+  - `AZL_API_TOKEN=… bash scripts/benchmark_enterprise_v1_chat.sh` — enterprise `POST /v1/chat` (daemon on `AZL_ENTERPRISE_PORT`, default 8080)
 
 ## CI
 - Main CI (`.github/workflows/ci.yml`):

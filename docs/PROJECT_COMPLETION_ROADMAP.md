@@ -28,6 +28,13 @@ This is the **honest** map from **today’s repository** to the **contract goals
 
 Depends on **which stack** answers requests (C-only vs AZL `http_server.azl`). Do after spine choice is unambiguous for the canonical profile.
 
+**Shipped (instrumentation + docs, not “one true server”):**
+
+- **C native engine:** `GET /api/llm/capabilities`, `POST /api/ollama/generate` → Ollama; `scripts/run_native_engine_llm_bench.sh` + `scripts/benchmark_llm_ollama.sh` (bench skips non-proxy ports so enterprise :8080 is not mistaken for the C proxy).
+- **Enterprise combined daemon:** `azl/system/http_server.azl` exposes **`POST /v1/chat`** (Bearer); `scripts/benchmark_enterprise_v1_chat.sh` for latency when the daemon is up.
+
+**Still open:** pick or document the **canonical** HTTP profile per deployment (C-only supervisor vs full AZL HTTP server) and align default startup scripts and audits so product expectations match the process trace.
+
 ## Layer 3 — P2 process capability policy
 
 `proc.exec` / `proc.spawn` under explicit AZL policy — see contract.

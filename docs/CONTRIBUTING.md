@@ -21,6 +21,18 @@ Subtrees such as `azl/quantum/`, `azl/memory/`, `azl/neural/`, and `azl/ffi/` co
 
 Refresh local counts: `bash scripts/audit_gpu_neural_quantum_surfaces.sh`
 
+## LLM and HTTP benchmarks (optional)
+
+Three **different** surfaces — do not mix them up:
+
+| Script | What it measures |
+|--------|------------------|
+| `scripts/run_native_engine_llm_bench.sh` | Builds and starts **C `azl-native-engine`**, then runs the Ollama comparison (needs `ollama serve` + a model). |
+| `scripts/benchmark_llm_ollama.sh` | Python vs curl vs **C engine** `POST /api/ollama/generate` (only if `GET /api/llm/capabilities` reports the proxy). |
+| `scripts/benchmark_enterprise_v1_chat.sh` | **Enterprise daemon** `POST /v1/chat` with `AZL_API_TOKEN` (not the C Ollama proxy). |
+
+Details and honesty contract: [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md).
+
 ## Active work areas (coordinate before changing)
 
 - **`azl/core/parser/azl_parser.azl`** — Token types, keywords, operators, punctuation, `tokenize`, `parse_azl_code`, AST.
@@ -50,7 +62,7 @@ Please avoid large, conflicting edits in these areas without coordination. Add t
 2. Create a feature branch (`git checkout -b feature/your-feature`).
 3. Make changes; update specs/docs under `docs/` when changing behavior.
 4. Add or adjust tests under `azl/testing/` and runtime gate scripts.
-5. Ensure the project runs (`scripts/run_tests.sh` and `scripts/verify_native_runtime_live.sh`).
+5. Ensure the project runs (`scripts/run_tests.sh`, `scripts/run_all_tests.sh` for the full suite, and `scripts/verify_native_runtime_live.sh` where relevant).
 6. Push and open a Pull Request. Keep PRs small and reviewable.
 
 ## Documentation

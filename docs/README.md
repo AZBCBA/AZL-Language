@@ -20,7 +20,7 @@ Single entry point for **accurate** project docs. Older “status report”, “
 | [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md) | Phased completion vs contract (P0 executor gap, P1–P5) |
 | [DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md](DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md) | Quantum / LHA3 / memory: real vs symbolic |
 | [AZL_GPU_NEURAL_QUANTUM_INVENTORY.md](AZL_GPU_NEURAL_QUANTUM_INVENTORY.md) | GPU / neural / LHA3 / quantum **file map** vs default runtime; `scripts/audit_gpu_neural_quantum_surfaces.sh` |
-| [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md) | LLM / HTTP / proxy stack; includes **`GET /api/llm/capabilities`** on native engine |
+| [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md) | LLM / HTTP / proxy stack; includes **`GET /api/llm/capabilities`** on native engine; benches: `scripts/run_native_engine_llm_bench.sh`, `scripts/benchmark_llm_ollama.sh`, `scripts/benchmark_enterprise_v1_chat.sh` |
 | [INTEGRATIONS_HOST_VS_NATIVE.md](INTEGRATIONS_HOST_VS_NATIVE.md) | AnythingLLM / `azl/integrations`: pure AZL vs host-shaped reference |
 | [AUDIT_STRENGTH_ITEMS.md](AUDIT_STRENGTH_ITEMS.md) | Focused strength / risk audit |
 | [STATUS.md](STATUS.md) | Short **verified** runtime snapshot |

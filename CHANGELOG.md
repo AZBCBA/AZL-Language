@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+- **Enterprise chat benchmark:** `scripts/benchmark_enterprise_v1_chat.sh` — `POST /v1/chat` latency against the enterprise HTTP stack (requires `AZL_API_TOKEN`; rejects C-native ports). Documented in `LLM_INFRASTRUCTURE_AUDIT.md`, `CONTRIBUTING.md`, `README.md`, `OPERATIONS.md`, `docs/README.md`; `PROJECT_COMPLETION_ROADMAP.md` Layer 2 updated with shipped instrumentation vs open “canonical profile” choice.
 - **Advanced topology handshake:** `on initialize_advanced_topology` now validates payload strictly (`advanced_topology` must be boolean `true`, `consciousness_integration` must be boolean); on failure emits `quantum.mathematics.advanced_topology.error` plus `log_error` (no silent defaults).
 - **LLM bench automation:** `scripts/run_native_engine_llm_bench.sh` — build/start C `azl-native-engine` with minimal bootstrap, then run `benchmark_llm_ollama.sh`; documented in `docs/LLM_INFRASTRUCTURE_AUDIT.md` §5.
 - **Rename:** `azl/quantum/mathematics/quantum_math.azl` → `advanced_topology.azl` (matches `::quantum.mathematics.advanced_topology`). `train_real_models.azl`, `azl.build.json`, reorganizer plan, architecture docs, and inventory/audit markdown updated; `on initialize_advanced_topology` added for orchestration handshake.
