@@ -67,6 +67,7 @@ When implemented, update **`GET /api/llm/capabilities`** to set `gguf_in_process
 
 - **API latency:** `scripts/benchmark_azl_vs_python.sh` (healthz / status / exec_state).
 - **LLM proxy:** `scripts/benchmark_llm_ollama.sh` — compares Python → Ollama, curl → Ollama, and **C native engine** → `POST /api/ollama/generate` only when `GET /api/llm/capabilities` reports `"ollama_http_proxy":true` (avoids mistaking the enterprise HTTP stack on :8080 for the C proxy).
+- **Product suite:** `scripts/run_product_benchmark_suite.sh` — runs `run_native_engine_llm_bench.sh`, then `benchmark_enterprise_v1_chat.sh` only when `AZL_API_TOKEN` is set.
 - **One-shot C engine + LLM bench:** `scripts/run_native_engine_llm_bench.sh` — builds `azl-native-engine`, starts it with minimal bootstrap (`azl/tests/c_minimal_link_ping.azl`), waits for capabilities, runs `benchmark_llm_ollama.sh` with matching `AZL_BENCH_PORT` / `AZL_BENCH_TOKEN`. Requires `ollama serve` and a pulled model (e.g. `llama3.2:1b`).
 - **Enterprise HTTP stack (different surface):** when the combined daemon serves `azl/system/http_server.azl`, chat is **`POST /v1/chat`** (or `/chat`) with **Bearer** auth — not **`POST /api/ollama/generate`**. **`scripts/benchmark_enterprise_v1_chat.sh`** measures latency for that route (requires running enterprise daemon + `AZL_API_TOKEN`).
 
@@ -80,6 +81,7 @@ When implemented, update **`GET /api/llm/capabilities`** to set `gguf_in_process
 | `scripts/benchmark_llm_ollama.sh` | LLM latency benchmark (detects C proxy via `/api/llm/capabilities`) |
 | `scripts/run_native_engine_llm_bench.sh` | Start C engine + run LLM benchmark end-to-end |
 | `scripts/benchmark_enterprise_v1_chat.sh` | Enterprise `POST /v1/chat` latency (daemon + token) |
+| `scripts/run_product_benchmark_suite.sh` | Native LLM bench + optional enterprise chat in one run |
 | `azl/system/azl_system_interface.azl` | `http_client` sysproxy integration |
 | `azl/integrations/anythingllm/azme_bridge.azl` | Ollama client (integration / host contexts) |
 | `azl/integrations/anythingllm/azme_anythingllm_provider.azl` | AnythingLLM-oriented provider |
