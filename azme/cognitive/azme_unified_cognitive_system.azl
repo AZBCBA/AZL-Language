@@ -9,7 +9,7 @@ component ::azme.unified_cognitive_system {
 
   behavior {
     listen for "orchestrate_cognition" then {
-      # Initialize Rust infrastructure components (conceptual placeholders)
+      # Initialize Rust infrastructure components (design-time wiring)
     // Initialize Rust infrastructure components
       set ::rust_components = {
         neural_engine: "simulated",

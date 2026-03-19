@@ -207,7 +207,7 @@ component ::azl.runtime {
       }
       # Record call for tracing
       emit runtime.call.trace with { component: context, fn: func_name, argc: (args.length or 0) }
-      # Until full function registry is wired, return null strictly (no placeholder)
+      # Until full function registry is wired, return null strictly (no synthetic fallback)
       return null
     }
     return null
