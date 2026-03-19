@@ -60,6 +60,9 @@ cap = r1["result"]["capabilities"]
 if not cap.get("hoverProvider"):
     sys.stderr.write("missing hoverProvider\n")
     sys.exit(53)
+if not cap.get("definitionProvider"):
+    sys.stderr.write("missing definitionProvider\n")
+    sys.exit(59)
 
 uri = "file:///tmp/azl_lsp_smoke.azl"
 bad = "class Broken {}\nimport os\ndef foo():\n  pass\n"

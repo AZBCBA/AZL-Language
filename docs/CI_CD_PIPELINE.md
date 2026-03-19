@@ -18,8 +18,8 @@ To save GitHub Actions minutes, consider **disabling or slimming** overlapping w
 ## Local parity
 
 - Tests: `./scripts/run_all_tests.sh` (see root `Makefile` `make test`).
-- Includes `scripts/verify_azl_use_vm_path.sh` (static check for `AZL_USE_VM` docs + interpreter wiring).
-- Includes `scripts/verify_azlpack_local.sh` (build + install `azl-hello` .azlpack) and `scripts/verify_lsp_smoke.sh` (`tools/azl_lsp.py`: initialize + `didOpen` → `publishDiagnostics`).
+- Includes `scripts/test_azl_use_vm_path.sh` (`AZL_USE_VM` wiring, VM vs tree-walker **source parity**, eligible fixture lint; see `docs/AZL_NATIVE_RUNTIME_CONTRACT.md`).
+- Includes `scripts/verify_azlpack_local.sh` (build + install `azl-hello` .azlpack), `scripts/verify_lsp_smoke.sh` (`initialize` + `definitionProvider` + `didOpen` → `publishDiagnostics`), and `scripts/test_lsp_jump_to_def.sh` (`textDocument/definition` on `azl/tests/lsp_definition_resolution.azl`).
 - Includes `scripts/verify_native_bundle_excludes_host_integrations.sh` (no host-shaped AnythingLLM paths in `run_enterprise_daemon.sh`).
 - Release order: `RELEASE_READY.md` (canonical gate sequence).
 

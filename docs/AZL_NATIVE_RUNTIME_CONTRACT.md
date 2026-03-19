@@ -2,6 +2,8 @@
 
 This document defines the hard direction for AZL as an independent language runtime.
 
+**Spine decision (current vs target, P0–P5):** [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md) — read this first so you do not confuse **today’s default runtime child** (C minimal on the combined file) with the **decided semantic core** (AZL interpreter).
+
 ## Objective
 
 AZL must converge to a standalone language stack for end users:
@@ -27,6 +29,23 @@ AZL must converge to a standalone language stack for end users:
 
 - Interpreter gate + opcode runner: `azl/runtime/interpreter/azl_interpreter.azl` (`vm_compile_ast`, `vm_run_bytecode_program`)
 - Reference VM (separate opcode surface): `azl/runtime/vm/azl_vm.azl`
+
+### Default enterprise runtime vs pure AZL interpreter
+
+Canonical **native enterprise** startup (`scripts/start_azl_native_mode.sh` → `run_enterprise_daemon.sh`) sets `AZL_NATIVE_RUNTIME_CMD` to **`scripts/azl_c_interpreter_runtime.sh`**, which runs the **C minimal interpreter** (`tools/azl_interpreter_minimal.c`) over the combined `.azl` bundle. That path **does not** load or execute `azl/runtime/interpreter/azl_interpreter.azl`, so it **never consults** `AZL_USE_VM`.
+
+`AZL_USE_VM` matters when execution reaches **`::azl.interpreter`**’s **`execute`** handler (pure-AZL bootstrap, self-hosted paths, tests, or any future runtime that runs the AZL interpreter instead of the C skeleton).
+
+**Observable parity (when the AZL interpreter runs):** VM and tree-walker both use `evaluate_expression` for `say` operands and call **`emit_event_resolved`** for `emit`, so `say` lines are prefixed with `💬 ` and emits log `📡 Emitting event: …` before listener dispatch.
+
+### Example (eligible snippet)
+
+See `azl/tests/fixtures/vm_parity_minimal.azl`: root-level `say` / `emit`, one component with **`init`** containing only `say` / `emit` and an **empty** `behavior` block.
+
+### Verification
+
+- `scripts/test_azl_use_vm_path.sh` — static wiring (`verify_azl_use_vm_path.sh`), source parity (`scripts/check_azl_vm_tree_parity.py`), fixture lint (no `listen` / `set` / `if` / `fn` in the eligible fixture).
+- `scripts/run_all_tests.sh` invokes the above.
 
 ## Native Mode Switch
 

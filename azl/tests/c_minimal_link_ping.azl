@@ -1,0 +1,15 @@
+# Contract test for tools/azl_interpreter_minimal.c: link + unquoted emit + listener dispatch
+component ::a.listener {
+  behavior {
+    listen for "ping" {
+      say "C_MINIMAL_LINK_PING_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::a.listener
+    emit ping
+  }
+}

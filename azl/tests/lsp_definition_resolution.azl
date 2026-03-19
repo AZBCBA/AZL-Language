@@ -1,0 +1,35 @@
+# LSP jump-to-definition fixtures (positions asserted by scripts/test_lsp_jump_to_def.sh)
+# Do not reorder sections without updating the test script.
+
+component ::lsp.def.target {
+  init {
+    say "lsp.def.target.init"
+  }
+  behavior {
+    listen for "lsp.def.event" {
+      say "lsp.def.target.heard"
+    }
+  }
+}
+
+component ::lsp.def.caller {
+  init {
+    link ::lsp.def.target
+    emit "lsp.def.event"
+  }
+  behavior {
+    listen for "lsp.def.outer" {
+      emit "lsp.def.event"
+    }
+  }
+}
+
+fn lsp_def_fun(x) {
+  say x
+}
+
+component ::lsp.def.fn_user {
+  init {
+    lsp_def_fun("lsp.def.fn.arg")
+  }
+}

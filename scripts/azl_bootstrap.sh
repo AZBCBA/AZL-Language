@@ -27,51 +27,15 @@ else
   mkdir -p "${TMPDIR}"
 fi
 
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT_DIR"
+
 # If input already a bootstrap, do not re-wrap it
 if head -n 1 "$INPUT" 2>/dev/null | grep -q '^# AZL-BOOTSTRAP v1'; then
   BUNDLE="$INPUT"
 else
   BUNDLE="$(mktemp -p "${TMPDIR}" -t azl_bootstrap.XXXXXX.azl)"
-  # trap 'rm -f "$BUNDLE"' EXIT  # Commented out for debugging
-
-  {
-    echo '# AZL-BOOTSTRAP v1'
-    echo "## ENTRY: $ENTRY"
-    echo "## COMBINED: $INPUT"
-    echo
-
-    # ===== Runtime (overwrite, not append) =====
-    # IMPORTANT: every cat below is an append *to this one new file*,
-    # but we started with a clean file thanks to the block above.
-    cat azl/kernel/azl_kernel.azl
-    cat azl/system/azl_system_interface.azl
-    cat azl/core/error_system.azl
-    cat azl/runtime/interpreter/azl_interpreter.azl
-    cat azl/runtime/vm/azl_vm.azl
-    cat azl/core/compiler/azl_bytecode.azl
-    cat azl/core/azl/self_execution_engine.azl
-    cat azl/bootstrap/azl_pure_launcher.azl
-    cat azl/host/exec_bridge.azl
-
-    # Final tiny boot component that calls the launcher on $INPUT/$ENTRY
-    cat <<'AZL'
-component ::boot.entry {
-  init {
-    say "exec_bridge: AZL_BOOT: calling pure launcher..."
-    
-    # Instead of calling the launcher on the combined file (which creates a loop),
-    # we'll directly execute the exec_bridge component which contains our trampoline
-    say "🚀 Direct execution of exec_bridge component..."
-    
-    # Link and execute the exec_bridge component
-    link ::host.exec_bridge
-    
-    # The exec_bridge component should now run its init block with the trampoline
-    say "✅ exec_bridge component linked and should be executing"
-  }
-}
-AZL
-  } > "$BUNDLE"
+  bash scripts/build_azl_bootstrap_bundle.sh "$INPUT" "$ENTRY" --out "$BUNDLE"
 fi
 
 # Set env vars for the launcher, but DO NOT spawn any more bootstrap steps

@@ -10,6 +10,7 @@ Single entry point for **accurate** project docs. Older “status report”, “
 | [../OPERATIONS.md](../OPERATIONS.md) | Runbook: daemons, sysproxy, tests |
 | [../RELEASE_READY.md](../RELEASE_READY.md) | **Release gate order** before shipping native profile |
 | [AZL_NATIVE_RUNTIME_CONTRACT.md](AZL_NATIVE_RUNTIME_CONTRACT.md) | Native HTTP/runtime behavior contract |
+| [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md) | **Spine source of truth:** C engine vs AZL interpreter (current vs target, P0–P5) |
 
 ## Roadmap and audits (planning)
 
@@ -54,7 +55,9 @@ Broader / historical spec draft: [../azl/docs/AZL_LANGUAGE_SPECIFICATION.md](../
 
 Workflows live under `.github/workflows/` — including **`test-and-deploy.yml`** (tests, native matrix, benchmarks, coverage artifact, Docker → GHCR, optional staging webhook).
 
-Gate script **`scripts/verify_azl_use_vm_path.sh`** (run from `run_all_tests.sh`) checks that `AZL_USE_VM` is documented and wired in `azl_interpreter.azl` + enterprise daemon.
+**`scripts/test_azl_use_vm_path.sh`** (from `run_all_tests.sh`) checks `AZL_USE_VM` docs + wiring, **source-level parity** between `vm_run_bytecode_program` and tree-walker say/emit (`check_azl_vm_tree_parity.py`), and the eligible fixture `azl/tests/fixtures/vm_parity_minimal.azl`.
+
+**LSP:** `tools/azl_lsp.py` provides diagnostics and **`textDocument/definition`** (jump to `component ::…`, matching `emit`/`listen` sites, `fn` / `function`). Integration tests: `scripts/verify_lsp_smoke.sh`, `scripts/test_lsp_jump_to_def.sh` (fixture `azl/tests/lsp_definition_resolution.azl`).
 
 ## Packages, training, runbooks
 
@@ -79,7 +82,7 @@ Gate script **`scripts/verify_azl_use_vm_path.sh`** (run from `run_all_tests.sh`
 | Document | Use |
 |----------|-----|
 | [CODEGEN.md](CODEGEN.md) | Code generation notes |
-| [AZL_LSP_SETUP.md](AZL_LSP_SETUP.md) | LSP setup |
+| [AZL_LSP_SETUP.md](AZL_LSP_SETUP.md) | LSP: diagnostics + go to definition |
 | [STRICT_AZL_GRAMMAR_CONFORMANCE_CHECKLIST.md](STRICT_AZL_GRAMMAR_CONFORMANCE_CHECKLIST.md) | Grammar conformance |
 | [reflection_flow.md](reflection_flow.md) | Reflection flow |
 | [ENTERPRISE_BUILD_SYSTEM.md](ENTERPRISE_BUILD_SYSTEM.md) | Enterprise build |

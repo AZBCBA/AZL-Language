@@ -1,6 +1,6 @@
 # AZL Language Server (LSP) Setup
 
-Minimal LSP server for `.azl` files. Provides hover, completion, and **push diagnostics** after `textDocument/didOpen` / `didChange` (heuristic host-syntax hints: `class`, `import`, `def`).
+Minimal LSP server for `.azl` files (Python stdlib only): hover, completion, push diagnostics, and **go to definition**.
 
 ## Usage
 
@@ -10,34 +10,50 @@ The server reads JSON-RPC from stdin and writes to stdout. No other setup requir
 
 ## VSCode / Cursor
 
-Create `.vscode/settings.json`:
+Point your LSP client at the server (or use a generic “stdio language server” extension):
 
 ```json
 {
   "azl.languageServerPath": "python3",
-  "azl.languageServerArgs": ["tools/azl_lsp.py"]
+  "azl.languageServerArgs": ["${workspaceFolder}/tools/azl_lsp.py"]
 }
 ```
 
-Or use a generic extension that allows custom LSP server paths.
+Extensions such as **Language Server Protocol** / **vscode-languageservers**-style wrappers work as long as they spawn the command above with the workspace folder as cwd (so `${workspaceFolder}` resolves).
 
 ## Capabilities
 
 | Feature | Status |
 |---------|--------|
-| Hover | Basic (AZL info) |
-| Completion | AZL keywords (component, emit, listen, etc.) |
-| Diagnostics | Push via `textDocument/publishDiagnostics` (heuristic) |
-| Go to definition | Planned |
+| Hover | Basic (AZL overview) |
+| Completion | AZL keywords (`component`, `emit`, `listen`, …) |
+| Diagnostics | Push (`textDocument/publishDiagnostics`) — host-syntax hints (`class`, `import`, `def`) |
+| **Go to definition** | `textDocument/definition` (see below) |
+
+### Go to definition (implemented)
+
+Heuristic, **same-line–centric** resolution (no full AST); good for large trees and `::` navigation.
+
+| You click on | Result |
+|----------------|--------|
+| `::foo.bar` / `::foo.bar.baz` (e.g. after `link`, `to`, or inline) | `component ::foo.bar…` **name** range in any **open** document |
+| Event string in `listen for "event.name"` | All `emit "event.name"` / `emit event.name` sites in **open** documents |
+| Event string or name in `emit "event.name"` / `emit name` | All matching `listen for …` sites in **open** documents |
+| Identifier for a call (e.g. `my_fn(`) | First `fn my_fn(` / `function my_fn(` definition in **open** documents |
+
+**Limits:** Only buffers registered via `textDocument/didOpen` are searched (typical for LSP). `LocationLink` / multi-root workspace indexing are not implemented yet. Unquoted `listen for word` and `emit word` are supported on the **same line** as the keyword.
+
+**Fixture / tests:** `azl/tests/lsp_definition_resolution.azl` — run `bash scripts/test_lsp_jump_to_def.sh`.
 
 ## Requirements
 
 - Python 3 (stdlib only; no pip packages)
 
-## CI smoke
+## CI
 
 ```bash
 bash scripts/verify_lsp_smoke.sh
+bash scripts/test_lsp_jump_to_def.sh
 ```
 
-Sends `initialize`, then `textDocument/didOpen` with host-shaped sample text, and asserts `textDocument/publishDiagnostics` with expected diagnostic codes. Run from `scripts/run_all_tests.sh`.
+Both run from `scripts/run_all_tests.sh`. Smoke checks `initialize` + diagnostics + `definitionProvider`; jump-to-def test drives `textDocument/definition` on the fixture file.

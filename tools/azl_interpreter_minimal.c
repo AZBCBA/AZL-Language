@@ -50,42 +50,7 @@ static void skip_whitespace_and_comments(const char **p) {
   }
 }
 
-static int next_token(const char **p, char *out, size_t out_sz) {
-  skip_whitespace_and_comments(p);
-  if (!**p) return 0;
-  const char *start = *p;
-  if (*start == '"' || *start == '\'') {
-    char q = *start++;
-    size_t i = 0;
-    while (*start && *start != q && i + 1 < out_sz) {
-      if (*start == '\\') start++;
-      out[i++] = *start++;
-    }
-    out[i] = '\0';
-    if (*start == q) start++;
-    *p = start;
-    return 1;
-  }
-  if (isalnum((unsigned char)*start) || *start == '_' || *start == ':') {
-    size_t i = 0;
-    while (*start && (isalnum((unsigned char)*start) || *start == '_' || *start == '.' || *start == ':') && i + 1 < out_sz)
-      out[i++] = *start++;
-    out[i] = '\0';
-    *p = start;
-    return 1;
-  }
-  if (*start == '{' || *start == '}' || *start == '(' || *start == ')' || *start == ';' || *start == '=' || *start == ',' || *start == '[' || *start == ']') {
-    out[0] = *start;
-    out[1] = '\0';
-    (*p)++;
-    return 1;
-  }
-  (*p)++;
-  return 0;
-}
-
 static int tokenize(void) {
-  char tok[256];
   const char *p = g_src;
   g_ntok = 0;
   while (g_ntok < MAX_TOKS - 1) {
@@ -177,6 +142,12 @@ static void register_listener(const char *ev, int start, int end) {
   }
 }
 
+static int find_block_end(int i);
+static void register_behavior_listeners(int start, int end);
+static void exec_init_block(int *i);
+static void exec_link(int *i);
+static void run_linked_component(const char *link_target);
+
 /* Execute say "string" or say ::var - print to stdout */
 static void exec_say(int *i) {
   (*i)++;
@@ -231,22 +202,29 @@ static void exec_set(int *i) {
   (*i)++;
 }
 
-/* Execute emit "event" */
+/* Execute emit "event" or emit event (unquoted identifier) */
 static void exec_emit(int *i) {
   (*i)++;
   if (*i >= g_ntok) return;
   const char *s = g_tok[*i];
+  char ev[64] = {0};
+  int have_ev = 0;
   if (s && strlen(s) >= 2 && (s[0] == '"' || s[0] == '\'')) {
-    char ev[64] = {0};
     size_t len = strlen(s);
     if (len >= 2) {
       size_t n = len - 2;
       if (n >= sizeof(ev)) n = sizeof(ev) - 1;
       memcpy(ev, s + 1, n);
       ev[n] = '\0';
+      have_ev = 1;
     }
-    queue_push(ev);
+  } else if (s && s[0] != '\0') {
+    strncpy(ev, s, sizeof(ev) - 1);
+    ev[sizeof(ev) - 1] = '\0';
+    have_ev = 1;
   }
+  if (!have_ev) return;
+  queue_push(ev);
   (*i)++;
   /* Skip "with" { ... } if present */
   if (*i < g_ntok && strcmp(g_tok[*i], "with") == 0) {
@@ -263,6 +241,58 @@ static void exec_emit(int *i) {
   }
 }
 
+/* link ::component.name — register listeners + run init for that component */
+static void exec_link(int *i) {
+  (*i)++;
+  if (*i >= g_ntok) return;
+  run_linked_component(g_tok[*i]);
+  (*i)++;
+}
+
+static void run_linked_component(const char *link_target) {
+  if (!link_target || !link_target[0]) return;
+  const char *lt = link_target;
+  if (lt[0] == ':' && lt[1] == ':') lt += 2;
+
+  for (int ci = 0; ci < g_ntok; ci++) {
+    if (strcmp(g_tok[ci], "component") != 0) continue;
+    int j = ci + 1;
+    char name_buf[256] = {0};
+    while (j < g_ntok && g_tok[j] && strcmp(g_tok[j], "{") != 0 && strcmp(g_tok[j], "init") != 0) {
+      if (strlen(name_buf) + strlen(g_tok[j]) + 1 < sizeof(name_buf))
+        strncat(name_buf, g_tok[j], sizeof(name_buf) - strlen(name_buf) - 1);
+      j++;
+    }
+    const char *nb = name_buf;
+    if (nb[0] == ':' && nb[1] == ':') nb += 2;
+    if (strcmp(nb, lt) != 0) continue;
+
+    if (j >= g_ntok || strcmp(g_tok[j], "{") != 0) return;
+    /* j points at opening '{'; find_block_end expects first token *inside* the block */
+    int comp_end = find_block_end(j + 1);
+    int k = j;
+    while (k < comp_end && strcmp(g_tok[k], "behavior") != 0) k++;
+    if (k < comp_end && strcmp(g_tok[k], "behavior") == 0) {
+      k++;
+      if (k < comp_end && strcmp(g_tok[k], "{") == 0) {
+        register_behavior_listeners(k + 1, find_block_end(k + 1));
+      }
+    }
+    k = j;
+    while (k < comp_end && strcmp(g_tok[k], "init") != 0) k++;
+    if (k < comp_end && strcmp(g_tok[k], "init") == 0) {
+      k++;
+      while (k < comp_end && strcmp(g_tok[k], "{") != 0) k++;
+      if (k < comp_end) {
+        k++;
+        exec_init_block(&k);
+      }
+    }
+    return;
+  }
+  fprintf(stderr, "azl_interpreter_minimal: link: component not found: %s\n", link_target);
+}
+
 /* Execute a block from start to end (exclusive) */
 static void exec_block(int start, int end) {
   int depth = 1;
@@ -274,6 +304,7 @@ static void exec_block(int start, int end) {
     else if (depth == 1 && strcmp(t, "say") == 0) exec_say(&i);
     else if (depth == 1 && strcmp(t, "set") == 0) exec_set(&i);
     else if (depth == 1 && strcmp(t, "emit") == 0) exec_emit(&i);
+    else if (depth == 1 && strcmp(t, "link") == 0) exec_link(&i);
     else i++;
   }
 }
@@ -302,6 +333,7 @@ static void exec_init_block(int *i) {
     else if (depth == 1 && strcmp(t, "say") == 0) exec_say(i);
     else if (depth == 1 && strcmp(t, "set") == 0) exec_set(i);
     else if (depth == 1 && strcmp(t, "emit") == 0) { exec_emit(i); process_events(); }
+    else if (depth == 1 && strcmp(t, "link") == 0) exec_link(i);
     else (*i)++;
   }
 }
@@ -363,23 +395,25 @@ static int run(const char *entry) {
       }
       int matches = !entry || (name_buf[0] && strstr(name_buf, entry) != NULL);
       if (matches) {
+        if (j >= g_ntok || strcmp(g_tok[j], "{") != 0) return 0;
+        int comp_end = find_block_end(j + 1);
         i = j;
-        /* Register behavior listeners before init */
-        while (i < g_ntok && strcmp(g_tok[i], "behavior") != 0) i++;
-        if (i < g_ntok && strcmp(g_tok[i], "behavior") == 0) {
+        /* Register behavior listeners before init (stay within this component body) */
+        while (i < comp_end && strcmp(g_tok[i], "behavior") != 0) i++;
+        if (i < comp_end && strcmp(g_tok[i], "behavior") == 0) {
           i++;
-          if (i < g_ntok && strcmp(g_tok[i], "{") == 0) {
+          if (i < comp_end && strcmp(g_tok[i], "{") == 0) {
             int bh_start = i + 1;
             int bh_end = find_block_end(i + 1);
             register_behavior_listeners(bh_start, bh_end);
           }
         }
         i = j;
-        while (i < g_ntok && strcmp(g_tok[i], "init") != 0) i++;
-        if (i < g_ntok && strcmp(g_tok[i], "init") == 0) {
+        while (i < comp_end && strcmp(g_tok[i], "init") != 0) i++;
+        if (i < comp_end && strcmp(g_tok[i], "init") == 0) {
           i++;
-          while (i < g_ntok && strcmp(g_tok[i], "{") != 0) i++;
-          if (i < g_ntok) { i++; exec_init_block(&i); }
+          while (i < comp_end && strcmp(g_tok[i], "{") != 0) i++;
+          if (i < comp_end) { i++; exec_init_block(&i); }
         }
         process_events();
         return 0;
@@ -388,25 +422,33 @@ static int run(const char *entry) {
   }
   /* No entry match: run first component */
   for (int i = 0; i < g_ntok; i++) {
-    if (strcmp(g_tok[i], "component") == 0 && i + 1 < g_ntok) {
-      int j = i + 1;
-      while (j < g_ntok && strcmp(g_tok[j], "behavior") != 0) j++;
-      if (j < g_ntok && strcmp(g_tok[j], "behavior") == 0) {
-        j++;
-        if (j < g_ntok && strcmp(g_tok[j], "{") == 0) {
-          register_behavior_listeners(j + 1, find_block_end(j + 1));
-        }
-      }
-      j = i + 1;
-      while (j < g_ntok && strcmp(g_tok[j], "init") != 0) j++;
-      if (j < g_ntok && strcmp(g_tok[j], "init") == 0) {
-        j++;
-        while (j < g_ntok && strcmp(g_tok[j], "{") != 0) j++;
-        if (j < g_ntok) { j++; exec_init_block(&j); }
-      }
-      process_events();
-      return 0;
+    if (strcmp(g_tok[i], "component") != 0 || i + 1 >= g_ntok) continue;
+    int j = i + 1;
+    char nb[256] = {0};
+    while (j < g_ntok && g_tok[j] && strcmp(g_tok[j], "{") != 0 && strcmp(g_tok[j], "init") != 0) {
+      if (strlen(nb) + strlen(g_tok[j]) + 1 < sizeof(nb))
+        strncat(nb, g_tok[j], sizeof(nb) - strlen(nb) - 1);
+      j++;
     }
+    if (j >= g_ntok || strcmp(g_tok[j], "{") != 0) continue;
+    int comp_end = find_block_end(j + 1);
+    int jj = j;
+    while (jj < comp_end && strcmp(g_tok[jj], "behavior") != 0) jj++;
+    if (jj < comp_end && strcmp(g_tok[jj], "behavior") == 0) {
+      jj++;
+      if (jj < comp_end && strcmp(g_tok[jj], "{") == 0) {
+        register_behavior_listeners(jj + 1, find_block_end(jj + 1));
+      }
+    }
+    jj = j;
+    while (jj < comp_end && strcmp(g_tok[jj], "init") != 0) jj++;
+    if (jj < comp_end && strcmp(g_tok[jj], "init") == 0) {
+      jj++;
+      while (jj < comp_end && strcmp(g_tok[jj], "{") != 0) jj++;
+      if (jj < comp_end) { jj++; exec_init_block(&jj); }
+    }
+    process_events();
+    return 0;
   }
   return 0;
 }

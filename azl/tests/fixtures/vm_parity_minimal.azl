@@ -1,0 +1,16 @@
+# vm_parity_minimal.azl — document-order snippet eligible for AZL_USE_VM=1
+# (say / emit at root; one component with init-only say/emit and empty behavior)
+# See docs/AZL_NATIVE_RUNTIME_CONTRACT.md
+
+say "vm_parity_root"
+
+component ::vm.parity.minimal {
+  init {
+    say "vm_parity_init"
+    emit "vm_parity_inner" with "inner_payload"
+  }
+  behavior {
+  }
+}
+
+emit "vm_parity_outer" with "outer_payload"

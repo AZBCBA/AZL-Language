@@ -59,6 +59,26 @@ if ! rg -q "/api/llm/capabilities" tools/azl_native_engine.c; then
   exit 22
 fi
 
+echo "[gate] F: C minimal interpreter — link, unquoted emit, listener dispatch"
+bash scripts/build_azl_interpreter_minimal.sh >/dev/null
+MINI_BIN="${ROOT_DIR}/.azl/bin/azl-interpreter-minimal"
+if [ ! -x "$MINI_BIN" ]; then
+  echo "ERROR: azl-interpreter-minimal not built at $MINI_BIN"
+  exit 23
+fi
+set +e
+MINI_OUT="$("$MINI_BIN" azl/tests/c_minimal_link_ping.azl boot.entry 2>&1)"
+mini_rc=$?
+set -e
+if [ "$mini_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal c_minimal_link_ping exited $mini_rc: $MINI_OUT"
+  exit 24
+fi
+if ! printf '%s\n' "$MINI_OUT" | rg -q 'C_MINIMAL_LINK_PING_OK'; then
+  echo "ERROR: azl-interpreter-minimal expected C_MINIMAL_LINK_PING_OK in output, got: $MINI_OUT"
+  exit 25
+fi
+
 echo "[gate] E: legacy deploy profile blocked by default"
 if rg -q 'AZL_ENABLE_LEGACY_HOST="\$\{AZL_ENABLE_LEGACY_HOST:-1\}"' scripts/*.sh; then
   echo "ERROR: found script defaulting AZL_ENABLE_LEGACY_HOST to 1"

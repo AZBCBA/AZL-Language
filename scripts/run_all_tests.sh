@@ -15,14 +15,15 @@ bash scripts/enforce_legacy_entrypoint_blocklist.sh
 bash scripts/verify_native_runtime_live.sh
 bash scripts/verify_quantum_lha3_stack.sh
 bash scripts/verify_azl_grammar_conformance.sh
-chmod +x scripts/verify_azl_use_vm_path.sh || true
-bash scripts/verify_azl_use_vm_path.sh
+chmod +x scripts/test_azl_use_vm_path.sh scripts/check_azl_vm_tree_parity.py 2>/dev/null || true
+bash scripts/test_azl_use_vm_path.sh
 
 chmod +x scripts/verify_native_bundle_excludes_host_integrations.sh 2>/dev/null || true
 bash scripts/verify_native_bundle_excludes_host_integrations.sh
 
-chmod +x scripts/build_azlpack.sh scripts/verify_azlpack_local.sh scripts/verify_lsp_smoke.sh 2>/dev/null || true
+chmod +x scripts/build_azlpack.sh scripts/verify_azlpack_local.sh scripts/verify_lsp_smoke.sh scripts/test_lsp_jump_to_def.sh 2>/dev/null || true
 bash scripts/verify_azlpack_local.sh
 bash scripts/verify_lsp_smoke.sh
+bash scripts/test_lsp_jump_to_def.sh
 
 echo "✅ All tests completed"
