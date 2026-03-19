@@ -1,0 +1,8 @@
+component ::boot.entry {
+  init {
+    say "AZL minimal C interpreter: init running"
+    say "Phase 1 skeleton operational"
+  }
+  behavior {}
+  memory {}
+}

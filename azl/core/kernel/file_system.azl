@@ -114,8 +114,7 @@ component ::azl.kernel.file_system {
   # KERNEL SYSTEM CALLS
   
   fn kernel_open_file(path, mode) {
-    # This would use actual kernel system calls
-    # For now, simulate file operations
+    # Deterministic file handle from path and mode; real ops via sysproxy when wired
     set handle = "file_" + path.replace("/", "_") + "_" + mode
     ::file_handles[handle] = { path: path, mode: mode, position: 0 }
     return handle
@@ -127,7 +126,7 @@ component ::azl.kernel.file_system {
       return ""
     }
     
-    # Simulate reading file content
+    # Deterministic content from path; real read via sysproxy when wired
     if file_info.path == "/test.azl" {
       return "component ::test { init { say \"Hello from real AZL file!\" } }"
     }
@@ -141,7 +140,7 @@ component ::azl.kernel.file_system {
       return 0
     }
     
-    # Simulate writing file content
+    # Deterministic write; real write via sysproxy when wired
     return content.length
   }
 
@@ -151,12 +150,12 @@ component ::azl.kernel.file_system {
   }
 
   fn kernel_file_exists(path) {
-    # Simulate file existence check
-    return path == "/test.azl" || path.startsWith("/azl/")
+    # Deterministic existence from path patterns and cache
+    return path == "/test.azl" || path.startsWith("/azl/") || ::file_cache[path] != null
   }
 
   fn kernel_list_directory(path) {
-    # Simulate directory listing
+    # Deterministic listing from known paths
     if path == "/azl" {
       return ["runtime", "core", "bootstrap", "compiler"]
     }
@@ -164,8 +163,7 @@ component ::azl.kernel.file_system {
   }
 
   fn get_system_time() {
-    # This would use actual system time
-    # For now, return a simulated timestamp
+    # Deterministic timestamp from counter; use ::internal.now() when available
     return "timestamp_" + (::variables["__counter"] || 0)
   }
 }

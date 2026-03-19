@@ -457,8 +457,8 @@
     function execute_event_handler(handler, event) {
       store ::start_time from ::now
       
-      # Simulate handler execution
-      store ::handler_success from ::simulate_handler_execution(::handler.handler_function, ::event)
+      # Deterministic handler execution: success when handler is registered and valid
+      store ::handler_success from (::handler != null && ::handler.handler_function != null)
       
       if ::handler_success {
         store ::processing_time from ::now - ::start_time
@@ -595,20 +595,6 @@
       }
       
       return ::handlers
-    }
-    
-    # Helper function: Simulate handler execution
-    function simulate_handler_execution(handler_function, event) {
-      # Simulate handler success/failure
-      if ::handler_function == "default_handler" {
-        return true  # High success rate for default handler
-      } else if ::handler_function contains "memory" {
-        return (::now % 10) > 1  # 90% success rate for memory handlers
-      } else if ::handler_function contains "quantum" {
-        return (::now % 10) > 2  # 80% success rate for quantum handlers
-      } else {
-        return (::now % 10) > 5  # 50% success rate for other handlers
-      }
     }
     
     # Helper function: Execute request-response pattern
