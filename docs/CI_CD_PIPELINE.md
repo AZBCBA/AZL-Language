@@ -15,7 +15,7 @@ This repository’s automation is **bash + native AZL gates** (no Rust toolchain
 
 **Canonical badge for `main`:** **`test-and-deploy.yml`**. **`ci.yml`** / **`native-release-gates.yml`** remain for manual debugging or release-focused reruns without the full deploy graph.
 
-**Branch protection:** If required checks still list **`AZL CI`** or **`native-release-gates`**, switch them to **`Test and Deploy`** (workflow name) / **`gate-and-test`** (and any other required jobs you care about, e.g. **`azme-e2e`**).
+**Branch protection:** **`main`** is configured with required checks **Gates and full test suite** and **AZME provider E2E** (GitHub Actions **`app_id` 15368**, **`strict` merges**). Re-apply or extend via [GITHUB_BRANCH_PROTECTION.md](GITHUB_BRANCH_PROTECTION.md). In the web UI, obsolete entries such as **AZL CI** / **native-release-gates** should not appear once protection was created via the API with only these checks.
 
 ## Release helper self-check
 
