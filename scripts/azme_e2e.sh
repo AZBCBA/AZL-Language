@@ -13,7 +13,10 @@ export AZME_PROVIDER_E2E="1"
 export AZL_HTTP_MAX_REQUEST_SIZE=${AZL_HTTP_MAX_REQUEST_SIZE:-64}
 export AZL_HTTP_RATE_WINDOW_MS=${AZL_HTTP_RATE_WINDOW_MS:-500}
 export AZL_HTTP_RATE_MAX_PER_WINDOW=${AZL_HTTP_RATE_MAX_PER_WINDOW:-2}
-timeout 90s bash scripts/test_sysproxy_setup.sh || true
+if ! timeout 120s bash scripts/test_sysproxy_setup.sh; then
+  echo "ERROR[AZME_E2E]: test_sysproxy_setup failed — daemon did not start or healthz never passed" >&2
+  exit 1
+fi
 
 # 2) Basic daemon health check (token if required)
 echo "🏥 Verifying daemon health endpoints"

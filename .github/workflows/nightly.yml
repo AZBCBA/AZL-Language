@@ -23,9 +23,9 @@ jobs:
           mkdir -p .azl
           gcc -O2 -Wall -o .azl/sysproxy tools/sysproxy.c
 
-      - name: Run sysproxy integration test (timeout 90s)
+      - name: Run sysproxy integration test (timeout 120s)
         run: |
-          timeout 90s bash scripts/test_sysproxy_setup.sh || true
+          timeout 120s bash scripts/test_sysproxy_setup.sh
 
       - name: Verify health endpoints
         run: |
