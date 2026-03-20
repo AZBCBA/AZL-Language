@@ -13,6 +13,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 pick_free_port() {
   python3 - <<'PY'
@@ -63,7 +65,7 @@ export AZL_BUILD_API_PORT="$PORT"
 export AZL_NATIVE_RUNTIME_CMD="$(bash scripts/azl_resolve_native_runtime_cmd.sh)"
 
 echo "[bench-native] starting $BIN on 127.0.0.1:$PORT (bundle=$BUNDLE)"
-"$BIN" "$BUNDLE" >>.azl/native_llm_bench_engine.log 2>&1 &
+"$BIN" "$BUNDLE" >>"${AZL_LOGS_DIR}/native_llm_bench_engine.log" 2>&1 &
 ENGINE_PID=$!
 
 ready=0
@@ -75,7 +77,7 @@ for _ in $(seq 1 75); do
   sleep 0.2
 done
 if [ "$ready" != 1 ]; then
-  echo "ERROR: native engine did not expose /api/llm/capabilities in time (see .azl/native_llm_bench_engine.log)" >&2
+  echo "ERROR: native engine did not expose /api/llm/capabilities in time (see ${AZL_LOGS_DIR}/native_llm_bench_engine.log)" >&2
   exit 12
 fi
 

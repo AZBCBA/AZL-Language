@@ -14,7 +14,7 @@ This runbook documents how to run the enterprise daemon and validate host integr
   - `curl http://127.0.0.1:8080/healthz`
   - `curl http://127.0.0.1:8080/readyz`
   - `curl http://127.0.0.1:8080/status`
-  - `tail -f .azl/daemon.out | grep '@sysproxy'`
+  - `tail -f .azl/logs/daemon.out | grep '@sysproxy'`
 
 ## Native Smoke Tests
 - **`bash scripts/run_full_repo_verification.sh`** — `RELEASE_READY.md` order + `run_all_tests.sh` + optional LLM benches (`RUN_OPTIONAL_BENCHES=0` to skip benches)
@@ -25,7 +25,7 @@ This runbook documents how to run the enterprise daemon and validate host integr
   - `bash scripts/run_product_benchmark_suite.sh` — native LLM bench + enterprise `/v1/chat` if `AZL_API_TOKEN` is set
   - `bash scripts/run_native_engine_llm_bench.sh` — C `azl-native-engine` + Ollama (`ollama serve` + model)
   - `bash scripts/benchmark_llm_ollama.sh` — Python vs curl vs C Ollama proxy (detects proxy via `GET /api/llm/capabilities`)
-  - **`bash scripts/run_proof_llm_python_vs_azl.sh`** — **1000×** identical requests: Python → Ollama vs client → **`azl-native-engine`** `POST /api/ollama/generate` → Ollama; writes **`.azl/proof_llm_python_vs_azl_*.md`** (mean/p95 **AZL/Python** ratios). Override count: `PROOF_REQS=500 …`.
+  - **`bash scripts/run_proof_llm_python_vs_azl.sh`** — **1000×** identical requests: Python → Ollama vs client → **`azl-native-engine`** `POST /api/ollama/generate` → Ollama; writes **`.azl/benchmarks/proof_llm_python_vs_azl_*.md`** (mean/p95 **AZL/Python** ratios). Override count: `PROOF_REQS=500 …`.
   - **`bash scripts/run_proof_llm_enterprise_bundle.sh`** — same proof as above, but the **child runtime** loads the **full enterprise concatenated .azl** (same component list as **`run_enterprise_daemon.sh`**: quantum, LHA3, neural, AZME, …). Stops other daemons if they hold **`.azl/engine.out` / `9099`**. Default **`PROOF_REQS=200`** (set **`PROOF_REQS=1000`** for a full run). Report includes an explicit **Scope** section (native C Ollama proxy vs `/v1/chat`).
   - **`bash scripts/build_enterprise_combined.sh <out.azl>`** — writes the enterprise combined file only (for inspection or custom bundles).
   - `AZL_API_TOKEN=… bash scripts/benchmark_enterprise_v1_chat.sh` — enterprise `POST /v1/chat` (daemon on `AZL_ENTERPRISE_PORT`, default 8080)
@@ -40,13 +40,13 @@ This runbook documents how to run the enterprise daemon and validate host integr
   - Builds sysproxy, runs `scripts/test_sysproxy_setup.sh`, uploads logs
 
 ## Troubleshooting
-- Permission denied on `.azl/daemon.out`:
-  - Ensure file exists and writable: `: > .azl/daemon.out && chmod 664 .azl/daemon.out`
+- Permission denied on `.azl/logs/daemon.out`:
+  - Ensure file exists and writable: `: > .azl/logs/daemon.out && chmod 664 .azl/logs/daemon.out`
 - Port conflict on 8080:
   - Set `AZL_BUILD_API_PORT` before running daemon: `AZL_BUILD_API_PORT=8090 bash scripts/run_enterprise_daemon.sh`
 - No sysproxy responses:
-  - Check wire logs: `tail -f .azl/wire.log`
-  - Check sysproxy logs: `tail -f .azl/sysproxy.log`
+  - Check wire logs: `tail -f .azl/logs/wire.log`
+  - Check sysproxy logs: `tail -f .azl/logs/sysproxy.log`
 
 ## Notes
 - Torch FFI is disabled by default; calls log `ffi_disabled` and proceed.

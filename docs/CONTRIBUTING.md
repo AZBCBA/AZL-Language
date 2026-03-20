@@ -57,7 +57,7 @@ Quick check before a PR (same tooling as native gates: **`rg`**, **`python3`**, 
 bash scripts/verify_azl_strength_bar.sh
 ```
 
-That runs **`check_azl_native_gates.sh`** and **`verify_native_runtime_live.sh`**. It does **not** replace the full release sequence — use **`scripts/run_full_repo_verification.sh`** (see `RELEASE_READY.md`).
+That runs **`check_azl_native_gates.sh`**, **`verify_native_runtime_live.sh`**, and **`verify_enterprise_native_http_live.sh`**. It does **not** replace the full release sequence — use **`scripts/run_full_repo_verification.sh`** (see `RELEASE_READY.md`).
 
 ## Standards
 
@@ -78,7 +78,7 @@ That runs **`check_azl_native_gates.sh`** and **`verify_native_runtime_live.sh`*
 2. Create a feature branch (`git checkout -b feature/your-feature`).
 3. Make changes; update specs/docs under `docs/` when changing behavior.
 4. Add or adjust tests under `azl/testing/` and runtime gate scripts.
-5. Ensure the project runs — **`bash scripts/run_full_repo_verification.sh`** (or `RUN_OPTIONAL_BENCHES=0` for CI-style without LLM benches), or individually: `scripts/run_tests.sh`, `scripts/run_all_tests.sh`, `scripts/verify_native_runtime_live.sh`.
+5. Ensure the project runs — **`bash scripts/run_full_repo_verification.sh`** (or `RUN_OPTIONAL_BENCHES=0` for CI-style without LLM benches), or individually: `scripts/run_tests.sh`, `scripts/run_all_tests.sh`, `scripts/verify_native_runtime_live.sh`, `scripts/verify_enterprise_native_http_live.sh`.
 6. Push and open a Pull Request. Keep PRs small and reviewable.
 
 ## Documentation

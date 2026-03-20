@@ -3,12 +3,20 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 TOKEN="${AZL_VERIFY_TOKEN:-azl_verify_token_2026}"
 PORT="${AZL_VERIFY_PORT:-$(( (RANDOM % 20000) + 30000 ))}"
-LOG_PATH="${AZL_VERIFY_GRAMMAR_LOG:-.azl/verify_azl_grammar_conformance.log}"
+LOG_PATH="${AZL_VERIFY_GRAMMAR_LOG:-${AZL_LOGS_DIR}/verify_azl_grammar_conformance.log}"
 
 mkdir -p .azl
+
+cleanup_verify_grammar() {
+  chmod +x scripts/azl_teardown_verify_native_stack.sh 2>/dev/null || true
+  bash scripts/azl_teardown_verify_native_stack.sh "$PORT" "$TOKEN" || true
+}
+trap cleanup_verify_grammar EXIT
 
 echo "[verify-grammar] starting native mode on 127.0.0.1:${PORT}"
 AZL_API_TOKEN="$TOKEN" \

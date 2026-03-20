@@ -58,7 +58,7 @@
 1. **Shipped (optional build):** link **llama.cpp** into **`azl-native-engine`** — see **`scripts/build_azl_native_engine_with_llamacpp.sh`**, **`tools/azl_gguf_infer_llamacpp.cpp`**, **`GET /api/llm/capabilities`** when `gguf_embedded_llamacpp: true`.
 2. **Still open:** pure **`.azl`** `load_gguf_native` mmap + forward (no llama.cpp) — multi-year scope unless constrained to a tiny reference model.
 3. **Kernels** — matmul, attention; GPU optional — **`AZL_LLAMA_NGL`** or **`AZL_LLM_GPU_LAYERS`** (alias) → **`n_gpu_layers`** (embedded) or **`-ngl`** (`llama-cli` subprocess). Requires a **GPU-enabled llama.cpp** build.
-4. **Tokenization** — inside llama.cpp for GGUF; `tokenizer_bpe32k.json` remains for training pipelines.
+4. **Tokenization** — inside llama.cpp for GGUF; `tokenizers/tokenizer_bpe32k.json` remains for training pipelines.
 
 ### 4.2 Optional hardening
 
@@ -102,11 +102,12 @@
 | `azl/neural/model_loader.azl` | Model registry / config (not GGUF bytes) |
 | `azl/core/neural/neural.azl` | Neural scaffolding |
 | `azl/core/types/tensor.azl` | Pure AZL tensor |
-| `tokenizer_bpe32k.json` | BPE tokenizer asset |
+| `tokenizers/tokenizer_bpe32k.json` | BPE tokenizer asset |
 
 ---
 
 ## 7. Verification
 
-- `scripts/verify_native_runtime_live.sh` — starts **`azl-native-engine`** with the **minimal** bootstrap bundle (`c_minimal_link_ping`, same family as `run_native_engine_llm_bench.sh`), waits for **`/healthz`** + **`/readyz`** HTTP 200, then asserts `/api/llm/capabilities` returns `ok`, `ollama_http_proxy: true`, and either **`gguf_in_process: false` + `ERR_NATIVE_GGUF_NOT_IN_PROCESS`** (default build) or **`gguf_in_process: true` + `gguf_embedded_llamacpp: true` + `error: null`** (llama.cpp-linked build). (Not the full enterprise combined daemon — that path is validated elsewhere.)
+- `scripts/verify_native_runtime_live.sh` — starts **`azl-native-engine`** with the **minimal** bootstrap bundle (`c_minimal_link_ping`, same family as `run_native_engine_llm_bench.sh`), waits for **`/healthz`** + **`/readyz`** HTTP 200, then asserts `/api/llm/capabilities` returns `ok`, `ollama_http_proxy: true`, and either **`gguf_in_process: false` + `ERR_NATIVE_GGUF_NOT_IN_PROCESS`** (default build) or **`gguf_in_process: true` + `gguf_embedded_llamacpp: true` + `error: null`** (llama.cpp-linked build).
+- `scripts/verify_enterprise_native_http_live.sh` — same capability assertions on **`azl-native-engine`** with the **fat** combined file from **`build_enterprise_combined.sh`** and entry **`::build.daemon.enterprise`** (run via **`scripts/run_tests.sh`** inside **`run_all_tests.sh`** and **`run_full_repo_verification.sh`** step 5; also CI runtime smoke).
 - `scripts/check_azl_native_gates.sh` — requires the capabilities route to exist in the C source.

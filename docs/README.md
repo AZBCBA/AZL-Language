@@ -74,9 +74,9 @@ Workflows live under `.github/workflows/` — including **`test-and-deploy.yml`*
 | [AZLPACK_SPEC.md](AZLPACK_SPEC.md) | Package format; first-party dogfood pack `packages/src/azl-hello/` |
 | [TRAIN_IN_PURE_AZL.md](TRAIN_IN_PURE_AZL.md) | Training in AZL |
 | [AZME_PRODUCTION_RUNBOOK.md](AZME_PRODUCTION_RUNBOOK.md) | AZME operations (theoretical / verify before use) |
-| [../README_PREPARE_AZME_TRAINING.md](../README_PREPARE_AZME_TRAINING.md) | Prepare AZME training env |
-| [../AZL_AZME_TRAINING_GUIDE.md](../AZL_AZME_TRAINING_GUIDE.md) | AZL/AZME training guide |
-| [../AZME_USAGE_GUIDE.md](../AZME_USAGE_GUIDE.md) | AZME ask/spawn usage examples |
+| [../project/entries/docs/README_PREPARE_AZME_TRAINING.md](../project/entries/docs/README_PREPARE_AZME_TRAINING.md) | Prepare AZME training env |
+| [../project/entries/docs/AZL_AZME_TRAINING_GUIDE.md](../project/entries/docs/AZL_AZME_TRAINING_GUIDE.md) | AZL/AZME training guide |
+| [../project/entries/docs/AZME_USAGE_GUIDE.md](../project/entries/docs/AZME_USAGE_GUIDE.md) | AZME ask/spawn usage examples |
 
 ## Experimental / future-only
 

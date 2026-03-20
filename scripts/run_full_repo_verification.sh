@@ -5,8 +5,8 @@
 #   1) enforce_canonical_stack
 #   2) check_azl_native_gates  (includes gate H — P0 tokenizer + brace balance)
 #   3) enforce_legacy_entrypoint_blocklist
-#   4) verify_native_runtime_live
-#   5) run_all_tests
+#   4) verify_native_runtime_live  (minimal bundle — fast C-engine HTTP contract before long suite)
+#   5) run_all_tests  (scripts/run_tests.sh includes enterprise HTTP + qlha3 + grammar; see run_tests.sh)
 #
 # Optional tail (does not fail the script if skipped):
 #   If Ollama is up: LLM_BENCH_REQS=3 run_native_engine_llm_bench.sh

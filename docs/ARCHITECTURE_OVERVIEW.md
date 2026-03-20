@@ -13,7 +13,7 @@ Production path [VERIFIED current path]
 - Error: `azl/core/error_system.azl` (collects `log_error`, summarizes)
 - NLP: `azl/nlp/{nlp_orchestrator,quantum_byte_processor,utf8_aggregator,weight_storage}.azl`
 - Quantum: `azl/quantum/processor/{quantum_core,quantum_ai_pipeline,quantum_behavior_modeling,quantum_processor}.azl`
-- AZME: `azme_chat_integration.azl`, `azme/runtime/{azme_unified_runtime,azme_runtime_bootstrap}.azl`, `azme/cognitive/azme_cognitive_loop.azl`
+- AZME (root entry bundles): `project/entries/azl/azme_chat_integration.azl`, `azme/runtime/{azme_unified_runtime,azme_runtime_bootstrap}.azl`, `azme/cognitive/azme_cognitive_loop.azl`
 
 Event contracts
 ---------------

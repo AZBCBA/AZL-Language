@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Proof: N identical requests — Python direct to Ollama vs AZL native POST /api/ollama/generate.
-# Default N=1000 each. Report: .azl/proof_llm_python_vs_azl_*.md
+# Default N=1000 each. Report: .azl/benchmarks/proof_llm_python_vs_azl_*.md (via AZL_BENCHMARKS_DIR)
 #
 # Requires: ollama serve + model (default LLM_BENCH_MODEL=llama3.2:1b)
 #
@@ -11,6 +11,8 @@
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 pick_free_port() {
   python3 - <<'PY'
@@ -73,7 +75,7 @@ for _ in $(seq 1 75); do
   sleep 0.2
 done
 if [ "$ready" != 1 ]; then
-  echo "ERROR: native engine did not expose /api/llm/capabilities (see .azl/native_proof_llm_engine.log)" >&2
+  echo "ERROR: native engine did not expose /api/llm/capabilities (see ${AZL_LOGS_DIR}/native_proof_llm_engine.log)" >&2
   exit 12
 fi
 

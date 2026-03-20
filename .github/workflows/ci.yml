@@ -34,8 +34,10 @@ jobs:
 
       - name: Runtime smoke - Native
         run: |
+          chmod +x scripts/verify_enterprise_native_http_live.sh scripts/verify_native_runtime_live.sh || true
           bash scripts/check_azl_native_gates.sh
           bash scripts/verify_native_runtime_live.sh
+          bash scripts/verify_enterprise_native_http_live.sh
 
       - name: Perf smoke
         run: bash scripts/perf_smoke.sh
@@ -82,12 +84,12 @@ jobs:
         with:
           name: azme-e2e-logs
           path: |
-            .azl/daemon.out
-            .azl/sysproxy.out
-            .azl/sysproxy.log
-            .azl/wire.log
-            .azl/wire.requests.log
-            .azl/wire.responses.log
+            .azl/logs/daemon.out
+            .azl/logs/sysproxy.out
+            .azl/logs/sysproxy.log
+            .azl/logs/wire.log
+            .azl/logs/wire.requests.log
+            .azl/logs/wire.responses.log
             .azl/azme_models.json
             .azl/azme_chat.json
             .azl/azme_proxy_workspaces.json

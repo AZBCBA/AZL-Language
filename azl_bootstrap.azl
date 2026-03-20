@@ -26,7 +26,7 @@ component ::azl.bootstrap {
     
     listen for "build.daemon.enterprise.started" then {
       say "🎉 Enterprise daemon started successfully"
-      say "📝 Logs: .azl/daemon.log"
+      say "📝 Logs: .azl/logs/daemon.log"
       say "📊 Metrics: .azl/metrics.ndjson"
       say "🚀 AZL ENTERPRISE BUILD SYSTEM READY FOR PRODUCTION!"
     }

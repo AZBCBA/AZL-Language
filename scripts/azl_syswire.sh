@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# singleton guard
-exec 9>.azl/wire.lock
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
+mkdir -p "$AZL_LOGS_DIR"
+
+# singleton guard (co-located with wire traffic logs)
+exec 9>"${AZL_LOGS_DIR}/wire.lock"
 flock -n 9 || exit 0
 
 ENGINE_OUT="$1"   # from AZL engine; lines like:  @sysproxy {"id":...}
@@ -23,14 +29,14 @@ exec 4>>"$ENGINE_IN"
 (
   stdbuf -oL sed -u -n 's/.*@sysproxy[[:space:]]\{1,\}//p' "$ENGINE_OUT" \
     | stdbuf -oL tee /dev/stderr \
-    | stdbuf -oL tee -a .azl/wire.requests.log \
+    | stdbuf -oL tee -a "${AZL_LOGS_DIR}/wire.requests.log" \
     >&3
 ) &
 
 # pump responses sysproxy->engine (log to file)
 (
   stdbuf -oL cat <&3 \
-    | stdbuf -oL tee -a .azl/wire.responses.log \
+    | stdbuf -oL tee -a "${AZL_LOGS_DIR}/wire.responses.log" \
     | while IFS= read -r resp; do
         printf '@sysproxy.response %s\n' "$resp" >&4
       done

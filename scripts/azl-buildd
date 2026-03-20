@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
+
 # AZL Enterprise Build Daemon Launcher
 # Usage: scripts/azl-buildd [--config config/prod.azl.json] [--daemon]
 
@@ -107,11 +112,11 @@ echo "🔑 Token: $AZL_API_TOKEN"
 # Run the daemon
 if [ "$DAEMON_MODE" = "--daemon" ]; then
     echo "🔄 Running in daemon mode..."
-    nohup scripts/azl run "$COMBINED" > .azl/daemon.log 2>&1 &
+    nohup scripts/azl run "$COMBINED" > "${AZL_LOGS_DIR}/daemon.log" 2>&1 &
     DAEMON_PID=$!
-    echo $DAEMON_PID > .azl/daemon.pid
+    echo $DAEMON_PID > "${AZL_RUN_DIR}/daemon.pid"
     echo "✅ Daemon started with PID: $DAEMON_PID"
-    echo "📝 Logs: .azl/daemon.log"
+    echo "📝 Logs: ${AZL_LOGS_DIR}/daemon.log"
 else
     echo "🔄 Running in foreground mode..."
     scripts/azl run "$COMBINED"

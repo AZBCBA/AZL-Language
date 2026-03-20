@@ -404,4 +404,4 @@ listen for "reply.sent" then { say "Reply: $1" }
 
 AZME in pure AZL provides a powerful, self-hosting agent system that runs entirely without Rust dependencies. You can now build complex, distributed applications using only AZL code!
 
-For more examples, see `azme_example.azl` in the project root.
+For more examples, see `project/entries/azl/azme_example.azl`.

@@ -79,7 +79,7 @@ Audit of what exists vs what needs to be built to make AZL stronger.
 
 | Item | Status | Location | Action |
 |------|--------|----------|--------|
-| Native gates | **HAVE** | check_azl_native_gates.sh, verify_native_runtime_live | ✓ |
+| Native gates | **HAVE** | check_azl_native_gates.sh, verify_native_runtime_live, verify_enterprise_native_http_live | ✓ |
 | Grammar verify | **HAVE** | verify_azl_grammar_conformance.sh | ✓ |
 | Unit test framework | **NEED** | — | `azl test` with assert_eq, etc. |
 | Integration tests | **PARTIAL** | azme_e2e, various test_*.azl | Expand coverage |

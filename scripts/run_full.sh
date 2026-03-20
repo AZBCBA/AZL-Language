@@ -25,7 +25,7 @@ cat \
   azl/quantum/processor/quantum_ai_pipeline.azl \
   azl/quantum/processor/quantum_behavior_modeling.azl \
   azl/quantum/processor/quantum_processor.azl \
-  azme_chat_integration.azl \
+  project/entries/azl/azme_chat_integration.azl \
   azme/runtime/azme_unified_runtime.azl azme/runtime/azme_runtime_bootstrap.azl \
   azme/cognitive/azme_cognitive_loop.azl \
   runtime_boot.azl \

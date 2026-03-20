@@ -2,8 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PID_FILE="$ROOT_DIR/.azl/azme_24h.pid"
-OUT_FILE="$ROOT_DIR/.azl/logs/azme_24h.out"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
+PID_FILE="${AZL_RUN_DIR}/azme_24h.pid"
+OUT_FILE="${AZL_LOGS_DIR}/azme_24h.out"
 DASHBOARD_URL="http://${AZL_DASHBOARD_HOST:-127.0.0.1}:${AZL_DASHBOARD_PORT:-8787}"
 SERVICE_NAME="azme-24h.service"
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Provable "strength bar": native gates + live runtime /api/llm/capabilities probe.
+# Provable "strength bar": native gates + minimal live verify + enterprise combined live verify.
 # Prereqs: ripgrep (rg), python3, gcc — same as scripts/check_azl_native_gates.sh.
 #
 # This does NOT replace scripts/run_full_repo_verification.sh
@@ -33,7 +33,7 @@ if ! command -v gcc >/dev/null 2>&1; then
   exit 4
 fi
 
-echo "[AZL_STRENGTH_BAR] step 1/2: scripts/check_azl_native_gates.sh"
+echo "[AZL_STRENGTH_BAR] step 1/3: scripts/check_azl_native_gates.sh"
 set +e
 bash scripts/check_azl_native_gates.sh
 rc1=$?
@@ -43,7 +43,7 @@ if [ "$rc1" -ne 0 ]; then
   exit 10
 fi
 
-echo "[AZL_STRENGTH_BAR] step 2/2: scripts/verify_native_runtime_live.sh"
+echo "[AZL_STRENGTH_BAR] step 2/3: scripts/verify_native_runtime_live.sh"
 set +e
 bash scripts/verify_native_runtime_live.sh
 rc2=$?
@@ -51,6 +51,17 @@ set -e
 if [ "$rc2" -ne 0 ]; then
   err "step 2 failed: verify_native_runtime_live exited $rc2"
   exit 11
+fi
+
+chmod +x scripts/verify_enterprise_native_http_live.sh 2>/dev/null || true
+echo "[AZL_STRENGTH_BAR] step 3/3: scripts/verify_enterprise_native_http_live.sh"
+set +e
+bash scripts/verify_enterprise_native_http_live.sh
+rc3=$?
+set -e
+if [ "$rc3" -ne 0 ]; then
+  err "step 3 failed: verify_enterprise_native_http_live exited $rc3"
+  exit 12
 fi
 
 echo "[AZL_STRENGTH_BAR] ok — see docs/AZL_DOCUMENTATION_CANON.md §1.7; for release use scripts/run_full_repo_verification.sh"

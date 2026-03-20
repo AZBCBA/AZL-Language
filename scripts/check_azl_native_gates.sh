@@ -14,6 +14,10 @@ if [ ! -x "scripts/verify_native_runtime_live.sh" ]; then
   echo "ERROR: scripts/verify_native_runtime_live.sh is not executable"
   exit 12
 fi
+if [ ! -x "scripts/verify_enterprise_native_http_live.sh" ]; then
+  echo "ERROR: scripts/verify_enterprise_native_http_live.sh is not executable"
+  exit 16
+fi
 if [ ! -x "scripts/verify_quantum_lha3_stack.sh" ]; then
   echo "ERROR: scripts/verify_quantum_lha3_stack.sh is not executable"
   exit 13

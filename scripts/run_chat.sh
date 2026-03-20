@@ -15,7 +15,7 @@ cat \
   azl/nlp/utf8_aggregator.azl \
   azl/nlp/nlp_orchestrator.azl \
   azl/nlp/quantum_byte_processor.azl \
-  azme_chat_integration.azl \
+  project/entries/azl/azme_chat_integration.azl \
   azl/ui/chat_console.azl > "$COMBINED"
 
 echo "Running pure AZL interpreter on chat pipeline"

@@ -12,9 +12,11 @@
 |------|--------|
 | C HTTP engine | `tools/azl_native_engine.c` — health, readiness, status, exec_state, capabilities, Ollama proxy, GGUF CLI infer, llama-server completion proxy |
 | Native gates | `scripts/check_azl_native_gates.sh` — guards A–E, VM opcode contract D, C minimal F, Python parity F2, P0 slice F3, spine G, tokenizer/brace H |
-| Live HTTP + LLM honesty | `scripts/verify_native_runtime_live.sh` — `azl-native-engine` + minimal bootstrap (`c_minimal_link_ping`), `/api/llm/capabilities`, native-only `scripts/azl` block |
-| Strength bar (one command) | `scripts/verify_azl_strength_bar.sh` — gates + `verify_native_runtime_live.sh`; failures: `ERROR[AZL_STRENGTH_BAR]: …` |
+| Live HTTP + LLM honesty (minimal bundle) | `scripts/verify_native_runtime_live.sh` — `azl-native-engine` + minimal bootstrap (`c_minimal_link_ping`), `/api/llm/capabilities`, native-only `scripts/azl` block |
+| Live HTTP + enterprise combined | `scripts/verify_enterprise_native_http_live.sh` — same HTTP contract + `build_enterprise_combined.sh` + `::build.daemon.enterprise`; `/status` `combined` must match built path |
+| Strength bar (one command) | `scripts/verify_azl_strength_bar.sh` — gates + `verify_native_runtime_live.sh` + `verify_enterprise_native_http_live.sh`; failures: `ERROR[AZL_STRENGTH_BAR]: …` |
 | Full release sequence | `scripts/run_full_repo_verification.sh` — see [RELEASE_READY.md](../RELEASE_READY.md) |
+| End-to-end connectivity map | [CONNECTIVITY_AUDIT.md](CONNECTIVITY_AUDIT.md) — release-gated stack vs alternate launchers vs optional backends |
 | Changelog | [CHANGELOG.md](../CHANGELOG.md) |
 
 ### 1.2 Interpreter spine (done phases; not full self-host)
@@ -104,7 +106,7 @@ bash scripts/verify_azl_strength_bar.sh   # rg, python3, gcc required
 Full phased map: [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md). Strategy / competitive gaps: [AZL_PERFECTION_PLAN.md](AZL_PERFECTION_PLAN.md). HAVE vs NEED inventory: [AUDIT_STRENGTH_ITEMS.md](AUDIT_STRENGTH_ITEMS.md).
 
 - **P0 remainder:** Semantic engine wide enough to run `azl_interpreter.azl` as the runtime child (or verified equivalent); default spine choice documented in [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md).  
-- **Bootstrap footgun:** `scripts/azl_bootstrap.sh` → `scripts/azl_seed_runner.sh` requires **`AZL_NATIVE_EXEC_CMD`** (path to `azl-native-engine`). **`start_azl_native_mode.sh`** builds and exports it before **`start_enterprise_daemon.sh`**. Calling **`run_enterprise_daemon.sh`** directly without **`AZL_NATIVE_EXEC_CMD`** set causes seed exit **65** (distinct from **`AZL_NATIVE_RUNTIME_CMD`**, which the C engine passes to its **child**).  
+- **Bootstrap executor:** `scripts/azl_bootstrap.sh` → `scripts/azl_seed_runner.sh` requires **`AZL_NATIVE_EXEC_CMD`** (path to `azl-native-engine`). **`start_azl_native_mode.sh`** and **`run_enterprise_daemon.sh`** both ensure it (build via **`build_azl_native_engine.sh`** if unset, then validate executable; **`ERROR[AZL_ENTERPRISE_DAEMON]`** exits **64/65** if invalid). Distinct from **`AZL_NATIVE_RUNTIME_CMD`**, which the C engine passes to its **child**.  
 - **P1+:** HTTP profile per deployment, proc policy, VM breadth, packages, in-process GGUF (deferred unless product requires).  
 - **Quality:** `scripts/check_no_placeholders.sh`, grammar / LHA3 verifiers in `run_all_tests.sh`.
 
@@ -171,9 +173,9 @@ Full phased map: [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md).
 | [AZLPACK_SPEC.md](AZLPACK_SPEC.md) | Pack format |
 | [TRAIN_IN_PURE_AZL.md](TRAIN_IN_PURE_AZL.md) | Training in AZL |
 | [AZME_PRODUCTION_RUNBOOK.md](AZME_PRODUCTION_RUNBOOK.md) | AZME ops (theoretical — verify before use) |
-| [../README_PREPARE_AZME_TRAINING.md](../README_PREPARE_AZME_TRAINING.md) | AZME training prep |
-| [../AZL_AZME_TRAINING_GUIDE.md](../AZL_AZME_TRAINING_GUIDE.md) | AZL/AZME training |
-| [../AZME_USAGE_GUIDE.md](../AZME_USAGE_GUIDE.md) | AZME usage |
+| [../project/entries/docs/README_PREPARE_AZME_TRAINING.md](../project/entries/docs/README_PREPARE_AZME_TRAINING.md) | AZME training prep |
+| [../project/entries/docs/AZL_AZME_TRAINING_GUIDE.md](../project/entries/docs/AZL_AZME_TRAINING_GUIDE.md) | AZL/AZME training |
+| [../project/entries/docs/AZME_USAGE_GUIDE.md](../project/entries/docs/AZME_USAGE_GUIDE.md) | AZME usage |
 
 ### Other technical
 

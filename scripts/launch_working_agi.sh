@@ -82,8 +82,8 @@ if [ -f "azme/core/event_monitoring.azl" ]; then
 fi
 
 # Add our AGI behavior template
-if [ -f "agi_behavior_template.azl" ]; then
-  cat agi_behavior_template.azl >> "$COMBINED"
+if [ -f "project/entries/azl/agi_behavior_template.azl" ]; then
+  cat project/entries/azl/agi_behavior_template.azl >> "$COMBINED"
 fi
 
 # Add system interfaces

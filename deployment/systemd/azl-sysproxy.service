@@ -9,8 +9,8 @@ Type=simple
 User=abdulrahman-alzalameh
 WorkingDirectory=/home/abdulrahman-alzalameh/azl-language
 EnvironmentFile=-/etc/default/azl
-ExecStartPre=/bin/bash -lc 'mkdir -p .azl'
-ExecStart=/bin/bash -lc 'SYSPROXY_TCP=${SYSPROXY_TCP:-127.0.0.1:9099} /usr/local/bin/azl-sysproxy 1>.azl/sysproxy.out 2>.azl/sysproxy.log'
+ExecStartPre=/bin/bash -lc 'mkdir -p .azl .azl/logs'
+ExecStart=/bin/bash -lc 'SYSPROXY_TCP=${SYSPROXY_TCP:-127.0.0.1:9099} /usr/local/bin/azl-sysproxy 1>.azl/logs/sysproxy.out 2>.azl/logs/sysproxy.log'
 Restart=always
 RestartSec=1s
 LimitNOFILE=8192

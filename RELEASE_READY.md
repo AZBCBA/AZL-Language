@@ -29,8 +29,8 @@ Use `RUN_OPTIONAL_BENCHES=1` (default) to also run native + enterprise LLM bench
 1. `bash scripts/enforce_canonical_stack.sh`
 2. `bash scripts/check_azl_native_gates.sh`
 3. `bash scripts/enforce_legacy_entrypoint_blocklist.sh`
-4. `bash scripts/verify_native_runtime_live.sh`
-5. `bash scripts/run_all_tests.sh`
+4. `bash scripts/verify_native_runtime_live.sh` (minimal bundle — fast C-engine HTTP contract before the long suite)
+5. `bash scripts/run_all_tests.sh` — includes `scripts/run_tests.sh`, which runs **`verify_enterprise_native_http_live.sh`** (fat combined + `::build.daemon.enterprise`) after the minimal live verify, then quantum LHA3 + grammar + VM/azlpack/LSP checks.
 
 All commands must pass with exit code `0`.
 

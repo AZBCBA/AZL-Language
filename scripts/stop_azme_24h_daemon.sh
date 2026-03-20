@@ -2,7 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PID_FILE="$ROOT_DIR/.azl/azme_24h.pid"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
+PID_FILE="${AZL_RUN_DIR}/azme_24h.pid"
 SERVICE_NAME="azme-24h.service"
 
 if [ "${AZME_FORCE_LEGACY_DAEMON:-0}" != "1" ] && command -v systemctl >/dev/null 2>&1; then

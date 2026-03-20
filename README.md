@@ -48,6 +48,8 @@ Run native completion gates:
 bash scripts/check_azl_native_gates.sh
 bash scripts/enforce_legacy_entrypoint_blocklist.sh
 bash scripts/verify_native_runtime_live.sh
+# Enterprise combined HTTP (also runs inside scripts/run_tests.sh):
+bash scripts/verify_enterprise_native_http_live.sh
 ```
 
 **Strength bar (gates + live capabilities in one command):** `bash scripts/verify_azl_strength_bar.sh` — see [docs/AZL_DOCUMENTATION_CANON.md](docs/AZL_DOCUMENTATION_CANON.md) §1.7.
@@ -299,7 +301,8 @@ azl-language/
 ├── scripts/
 │   ├── start_azl_native_mode.sh  # Canonical native startup
 │   ├── run_enterprise_daemon.sh  # Canonical combined component launcher
-│   └── verify_native_runtime_live.sh
+│   ├── verify_native_runtime_live.sh
+│   └── verify_enterprise_native_http_live.sh
 └── azl/testing/                 # Pure AZL tests
 ```
 

@@ -9,9 +9,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 TOKEN="${AZL_VERIFY_TOKEN:-azl_verify_token_2026}"
-LOG_PATH="${AZL_VERIFY_LOG:-.azl/verify_native_runtime.log}"
+LOG_PATH="${AZL_VERIFY_LOG:-${AZL_LOGS_DIR}/verify_native_runtime.log}"
 
 mkdir -p .azl/tmp
 

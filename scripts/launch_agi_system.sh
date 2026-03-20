@@ -125,7 +125,7 @@ cat \
   azl/ffi/http.azl \
   azl/ffi/math_engine.azl \
   azl/system/azl_system_interface.azl \
-  azme_chat_integration.azl \
+  project/entries/azl/azme_chat_integration.azl \
   >> "$COMBINED"
 
 # AGI boot sequence

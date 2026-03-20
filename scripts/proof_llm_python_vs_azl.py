@@ -10,6 +10,7 @@ Env:
   OLLAMA_HOST          default http://127.0.0.1:11434
   AZL_BASE_URL         e.g. http://127.0.0.1:18080 (required)
   AZL_API_TOKEN        Bearer for AZL (required if engine enforces auth)
+  AZL_BENCHMARKS_DIR   directory for .md / .lat proof artifacts (default: <repo>/.azl/benchmarks)
   LLM_BENCH_MODEL      default llama3.2:1b
   LLM_BENCH_PROMPT     default short fixed string
   LLM_BENCH_NUM_PREDICT default 16
@@ -115,7 +116,8 @@ def main() -> int:
         return 91
 
     root = Path(__file__).resolve().parents[1]
-    out_dir = root / ".azl"
+    bench = os.environ.get("AZL_BENCHMARKS_DIR", "").strip()
+    out_dir = Path(bench) if bench else (root / ".azl" / "benchmarks")
     out_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     lat_py = out_dir / f"proof_llm_python_direct_{ts}.lat"

@@ -17,24 +17,24 @@ Outputs:
 2) Generate master configs and training config without running
 
 ```bash
-python3 master_training_launcher.py --action prepare --config master_training_config.json
+python3 master_training_launcher.py --action prepare --config project/entries/config/master_training_config.json
 ```
 
 This sets the dataset to the unified corpus and writes:
-- `master_training_config.json`
-- `training_config.json`
+- `project/entries/config/master_training_config.json`
+- `project/entries/config/training_config.json`
 
 3) Verify configs reference the unified corpus and tokenizer path
 
 ```bash
-grep -n "azme_full_corpus" master_training_config.json training_config.json | cat
+grep -n "azme_full_corpus" project/entries/config/master_training_config.json project/entries/config/training_config.json | cat
 ```
 
 After preparation, you can later start training explicitly:
 
 ```bash
 # (do not run now unless you want to start training)
-python3 master_training_launcher.py --action train --config master_training_config.json
+python3 master_training_launcher.py --action train --config project/entries/config/master_training_config.json
 ```
 
 Notes:

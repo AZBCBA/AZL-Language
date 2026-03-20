@@ -63,9 +63,9 @@ cleanup() {
   if [ -n "${WIRE_PID:-}" ] && kill -0 "$WIRE_PID" 2>/dev/null; then
     kill -TERM "$WIRE_PID" 2>/dev/null || true
   fi
-  if [ "$SP_STARTED" = "1" ] && [ -f .azl/sysproxy_policy_bench.pid ]; then
-    kill "$(cat .azl/sysproxy_policy_bench.pid)" 2>/dev/null || true
-    rm -f .azl/sysproxy_policy_bench.pid
+  if [ "$SP_STARTED" = "1" ] && [ -f "${AZL_RUN_DIR}/sysproxy_policy_bench.pid" ]; then
+    kill "$(cat "${AZL_RUN_DIR}/sysproxy_policy_bench.pid")" 2>/dev/null || true
+    rm -f "${AZL_RUN_DIR}/sysproxy_policy_bench.pid"
   fi
 }
 trap cleanup EXIT
@@ -96,7 +96,7 @@ bash scripts/build_enterprise_combined.sh .azl/tmp/policy_bench_enterprise_combi
 bash scripts/build_azl_bootstrap_bundle.sh .azl/tmp/policy_bench_enterprise_combined.azl "::build.daemon.enterprise" --out .azl/tmp/policy_bench_enterprise.bundle.azl >/tmp/azl_policy_bundle.log
 
 echo "[policy-bench] starting engine on 127.0.0.1:${PORT}"
-./.azl/bin/azl-native-engine .azl/tmp/policy_bench_enterprise.bundle.azl >>.azl/native_policy_bench_engine.log 2>&1 &
+./.azl/bin/azl-native-engine .azl/tmp/policy_bench_enterprise.bundle.azl >>"${AZL_LOGS_DIR}/native_policy_bench_engine.log" 2>&1 &
 ENGINE_PID=$!
 
 ready=0
@@ -108,7 +108,7 @@ for _ in $(seq 1 200); do
   sleep 0.3
 done
 if [ "$ready" != "1" ]; then
-  echo "ERROR: engine did not become ready (see .azl/native_policy_bench_engine.log)" >&2
+  echo "ERROR: engine did not become ready (see ${AZL_LOGS_DIR}/native_policy_bench_engine.log)" >&2
   exit 12
 fi
 

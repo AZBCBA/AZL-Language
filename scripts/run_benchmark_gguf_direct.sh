@@ -13,6 +13,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 GGUF="${AZL_GGUF_PATH:-}"
 if [ -z "$GGUF" ] || [ ! -f "$GGUF" ]; then
@@ -76,7 +78,7 @@ export AZL_GGUF_PATH="$GGUF"
 export AZL_NATIVE_RUNTIME_CMD="$(bash scripts/azl_resolve_native_runtime_cmd.sh)"
 
 echo "[bench-gguf] starting engine on 127.0.0.1:$PORT GGUF=$GGUF"
-"$BIN" "$BUNDLE" >>.azl/native_gguf_bench_engine.log 2>&1 &
+"$BIN" "$BUNDLE" >>"${AZL_LOGS_DIR}/native_gguf_bench_engine.log" 2>&1 &
 ENGINE_PID=$!
 
 ready=0
@@ -88,7 +90,7 @@ for _ in $(seq 1 75); do
   sleep 0.2
 done
 if [ "$ready" != 1 ]; then
-  echo "ERROR: engine did not respond (see .azl/native_gguf_bench_engine.log)" >&2
+  echo "ERROR: engine did not respond (see ${AZL_LOGS_DIR}/native_gguf_bench_engine.log)" >&2
   exit 12
 fi
 

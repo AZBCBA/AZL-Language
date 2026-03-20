@@ -1,5 +1,5 @@
-#!/bin/bash
-set -eu
+#!/usr/bin/env bash
+set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -32,6 +32,28 @@ fi
 echo "⚙️  AZL_RUNTIME_SPINE=${AZL_RUNTIME_SPINE:-c_minimal}"
 echo "⚙️  AZL_NATIVE_RUNTIME_CMD=${AZL_NATIVE_RUNTIME_CMD}"
 
+# Seed runner (azl_bootstrap → azl_seed_runner) requires AZL_NATIVE_EXEC_CMD. Fail here
+# before sysproxy/wire/FIFOs so we never print "daemon initiated" while the child exits 65/66.
+if [ -z "${AZL_NATIVE_EXEC_CMD:-}" ]; then
+  echo "🔧 AZL_NATIVE_EXEC_CMD not set; building native engine (same contract as start_azl_native_mode.sh)..."
+  AZL_NATIVE_EXEC_CMD="$(bash scripts/build_azl_native_engine.sh)"
+  export AZL_NATIVE_EXEC_CMD
+fi
+_exec="${AZL_NATIVE_EXEC_CMD}"
+if [[ "${_exec}" == */* ]]; then
+  if [ ! -f "${_exec}" ] || [ ! -x "${_exec}" ]; then
+    echo "ERROR[AZL_ENTERPRISE_DAEMON]: AZL_NATIVE_EXEC_CMD is not an executable file: ${_exec}" >&2
+    echo "Build with: bash scripts/build_azl_native_engine.sh" >&2
+    exit 64
+  fi
+else
+  if ! command -v "${_exec}" >/dev/null 2>&1; then
+    echo "ERROR[AZL_ENTERPRISE_DAEMON]: AZL_NATIVE_EXEC_CMD not found in PATH: ${_exec}" >&2
+    exit 65
+  fi
+fi
+echo "⚙️  AZL_NATIVE_EXEC_CMD=${AZL_NATIVE_EXEC_CMD}"
+
 echo "🔑 API Token: $AZL_API_TOKEN"
 echo "📁 Config: $AZL_BUILD_CONFIG"
 echo "🌐 Port: $AZL_BUILD_API_PORT"
@@ -54,8 +76,8 @@ if [ "${ok}" != "0" ]; then
     echo "🛠️  Building sysproxy..."
     gcc -O2 -o .azl/sysproxy tools/sysproxy.c
   fi
-  SYSPROXY_TCP=127.0.0.1:9099 SYSFIFO_IN=.azl/engine.in SYSFIFO_IN_KEEP=1 .azl/sysproxy 2>.azl/sysproxy.log &
-  echo $! > .azl/sysproxy.pid
+  SYSPROXY_TCP=127.0.0.1:9099 SYSFIFO_IN=.azl/engine.in SYSFIFO_IN_KEEP=1 .azl/sysproxy 2>"${AZL_LOGS_DIR}/sysproxy.log" &
+  echo $! > "${AZL_RUN_DIR}/sysproxy.pid"
   sleep 0.2
 fi
 
@@ -66,8 +88,8 @@ mkfifo .azl/engine.out .azl/engine.in 2>/dev/null || true
 
 # Start the wire first (so FIFO has a reader before engine writes)
 echo "🔌 Starting wire..."
-bash scripts/azl_syswire.sh .azl/engine.out .azl/engine.in 2>.azl/wire.log &
-echo $! > .azl/syswire.pid
+bash scripts/azl_syswire.sh .azl/engine.out .azl/engine.in 2>"${AZL_LOGS_DIR}/wire.log" &
+echo $! > "${AZL_RUN_DIR}/syswire.pid"
 sleep 0.2  # Give wire time to start
 
 # Create combined AZL file with all components
@@ -268,24 +290,24 @@ echo "🎯 Entry point: $AZL_ENTRY"
 echo ""
 
 echo "🧠 Loading and executing AZL components..."
-DAEMON_LOG_PATH=".azl/daemon.out"
+DAEMON_LOG_PATH="${AZL_LOGS_DIR}/daemon.out"
 # Some environments may leave a root-owned daemon.out from prior runs.
 # Fall back to a user-owned log file if daemon.out is not writable.
 if ! (touch "$DAEMON_LOG_PATH" >/dev/null 2>&1); then
-  DAEMON_LOG_PATH=".azl/daemon.${USER:-user}.out"
+  DAEMON_LOG_PATH="${AZL_LOGS_DIR}/daemon.${USER:-user}.out"
   touch "$DAEMON_LOG_PATH"
 fi
 if [ "${AZL_SYSTEMD:-0}" = "1" ]; then
   # Under systemd: avoid extra tee/stdbuf processes; log directly
   scripts/azl_bootstrap.sh "$COMBINED" "::build.daemon.enterprise" >> "$DAEMON_LOG_PATH" 2>&1 &
-  echo $! > .azl/daemon.pid
+  echo $! > "${AZL_RUN_DIR}/daemon.pid"
 else
   # Interactive/dev mode: keep previous behavior with tees
   stdbuf -oL -eL scripts/azl_bootstrap.sh "$COMBINED" "::build.daemon.enterprise" 2>&1 \
     | stdbuf -oL tee "$DAEMON_LOG_PATH" \
     | stdbuf -oL tee .azl/engine.out \
     >/dev/null &
-  echo $! > .azl/daemon.pid
+  echo $! > "${AZL_RUN_DIR}/daemon.pid"
 fi
 
 echo ""

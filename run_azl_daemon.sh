@@ -18,7 +18,7 @@ mkdir -p .azl/cache
 
 # Load and execute the main AZL runner
 echo "🧠 Loading AZL Pure Runner..."
-MAIN_FILE="run_azl_pure.azl"
+MAIN_FILE="project/entries/azl/run_azl_pure.azl"
 
 if [ ! -f "$MAIN_FILE" ]; then
     echo "❌ Main AZL file not found: $MAIN_FILE"

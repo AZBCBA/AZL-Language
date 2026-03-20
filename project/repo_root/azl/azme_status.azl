@@ -169,10 +169,10 @@ component ::azme.status {
     # Show usage instructions
     listen for "show_usage_instructions" {
       say "📖 Usage Instructions:"
-      say "  💬 Chat Interface: ./azl_interpreter azme_interactive_chat.azl"
+      say "  💬 Chat Interface: ./azl_interpreter project/entries/azl/azme_interactive_chat.azl"
       say "  🎬 Demo Mode: ./azl_interpreter azme_demo.azl"
       say "  📊 Status Check: ./azl_interpreter azme_status.azl"
-      say "  🔧 System Test: ./azl_interpreter azme_chat_integration.azl"
+      say "  🔧 System Test: ./azl_interpreter project/entries/azl/azme_chat_integration.azl"
       
       emit final_summary
     }
@@ -190,7 +190,7 @@ component ::azme.status {
       say "  ✅ Pure AZL: ACTIVE"
       
       say "🚀 AZME is ready for production use!"
-      say "💬 Start chatting with: ./azl_interpreter azme_interactive_chat.azl"
+      say "💬 Start chatting with: ./azl_interpreter project/entries/azl/azme_interactive_chat.azl"
     }
   }
 

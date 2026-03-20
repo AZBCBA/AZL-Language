@@ -11,6 +11,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 GGUF="${AZL_GGUF_PATH:-}"
 if [ -z "$GGUF" ] || [ ! -f "$GGUF" ]; then
@@ -76,7 +78,7 @@ trap cleanup EXIT
 
 mkdir -p .azl
 echo "[bench-llama-srv] starting llama-server on 127.0.0.1:$LL_PORT model=$GGUF"
-"$LS_BIN" -m "$GGUF" --host 127.0.0.1 --port "$LL_PORT" >>.azl/llama_server_bench.log 2>&1 &
+"$LS_BIN" -m "$GGUF" --host 127.0.0.1 --port "$LL_PORT" >>"${AZL_LOGS_DIR}/llama_server_bench.log" 2>&1 &
 LS_PID=$!
 
 ready_ls=0
@@ -88,7 +90,7 @@ for _ in $(seq 1 240); do
   sleep 0.5
 done
 if [ "$ready_ls" != 1 ]; then
-  echo "ERROR: llama-server not healthy on :$LL_PORT (see .azl/llama_server_bench.log)" >&2
+  echo "ERROR: llama-server not healthy on :$LL_PORT (see ${AZL_LOGS_DIR}/llama_server_bench.log)" >&2
   exit 12
 fi
 echo "[bench-llama-srv] llama-server healthy"
@@ -106,7 +108,7 @@ export AZL_LLAMA_SERVER_URL="http://127.0.0.1:${LL_PORT}"
 export AZL_NATIVE_RUNTIME_CMD="$(bash scripts/azl_resolve_native_runtime_cmd.sh)"
 
 echo "[bench-llama-srv] starting azl-native-engine on 127.0.0.1:$AZ_PORT"
-"$BIN" "$BUNDLE" >>.azl/native_llama_srv_bench.log 2>&1 &
+"$BIN" "$BUNDLE" >>"${AZL_LOGS_DIR}/native_llama_srv_bench.log" 2>&1 &
 ENGINE_PID=$!
 
 ready_az=0
@@ -118,7 +120,7 @@ for _ in $(seq 1 75); do
   sleep 0.2
 done
 if [ "$ready_az" != 1 ]; then
-  echo "ERROR: native engine not up on :$AZ_PORT (see .azl/native_llama_srv_bench.log)" >&2
+  echo "ERROR: native engine not up on :$AZ_PORT (see ${AZL_LOGS_DIR}/native_llama_srv_bench.log)" >&2
   exit 13
 fi
 

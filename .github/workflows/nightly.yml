@@ -51,10 +51,10 @@ jobs:
         with:
           name: nightly-sysproxy-logs
           path: |
-            .azl/sysproxy.out
-            .azl/sysproxy.log
-            .azl/wire.log
-            .azl/daemon.out
+            .azl/logs/sysproxy.out
+            .azl/logs/sysproxy.log
+            .azl/logs/wire.log
+            .azl/logs/daemon.out
 
       - name: Cleanup (always)
         if: always()

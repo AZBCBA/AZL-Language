@@ -13,6 +13,8 @@
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 if ! curl -sf --max-time 3 http://127.0.0.1:11434/api/tags >/dev/null; then
   echo "ERROR: Ollama not reachable at http://127.0.0.1:11434" >&2
@@ -47,9 +49,9 @@ cleanup() {
   if [ -n "$WIRE_PID" ] && kill -0 "$WIRE_PID" 2>/dev/null; then
     kill -TERM "$WIRE_PID" 2>/dev/null || true
   fi
-  if [ "$SP_STARTED" = "1" ] && [ -f .azl/sysproxy_proof.pid ]; then
-    kill "$(cat .azl/sysproxy_proof.pid)" 2>/dev/null || true
-    rm -f .azl/sysproxy_proof.pid
+  if [ "$SP_STARTED" = "1" ] && [ -f "${AZL_RUN_DIR}/sysproxy_proof.pid" ]; then
+    kill "$(cat "${AZL_RUN_DIR}/sysproxy_proof.pid")" 2>/dev/null || true
+    rm -f "${AZL_RUN_DIR}/sysproxy_proof.pid"
   fi
 }
 trap cleanup EXIT
@@ -65,18 +67,18 @@ if [ "${ok}" != "0" ]; then
   if [ ! -x .azl/sysproxy ]; then
     gcc -O2 -Wall -o .azl/sysproxy tools/sysproxy.c
   fi
-  SYSPROXY_TCP=127.0.0.1:9099 SYSFIFO_IN=.azl/engine.in SYSFIFO_IN_KEEP=1 .azl/sysproxy 2>.azl/sysproxy_proof.log &
-  echo $! > .azl/sysproxy_proof.pid
+  SYSPROXY_TCP=127.0.0.1:9099 SYSFIFO_IN=.azl/engine.in SYSFIFO_IN_KEEP=1 .azl/sysproxy 2>"${AZL_LOGS_DIR}/sysproxy_proof.log" &
+  echo $! > "${AZL_RUN_DIR}/sysproxy_proof.pid"
   SP_STARTED=1
   sleep 0.35
 fi
 
 mkdir -p .azl/cache .azl/tmp
-rm -f .azl/wire.lock 2>/dev/null || true
+rm -f "${AZL_LOGS_DIR}/wire.lock" .azl/wire.lock 2>/dev/null || true
 rm -f .azl/engine.out .azl/engine.in
 mkfifo .azl/engine.out .azl/engine.in 2>/dev/null || true
 
-bash scripts/azl_syswire.sh .azl/engine.out .azl/engine.in >>.azl/wire_proof.log 2>&1 &
+bash scripts/azl_syswire.sh .azl/engine.out .azl/engine.in >>"${AZL_LOGS_DIR}/wire_proof.log" 2>&1 &
 WIRE_PID=$!
 sleep 0.35
 
@@ -107,8 +109,8 @@ export PROOF_REPORT_TITLE="LLM proof with enterprise AZL bundle loaded (runtime)
 export PROOF_REPORT_DISCLAIMER="This run loads the **same concatenated enterprise .azl** as \`run_enterprise_daemon.sh\` (neural, **LHA3**, **quantum**, AZME, training orchestrators, etc.) into the **child runtime** (\`AZL_NATIVE_RUNTIME_CMD\`). The timed HTTP calls use \`POST /api/ollama/generate\`, which is handled in **tools/azl_native_engine.c** (curl to Ollama)—not by AZL \`http_server.azl\` \`/v1/chat\`. So: you are measuring **proxy latency while the fat AZL program is loaded and running**, not “AZL interpreted every token of the LLM response.” That is still the honest production split today."
 
 echo "[proof-enterprise] combined=$(wc -c < "$COMBINED") bytes spine=${AZL_RUNTIME_SPINE:-c_minimal} port=$PORT"
-echo "[proof-enterprise] starting engine (log: .azl/native_enterprise_proof_engine.log)"
-"$BIN" "$BUNDLE" >>.azl/native_enterprise_proof_engine.log 2>&1 &
+echo "[proof-enterprise] starting engine (log: ${AZL_LOGS_DIR}/native_enterprise_proof_engine.log)"
+"$BIN" "$BUNDLE" >>"${AZL_LOGS_DIR}/native_enterprise_proof_engine.log" 2>&1 &
 ENGINE_PID=$!
 
 ready=0
@@ -120,8 +122,8 @@ for i in $(seq 1 400); do
   sleep 0.5
 done
 if [ "$ready" != "1" ]; then
-  echo "ERROR: /readyz did not become ready (see .azl/native_enterprise_proof_engine.log tail below)" >&2
-  tail -40 .azl/native_enterprise_proof_engine.log >&2 || true
+  echo "ERROR: /readyz did not become ready (see ${AZL_LOGS_DIR}/native_enterprise_proof_engine.log tail below)" >&2
+  tail -40 "${AZL_LOGS_DIR}/native_enterprise_proof_engine.log" >&2 || true
   exit 12
 fi
 
