@@ -6,7 +6,7 @@ This repository’s automation is **bash + native AZL gates** (no Rust toolchain
 
 | Workflow | When | What it does |
 |----------|------|----------------|
-| **`test-and-deploy.yml`** | PR + push `main`/`master` | Full `run_all_tests.sh`, native engine **matrix** (O2 / O0 / Os), **benchmark** gate + artifacts, **GCC/lcov** coverage artifact for `tools/azl_native_engine.c`, **Docker** build; on **main** push also **GHCR** publish and optional **staging** webhook (`STAGING_DEPLOY_WEBHOOK`). |
+| **`test-and-deploy.yml`** | PR + push `main`/`master` | Full `run_all_tests.sh`, native engine **matrix** (O2 / O0 / Os), **benchmark** gate + artifacts, **GCC/lcov** coverage artifact for `tools/azl_native_engine.c`, **Docker** build (**buildx@v4**, **login@v4**, **build-push@v7**, Node 24); on **main** push also **GHCR** publish and optional **staging** webhook (`STAGING_DEPLOY_WEBHOOK`). |
 | `ci.yml` | PR + push `main`/`master` | Placeholder / stale-v2 guards, `run_full.sh`, `audit_live_path.sh`, native smoke, perf smoke, benchmark gate, full tests, AZME E2E job. |
 | `native-release-gates.yml` | PR + push `main`/`master` | Canonical stack, native gates, legacy blocklist, live verify, `run_all_tests.sh`. |
 | **`azl-ci.yml`** (*AZL CI (all branches)*) | PR + push (all branches) | Installs `ripgrep`/build deps; placeholders + `run_all_tests.sh` + `run_examples.sh`. |
