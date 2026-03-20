@@ -8,14 +8,16 @@
 
 | Format | Created? | Location | Notes |
 |--------|----------|----------|-------|
-| **GGUF** | ❌ No | — | No in-process loader. Ollama holds GGUF internally; AZL does not mmap weights. |
+| **GGUF** | ⚠️ Optional in-process | `tools/azl_gguf_infer_llamacpp.cpp` + `scripts/build_azl_native_engine_with_llamacpp.sh` | **Default** `azl-native-engine` still forks **`llama-cli`**. **Optional** CMake build links **llama.cpp**; **`POST /api/llm/gguf_infer`** then runs **in-process** (set **`AZL_GGUF_USE_CLI=1`** to force subprocess). |
 | **ONNX** | ❌ No | — | No ONNX runtime bridge. |
 | **Safetensors** | ❌ No | — | No loader. |
 | **PyTorch .pt** | ⚠️ Via FFI | `azl/ffi/torch.azl` | Spawns Python `mini_llm_train.py`; training-oriented, not production inference. |
 
-**Honesty API:** `GET /api/llm/capabilities` on the native engine returns `gguf_in_process: false` and `error.code: ERR_NATIVE_GGUF_NOT_IN_PROCESS` (weights are not linked inside the binary). When **`AZL_GGUF_PATH`** points at a local **`.gguf`** file, the same JSON advertises **`gguf_cli_infer: true`** and **`POST /api/llm/gguf_infer`** runs **`llama-cli`** from **llama.cpp** on that file (no Ollama). When **`AZL_LLAMA_SERVER_URL`** is set, **`llama_server_upstream_configured: true`** and **`POST /api/llm/llama_server/completion`** proxies to **`llama-server`**’s **`/completion`** (model stays loaded in the upstream process).
+**Honesty API:** `GET /api/llm/capabilities` — **default gcc build:** `gguf_in_process: false` and `error.code: ERR_NATIVE_GGUF_NOT_IN_PROCESS`. **Optional llama.cpp-linked build:** `gguf_in_process: true`, `gguf_embedded_llamacpp: true`, `error: null`. When **`AZL_GGUF_PATH`** points at a local **`.gguf`**, **`gguf_model_configured: true`** and **`POST /api/llm/gguf_infer`** runs either **in-process** (embedded build) or **`llama-cli`** (default build, or **`AZL_GGUF_USE_CLI=1`** on embedded). When **`AZL_LLAMA_SERVER_URL`** is set, **`llama_server_upstream_configured: true`** and **`POST /api/llm/llama_server/completion`** proxies to **`llama-server`**’s **`/completion`**.
 
-**AZL surface:** `::neural.model_loader` listens for **`load_gguf_native`** with a path argument; it emits structured `log_error` (`ERR_NATIVE_GGUF_NOT_IMPLEMENTED`) and **`model_load_failed`** until an in-process loader exists.
+**AZL surface:** `::neural.model_loader` **`load_gguf_native`** still does not mmap bytes in pure AZL; it emits **`ERR_NATIVE_GGUF_NOT_IMPLEMENTED`** and directs orchestration to the native engine route (see message in `model_loader.azl`).
+
+**Code audit:** [docs/NATIVE_LLM_INDEPENDENCE_CODE_AUDIT.md](NATIVE_LLM_INDEPENDENCE_CODE_AUDIT.md).
 
 ---
 
@@ -24,6 +26,7 @@
 | Path | Created? | How it works |
 |------|----------|--------------|
 | **Ollama via C engine proxy** | ✅ Yes | `POST /api/ollama/generate` on `tools/azl_native_engine.c` forwards JSON body to `$OLLAMA_HOST/api/generate` (default `http://127.0.0.1:11434`) using `curl`. |
+| **GGUF via linked llama.cpp (same process)** | ⚠️ Optional | `POST /api/llm/gguf_infer` when **`azl-native-engine`** is built with **`build_azl_native_engine_with_llamacpp.sh`** (`AZL_WITH_LLAMACPP`); greedy decode in `tools/azl_gguf_infer_llamacpp.cpp`. |
 | **llama.cpp llama-server via C engine proxy** | ✅ Yes | `POST /api/llm/llama_server/completion` forwards the JSON body to **`$AZL_LLAMA_SERVER_URL/completion`** with `curl` (Bearer on the engine route; upstream is usually open on localhost). |
 | **Ollama / HTTP from integrations** | ✅ Yes | `azme_bridge.azl`, `azme_anythingllm_provider.azl` — host-style HTTP when run outside strict native-only paths. |
 | **Virtual OS → sysproxy `http_client`** | ✅ Yes | `azl/system/azl_system_interface.azl` issues `sysproxy_call("http_client", { url, method, body })` for real HTTP when sysproxy implements it. |
@@ -52,11 +55,10 @@
 
 ### 4.1 In-process native LLM (GGUF)
 
-1. **GGUF loader + inference** — e.g. llama.cpp (or equivalent) in C/C++; AZL invokes via FFI, syscall bridge, or a dedicated engine subcommand.
-2. **Kernels** — matmul, attention; GPU optional (CUDA/cuBLAS).
-3. **Tokenization** — BPE/SPM; `tokenizer_bpe32k.json` exists for training pipelines.
-
-When implemented, update **`GET /api/llm/capabilities`** to set `gguf_in_process: true` and remove or narrow `ERR_NATIVE_GGUF_NOT_IN_PROCESS`.
+1. **Shipped (optional build):** link **llama.cpp** into **`azl-native-engine`** — see **`scripts/build_azl_native_engine_with_llamacpp.sh`**, **`tools/azl_gguf_infer_llamacpp.cpp`**, **`GET /api/llm/capabilities`** when `gguf_embedded_llamacpp: true`.
+2. **Still open:** pure **`.azl`** `load_gguf_native` mmap + forward (no llama.cpp) — multi-year scope unless constrained to a tiny reference model.
+3. **Kernels** — matmul, attention; GPU optional (`AZL_LLAMA_NGL` passes **`n_gpu_layers`** to llama.cpp in the embedded path).
+4. **Tokenization** — inside llama.cpp for GGUF; `tokenizer_bpe32k.json` remains for training pipelines.
 
 ### 4.2 Optional hardening
 
@@ -81,7 +83,10 @@ When implemented, update **`GET /api/llm/capabilities`** to set `gguf_in_process
 
 | File | Purpose |
 |------|---------|
-| `tools/azl_native_engine.c` | HTTP server, `POST /api/ollama/generate`, **`POST /api/llm/gguf_infer`** (local `llama-cli` + `AZL_GGUF_PATH`), **`POST /api/llm/llama_server/completion`** (`curl` → `$AZL_LLAMA_SERVER_URL/completion`), **`GET /api/llm/capabilities`** |
+| `tools/azl_native_engine.c` | HTTP server, `POST /api/ollama/generate`, **`POST /api/llm/gguf_infer`** (default: `llama-cli` fork; optional: in-process via **`AZL_WITH_LLAMACPP`**), **`POST /api/llm/llama_server/completion`**, **`GET /api/llm/capabilities`** |
+| `tools/azl_gguf_infer_llamacpp.cpp` | Optional greedy GGUF completion (llama.cpp API) |
+| `scripts/build_azl_native_engine_with_llamacpp.sh` | CMake link **`LLAMA_CPP_ROOT`** → **`.azl/bin/azl-native-engine`** |
+| `docs/NATIVE_LLM_INDEPENDENCE_CODE_AUDIT.md` | Code-derived independence / gap list |
 | `scripts/benchmark_llm_ollama.sh` | LLM latency benchmark (detects C proxy via `/api/llm/capabilities`) |
 | `scripts/run_native_engine_llm_bench.sh` | Start C engine + run LLM benchmark end-to-end |
 | `scripts/run_benchmark_gguf_direct.sh` | Start C engine + direct `.gguf` / `llama-cli` benchmark (no Ollama) |
@@ -103,5 +108,5 @@ When implemented, update **`GET /api/llm/capabilities`** to set `gguf_in_process
 
 ## 7. Verification
 
-- `scripts/verify_native_runtime_live.sh` — starts **`azl-native-engine`** with the **minimal** bootstrap bundle (`c_minimal_link_ping`, same family as `run_native_engine_llm_bench.sh`), waits for **`/healthz`** + **`/readyz`** HTTP 200, then asserts `/api/llm/capabilities` returns `ok`, `ollama_http_proxy: true`, `gguf_in_process: false`, and `ERR_NATIVE_GGUF_NOT_IN_PROCESS`. (Not the full enterprise combined daemon — that path is validated elsewhere.)
+- `scripts/verify_native_runtime_live.sh` — starts **`azl-native-engine`** with the **minimal** bootstrap bundle (`c_minimal_link_ping`, same family as `run_native_engine_llm_bench.sh`), waits for **`/healthz`** + **`/readyz`** HTTP 200, then asserts `/api/llm/capabilities` returns `ok`, `ollama_http_proxy: true`, and either **`gguf_in_process: false` + `ERR_NATIVE_GGUF_NOT_IN_PROCESS`** (default build) or **`gguf_in_process: true` + `gguf_embedded_llamacpp: true` + `error: null`** (llama.cpp-linked build). (Not the full enterprise combined daemon — that path is validated elsewhere.)
 - `scripts/check_azl_native_gates.sh` — requires the capabilities route to exist in the C source.

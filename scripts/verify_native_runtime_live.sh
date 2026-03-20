@@ -106,13 +106,25 @@ if ! echo "$CAP_JSON" | rg -q '"ollama_http_proxy":true'; then
   echo "ERROR: /api/llm/capabilities missing ollama_http_proxy: ${CAP_JSON}"
   exit 75
 fi
-if ! echo "$CAP_JSON" | rg -q '"gguf_in_process":false'; then
-  echo "ERROR: /api/llm/capabilities expected gguf_in_process false until native GGUF exists: ${CAP_JSON}"
+# Default gate binary: gguf_in_process false + ERR_NATIVE_GGUF_NOT_IN_PROCESS (honest stub).
+# Optional llama.cpp-linked binary: gguf_in_process true + gguf_embedded_llamacpp + error:null.
+if echo "$CAP_JSON" | rg -q '"gguf_in_process":false'; then
+  if ! echo "$CAP_JSON" | rg -q 'ERR_NATIVE_GGUF_NOT_IN_PROCESS'; then
+    echo "ERROR: /api/llm/capabilities missing ERR_NATIVE_GGUF_NOT_IN_PROCESS (stub build): ${CAP_JSON}"
+    exit 77
+  fi
+elif echo "$CAP_JSON" | rg -q '"gguf_in_process":true'; then
+  if ! echo "$CAP_JSON" | rg -q '"gguf_embedded_llamacpp":true'; then
+    echo "ERROR: /api/llm/capabilities expected gguf_embedded_llamacpp when gguf_in_process true: ${CAP_JSON}"
+    exit 76
+  fi
+  if ! echo "$CAP_JSON" | rg -q '"error":null'; then
+    echo "ERROR: /api/llm/capabilities expected error:null for embedded llama.cpp build: ${CAP_JSON}"
+    exit 77
+  fi
+else
+  echo "ERROR: /api/llm/capabilities missing valid gguf_in_process boolean: ${CAP_JSON}"
   exit 76
-fi
-if ! echo "$CAP_JSON" | rg -q 'ERR_NATIVE_GGUF_NOT_IN_PROCESS'; then
-  echo "ERROR: /api/llm/capabilities missing ERR_NATIVE_GGUF_NOT_IN_PROCESS: ${CAP_JSON}"
-  exit 77
 fi
 
 echo "live-native-api-ok"

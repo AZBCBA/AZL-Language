@@ -25,6 +25,7 @@ Single entry point for **accurate** project docs. Older “status report”, “
 | [DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md](DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md) | Quantum / LHA3 / memory: real vs symbolic |
 | [AZL_GPU_NEURAL_QUANTUM_INVENTORY.md](AZL_GPU_NEURAL_QUANTUM_INVENTORY.md) | GPU / neural / LHA3 / quantum **file map** vs default runtime; `scripts/audit_gpu_neural_quantum_surfaces.sh` |
 | [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md) | LLM / HTTP / proxy stack; **`GET /api/llm/capabilities`**; benches |
+| [NATIVE_LLM_INDEPENDENCE_CODE_AUDIT.md](NATIVE_LLM_INDEPENDENCE_CODE_AUDIT.md) | Code-derived gaps: in-process GGUF vs Ollama / `llama-cli` / pure `.azl` |
 | [INTEGRATIONS_HOST_VS_NATIVE.md](INTEGRATIONS_HOST_VS_NATIVE.md) | AnythingLLM / `azl/integrations`: pure AZL vs host-shaped reference |
 | [AUDIT_STRENGTH_ITEMS.md](AUDIT_STRENGTH_ITEMS.md) | Focused strength / risk audit (HAVE vs NEED) |
 

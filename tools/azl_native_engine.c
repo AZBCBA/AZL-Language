@@ -16,6 +16,10 @@
 #include <fcntl.h>
 #include <strings.h>
 
+#ifdef AZL_WITH_LLAMACPP
+#include "azl_gguf_infer_llamacpp.h"
+#endif
+
 /* Max bytes stored for one HTTP/1.x request (headers + body); excludes trailing NUL. */
 #define ENGINE_HTTP_REQ_MAX (65535)
 
@@ -404,6 +408,55 @@ static void handle_gguf_infer(int cfd, const char *req, ssize_t n, EngineState *
   if (n_predict > 8192) n_predict = 8192;
   free(body_copy);
 
+#ifdef AZL_WITH_LLAMACPP
+  {
+    const char *force_cli = getenv("AZL_GGUF_USE_CLI");
+    if (!(force_cli && force_cli[0] == '1')) {
+      char outb[GGUF_READ_MAX + 1];
+      char errb[512];
+      int ir = azl_llamacpp_gguf_infer(gguf, prompt, n_predict, outb, sizeof(outb), errb, sizeof(errb));
+      if (ir != 0) {
+        char eesc[1024];
+        json_escape_text(errb, eesc, sizeof(eesc));
+        size_t rsz = strlen(eesc) + 320;
+        char *resp = malloc(rsz);
+        if (!resp) {
+          write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+          return;
+        }
+        (void)snprintf(
+            resp, rsz,
+            "{\"ok\":false,\"error\":\"llamacpp_infer_failed\",\"code\":%d,\"message\":\"%s\","
+            "\"hint\":\"Check AZL_GGUF_PATH, GGUF compatibility, RAM, and optional AZL_LLAMA_NGL.\"}",
+            ir, eesc);
+        write_response(cfd, 502, "Bad Gateway", resp);
+        free(resp);
+        return;
+      }
+      char *esc = malloc(GGUF_READ_MAX * 2 + 256);
+      if (!esc) {
+        write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+        return;
+      }
+      json_escape_text(outb, esc, GGUF_READ_MAX * 2);
+      size_t el = strlen(esc);
+      size_t rsz2 = el + 256;
+      if (rsz2 < 128) rsz2 = 128;
+      char *resp2 = malloc(rsz2);
+      if (!resp2) {
+        free(esc);
+        write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+        return;
+      }
+      (void)snprintf(resp2, rsz2, "{\"ok\":true,\"backend\":\"llama_cpp\",\"text\":\"%s\"}", esc);
+      free(esc);
+      write_response(cfd, 200, "OK", resp2);
+      free(resp2);
+      return;
+    }
+  }
+#endif
+
   char tpl[] = "/tmp/azl_gguf_p_XXXXXX";
   int pfd = mkstemp(tpl);
   if (pfd < 0) {
@@ -739,6 +792,21 @@ static void handle_conn(int cfd, EngineState *st) {
     const char *lsu = getenv("AZL_LLAMA_SERVER_URL");
     int ls_ok = (lsu && lsu[0] != '\0');
     char cap[8192];
+#ifdef AZL_WITH_LLAMACPP
+    int cn = snprintf(
+        cap, sizeof(cap),
+        "{\"ok\":true,\"engine\":\"azl-native-engine\","
+        "\"ollama_http_proxy\":true,\"ollama_proxy_path\":\"/api/ollama/generate\","
+        "\"ollama_upstream_env\":\"OLLAMA_HOST\","
+        "\"gguf_in_process\":true,\"gguf_embedded_llamacpp\":true,"
+        "\"gguf_cli_infer\":%s,\"gguf_infer_path\":\"/api/llm/gguf_infer\","
+        "\"gguf_model_configured\":%s,"
+        "\"llama_server_http_proxy\":%s,\"llama_server_completion_path\":\"/api/llm/llama_server/completion\","
+        "\"llama_server_upstream_configured\":%s,"
+        "\"error\":null}",
+        gp_ok ? "true" : "false", gp_ok ? "true" : "false", ls_ok ? "true" : "false",
+        ls_ok ? "true" : "false");
+#else
     int cn = snprintf(
         cap, sizeof(cap),
         "{\"ok\":true,\"engine\":\"azl-native-engine\","
@@ -752,10 +820,12 @@ static void handle_conn(int cfd, EngineState *st) {
         "\"error\":{\"code\":\"ERR_NATIVE_GGUF_NOT_IN_PROCESS\","
         "\"message\":\"Weights are not linked inside this binary; use POST /api/llm/gguf_infer "
         "(set AZL_GGUF_PATH to a .gguf file and install llama.cpp llama-cli) or "
+        "build with scripts/build_azl_native_engine_with_llamacpp.sh (in-process llama.cpp), or "
         "POST /api/llm/llama_server/completion (llama-server + AZL_LLAMA_SERVER_URL) or "
         "POST /api/ollama/generate (Ollama).\"}}",
         gp_ok ? "true" : "false", gp_ok ? "true" : "false", ls_ok ? "true" : "false",
         ls_ok ? "true" : "false");
+#endif
     if (cn > 0 && (size_t)cn < sizeof(cap))
       write_response(cfd, 200, "OK", cap);
     else

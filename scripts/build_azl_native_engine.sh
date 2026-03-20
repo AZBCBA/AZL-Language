@@ -17,6 +17,8 @@ if ! command -v gcc >/dev/null 2>&1; then
 fi
 
 mkdir -p "$OUT_DIR"
+# Default gate build: no llama.cpp. For in-process GGUF (linked llama.cpp), use:
+#   LLAMA_CPP_ROOT=/path/to/llama.cpp ./scripts/build_azl_native_engine_with_llamacpp.sh
 gcc -O2 -Wall -Wextra -o "$OUT_BIN" "$SRC"
 chmod +x "$OUT_BIN"
 echo "$OUT_BIN"
