@@ -15,7 +15,7 @@ This repository’s automation is **bash + native AZL gates** (no Rust toolchain
 
 **Canonical badge for `main`:** **`test-and-deploy.yml`**. **`ci.yml`** / **`native-release-gates.yml`** remain for manual debugging or release-focused reruns without the full deploy graph.
 
-**Branch protection:** **`main`** requires **eight** **Test and Deploy** jobs (gates, AZME, three native-engine matrix builds, benchmarks, lcov coverage, Docker) — see [GITHUB_BRANCH_PROTECTION.md](GITHUB_BRANCH_PROTECTION.md). **Deploy staging** is intentionally not required (skipped on PRs). **`app_id` 15368**, **`strict` merges**. Apply / drift-check: **`scripts/gh_apply_main_branch_protection.sh`** and **`make branch-protection-verify`**.
+**Branch protection:** **`main`** requires **eight** **Test and Deploy** jobs — defined in **`release/ci/required_github_status_checks.json`**; CI enforces sync with the workflow via **`scripts/verify_required_github_status_checks_contract.sh`**. See [GITHUB_BRANCH_PROTECTION.md](GITHUB_BRANCH_PROTECTION.md). **Deploy staging** is not required (skipped on PRs). Maintainers: **`make branch-protection-apply`** / **`make branch-protection-verify`**.
 
 ## Release helper self-check
 

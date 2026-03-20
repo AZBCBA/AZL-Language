@@ -1,0 +1,40 @@
+{
+  "description": "Single source of truth for required GitHub branch-protection contexts (Test and Deploy). CI verifies this contract against the workflow file on every PR. Maintainers: gh_apply_main_branch_protection.sh reads this file.",
+  "workflow_file": ".github/workflows/test-and-deploy.yml",
+  "github_actions_app_id": 15368,
+  "branch_default": "main",
+  "workflow_assertions": [
+    {
+      "job_id": "gate-and-test",
+      "exact_name": "Gates and full test suite"
+    },
+    {
+      "job_id": "azme-e2e",
+      "exact_name": "AZME provider E2E"
+    },
+    {
+      "job_id": "native-engine-matrix",
+      "matrix_job": true,
+      "name_template": "Native engine (%s)",
+      "matrix_variant_names": ["release-O2", "debug-O0", "size-Os"]
+    },
+    {
+      "job_id": "benchmark-regression",
+      "exact_name": "Benchmarks and regression gate"
+    },
+    {
+      "job_id": "native-engine-coverage",
+      "exact_name": "Native engine coverage (GCC / lcov)"
+    },
+    {
+      "job_id": "container-image",
+      "exact_name": "Docker image (build; push to GHCR on main)"
+    }
+  ],
+  "must_not_require_job_ids": [
+    "deploy-staging"
+  ],
+  "must_not_require_name_substrings": [
+    "Deploy staging"
+  ]
+}

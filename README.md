@@ -93,7 +93,7 @@ See [docs/LLM_INFRASTRUCTURE_AUDIT.md](docs/LLM_INFRASTRUCTURE_AUDIT.md).
 
 ## CI
 - **`test-and-deploy.yml`**: **Canonical** PR/main CI/CD — repo guards (`run_full`, `audit_live`, stale v2), **`run_all_tests.sh`**, **`perf_smoke`**, AZME E2E job, native engine matrix, benchmarks, C coverage, Docker → GHCR, optional staging — see [docs/CI_CD_PIPELINE.md](docs/CI_CD_PIPELINE.md)
-- **`main` branch protection:** **eight** required jobs from **Test and Deploy** (no **Deploy staging** on PRs) — [docs/GITHUB_BRANCH_PROTECTION.md](docs/GITHUB_BRANCH_PROTECTION.md). Maintainers: **`make branch-protection-verify`** / **`make branch-protection-apply`**.
+- **`main` branch protection:** **eight** required jobs — [docs/GITHUB_BRANCH_PROTECTION.md](docs/GITHUB_BRANCH_PROTECTION.md), **`release/ci/required_github_status_checks.json`**. Local: **`make branch-protection-contract`**; maintainers: **`make branch-protection-verify`** / **`make branch-protection-apply`**.
 - `ci.yml` / `native-release-gates.yml`: **`workflow_dispatch` only** (legacy / focused reruns)
 - `azl-ci.yml`: all branches — same guards + **`run_all_tests.sh`** + **`run_examples.sh`**
 - `nightly.yml`: **`check_azl_native_gates.sh`** + sysproxy E2E + logs

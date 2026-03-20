@@ -41,7 +41,7 @@ The shipped **`Dockerfile`** installs **`jq`**, **`ripgrep`**, **`gcc`**, **`cur
 - **All branches (`azl-ci.yml`):** same repo guards as above (without Docker deploy graph) + **`run_examples.sh`**.
 - **Nightly (`nightly.yml`):** **`check_azl_native_gates.sh`** then sysproxy build + **`scripts/test_sysproxy_setup.sh`** + health checks + log artifacts.
 - **Manual only:** **`ci.yml`**, **`native-release-gates.yml`** — run from the Actions tab if you need those layouts in isolation.
-- **Branch protection (maintainers):** **`docs/GITHUB_BRANCH_PROTECTION.md`** — **`make branch-protection-apply`** (PUT) or **`make branch-protection-verify`** (**`--verify`**, no write; fails if checks drift).
+- **Branch protection:** **`docs/GITHUB_BRANCH_PROTECTION.md`** — config **`release/ci/required_github_status_checks.json`**; **`make branch-protection-contract`** (same as CI); **`make branch-protection-apply`** / **`make branch-protection-verify`** (maintainers, **`gh`**).
 
 ## Troubleshooting
 - Permission denied on `.azl/logs/daemon.out`:

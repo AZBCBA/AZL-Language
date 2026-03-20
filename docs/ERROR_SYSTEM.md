@@ -36,7 +36,7 @@
 - No `placeholder|TODO|FIXME` in `.azl` sources committed to main.
 - Event recursion/cycle detection must be active by default.
 - I/O and HTTP in pure mode must route through virtual OS stores.
-- **GitHub Actions:** PR/push to **`main`**/**`master`** is gated by **`test-and-deploy.yml`**; **`main`** branch protection requires **eight** of those jobs (see **`docs/GITHUB_BRANCH_PROTECTION.md`** / **`scripts/gh_apply_main_branch_protection.sh`**). Failing steps surface **`ERROR:`** / numeric exits — no silent green. **`ci.yml`** and **`native-release-gates.yml`** are **`workflow_dispatch` only**. **`nightly.yml`** runs **`check_azl_native_gates.sh`** then sysproxy E2E. Full matrix: **`docs/CI_CD_PIPELINE.md`**.
+- **GitHub Actions:** PR/push to **`main`**/**`master`** is gated by **`test-and-deploy.yml`**; **`main`** branch protection requires **eight** of those jobs ( **`release/ci/required_github_status_checks.json`** + **`docs/GITHUB_BRANCH_PROTECTION.md`** ). CI runs **`verify_required_github_status_checks_contract.sh`** so renames cannot drift silently. Failing steps surface **`ERROR:`** / numeric exits — no silent green. **`ci.yml`** and **`native-release-gates.yml`** are **`workflow_dispatch` only**. **`nightly.yml`** runs **`check_azl_native_gates.sh`** then sysproxy E2E. Full matrix: **`docs/CI_CD_PIPELINE.md`**.
 
 ### Shell helpers (release + live verify)
 
@@ -161,17 +161,32 @@ Used by **`.github/workflows/release.yml`** after **`actions/checkout`** at the 
 | **4** | **`HEAD`** ≠ peeled tag commit |
 | **5** | **`git`** not found |
 
+### Required GitHub status checks contract (`scripts/verify_required_github_status_checks_contract.sh`)
+
+Runs in **CI** ( **`test-and-deploy.yml`**, **`azl-ci.yml`** ): validates **`release/ci/required_github_status_checks.json`** against **`.github/workflows/test-and-deploy.yml`** (job ids, **`name:`** lines, matrix variants). No GitHub API.
+
+| Exit | Meaning |
+|------|---------|
+| **11** | **`jq`** not found |
+| **12** | Config missing / invalid JSON / bad **`workflow_assertions`** / **`must_not_require_job_ids`** inconsistency |
+| **13** | **`workflow_file`** path missing on disk |
+| **14** | Job block or **`name:`** line mismatch vs assertion |
+| **15** | Matrix variant missing under **`matrix.include`** |
+| **16** | Forbidden context string appears in derived required list |
+| **17** | Derived required-context list empty |
+
 ### Branch protection (`scripts/gh_apply_main_branch_protection.sh`)
 
-Maintainer-only: **PUT** or **`--verify`** **GET** for **required status checks** on **`main`** (see **`docs/GITHUB_BRANCH_PROTECTION.md`**). Expected contexts match **`test-and-deploy.yml`** (eight checks; excludes **Deploy staging**). Uses **`gh api`** + **`jq`**; not invoked from Actions.
+Maintainer / local: **PUT**, **`--dry-run`**, or **`--verify`** **GET**. Required contexts are read from **`release/ci/required_github_status_checks.json`** (not hard-coded). **`--dry-run`** needs **`jq`** only. **PUT** / **`--verify`** need **`gh`** + auth (**`--verify`** needs permission to read protection). Not invoked from Actions.
 
 | Exit | Meaning |
 |------|---------|
 | **0** | **`--help`** / **`-h`** (usage on stderr), or **`--verify`** success |
 | **2** | Invalid arguments (e.g. both **`--dry-run`** and **`--verify`**, or extra branch argument) |
 | **3** | **`GITHUB_REPOSITORY`** unset and **`gh repo view`** could not resolve owner/repo |
+| **4** | **`release/ci/required_github_status_checks.json`** missing, invalid JSON, or cannot derive contexts |
 | **5** | **`gh`** or **`jq`** not found |
-| **6** | **`gh`** not authenticated |
+| **6** | **`gh`** not authenticated (N/A for **`--dry-run`**) |
 | **7** | GitHub API **PUT** **`…/branches/<branch>/protection`** failed (**stderr** includes API body if present) |
 | **8** | **`--verify`**: branch not protected or **GET** **404** / “Branch not protected” |
 | **9** | **`--verify`**: **`strict`** is not **true**, or required **contexts** / **`checks[].context`** set ≠ expected (sorted JSON arrays differ) |

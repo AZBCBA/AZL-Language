@@ -54,7 +54,7 @@ If you see "Could not resolve host: github.com" or similar, run that script from
 
 4. **Repo settings on GitHub**
    - **Settings → General**: add description and website/topics so people can find the repo.
-   - **`main` branch protection:** the upstream repo enforces **eight** required **Test and Deploy** checks (see **[docs/GITHUB_BRANCH_PROTECTION.md](docs/GITHUB_BRANCH_PROTECTION.md)**). **Maintainers** re-apply or verify with **`make branch-protection-apply`** / **`make branch-protection-verify`** (needs **`gh` auth** + **admin**). Forks: run the same targets against your fork after cloning, or use **`bash scripts/gh_apply_main_branch_protection.sh --dry-run`** and **`gh api …/protection --input`** as documented there. Add **required reviewers** under **Settings → Branches** if your org wants reviews on top of status checks.
+   - **`main` branch protection:** **eight** required **Test and Deploy** checks driven by **`release/ci/required_github_status_checks.json`** (see **[docs/GITHUB_BRANCH_PROTECTION.md](docs/GITHUB_BRANCH_PROTECTION.md)**). CI verifies the workflow matches that file; **maintainers** re-apply with **`make branch-protection-apply`** / **`make branch-protection-verify`** (**`gh`** + **admin**). Forks: same flow, or **`bash scripts/gh_apply_main_branch_protection.sh --dry-run`** + **`gh api …/protection --input`**. Add **required reviewers** under **Settings → Branches** if your org wants reviews on top of status checks.
    - **Insights → Community**: GitHub will suggest SECURITY.md, CODE_OF_CONDUCT.md, CONTRIBUTING, etc.; you’ve already added them.
 
 ## After publish

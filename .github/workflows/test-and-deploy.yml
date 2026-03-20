@@ -49,6 +49,11 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y gcc curl ripgrep jq iproute2 openssl python3
 
+      - name: Verify required status checks contract (workflow vs JSON)
+        run: |
+          chmod +x scripts/verify_required_github_status_checks_contract.sh 2>/dev/null || true
+          bash scripts/verify_required_github_status_checks_contract.sh
+
       - name: Check no placeholders (.azl / .rs)
         run: |
           chmod +x scripts/check_no_placeholders.sh || true

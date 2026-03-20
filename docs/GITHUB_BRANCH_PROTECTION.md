@@ -1,6 +1,21 @@
 # GitHub branch protection (`main`)
 
-**`main`** uses the REST **branch protection** API with **required status checks** from **GitHub Actions** (**`app_id` 15368**). The list is defined in **`scripts/gh_apply_main_branch_protection.sh`** (single source of truth) and matches **`.github/workflows/test-and-deploy.yml`** job names.
+**`main`** uses the REST **branch protection** API with **required status checks** from **GitHub Actions** (**`app_id` 15368**).
+
+## Single source of truth
+
+**`release/ci/required_github_status_checks.json`** defines:
+
+- Which **job ids** and **`name:`** lines in **`.github/workflows/test-and-deploy.yml`** correspond to required checks (including matrix expansion).
+- What must **not** be required (**`deploy-staging`**).
+
+**`scripts/gh_apply_main_branch_protection.sh`** reads that JSON to build the API payload and to compare on **`--verify`**.
+
+## CI contract (no admin token)
+
+**`scripts/verify_required_github_status_checks_contract.sh`** runs in **Test and Deploy** and **AZL CI (all branches)** after **`jq`** is installed. It proves the workflow file still matches the JSON (rename a job without updating the JSON → **PR fails**).
+
+**We do not** run live **`GET …/branches/main/protection`** from Actions on every PR: the default **`GITHUB_TOKEN`** usually **cannot** read branch-protection settings, and storing a highly privileged PAT in secrets only to duplicate what maintainers already verify is a **larger blast radius** than the value gained. Maintainers use **`make branch-protection-verify`** after policy changes.
 
 ## Required checks (current)
 
@@ -15,27 +30,24 @@
 | **Native engine coverage (GCC / lcov)** | **`ci_native_engine_coverage.sh`** |
 | **Docker image (build; push to GHCR on main)** | **`docker/build-push-action`** |
 
-**Not required:** **Deploy staging** — that job is **`if:`** push to **`main`** only; it is **skipped on `pull_request`**, so requiring it would block PR merges.
+**Not required:** **Deploy staging** — skipped on **`pull_request`**; requiring it would block PR merges.
 
-**Strict updates:** branches must be up to date with **`main`** before merge (API **`strict: true`**).
+**Strict updates:** **`strict: true`** on the API.
 
-No required approving reviews are enforced by this payload (solo/small-team default). Adjust in **Settings → Branches** if you add review rules.
+No required approving reviews in the default payload. Add reviewers under **Settings → Branches** if your org wants them.
 
-## Apply / verify (preferred)
-
-From repo root, with **`gh auth login`** and **admin** on the repository:
+## Apply / verify (maintainers)
 
 ```bash
-bash scripts/gh_apply_main_branch_protection.sh          # PUT (idempotent)
-bash scripts/gh_apply_main_branch_protection.sh --verify # GET + compare (no write)
-bash scripts/gh_apply_main_branch_protection.sh --dry-run # print JSON only
+make branch-protection-contract   # workflow vs JSON only (same as CI)
+make branch-protection-apply      # PUT (needs gh + repo admin)
+make branch-protection-verify     # GET + compare to JSON (needs gh + can read protection)
+bash scripts/gh_apply_main_branch_protection.sh --dry-run   # jq only; print API body
 ```
 
-Optional argument: branch name (default **`main`**).
+Optional argument: branch name (default from JSON **`branch_default`**, usually **`main`**).
 
-**Make targets:** **`make branch-protection-apply`**, **`make branch-protection-verify`**.
-
-Exit codes: **`docs/ERROR_SYSTEM.md`** § **Branch protection (`gh_apply_main_branch_protection.sh`)**.
+Exit codes: **`docs/ERROR_SYSTEM.md`** — **Branch protection** and **Required GitHub status checks contract**.
 
 ## Inspect via `gh`
 
@@ -47,11 +59,10 @@ gh api repos/AZBCBA/AZL-Language/branches/main/protection --jq '.required_status
 
 ```bash
 bash scripts/gh_apply_main_branch_protection.sh --dry-run > /tmp/protection-body.json
-# edit repo/branch, then:
 gh api --method PUT repos/OWNER/REPO/branches/main/protection --input /tmp/protection-body.json
 ```
 
-**Discover check contexts** after a green run (exact strings vary by matrix expansion):
+**Discover check contexts** after a green run:
 
 ```bash
 gh api repos/AZBCBA/AZL-Language/commits/main/check-runs \
