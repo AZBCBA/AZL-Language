@@ -963,11 +963,27 @@ static void handle_chat_session(int cfd, const char *req, ssize_t n, EngineState
   }
   (void)snprintf(sess->history + hlen, sizeof(sess->history) - hlen, "\nUser: %s", message);
 
-  char prompt[12288];
-  (void)snprintf(prompt, sizeof(prompt),
-                 "System: You are AZL chat assistant. Follow policy, be accurate, concise, and production-grade.\n"
-                 "Conversation:\n%s\nAssistant:",
-                 sess->history);
+  /* History can be up to CHAT_SESS_HIST_MAX; stack snprintf into 12KiB tripped -Werror=format-truncation on -Os CI. */
+  static const char kChatWrapPrefix[] =
+      "System: You are AZL chat assistant. Follow policy, be accurate, concise, and production-grade.\n"
+      "Conversation:\n";
+  static const char kChatWrapSuffix[] = "\nAssistant:";
+  const size_t wp = sizeof(kChatWrapPrefix) - 1u;
+  const size_t ws = sizeof(kChatWrapSuffix) - 1u;
+  const size_t hl = strlen(sess->history);
+  const size_t need = wp + hl + ws + 1u;
+  if (need < wp + ws + 1u) {
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"chat_prompt_size_overflow\"}");
+    return;
+  }
+  char *prompt = malloc(need);
+  if (!prompt) {
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+    return;
+  }
+  memcpy(prompt, kChatWrapPrefix, wp);
+  memcpy(prompt + wp, sess->history, hl);
+  memcpy(prompt + wp + hl, kChatWrapSuffix, ws + 1u);
 
   char answer[GGUF_READ_MAX + 1];
   char backend[32];
@@ -984,6 +1000,7 @@ static void handle_chat_session(int cfd, const char *req, ssize_t n, EngineState
                    "\"hint\":\"Adjust prompt or AZL_POLICY_* if intended.\"}",
                    esc_reason);
     write_response(cfd, 403, "Forbidden", resp);
+    free(prompt);
     return;
   }
   if (ir != 0) {
@@ -993,9 +1010,11 @@ static void handle_chat_session(int cfd, const char *req, ssize_t n, EngineState
     (void)snprintf(resp, sizeof(resp), "{\"ok\":false,\"error\":\"chat_infer_failed\",\"code\":%d,\"message\":\"%s\"}",
                    ir, esc_err);
     write_response(cfd, 502, "Bad Gateway", resp);
+    free(prompt);
     return;
   }
   sanitize_chat_answer(prompt, answer, sizeof(answer));
+  free(prompt);
   hlen = strlen(sess->history);
   size_t alen = strlen(answer);
   if (hlen + alen + 20 >= sizeof(sess->history)) {
