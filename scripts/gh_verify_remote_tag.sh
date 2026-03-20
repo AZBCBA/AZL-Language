@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Verify refs/tags/<tag> exists on the GitHub remote (REST). Used by release workflow_dispatch
 # before checkout so a typo fails with ERROR instead of an opaque checkout failure.
-# Requires: gh, python3, GH_TOKEN, GITHUB_REPOSITORY, argv1 = tag (e.g. v1.2.3).
+# Requires: gh, jq (URI-encode ref path for GitHub REST), GH_TOKEN, GITHUB_REPOSITORY, argv1 = tag (e.g. v1.2.3).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,7 +22,7 @@ if [ -z "${GH_TOKEN:-}" ]; then
   exit 4
 fi
 
-for cmd in gh python3; do
+for cmd in gh jq; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "ERROR: required command not found: $cmd" >&2
     exit 5
@@ -32,9 +32,10 @@ done
 azl_assert_release_tag_shape_or_die "$TAG" 6
 
 FULL_REF="refs/tags/${TAG}"
-ENC="$(
-  REF="$FULL_REF" python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['REF'], safe=''))"
-)"
+if ! ENC="$(jq -rn --arg r "$FULL_REF" '$r | @uri' 2>/dev/null)" || [ -z "$ENC" ]; then
+  echo "ERROR: jq @uri encoding failed for ref: ${FULL_REF}" >&2
+  exit 9
+fi
 
 export GH_TOKEN
 GH_ERR="$(mktemp)"

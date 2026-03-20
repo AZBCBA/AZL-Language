@@ -51,7 +51,7 @@ Please avoid large, conflicting edits in these areas without coordination. Add t
 
 AZL’s “strength” is what you can **verify**, not adjectives in prose. The four pillars are recorded under **[AZL_DOCUMENTATION_CANON.md](AZL_DOCUMENTATION_CANON.md) §1.7**.
 
-Quick check before a PR (same tooling as native gates: **`rg`**, **`python3`**, **`gcc`**):
+Quick check before a PR (same tooling as native gates: **`rg`**, **`jq`**, **`python3`**, **`gcc`**):
 
 ```bash
 bash scripts/verify_azl_strength_bar.sh
@@ -61,7 +61,7 @@ That runs **`check_azl_native_gates.sh`**, **`verify_native_runtime_live.sh`**, 
 
 ## GitHub Releases (maintainers)
 
-Publishing sample assets to a **GitHub Release** is **not** part of `run_full_repo_verification.sh`. Flow, **`workflow_dispatch`**, and **`gh`/`ERROR` exits** are documented in **`RELEASE_READY.md`** § GitHub Release and **`docs/CI_CD_PIPELINE.md`**. Tag naming is defined once in **`scripts/azl_release_tag_policy.sh`** (sourced by **`scripts/gh_verify_remote_tag.sh`** and **`scripts/gh_create_sample_release.sh`**). Shell exit tables: **`docs/ERROR_SYSTEM.md`** § Shell helpers. **`scripts/self_check_release_helpers.sh`** runs as **gate 0** inside **`check_azl_native_gates.sh`** (**`rg`**, **`python3`**); it also verifies **`release/native/manifest.json`** (**`gates[]`** and **`github_release`** paths). When you add a GitHub release script, list it under **`github_release.scripts`** in the manifest.
+Publishing sample assets to a **GitHub Release** is **not** part of `run_full_repo_verification.sh`. Flow, **`workflow_dispatch`**, and **`gh`/`ERROR` exits** are documented in **`RELEASE_READY.md`** § GitHub Release and **`docs/CI_CD_PIPELINE.md`**. Tag naming is defined once in **`scripts/azl_release_tag_policy.sh`** (sourced by **`scripts/gh_verify_remote_tag.sh`** and **`scripts/gh_create_sample_release.sh`**). Shell exit tables: **`docs/ERROR_SYSTEM.md`** § Shell helpers. **`scripts/self_check_release_helpers.sh`** runs as **gate 0** inside **`check_azl_native_gates.sh`** (**`rg`**, **`jq`**); it verifies **`release/native/manifest.json`** (**`gates[]`** and **`github_release`** paths). When you add a GitHub release script, list it under **`github_release.scripts`** in the manifest. **`gh_verify_remote_tag.sh`** uses **`jq @uri`** for the GitHub REST ref path (no Python in that path).
 
 ## Standards
 

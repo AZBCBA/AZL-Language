@@ -3,7 +3,7 @@
 #
 # Release block (must all exit 0):
 #   1) enforce_canonical_stack
-#   2) check_azl_native_gates  (gate 0: self_check_release_helpers + manifest; includes gate H — P0 tokenizer + brace balance)
+#   2) check_azl_native_gates  (gate 0: self_check_release_helpers + jq/manifest; includes gate H — P0 tokenizer + brace balance)
 #   3) enforce_legacy_entrypoint_blocklist
 #   4) verify_native_runtime_live  (minimal bundle — fast C-engine HTTP contract before long suite)
 #   5) run_all_tests  (scripts/run_tests.sh includes enterprise HTTP + qlha3 + grammar; see run_tests.sh)

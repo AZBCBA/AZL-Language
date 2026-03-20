@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Provable "strength bar": native gates + minimal live verify + enterprise combined live verify.
-# Prereqs: ripgrep (rg), python3, gcc — same as scripts/check_azl_native_gates.sh.
+# Prereqs: ripgrep (rg), jq (gate 0 manifest + gh ref encoding contract), python3, gcc — same family as check_azl_native_gates.sh.
 #
 # This does NOT replace scripts/run_full_repo_verification.sh
 # (no enforce_canonical_stack, enforce_legacy_entrypoint_blocklist, run_all_tests).
@@ -23,14 +23,19 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 2
 fi
 
+if ! command -v jq >/dev/null 2>&1; then
+  err "jq is required (gate 0 self_check_release_helpers + gh_verify_remote_tag URI encoding)"
+  exit 3
+fi
+
 if ! command -v python3 >/dev/null 2>&1; then
   err "python3 is required"
-  exit 3
+  exit 4
 fi
 
 if ! command -v gcc >/dev/null 2>&1; then
   err "gcc is required (gate D builds azl-native-engine)"
-  exit 4
+  exit 5
 fi
 
 echo "[AZL_STRENGTH_BAR] step 1/3: scripts/check_azl_native_gates.sh"

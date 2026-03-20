@@ -20,7 +20,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y ripgrep
+          sudo apt-get install -y ripgrep jq
 
       - name: Gate - No placeholders/TODO/FIXME in .azl
         run: |

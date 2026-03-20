@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CI/local guard: syntax-check GitHub release helper scripts, tag-policy invariants, and
 # release/native/manifest.json (JSON + gates[] + github_release paths on disk).
-# Requires: bash, rg, python3 (stdlib json only).
+# Requires: bash, rg, jq (JSON + schema-shaped checks; no Python).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,6 +11,11 @@ export ROOT_DIR
 if ! command -v rg >/dev/null 2>&1; then
   echo "ERROR: required command not found: rg" >&2
   exit 40
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "ERROR: required command not found: jq" >&2
+  exit 49
 fi
 
 SCRIPTS=(
@@ -75,58 +80,64 @@ if ! echo "$verify_out" | rg -q 'usage'; then
   exit 48
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "ERROR: required command not found: python3" >&2
-  exit 49
+MANIFEST="${ROOT_DIR}/release/native/manifest.json"
+if [ ! -f "$MANIFEST" ]; then
+  echo "ERROR: manifest missing: ${MANIFEST}" >&2
+  exit 50
+fi
+if ! jq -e . "$MANIFEST" >/dev/null 2>&1; then
+  echo "ERROR: manifest invalid JSON or jq parse error: ${MANIFEST}" >&2
+  exit 50
 fi
 
-python3 <<'PY'
-import json
-import os
-import sys
+if ! jq -e '.gates | type == "array"' "$MANIFEST" >/dev/null 2>&1; then
+  echo "ERROR: manifest gates must be an array" >&2
+  exit 51
+fi
 
-root = os.environ["ROOT_DIR"]
-mp = os.path.join(root, "release", "native", "manifest.json")
-try:
-    with open(mp, encoding="utf-8") as f:
-        m = json.load(f)
-except Exception as e:
-    print(f"ERROR: manifest unreadable or invalid JSON: {mp}: {e}", file=sys.stderr)
-    sys.exit(50)
+while IFS= read -r g; do
+  if [ -z "$g" ]; then
+    echo "ERROR: manifest gates[] entries must be non-empty strings" >&2
+    exit 51
+  fi
+  path="${ROOT_DIR}/${g}"
+  if [ ! -f "$path" ]; then
+    echo "ERROR: manifest gates[] path missing on disk: ${g} -> ${path}" >&2
+    exit 57
+  fi
+done < <(jq -r '.gates[]' "$MANIFEST")
 
-for g in m.get("gates", []):
-    if not isinstance(g, str) or not g.strip():
-        print("ERROR: manifest gates[] entries must be non-empty strings", file=sys.stderr)
-        sys.exit(51)
-    p = os.path.normpath(os.path.join(root, g))
-    if not os.path.isfile(p):
-        print(f"ERROR: manifest gates[] path missing on disk: {g} -> {p}", file=sys.stderr)
-        sys.exit(57)
+if ! jq -e '.github_release | type == "object"' "$MANIFEST" >/dev/null 2>&1; then
+  echo "ERROR: manifest github_release must be an object" >&2
+  exit 52
+fi
 
-gr = m.get("github_release")
-if not isinstance(gr, dict):
-    print("ERROR: manifest github_release must be an object", file=sys.stderr)
-    sys.exit(52)
-wf = gr.get("workflow")
-if not isinstance(wf, str) or not wf.strip():
-    print("ERROR: manifest github_release.workflow must be a non-empty string", file=sys.stderr)
-    sys.exit(53)
-wp = os.path.normpath(os.path.join(root, wf))
-if not os.path.isfile(wp):
-    print(f"ERROR: manifest github_release.workflow file missing: {wf} -> {wp}", file=sys.stderr)
-    sys.exit(54)
-scripts = gr.get("scripts")
-if not isinstance(scripts, list):
-    print("ERROR: manifest github_release.scripts must be an array", file=sys.stderr)
-    sys.exit(55)
-for s in scripts:
-    if not isinstance(s, str) or not s.strip():
-        print("ERROR: manifest github_release.scripts entries must be non-empty strings", file=sys.stderr)
-        sys.exit(56)
-    sp = os.path.normpath(os.path.join(root, s))
-    if not os.path.isfile(sp):
-        print(f"ERROR: manifest github_release.scripts path missing: {s} -> {sp}", file=sys.stderr)
-        sys.exit(58)
-PY
+wf="$(jq -r '.github_release.workflow // empty' "$MANIFEST")"
+if [ -z "$wf" ]; then
+  echo "ERROR: manifest github_release.workflow must be a non-empty string" >&2
+  exit 53
+fi
+wf_path="${ROOT_DIR}/${wf}"
+if [ ! -f "$wf_path" ]; then
+  echo "ERROR: manifest github_release.workflow file missing: ${wf} -> ${wf_path}" >&2
+  exit 54
+fi
+
+if ! jq -e '.github_release.scripts | type == "array"' "$MANIFEST" >/dev/null 2>&1; then
+  echo "ERROR: manifest github_release.scripts must be an array" >&2
+  exit 55
+fi
+
+while IFS= read -r s; do
+  if [ -z "$s" ]; then
+    echo "ERROR: manifest github_release.scripts entries must be non-empty strings" >&2
+    exit 56
+  fi
+  sp="${ROOT_DIR}/${s}"
+  if [ ! -f "$sp" ]; then
+    echo "ERROR: manifest github_release.scripts path missing: ${s} -> ${sp}" >&2
+    exit 58
+  fi
+done < <(jq -r '.github_release.scripts[]' "$MANIFEST")
 
 echo "OK: release helper self-check (bash -n, tag policy, gh_verify usage, native manifest)"

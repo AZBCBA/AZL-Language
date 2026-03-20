@@ -52,7 +52,7 @@ Production scripts return **non-zero** with **`ERROR:`** on **stderr**; no silen
 | | **46** | Invalid tag assert did not exit **87** |
 | | **47** | **`gh_verify_remote_tag.sh`** no-arg exit not **2** |
 | | **48** | **`gh_verify_remote_tag.sh`** usage text missing |
-| | **49** | **`python3`** not found |
+| | **49** | **`jq`** not found |
 | | **50** | **`release/native/manifest.json`** unreadable or invalid JSON |
 | | **51** | **`gates[]`** entry not a non-empty string |
 | | **57** | **`gates[]`** path not a file on disk |
@@ -66,9 +66,10 @@ Production scripts return **non-zero** with **`ERROR:`** on **stderr**; no silen
 | `scripts/gh_verify_remote_tag.sh` | **2** | Usage: missing **`<tag>`** argument |
 | | **3** | **`GITHUB_REPOSITORY`** unset |
 | | **4** | **`GH_TOKEN`** unset |
-| | **5** | **`gh`** or **`python3`** not found |
+| | **5** | **`gh`** or **`jq`** not found |
 | | **6** | Tag shape invalid (see **`scripts/azl_release_tag_policy.sh`**) |
 | | **7** | **`refs/tags/<tag>`** not found on remote (**`gh api`** failed) |
+| | **9** | **`jq @uri`** encoding failed for **`refs/tags/<tag>`** |
 | `scripts/gh_create_sample_release.sh` | **2** | **`gh`** not found |
 | | **3** | **`GITHUB_REPOSITORY`** or **`GH_TOKEN`** unset; or **`GITHUB_REF`** unset when **`AZL_RELEASE_TAG`** unset |
 | | **4** | **`GITHUB_REF`** not **`refs/tags/v*.*.*`** and **`AZL_RELEASE_TAG`** unset |

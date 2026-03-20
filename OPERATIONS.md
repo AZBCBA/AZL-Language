@@ -17,7 +17,7 @@ This runbook documents how to run the enterprise daemon and validate host integr
   - `tail -f .azl/logs/daemon.out | grep '@sysproxy'`
 
 ## Native Smoke Tests
-- **Exit codes (no silent failures):** live verify and release helper scripts document **`ERROR:`** + numeric exits in [docs/ERROR_SYSTEM.md](docs/ERROR_SYSTEM.md) § *Shell helpers* — e.g. **`verify_native_runtime_live.sh`** **69–77**, **`verify_enterprise_native_http_live.sh`** **80–88**, **`self_check_release_helpers.sh`** **40–58**.
+- **Exit codes (no silent failures):** live verify and release helper scripts document **`ERROR:`** + numeric exits in [docs/ERROR_SYSTEM.md](docs/ERROR_SYSTEM.md) § *Shell helpers* — e.g. **`verify_native_runtime_live.sh`** **69–77**, **`verify_enterprise_native_http_live.sh`** **80–88**, **`self_check_release_helpers.sh`** **40–58** (needs **`rg`**, **`jq`**). **`gh_verify_remote_tag.sh`** uses **`jq @uri`** (not Python) for GitHub ref paths.
 - **`bash scripts/run_full_repo_verification.sh`** — `RELEASE_READY.md` order + `run_all_tests.sh` + optional LLM benches (`RUN_OPTIONAL_BENCHES=0` to skip benches)
 - `./scripts/run_tests.sh` — runs canonical native checks
 - `./scripts/run_all_tests.sh` — runs strict native suite + benchmark gates

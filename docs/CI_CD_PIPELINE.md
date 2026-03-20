@@ -17,7 +17,7 @@ To save GitHub Actions minutes, consider **disabling or slimming** overlapping w
 
 ## Release helper self-check
 
-- **`scripts/self_check_release_helpers.sh`** — **`bash -n`** on GitHub release helpers, **`azl_release_tag_policy.sh`** direct-run guard, sourced assert tests, **`gh_verify_remote_tag.sh`** usage, and **`python3`** validation of **`release/native/manifest.json`** (JSON parse, every **`gates[]`** path exists, **`github_release.workflow`** + **`github_release.scripts`** exist on disk). Invoked at the start of **`scripts/check_azl_native_gates.sh`** (**gate 0**), so any workflow that runs native gates (including **`ci.yml`** runtime smoke and **`run_tests.sh`**) validates release scripts. Manifest schema is enforced only by this script (keep **`github_release`** in sync when adding release files).
+- **`scripts/self_check_release_helpers.sh`** — **`bash -n`** on GitHub release helpers, **`azl_release_tag_policy.sh`** direct-run guard, sourced assert tests, **`gh_verify_remote_tag.sh`** usage, and **`jq`** validation of **`release/native/manifest.json`** (JSON parse, **`gates[]`** / **`github_release.workflow`** / **`github_release.scripts`** paths on disk). **`gh_verify_remote_tag.sh`** encodes **`refs/tags/<tag>`** with **`jq @uri`** for **`gh api`**. Invoked at the start of **`scripts/check_azl_native_gates.sh`** (**gate 0**). Workflows that run gates install **`jq`** (**`native-release-gates.yml`**, **`azl-ci.yml`**, **`ci.yml`**, **`test-and-deploy.yml`** already include it where needed; **`release.yml`** installs **`jq`** on **`workflow_dispatch`** before verify).
 
 ## Local parity
 
