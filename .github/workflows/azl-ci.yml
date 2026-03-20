@@ -16,6 +16,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ripgrep gcc curl iproute2 openssl
+
       - name: Make test scripts executable
         run: chmod +x scripts/run_all_tests.sh scripts/run_pure_tests.sh scripts/check_no_placeholders.sh scripts/run_examples.sh || true
 

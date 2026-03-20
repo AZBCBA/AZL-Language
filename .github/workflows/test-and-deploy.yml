@@ -87,7 +87,7 @@ jobs:
           gcc ${{ matrix.flags }} -o ".azl/bin/azl-native-engine-${{ matrix.name }}" tools/azl_native_engine.c
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: native-engine-${{ matrix.name }}
           path: .azl/bin/azl-native-engine-${{ matrix.name }}
@@ -118,7 +118,7 @@ jobs:
         run: bash scripts/benchmark_gate.sh
 
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-native-api
           path: .azl/benchmarks/benchmark_native_api_*.txt
@@ -157,13 +157,13 @@ jobs:
           bash scripts/ci_native_engine_coverage.sh
 
       - name: Upload coverage HTML
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-html-native-engine
           path: .azl/coverage-html/
 
       - name: Upload lcov info
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-lcov-info
           path: .azl/coverage.info

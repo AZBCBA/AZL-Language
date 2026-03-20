@@ -85,7 +85,7 @@ jobs:
           bash scripts/azme_e2e.sh | cat
       - name: Upload AZME E2E logs (always)
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: azme-e2e-logs
           path: |

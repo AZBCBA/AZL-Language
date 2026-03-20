@@ -50,7 +50,7 @@ jobs:
 
       - name: Upload logs (always)
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: nightly-sysproxy-logs
           path: |
