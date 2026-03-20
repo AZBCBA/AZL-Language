@@ -383,85 +383,163 @@ static int azl_llm_ngl_env_is_set(void) {
 #define CHAT_SESS_MAX 64
 #define CHAT_SESS_ID_MAX 96
 #define CHAT_SESS_HIST_MAX (96 * 1024)
+#define CHAT_SESS_DIR ".azl/chat_sessions"
 
 typedef struct {
   int in_use;
+  int loaded_from_disk;
   char id[CHAT_SESS_ID_MAX];
   char history[CHAT_SESS_HIST_MAX];
 } ChatSession;
 
 static ChatSession g_chat_sessions[CHAT_SESS_MAX];
 
+static int session_id_is_valid(const char *sid) {
+  if (!sid || sid[0] == '\0') return 0;
+  size_t n = strlen(sid);
+  if (n == 0 || n >= CHAT_SESS_ID_MAX) return 0;
+  for (size_t i = 0; i < n; i++) {
+    unsigned char c = (unsigned char)sid[i];
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' ||
+        c == '-' || c == '.') {
+      continue;
+    }
+    return 0;
+  }
+  return 1;
+}
+
+static void ensure_chat_sessions_dir(void) {
+  ensure_azl_dir();
+  struct stat st;
+  if (stat(CHAT_SESS_DIR, &st) == 0 && S_ISDIR(st.st_mode)) return;
+  (void)mkdir(CHAT_SESS_DIR, 0755);
+}
+
+static int chat_session_build_path(const char *sid, char *out, size_t outsz) {
+  if (!session_id_is_valid(sid)) return -1;
+  int n = snprintf(out, outsz, CHAT_SESS_DIR "/%s.txt", sid);
+  if (n <= 0 || (size_t)n >= outsz) return -1;
+  return 0;
+}
+
+static void chat_session_load_history(ChatSession *sess) {
+  if (!sess || sess->loaded_from_disk) return;
+  sess->loaded_from_disk = 1;
+  char p[512];
+  if (chat_session_build_path(sess->id, p, sizeof(p)) != 0) return;
+  FILE *fp = fopen(p, "r");
+  if (!fp) return;
+  size_t rn = fread(sess->history, 1, sizeof(sess->history) - 1, fp);
+  fclose(fp);
+  sess->history[rn] = '\0';
+}
+
+static void chat_session_save_history(const ChatSession *sess) {
+  if (!sess) return;
+  char p[512];
+  if (chat_session_build_path(sess->id, p, sizeof(p)) != 0) return;
+  ensure_chat_sessions_dir();
+  FILE *fp = fopen(p, "w");
+  if (!fp) return;
+  (void)fwrite(sess->history, 1, strlen(sess->history), fp);
+  fclose(fp);
+}
+
+static void chat_session_reset_history(ChatSession *sess) {
+  if (!sess) return;
+  sess->history[0] = '\0';
+  char p[512];
+  if (chat_session_build_path(sess->id, p, sizeof(p)) == 0) (void)unlink(p);
+}
+
 static ChatSession *chat_session_get_or_create(const char *sid) {
-  if (!sid || sid[0] == '\0') return NULL;
+  if (!session_id_is_valid(sid)) return NULL;
   for (int i = 0; i < CHAT_SESS_MAX; i++) {
-    if (g_chat_sessions[i].in_use && strcmp(g_chat_sessions[i].id, sid) == 0) return &g_chat_sessions[i];
+    if (g_chat_sessions[i].in_use && strcmp(g_chat_sessions[i].id, sid) == 0) {
+      chat_session_load_history(&g_chat_sessions[i]);
+      return &g_chat_sessions[i];
+    }
   }
   for (int i = 0; i < CHAT_SESS_MAX; i++) {
     if (!g_chat_sessions[i].in_use) {
       g_chat_sessions[i].in_use = 1;
+      g_chat_sessions[i].loaded_from_disk = 0;
       (void)snprintf(g_chat_sessions[i].id, sizeof(g_chat_sessions[i].id), "%s", sid);
       g_chat_sessions[i].history[0] = '\0';
+      chat_session_load_history(&g_chat_sessions[i]);
       return &g_chat_sessions[i];
     }
   }
   return NULL;
 }
 
-static int request_json_has_true_flag(const char *body, const char *field) {
-  if (!body || !field) return 0;
-  char pat[96];
-  (void)snprintf(pat, sizeof(pat), "\"%s\":true", field);
-  if (strstr(body, pat)) return 1;
-  (void)snprintf(pat, sizeof(pat), "\"%s\": true", field);
-  if (strstr(body, pat)) return 1;
+static int policy_decide_prompt(const char *prompt, char *reason, size_t reason_sz) {
+  int max_chars = 4000;
+  const char *mc = getenv("AZL_POLICY_MAX_PROMPT_CHARS");
+  if (mc && mc[0] != '\0') {
+    int v = atoi(mc);
+    if (v > 0) max_chars = v;
+  }
+  int block_secrets = 1;
+  const char *bs = getenv("AZL_POLICY_BLOCK_SECRETS");
+  if (bs && bs[0] == '0') block_secrets = 0;
+
+  char lower[12288];
+  size_t plen = strlen(prompt);
+  if (plen >= sizeof(lower)) plen = sizeof(lower) - 1;
+  for (size_t i = 0; i < plen; i++) {
+    char c = prompt[i];
+    if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+    lower[i] = c;
+  }
+  lower[plen] = '\0';
+  (void)snprintf(reason, reason_sz, "%s", "allowed");
+  if ((int)plen > max_chars) {
+    (void)snprintf(reason, reason_sz, "%s", "prompt_too_long");
+    return 1;
+  }
+  if (strstr(lower, "ignore previous instructions") != NULL) {
+    (void)snprintf(reason, reason_sz, "%s", "prompt_injection_pattern");
+    return 1;
+  }
+  if (block_secrets &&
+      (strstr(lower, "api_key") != NULL || strstr(lower, "password") != NULL ||
+       strstr(lower, "private key") != NULL || strstr(lower, "secret token") != NULL)) {
+    (void)snprintf(reason, reason_sz, "%s", "secret_exfiltration_pattern");
+    return 1;
+  }
   return 0;
 }
 
-static void handle_gguf_infer(int cfd, const char *req, ssize_t n, EngineState *st) {
-  (void)st;
+static void policy_audit_append(const char *decision, const char *reason, size_t prompt_chars) {
+  ensure_azl_dir();
+  FILE *af = fopen(".azl/policy_infer_audit.jsonl", "a");
+  if (!af) return;
+  char esc_reason[256];
+  json_escape_text(reason, esc_reason, sizeof(esc_reason));
+  fprintf(af,
+          "{\"ts\":%ld,\"path\":\"/api/llm/policy_infer\",\"decision\":\"%s\",\"reason\":\"%s\","
+          "\"prompt_chars\":%zu}\n",
+          (long)time(NULL), decision, esc_reason, prompt_chars);
+  fclose(af);
+}
+
+static int gguf_infer_text(const char *prompt, int n_predict, char *out, size_t outsz, char *backend,
+                           size_t backend_sz, char *err, size_t err_sz) {
+  if (!prompt || !out || outsz == 0) return -1;
   const char *gguf = getenv("AZL_GGUF_PATH");
   if (!gguf || gguf[0] == '\0') {
-    write_response(cfd, 503, "Service Unavailable",
-                  "{\"ok\":false,\"error\":\"AZL_GGUF_PATH_unset\","
-                  "\"hint\":\"Set AZL_GGUF_PATH to a local .gguf file and install llama-cli (llama.cpp).\"}");
-    return;
+    (void)snprintf(err, err_sz, "%s", "AZL_GGUF_PATH_unset");
+    return -2;
   }
   struct stat gst;
   if (stat(gguf, &gst) != 0 || !S_ISREG(gst.st_mode)) {
-    write_response(cfd, 503, "Service Unavailable",
-                  "{\"ok\":false,\"error\":\"AZL_GGUF_PATH_not_a_file\"}");
-    return;
+    (void)snprintf(err, err_sz, "%s", "AZL_GGUF_PATH_not_a_file");
+    return -3;
   }
-
-  const char *body_start = strstr(req, "\r\n\r\n");
-  if (body_start) body_start += 4;
-  else {
-    body_start = strstr(req, "\n\n");
-    if (body_start) body_start += 2;
-    else body_start = req;
-  }
-  size_t body_len = (size_t)(req + n - body_start);
-  if (body_len > 16384) body_len = 16384;
-  char *body_copy = malloc(body_len + 1);
-  if (!body_copy) {
-    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
-    return;
-  }
-  memcpy(body_copy, body_start, body_len);
-  body_copy[body_len] = '\0';
-
-  char prompt[12288] = {0};
-  if (json_extract_string_field(body_copy, "prompt", prompt, sizeof(prompt)) != 0) {
-    free(body_copy);
-    write_response(cfd, 400, "Bad Request", "{\"ok\":false,\"error\":\"missing_prompt_json\"}");
-    return;
-  }
-  int n_predict = 64;
-  (void)json_extract_int_field(body_copy, "n_predict", &n_predict, 64);
+  if (n_predict < 1) n_predict = 1;
   if (n_predict > 8192) n_predict = 8192;
-  free(body_copy);
-
 #ifdef AZL_WITH_LLAMACPP
   {
     const char *force_cli = getenv("AZL_GGUF_USE_CLI");
@@ -470,82 +548,46 @@ static void handle_gguf_infer(int cfd, const char *req, ssize_t n, EngineState *
       char errb[512];
       int ir = azl_llamacpp_gguf_infer(gguf, prompt, n_predict, outb, sizeof(outb), errb, sizeof(errb));
       if (ir != 0) {
-        char eesc[1024];
-        json_escape_text(errb, eesc, sizeof(eesc));
-        size_t rsz = strlen(eesc) + 320;
-        char *resp = malloc(rsz);
-        if (!resp) {
-          write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
-          return;
-        }
-        (void)snprintf(
-            resp, rsz,
-            "{\"ok\":false,\"error\":\"llamacpp_infer_failed\",\"code\":%d,\"message\":\"%s\","
-            "\"hint\":\"Check AZL_GGUF_PATH, GGUF compatibility, RAM, and optional AZL_LLAMA_NGL or AZL_LLM_GPU_LAYERS.\"}",
-            ir, eesc);
-        write_response(cfd, 502, "Bad Gateway", resp);
-        free(resp);
-        return;
+        (void)snprintf(err, err_sz, "llamacpp_infer_failed:%d:%s", ir, errb);
+        return -4;
       }
-      char *esc = malloc(GGUF_READ_MAX * 2 + 256);
-      if (!esc) {
-        write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
-        return;
-      }
-      json_escape_text(outb, esc, GGUF_READ_MAX * 2);
-      size_t el = strlen(esc);
-      size_t rsz2 = el + 256;
-      if (rsz2 < 128) rsz2 = 128;
-      char *resp2 = malloc(rsz2);
-      if (!resp2) {
-        free(esc);
-        write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
-        return;
-      }
-      (void)snprintf(resp2, rsz2, "{\"ok\":true,\"backend\":\"llama_cpp\",\"text\":\"%s\"}", esc);
-      free(esc);
-      write_response(cfd, 200, "OK", resp2);
-      free(resp2);
-      return;
+      (void)snprintf(out, outsz, "%s", outb);
+      (void)snprintf(backend, backend_sz, "%s", "llama_cpp");
+      return 0;
     }
   }
 #endif
-
   char tpl[] = "/tmp/azl_gguf_p_XXXXXX";
   int pfd = mkstemp(tpl);
   if (pfd < 0) {
-    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"mkstemp_failed\"}");
-    return;
+    (void)snprintf(err, err_sz, "%s", "mkstemp_failed");
+    return -5;
   }
   size_t plen = strlen(prompt);
   if (write_all(pfd, prompt, plen) != 0) {
     close(pfd);
     unlink(tpl);
-    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"prompt_write_failed\"}");
-    return;
+    (void)snprintf(err, err_sz, "%s", "prompt_write_failed");
+    return -6;
   }
   close(pfd);
-
   const char *cli = getenv("AZL_LLAMA_CLI");
   if (!cli || cli[0] == '\0') cli = "llama-cli";
-
   char nbuf[32];
   (void)snprintf(nbuf, sizeof(nbuf), "%d", n_predict);
-
   int pipefd[2];
   if (pipe(pipefd) != 0) {
     unlink(tpl);
-    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"pipe_failed\"}");
-    return;
+    (void)snprintf(err, err_sz, "%s", "pipe_failed");
+    return -7;
   }
-
   pid_t pid = fork();
   if (pid < 0) {
     close(pipefd[0]);
     close(pipefd[1]);
     unlink(tpl);
-    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"fork_failed\"}");
-    return;
+    (void)snprintf(err, err_sz, "%s", "fork_failed");
+    return -8;
   }
   if (pid == 0) {
     close(pipefd[0]);
@@ -581,14 +623,7 @@ static void handle_gguf_infer(int cfd, const char *req, ssize_t n, EngineState *
     _exit(127);
   }
   close(pipefd[1]);
-  char *raw = malloc(GGUF_READ_MAX + 1);
-  if (!raw) {
-    close(pipefd[0]);
-    waitpid(pid, NULL, 0);
-    unlink(tpl);
-    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
-    return;
-  }
+  char raw[GGUF_READ_MAX + 1];
   size_t total = 0;
   for (;;) {
     ssize_t rn = read(pipefd[0], raw + total, GGUF_READ_MAX - total);
@@ -601,34 +636,91 @@ static void handle_gguf_infer(int cfd, const char *req, ssize_t n, EngineState *
   (void)waitpid(pid, &wst, 0);
   unlink(tpl);
   raw[total] = '\0';
-
   if (!WIFEXITED(wst) || WEXITSTATUS(wst) != 0) {
-    free(raw);
-    write_response(cfd, 502, "Bad Gateway",
-                  "{\"ok\":false,\"error\":\"llama_cli_failed\","
-                  "\"hint\":\"Install llama.cpp llama-cli; or set AZL_LLAMA_SKIP_NO_CNV=1 if your build lacks -no-cnv\"}");
-    return;
+    (void)snprintf(err, err_sz, "%s", "llama_cli_failed");
+    return -9;
   }
+  (void)snprintf(out, outsz, "%s", raw);
+  (void)snprintf(backend, backend_sz, "%s", "llama_cli");
+  return 0;
+}
 
-  char *esc = malloc(GGUF_READ_MAX * 2 + 256);
-  if (!esc) {
-    free(raw);
+static int policy_infer_text(const char *prompt, int n_predict, char *out, size_t outsz, char *backend,
+                             size_t backend_sz, char *reason, size_t reason_sz, char *err, size_t err_sz) {
+  int blocked = policy_decide_prompt(prompt, reason, reason_sz);
+  policy_audit_append(blocked ? "blocked" : "allowed", reason, strlen(prompt));
+  if (blocked) return -10;
+  return gguf_infer_text(prompt, n_predict, out, outsz, backend, backend_sz, err, err_sz);
+}
+
+static int request_json_has_true_flag(const char *body, const char *field) {
+  if (!body || !field) return 0;
+  char pat[96];
+  (void)snprintf(pat, sizeof(pat), "\"%s\":true", field);
+  if (strstr(body, pat)) return 1;
+  (void)snprintf(pat, sizeof(pat), "\"%s\": true", field);
+  if (strstr(body, pat)) return 1;
+  return 0;
+}
+
+static void handle_gguf_infer(int cfd, const char *req, ssize_t n, EngineState *st) {
+  (void)st;
+  const char *body_start = strstr(req, "\r\n\r\n");
+  if (body_start) body_start += 4;
+  else {
+    body_start = strstr(req, "\n\n");
+    if (body_start) body_start += 2;
+    else body_start = req;
+  }
+  size_t body_len = (size_t)(req + n - body_start);
+  if (body_len > 16384) body_len = 16384;
+  char *body_copy = malloc(body_len + 1);
+  if (!body_copy) {
     write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
     return;
   }
-  json_escape_text(raw, esc, GGUF_READ_MAX * 2);
-  free(raw);
+  memcpy(body_copy, body_start, body_len);
+  body_copy[body_len] = '\0';
 
-  size_t el = strlen(esc);
-  size_t rsz = el + 256;
-  if (rsz < 128) rsz = 128;
-  char *resp = malloc(rsz);
+  char prompt[12288] = {0};
+  if (json_extract_string_field(body_copy, "prompt", prompt, sizeof(prompt)) != 0) {
+    free(body_copy);
+    write_response(cfd, 400, "Bad Request", "{\"ok\":false,\"error\":\"missing_prompt_json\"}");
+    return;
+  }
+  int n_predict = 64;
+  (void)json_extract_int_field(body_copy, "n_predict", &n_predict, 64);
+  free(body_copy);
+  char out[GGUF_READ_MAX + 1];
+  char backend[32];
+  char err[512];
+  int gr = gguf_infer_text(prompt, n_predict, out, sizeof(out), backend, sizeof(backend), err, sizeof(err));
+  if (gr != 0) {
+    char eesc[1024];
+    json_escape_text(err, eesc, sizeof(eesc));
+    char resp[1400];
+    (void)snprintf(resp, sizeof(resp),
+                   "{\"ok\":false,\"error\":\"gguf_infer_failed\",\"code\":%d,\"message\":\"%s\","
+                   "\"hint\":\"Check AZL_GGUF_PATH, llama-cli/llama.cpp, and model compatibility.\"}",
+                   gr, eesc);
+    write_response(cfd, 502, "Bad Gateway", resp);
+    return;
+  }
+  size_t esc_cap = GGUF_READ_MAX * 2 + 16;
+  char *esc = malloc(esc_cap);
+  if (!esc) {
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+    return;
+  }
+  json_escape_text(out, esc, esc_cap);
+  size_t resp_cap = strlen(esc) + 256;
+  char *resp = malloc(resp_cap);
   if (!resp) {
     free(esc);
     write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
     return;
   }
-  (void)snprintf(resp, rsz, "{\"ok\":true,\"backend\":\"llama_cli\",\"text\":\"%s\"}", esc);
+  (void)snprintf(resp, resp_cap, "{\"ok\":true,\"backend\":\"%s\",\"text\":\"%s\"}", backend, esc);
   free(esc);
   write_response(cfd, 200, "OK", resp);
   free(resp);
@@ -661,53 +753,15 @@ static void handle_policy_infer(int cfd, const char *req, ssize_t n, EngineState
   }
   free(body_copy);
 
-  int max_chars = 4000;
-  const char *mc = getenv("AZL_POLICY_MAX_PROMPT_CHARS");
-  if (mc && mc[0] != '\0') {
-    int v = atoi(mc);
-    if (v > 0) max_chars = v;
-  }
-  int block_secrets = 1;
-  const char *bs = getenv("AZL_POLICY_BLOCK_SECRETS");
-  if (bs && bs[0] == '0') block_secrets = 0;
-
-  char lower[12288];
-  size_t plen = strlen(prompt);
-  if (plen >= sizeof(lower)) plen = sizeof(lower) - 1;
-  for (size_t i = 0; i < plen; i++) {
-    char c = prompt[i];
-    if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
-    lower[i] = c;
-  }
-  lower[plen] = '\0';
-
-  int blocked = 0;
-  const char *reason = "allowed";
-  if ((int)plen > max_chars) {
-    blocked = 1;
-    reason = "prompt_too_long";
-  } else if (strstr(lower, "ignore previous instructions") != NULL) {
-    blocked = 1;
-    reason = "prompt_injection_pattern";
-  } else if (block_secrets &&
-             (strstr(lower, "api_key") != NULL || strstr(lower, "password") != NULL ||
-              strstr(lower, "private key") != NULL || strstr(lower, "secret token") != NULL)) {
-    blocked = 1;
-    reason = "secret_exfiltration_pattern";
-  }
-
-  FILE *af = fopen(".azl/policy_infer_audit.jsonl", "a");
-  if (af) {
-    char esc_reason[256];
-    json_escape_text(reason, esc_reason, sizeof(esc_reason));
-    fprintf(af,
-            "{\"ts\":%ld,\"path\":\"/api/llm/policy_infer\",\"decision\":\"%s\",\"reason\":\"%s\","
-            "\"prompt_chars\":%zu}\n",
-            (long)time(NULL), blocked ? "blocked" : "allowed", esc_reason, plen);
-    fclose(af);
-  }
-
-  if (blocked) {
+  int n_predict = 64;
+  (void)json_extract_int_field(body_start, "n_predict", &n_predict, 64);
+  char out[GGUF_READ_MAX + 1];
+  char backend[32];
+  char reason[256];
+  char err[512];
+  int pr = policy_infer_text(prompt, n_predict, out, sizeof(out), backend, sizeof(backend), reason,
+                             sizeof(reason), err, sizeof(err));
+  if (pr == -10) {
     char esc_reason[256];
     json_escape_text(reason, esc_reason, sizeof(esc_reason));
     char resp[1024];
@@ -718,11 +772,42 @@ static void handle_policy_infer(int cfd, const char *req, ssize_t n, EngineState
     write_response(cfd, 403, "Forbidden", resp);
     return;
   }
-
-  handle_gguf_infer(cfd, req, n, st);
+  if (pr != 0) {
+    char esc_err[1024];
+    json_escape_text(err, esc_err, sizeof(esc_err));
+    char resp[1500];
+    (void)snprintf(resp, sizeof(resp),
+                   "{\"ok\":false,\"error\":\"policy_infer_failed\",\"code\":%d,\"message\":\"%s\"}",
+                   pr, esc_err);
+    write_response(cfd, 502, "Bad Gateway", resp);
+    return;
+  }
+  size_t esc_cap = GGUF_READ_MAX * 2 + 16;
+  char *esc_text = malloc(esc_cap);
+  if (!esc_text) {
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+    return;
+  }
+  json_escape_text(out, esc_text, esc_cap);
+  char esc_reason[256];
+  json_escape_text(reason, esc_reason, sizeof(esc_reason));
+  size_t resp_cap = strlen(esc_text) + 512;
+  char *resp = malloc(resp_cap);
+  if (!resp) {
+    free(esc_text);
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+    return;
+  }
+  (void)snprintf(resp, resp_cap,
+                 "{\"ok\":true,\"backend\":\"%s\",\"policy\":\"allowed\",\"reason\":\"%s\",\"text\":\"%s\"}",
+                 backend, esc_reason, esc_text);
+  free(esc_text);
+  write_response(cfd, 200, "OK", resp);
+  free(resp);
 }
 
 static void handle_chat_session(int cfd, const char *req, ssize_t n, EngineState *st) {
+  (void)st;
   const char *body_start = strstr(req, "\r\n\r\n");
   if (body_start) body_start += 4;
   else {
@@ -747,6 +832,12 @@ static void handle_chat_session(int cfd, const char *req, ssize_t n, EngineState
     write_response(cfd, 400, "Bad Request", "{\"ok\":false,\"error\":\"missing_session_id\"}");
     return;
   }
+  if (!session_id_is_valid(sid)) {
+    free(body_copy);
+    write_response(cfd, 400, "Bad Request",
+                   "{\"ok\":false,\"error\":\"invalid_session_id\",\"hint\":\"Use [A-Za-z0-9_.-], max 95 chars.\"}");
+    return;
+  }
   if (json_extract_string_field(body_copy, "message", message, sizeof(message)) != 0) {
     free(body_copy);
     write_response(cfd, 400, "Bad Request", "{\"ok\":false,\"error\":\"missing_message\"}");
@@ -764,12 +855,11 @@ static void handle_chat_session(int cfd, const char *req, ssize_t n, EngineState
     write_response(cfd, 503, "Service Unavailable", "{\"ok\":false,\"error\":\"session_capacity_exceeded\"}");
     return;
   }
-  if (reset) sess->history[0] = '\0';
+  if (reset) chat_session_reset_history(sess);
 
   size_t hlen = strlen(sess->history);
   size_t mlen = strlen(message);
-  if (hlen + mlen + 64 >= sizeof(sess->history)) {
-    /* Trim old history by keeping the newest half. */
+  if (hlen + mlen + 96 >= sizeof(sess->history)) {
     size_t keep = sizeof(sess->history) / 2;
     if (hlen > keep) {
       memmove(sess->history, sess->history + (hlen - keep), keep);
@@ -780,31 +870,75 @@ static void handle_chat_session(int cfd, const char *req, ssize_t n, EngineState
       hlen = 0;
     }
   }
-  (void)snprintf(sess->history + hlen, sizeof(sess->history) - hlen, "\nUser: %s\nAssistant:", message);
+  (void)snprintf(sess->history + hlen, sizeof(sess->history) - hlen, "\nUser: %s", message);
 
   char prompt[12288];
-  (void)snprintf(
-      prompt, sizeof(prompt),
-      "You are AZL chat assistant. Keep answers concise and helpful.\nConversation history:%s\n",
-      sess->history);
+  (void)snprintf(prompt, sizeof(prompt),
+                 "System: You are AZL chat assistant. Follow policy, be accurate, concise, and production-grade.\n"
+                 "Conversation:\n%s\nAssistant:",
+                 sess->history);
 
-  char esc_prompt[24576];
-  json_escape_text(prompt, esc_prompt, sizeof(esc_prompt));
-
-  char policy_body[26000];
-  int bn = snprintf(policy_body, sizeof(policy_body), "{\"prompt\":\"%s\",\"n_predict\":%d}", esc_prompt, n_predict);
-  if (bn <= 0 || (size_t)bn >= sizeof(policy_body)) {
-    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"prompt_build_failed\"}");
+  char answer[GGUF_READ_MAX + 1];
+  char backend[32];
+  char reason[256];
+  char err[512];
+  int ir = policy_infer_text(prompt, n_predict, answer, sizeof(answer), backend, sizeof(backend), reason,
+                             sizeof(reason), err, sizeof(err));
+  if (ir == -10) {
+    char esc_reason[256];
+    json_escape_text(reason, esc_reason, sizeof(esc_reason));
+    char resp[1024];
+    (void)snprintf(resp, sizeof(resp),
+                   "{\"ok\":false,\"error\":\"policy_blocked\",\"reason\":\"%s\","
+                   "\"hint\":\"Adjust prompt or AZL_POLICY_* if intended.\"}",
+                   esc_reason);
+    write_response(cfd, 403, "Forbidden", resp);
     return;
   }
-  char fake_req[28672];
-  int rn = snprintf(fake_req, sizeof(fake_req),
-                    "POST /api/llm/policy_infer HTTP/1.1\r\nContent-Length: %d\r\n\r\n%s", bn, policy_body);
-  if (rn <= 0 || (size_t)rn >= sizeof(fake_req)) {
-    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"request_build_failed\"}");
+  if (ir != 0) {
+    char esc_err[1024];
+    json_escape_text(err, esc_err, sizeof(esc_err));
+    char resp[1500];
+    (void)snprintf(resp, sizeof(resp), "{\"ok\":false,\"error\":\"chat_infer_failed\",\"code\":%d,\"message\":\"%s\"}",
+                   ir, esc_err);
+    write_response(cfd, 502, "Bad Gateway", resp);
     return;
   }
-  handle_policy_infer(cfd, fake_req, (ssize_t)rn, st);
+  hlen = strlen(sess->history);
+  size_t alen = strlen(answer);
+  if (hlen + alen + 20 >= sizeof(sess->history)) {
+    size_t keep = sizeof(sess->history) / 2;
+    if (hlen > keep) {
+      memmove(sess->history, sess->history + (hlen - keep), keep);
+      sess->history[keep] = '\0';
+    } else {
+      sess->history[0] = '\0';
+    }
+  }
+  (void)snprintf(sess->history + strlen(sess->history), sizeof(sess->history) - strlen(sess->history),
+                 "\nAssistant: %s\n", answer);
+  chat_session_save_history(sess);
+
+  size_t esc_cap = GGUF_READ_MAX * 2 + 16;
+  char *esc_text = malloc(esc_cap);
+  if (!esc_text) {
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+    return;
+  }
+  json_escape_text(answer, esc_text, esc_cap);
+  size_t resp_cap = strlen(esc_text) + 512;
+  char *resp = malloc(resp_cap);
+  if (!resp) {
+    free(esc_text);
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+    return;
+  }
+  (void)snprintf(resp, resp_cap,
+                 "{\"ok\":true,\"session_id\":\"%s\",\"backend\":\"%s\",\"text\":\"%s\",\"persisted\":true}", sid,
+                 backend, esc_text);
+  free(esc_text);
+  write_response(cfd, 200, "OK", resp);
+  free(resp);
 }
 
 static void write_response(int fd, int status, const char *status_text, const char *body) {
