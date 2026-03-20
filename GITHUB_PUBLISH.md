@@ -24,7 +24,7 @@ From a machine with internet access, run:
 ./scripts/push_to_github.sh
 ```
 
-If you see "Could not resolve host: github.com" or similar, run that script from your local machine (or any host that can reach GitHub). If push is rejected because the remote changed, run: `git push origin main --force`.
+If you see "Could not resolve host: github.com" or similar, run that script from your local machine (or any host that can reach GitHub). If push is rejected, read the remote’s message (branch protection, non-fast-forward, etc.); do **not** force-push to **`main`** unless you own the repo and understand the risk.
 
 ---
 
@@ -52,9 +52,9 @@ If you see "Could not resolve host: github.com" or similar, run that script from
    git push -u origin main
    ```
 
-4. **Optional: repo settings on GitHub**
+4. **Repo settings on GitHub**
    - **Settings → General**: add description and website/topics so people can find the repo.
-   - **Settings → Branches**: add branch protection for `main` (e.g. require PR reviews) if you want.
+   - **`main` branch protection:** the upstream repo enforces **eight** required **Test and Deploy** checks (see **[docs/GITHUB_BRANCH_PROTECTION.md](docs/GITHUB_BRANCH_PROTECTION.md)**). **Maintainers** re-apply or verify with **`make branch-protection-apply`** / **`make branch-protection-verify`** (needs **`gh` auth** + **admin**). Forks: run the same targets against your fork after cloning, or use **`bash scripts/gh_apply_main_branch_protection.sh --dry-run`** and **`gh api …/protection --input`** as documented there. Add **required reviewers** under **Settings → Branches** if your org wants reviews on top of status checks.
    - **Insights → Community**: GitHub will suggest SECURITY.md, CODE_OF_CONDUCT.md, CONTRIBUTING, etc.; you’ve already added them.
 
 ## After publish
@@ -62,4 +62,4 @@ If you see "Could not resolve host: github.com" or similar, run that script from
 - **Use**: Anyone can clone and run `bash scripts/start_azl_native_mode.sh` (see README Installation).
 - **Contribute**: Contributors open issues (bug/feature templates) and PRs (PR template + CONTRIBUTING and AZL rules).
 
-If you want, we can next refine exactly which files to stage (e.g. only core AZL + docs and exclude training/LLM scripts) or add a `requirements.txt` and a one-line “Run tests” in README.
+**Tests:** from repo root, **`make test`** or **`bash scripts/run_all_tests.sh`** (see root **README** and **`docs/CI_CD_PIPELINE.md`**).
