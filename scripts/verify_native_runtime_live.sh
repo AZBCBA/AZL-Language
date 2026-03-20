@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Live HTTP checks against azl-native-engine + minimal bootstrap bundle (c_minimal_link_ping).
+# Optional: AZL_NATIVE_ENGINE_BIN=/abs/path/to/azl-native-engine (CI coverage uses gcc --coverage build).
 # This matches the stack used by native gate F and scripts/run_native_engine_llm_bench.sh.
 #
 # Full enterprise combined startup (scripts/start_azl_native_mode.sh) is heavier and can fail
@@ -41,7 +42,21 @@ cleanup() {
 }
 trap cleanup EXIT
 
-BIN="$(bash scripts/build_azl_native_engine.sh)"
+# CI coverage and other callers may build a custom binary (e.g. gcc --coverage). If set, must exist
+# and be executable; we do not fall back to a default build (explicit error).
+if [ -n "${AZL_NATIVE_ENGINE_BIN:-}" ]; then
+  if [ ! -f "$AZL_NATIVE_ENGINE_BIN" ]; then
+    echo "ERROR: AZL_NATIVE_ENGINE_BIN is set but file not found: ${AZL_NATIVE_ENGINE_BIN}" >&2
+    exit 69
+  fi
+  if [ ! -x "$AZL_NATIVE_ENGINE_BIN" ]; then
+    echo "ERROR: AZL_NATIVE_ENGINE_BIN is set but not executable: ${AZL_NATIVE_ENGINE_BIN}" >&2
+    exit 69
+  fi
+  BIN="$(realpath "$AZL_NATIVE_ENGINE_BIN")"
+else
+  BIN="$(bash scripts/build_azl_native_engine.sh)"
+fi
 COMBINED="$(realpath azl/tests/c_minimal_link_ping.azl)"
 BUNDLE=".azl/tmp/verify_native_live_bundle.azl"
 bash scripts/build_azl_bootstrap_bundle.sh "$COMBINED" "::boot.entry" --out "$BUNDLE"

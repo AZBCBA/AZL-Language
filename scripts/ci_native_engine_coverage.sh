@@ -27,6 +27,9 @@ find "$ROOT_DIR" -maxdepth 3 \( -name '*.gcda' -o -name '*.gcno' \) -delete 2>/d
 gcc --coverage -O0 -g -Wall -Wextra -o "$OUT_BIN" "$SRC"
 chmod +x "$OUT_BIN"
 
+# verify_native_runtime_live.sh otherwise rebuilds via build_azl_native_engine.sh (-O2, no --coverage),
+# replacing this binary and yielding no .gcda → lcov --capture fails.
+export AZL_NATIVE_ENGINE_BIN="$OUT_BIN"
 bash scripts/verify_native_runtime_live.sh
 
 # Stop daemons so instrumented processes flush .gcda before lcov.
@@ -35,15 +38,20 @@ pkill -f 'run_enterprise_daemon' 2>/dev/null || true
 pkill -f 'sysproxy' 2>/dev/null || true
 sleep 1
 
-if ! lcov --capture --directory "$ROOT_DIR" --output-file "${ROOT_DIR}/.azl/coverage.info" 2>/dev/null; then
-  echo "ERROR: lcov --capture failed" >&2
+LCOV_LOG="${ROOT_DIR}/.azl/lcov_capture.log"
+mkdir -p "${ROOT_DIR}/.azl"
+if ! lcov --capture --directory "$ROOT_DIR" --output-file "${ROOT_DIR}/.azl/coverage.info" >"$LCOV_LOG" 2>&1; then
+  echo "ERROR: lcov --capture failed (see ${LCOV_LOG})" >&2
+  cat "$LCOV_LOG" >&2
   exit 4
 fi
 
 lcov --remove "${ROOT_DIR}/.azl/coverage.info" '/usr/*' -o "${ROOT_DIR}/.azl/coverage.info" || true
 
-if ! genhtml "${ROOT_DIR}/.azl/coverage.info" --output-directory "${ROOT_DIR}/.azl/coverage-html" 2>/dev/null; then
-  echo "ERROR: genhtml failed" >&2
+GENHTML_LOG="${ROOT_DIR}/.azl/genhtml.log"
+if ! genhtml "${ROOT_DIR}/.azl/coverage.info" --output-directory "${ROOT_DIR}/.azl/coverage-html" >"$GENHTML_LOG" 2>&1; then
+  echo "ERROR: genhtml failed (see ${GENHTML_LOG})" >&2
+  cat "$GENHTML_LOG" >&2
   exit 5
 fi
 
