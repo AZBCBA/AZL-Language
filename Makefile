@@ -1,4 +1,4 @@
-.PHONY: test ci predeploy check-placeholders install-git-hooks examples branch-protection-apply
+.PHONY: test ci predeploy check-placeholders install-git-hooks examples branch-protection-apply branch-protection-verify
 
 test:
 	./scripts/run_all_tests.sh
@@ -23,3 +23,5 @@ examples:
 branch-protection-apply:
 	bash scripts/gh_apply_main_branch_protection.sh
 
+branch-protection-verify:
+	bash scripts/gh_apply_main_branch_protection.sh --verify

@@ -15,7 +15,7 @@ This repository’s automation is **bash + native AZL gates** (no Rust toolchain
 
 **Canonical badge for `main`:** **`test-and-deploy.yml`**. **`ci.yml`** / **`native-release-gates.yml`** remain for manual debugging or release-focused reruns without the full deploy graph.
 
-**Branch protection:** **`main`** is configured with required checks **Gates and full test suite** and **AZME provider E2E** (GitHub Actions **`app_id` 15368**, **`strict` merges**). Re-apply or extend via [GITHUB_BRANCH_PROTECTION.md](GITHUB_BRANCH_PROTECTION.md). In the web UI, obsolete entries such as **AZL CI** / **native-release-gates** should not appear once protection was created via the API with only these checks.
+**Branch protection:** **`main`** requires **eight** **Test and Deploy** jobs (gates, AZME, three native-engine matrix builds, benchmarks, lcov coverage, Docker) — see [GITHUB_BRANCH_PROTECTION.md](GITHUB_BRANCH_PROTECTION.md). **Deploy staging** is intentionally not required (skipped on PRs). **`app_id` 15368**, **`strict` merges**. Apply / drift-check: **`scripts/gh_apply_main_branch_protection.sh`** and **`make branch-protection-verify`**.
 
 ## Release helper self-check
 

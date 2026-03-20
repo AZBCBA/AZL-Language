@@ -36,7 +36,7 @@
 - No `placeholder|TODO|FIXME` in `.azl` sources committed to main.
 - Event recursion/cycle detection must be active by default.
 - I/O and HTTP in pure mode must route through virtual OS stores.
-- **GitHub Actions:** PR/push to **`main`**/**`master`** is gated by **`test-and-deploy.yml`** (failing job/step surfaces script **`ERROR:`** / numeric exits below — no silent green). **`ci.yml`** and **`native-release-gates.yml`** are **`workflow_dispatch` only** (manual reruns). **`nightly.yml`** runs **`check_azl_native_gates.sh`** then sysproxy E2E. Full matrix: **`docs/CI_CD_PIPELINE.md`**.
+- **GitHub Actions:** PR/push to **`main`**/**`master`** is gated by **`test-and-deploy.yml`**; **`main`** branch protection requires **eight** of those jobs (see **`docs/GITHUB_BRANCH_PROTECTION.md`** / **`scripts/gh_apply_main_branch_protection.sh`**). Failing steps surface **`ERROR:`** / numeric exits — no silent green. **`ci.yml`** and **`native-release-gates.yml`** are **`workflow_dispatch` only**. **`nightly.yml`** runs **`check_azl_native_gates.sh`** then sysproxy E2E. Full matrix: **`docs/CI_CD_PIPELINE.md`**.
 
 ### Shell helpers (release + live verify)
 
@@ -163,15 +163,18 @@ Used by **`.github/workflows/release.yml`** after **`actions/checkout`** at the 
 
 ### Branch protection (`scripts/gh_apply_main_branch_protection.sh`)
 
-Maintainer-only: applies **required status checks** on **`main`** (see **`docs/GITHUB_BRANCH_PROTECTION.md`**). Uses **`gh api`** + **`jq`**; not invoked from Actions.
+Maintainer-only: **PUT** or **`--verify`** **GET** for **required status checks** on **`main`** (see **`docs/GITHUB_BRANCH_PROTECTION.md`**). Expected contexts match **`test-and-deploy.yml`** (eight checks; excludes **Deploy staging**). Uses **`gh api`** + **`jq`**; not invoked from Actions.
 
 | Exit | Meaning |
 |------|---------|
-| **0** | **`--help`** / **`-h`** (usage on stderr) |
-| **2** | Invalid arguments (extra branch after branch name, etc.) |
+| **0** | **`--help`** / **`-h`** (usage on stderr), or **`--verify`** success |
+| **2** | Invalid arguments (e.g. both **`--dry-run`** and **`--verify`**, or extra branch argument) |
 | **3** | **`GITHUB_REPOSITORY`** unset and **`gh repo view`** could not resolve owner/repo |
 | **5** | **`gh`** or **`jq`** not found |
 | **6** | **`gh`** not authenticated |
 | **7** | GitHub API **PUT** **`…/branches/<branch>/protection`** failed (**stderr** includes API body if present) |
+| **8** | **`--verify`**: branch not protected or **GET** **404** / “Branch not protected” |
+| **9** | **`--verify`**: **`strict`** is not **true**, or required **contexts** / **`checks[].context`** set ≠ expected (sorted JSON arrays differ) |
+| **10** | **`--verify`**: **GET** failed (non-404), or response was not valid JSON |
 
 

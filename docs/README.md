@@ -56,7 +56,7 @@ Broader / historical spec draft: [../azl/docs/AZL_LANGUAGE_SPECIFICATION.md](../
 | Document | Use |
 |----------|-----|
 | [CI_CD_PIPELINE.md](CI_CD_PIPELINE.md) | GitHub Actions overview |
-| [GITHUB_BRANCH_PROTECTION.md](GITHUB_BRANCH_PROTECTION.md) | **`main`** required checks (API payload, verify, re-apply) |
+| [GITHUB_BRANCH_PROTECTION.md](GITHUB_BRANCH_PROTECTION.md) | **`main`**: eight required **Test and Deploy** checks; **`--verify`** / **`make branch-protection-verify`** |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
 | [OBSERVABILITY.md](OBSERVABILITY.md) | Logs / metrics hooks |
 
