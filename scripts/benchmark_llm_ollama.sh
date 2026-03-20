@@ -11,6 +11,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 OLLAMA_HOST="${OLLAMA_HOST:-http://127.0.0.1:11434}"
 REQS="${LLM_BENCH_REQS:-20}"
@@ -19,7 +21,7 @@ NUM_PREDICT="${LLM_BENCH_NUM_PREDICT:-16}"
 MODEL="${LLM_BENCH_MODEL:-llama3.2:1b}"
 PROMPT="${LLM_BENCH_PROMPT:-Say hello in one word.}"
 TOKEN="${AZL_BENCH_TOKEN:-azl_bench_token_2026}"
-mkdir -p .azl
+mkdir -p "$AZL_BENCHMARKS_DIR"
 
 # Check Ollama is reachable
 if ! curl -sf --max-time 5 "${OLLAMA_HOST}/api/tags" >/dev/null 2>&1; then
@@ -34,15 +36,15 @@ echo ""
 
 # --- 1) Python client ---
 echo "[1/3] Python client -> Ollama"
-LLM_BENCH_LAT_FILE=".azl/benchmark_llm_python.lat" \
+LLM_BENCH_LAT_FILE="${AZL_BENCHMARKS_DIR}/benchmark_llm_python.lat" \
 OLLAMA_HOST="$OLLAMA_HOST" LLM_BENCH_REQS="$REQS" LLM_BENCH_WARMUP="$WARMUP" \
 LLM_BENCH_NUM_PREDICT="$NUM_PREDICT" LLM_BENCH_MODEL="$MODEL" LLM_BENCH_PROMPT="$PROMPT" \
-  python3 scripts/benchmark_llm_python_client.py 2>>.azl/benchmark_llm_python_run.log | tail -1 > .azl/llm_python_summary.txt || true
-PY_LINE="$(cat .azl/llm_python_summary.txt 2>/dev/null || echo "generate,0,0,0,0")"
+  python3 scripts/benchmark_llm_python_client.py 2>>"${AZL_BENCHMARKS_DIR}/benchmark_llm_python_run.log" | tail -1 > "${AZL_BENCHMARKS_DIR}/llm_python_summary.txt" || true
+PY_LINE="$(cat "${AZL_BENCHMARKS_DIR}/llm_python_summary.txt" 2>/dev/null || echo "generate,0,0,0,0")"
 
 # --- 2) Curl baseline ---
 echo "[2/3] Curl -> Ollama"
-: > .azl/benchmark_llm_curl.lat
+: > "${AZL_BENCHMARKS_DIR}/benchmark_llm_curl.lat"
 PAYLOAD="$(printf '{"model":"%s","prompt":"%s","stream":false,"options":{"num_predict":%s}}' "$MODEL" "$PROMPT" "$NUM_PREDICT")"
 for _ in $(seq 1 "$WARMUP"); do
   curl -sfS -m 120 -X POST -H "Content-Type: application/json" -d "$PAYLOAD" \
@@ -54,11 +56,11 @@ for i in $(seq 1 "$REQS"); do
     "${OLLAMA_HOST}/api/generate" >/dev/null 2>&1 || true
   end_ns="$(date +%s%N)"
   dur_us=$(( (end_ns - start_ns) / 1000 ))
-  echo "generate,$dur_us" >> .azl/benchmark_llm_curl.lat
+  echo "generate,$dur_us" >> "${AZL_BENCHMARKS_DIR}/benchmark_llm_curl.lat"
 done
 summary_curl() {
   local tmp; tmp="$(mktemp)"
-  awk -F',' '$1=="generate"{print $2}' .azl/benchmark_llm_curl.lat | sort -n > "$tmp"
+  awk -F',' '$1=="generate"{print $2}' "${AZL_BENCHMARKS_DIR}/benchmark_llm_curl.lat" | sort -n > "$tmp"
   local n; n="$(wc -l < "$tmp" | tr -d ' ')"
   if [ "$n" -eq 0 ]; then echo "generate,0,0,0,0"; rm -f "$tmp"; return; fi
   local mean; mean="$(awk '{sum+=$1} END{printf "%.2f", sum/NR}' "$tmp")"
@@ -94,7 +96,7 @@ fi
 AZL_LINE="generate,0,0,0,0"
 if [ -n "$AZL_PORT" ]; then
   echo "[3/3] C native engine -> Ollama (port $AZL_PORT, POST /api/ollama/generate)"
-  : > .azl/benchmark_llm_azl.lat
+  : > "${AZL_BENCHMARKS_DIR}/benchmark_llm_azl.lat"
   for _ in $(seq 1 "$WARMUP"); do
     curl -sfS -m 120 -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
       -d "{\"model\":\"$MODEL\",\"prompt\":\"$PROMPT\",\"stream\":false,\"options\":{\"num_predict\":$NUM_PREDICT}}" \
@@ -107,10 +109,10 @@ if [ -n "$AZL_PORT" ]; then
       "http://127.0.0.1:${AZL_PORT}/api/ollama/generate" >/dev/null 2>&1 || true
     end_ns="$(date +%s%N)"
     dur_us=$(( (end_ns - start_ns) / 1000 ))
-    echo "generate,$dur_us" >> .azl/benchmark_llm_azl.lat
+    echo "generate,$dur_us" >> "${AZL_BENCHMARKS_DIR}/benchmark_llm_azl.lat"
   done
   tmp="$(mktemp)"
-  awk -F',' '$1=="generate"{print $2}' .azl/benchmark_llm_azl.lat | sort -n > "$tmp"
+  awk -F',' '$1=="generate"{print $2}' "${AZL_BENCHMARKS_DIR}/benchmark_llm_azl.lat" | sort -n > "$tmp"
   n="$(wc -l < "$tmp" | tr -d ' ')"
   if [ "$n" -gt 0 ]; then
     mean="$(awk '{sum+=$1} END{printf "%.2f", sum/NR}' "$tmp")"
@@ -130,7 +132,7 @@ else
 fi
 
 # --- Report ---
-REPORT=".azl/benchmark_llm_ollama_$(date +%Y%m%d_%H%M%S).txt"
+REPORT="${AZL_BENCHMARKS_DIR}/benchmark_llm_ollama_$(date +%Y%m%d_%H%M%S).txt"
 {
   echo "=============================================="
   echo "  LLM Benchmark: AZL vs Python vs Curl"
@@ -145,9 +147,9 @@ REPORT=".azl/benchmark_llm_ollama_$(date +%Y%m%d_%H%M%S).txt"
   echo "$CURL_LINE" | awk -F',' '{printf "%-12s %12s %12s %12s\n","Curl",$3,$4,$5}'
   echo "$AZL_LINE" | awk -F',' '{printf "%-12s %12s %12s %12s\n","AZL",$3,$4,$5}'
   echo ""
-  echo "Python:  .azl/benchmark_llm_python.lat"
-  echo "Curl:    .azl/benchmark_llm_curl.lat"
-  echo "AZL:     .azl/benchmark_llm_azl.lat (if engine was running)"
+  echo "Python:  ${AZL_BENCHMARKS_DIR}/benchmark_llm_python.lat"
+  echo "Curl:    ${AZL_BENCHMARKS_DIR}/benchmark_llm_curl.lat"
+  echo "AZL:     ${AZL_BENCHMARKS_DIR}/benchmark_llm_azl.lat (if engine was running)"
 } | tee "$REPORT"
 
 echo ""

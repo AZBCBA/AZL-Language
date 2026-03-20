@@ -172,9 +172,36 @@ static void ensure_azl_dir(void) {
   mkdir(".azl", 0755);
 }
 
+/* Create intermediate directories (POSIX mkdir -p subset). */
+static int mkdir_p_path(const char *path) {
+  char buf[512];
+  size_t n = snprintf(buf, sizeof buf, "%s", path);
+  if (n == 0 || n >= sizeof buf) return -1;
+  for (size_t i = 1; i < n; i++) {
+    if (buf[i] != '/') continue;
+    buf[i] = '\0';
+    if (mkdir(buf, 0755) != 0 && errno != EEXIST) return -1;
+    buf[i] = '/';
+  }
+  if (mkdir(buf, 0755) != 0 && errno != EEXIST) return -1;
+  return 0;
+}
+
+static const char *azl_state_dir(void) {
+  const char *e = getenv("AZL_STATE_DIR");
+  if (e && e[0]) return e;
+  return ".azl/state";
+}
+
 static void append_run_record(const EngineState *st) {
   ensure_azl_dir();
-  FILE *fp = fopen(".azl/native_engine_runs.jsonl", "a");
+  const char *sd = azl_state_dir();
+  if (mkdir_p_path(sd) != 0) {
+    fprintf(stderr, "native-engine: mkdir AZL_STATE_DIR %s: %s\n", sd, strerror(errno));
+  }
+  char path[512];
+  snprintf(path, sizeof path, "%s/native_engine_runs.jsonl", sd);
+  FILE *fp = fopen(path, "a");
   if (!fp) return;
   fprintf(fp,
           "{\"ts\":%ld,\"bundle\":\"%s\",\"combined\":\"%s\",\"entry\":\"%s\","
@@ -515,7 +542,13 @@ static int policy_decide_prompt(const char *prompt, char *reason, size_t reason_
 
 static void policy_audit_append(const char *decision, const char *reason, size_t prompt_chars) {
   ensure_azl_dir();
-  FILE *af = fopen(".azl/policy_infer_audit.jsonl", "a");
+  const char *sd = azl_state_dir();
+  if (mkdir_p_path(sd) != 0) {
+    fprintf(stderr, "native-engine: mkdir AZL_STATE_DIR %s: %s\n", sd, strerror(errno));
+  }
+  char apath[512];
+  snprintf(apath, sizeof apath, "%s/policy_infer_audit.jsonl", sd);
+  FILE *af = fopen(apath, "a");
   if (!af) return;
   char esc_reason[256];
   json_escape_text(reason, esc_reason, sizeof(esc_reason));

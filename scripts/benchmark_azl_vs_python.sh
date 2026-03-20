@@ -4,19 +4,21 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 REQS="${AZL_BENCH_REQS:-200}"
 CONC="${AZL_BENCH_CONCURRENCY:-1}"
-mkdir -p .azl
+mkdir -p "$AZL_BENCHMARKS_DIR"
 
 echo "=== AZL Native API Benchmark ==="
 AZL_BENCH_REQS="$REQS" AZL_BENCH_CONCURRENCY="$CONC" bash scripts/benchmark_native_api.sh
-AZL_RESULT="$(ls -t .azl/benchmark_native_api_*.txt 2>/dev/null | head -1)"
+AZL_RESULT="$(ls -t "${AZL_BENCHMARKS_DIR}"/benchmark_native_api_*.txt 2>/dev/null | head -1)"
 
 echo ""
 echo "=== Python API Benchmark ==="
 AZL_BENCH_REQS="$REQS" AZL_BENCH_CONCURRENCY="$CONC" bash scripts/benchmark_python_api.sh
-PY_RESULT="$(ls -t .azl/benchmark_python_api_*.txt 2>/dev/null | head -1)"
+PY_RESULT="$(ls -t "${AZL_BENCHMARKS_DIR}"/benchmark_python_api_*.txt 2>/dev/null | head -1)"
 
 # Parse results into vars
 azl_healthz_mean=""
@@ -66,7 +68,7 @@ faster_exec="tie"
 }
 
 # Comparison table
-REPORT=".azl/benchmark_azl_vs_python_$(date +%Y%m%d_%H%M%S).txt"
+REPORT="${AZL_BENCHMARKS_DIR}/benchmark_azl_vs_python_$(date +%Y%m%d_%H%M%S).txt"
 {
   echo "=============================================="
   echo "  AZL vs Python API Latency Comparison"

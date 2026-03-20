@@ -1,6 +1,11 @@
 #!/bin/bash
 set -eu
 
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
+
 # AZL Enterprise Daemon Runner - Pure AZL Execution
 # This script combines all components and executes the daemon
 

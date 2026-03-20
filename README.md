@@ -6,7 +6,7 @@ AZL is a **component–event** language: programs are built from named `componen
 
 **Broader library surface:** LHA3-style memory, quantum- and topology-flavored **software** modules, neural orchestration, optional Torch FFI (`AZL_ENABLE_TORCH_FFI`), and HTTP bridges for LLMs. Most of this is **not** exercised by the default native child; boundaries are documented in [AZL_GPU_NEURAL_QUANTUM_INVENTORY.md](docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md) and [DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md](docs/DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md). Native LLM access is designed around an **Ollama-compatible HTTP proxy**; in-process GGUF is **not** implemented and is reported via `GET /api/llm/capabilities`.
 
-**Documentation canon (shipped work + full doc map):** [docs/AZL_DOCUMENTATION_CANON.md](docs/AZL_DOCUMENTATION_CANON.md) · Index: [docs/README.md](docs/README.md) · **Where files belong (root vs `.azl/` vs trees):** [docs/REPOSITORY_LAYOUT.md](docs/REPOSITORY_LAYOUT.md)
+**Documentation canon (shipped work + full doc map):** [docs/AZL_DOCUMENTATION_CANON.md](docs/AZL_DOCUMENTATION_CANON.md) · Index: [docs/README.md](docs/README.md) · **Where files belong (root vs `.azl/` vs trees):** [docs/REPOSITORY_LAYOUT.md](docs/REPOSITORY_LAYOUT.md) · **Local `.azl/` subfolders:** [docs/LOCAL_WORKSPACE_LAYOUT.md](docs/LOCAL_WORKSPACE_LAYOUT.md)
 
 Canonical repo: **https://github.com/AZBCBA/AZL-Language** — [Contributing](docs/CONTRIBUTING.md) · [Issues](https://github.com/AZBCBA/AZL-Language/issues)
 

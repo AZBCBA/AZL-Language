@@ -5,13 +5,15 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 REQS="${AZL_BENCH_REQS:-200}"
 CONC="${AZL_BENCH_CONCURRENCY:-1}"
 TOKEN="${AZL_BENCH_TOKEN:-azl_bench_token_2026}"
 PORT="${BENCH_PYTHON_PORT:-$(( (RANDOM % 20000) + 30000 ))}"
-LAT_FILE=".azl/benchmark_python_api.lat"
-mkdir -p .azl
+LAT_FILE="${AZL_BENCHMARKS_DIR}/benchmark_python_api.lat"
+mkdir -p "$AZL_BENCHMARKS_DIR"
 : > "$LAT_FILE"
 
 if ! command -v python3 >/dev/null 2>&1; then
@@ -103,7 +105,7 @@ HEALTH_SUM="$(summary healthz)"
 STATUS_SUM="$(summary status)"
 EXEC_SUM="$(summary exec_state)"
 
-RESULT_PATH=".azl/benchmark_python_api_$(date +%Y%m%d_%H%M%S).txt"
+RESULT_PATH="${AZL_BENCHMARKS_DIR}/benchmark_python_api_$(date +%Y%m%d_%H%M%S).txt"
 {
   echo "python_api_benchmark"
   echo "port=${PORT}"

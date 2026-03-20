@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 REQS="${AZL_BENCH_REQS:-200}"
 CONC="${AZL_BENCH_CONCURRENCY:-1}"
@@ -21,9 +23,9 @@ pick_port() {
 }
 
 PORT="${AZL_BENCH_PORT:-$(pick_port)}"
-LOG_PATH=".azl/benchmark_native_api.log"
-LAT_FILE=".azl/benchmark_native_api.lat"
-mkdir -p .azl
+LOG_PATH="${AZL_BENCHMARKS_DIR}/benchmark_native_api.log"
+LAT_FILE="${AZL_BENCHMARKS_DIR}/benchmark_native_api.lat"
+mkdir -p "$AZL_BENCHMARKS_DIR"
 : > "$LAT_FILE"
 
 echo "[bench] starting native mode on 127.0.0.1:${PORT}"
@@ -115,7 +117,7 @@ HEALTH_SUM="$(summary healthz)"
 STATUS_SUM="$(summary status)"
 EXEC_SUM="$(summary exec_state)"
 
-RESULT_PATH=".azl/benchmark_native_api_$(date +%Y%m%d_%H%M%S).txt"
+RESULT_PATH="${AZL_BENCHMARKS_DIR}/benchmark_native_api_$(date +%Y%m%d_%H%M%S).txt"
 {
   echo "native_api_benchmark"
   echo "port=${PORT}"

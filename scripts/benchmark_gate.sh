@@ -6,6 +6,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 REQS="${AZL_BENCH_REQS:-100}"
 BASELINE_HEALTHZ="${AZL_BENCH_BASELINE_healthz:-6000}"
@@ -13,7 +15,7 @@ BASELINE_STATUS="${AZL_BENCH_BASELINE_status:-5500}"
 BASELINE_EXEC="${AZL_BENCH_BASELINE_exec_state:-5500}"
 THRESHOLD_PCT="${AZL_BENCH_REGRESSION_THRESHOLD:-10}"
 
-mkdir -p .azl
+mkdir -p "$AZL_BENCHMARKS_DIR"
 
 echo "=== Benchmark Gate ==="
 echo "Baseline (us): healthz=$BASELINE_HEALTHZ status=$BASELINE_STATUS exec_state=$BASELINE_EXEC"
@@ -22,7 +24,7 @@ echo ""
 
 AZL_BENCH_REQS="$REQS" bash scripts/benchmark_azl_vs_python.sh >/dev/null 2>&1 || true
 
-AZL_RESULT="$(ls -t .azl/benchmark_native_api_*.txt 2>/dev/null | head -1)"
+AZL_RESULT="$(ls -t "${AZL_BENCHMARKS_DIR}"/benchmark_native_api_*.txt 2>/dev/null | head -1)"
 if [ -z "$AZL_RESULT" ] || [ ! -f "$AZL_RESULT" ]; then
   echo "ERROR: No AZL benchmark result found"
   exit 1

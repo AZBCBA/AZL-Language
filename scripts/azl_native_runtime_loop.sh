@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 BUNDLE_PATH="${AZL_BOOTSTRAP_BUNDLE:-}"
 COMBINED_PATH="${AZL_COMBINED_PATH:-}"
@@ -26,8 +28,8 @@ if ! rg -q "component\\s+${ENTRY//./\\.}\\b" "$COMBINED_PATH"; then
   exit 43
 fi
 
-mkdir -p .azl
-STATE_PATH=".azl/native_runtime_state.json"
+mkdir -p "$AZL_STATE_DIR"
+STATE_PATH="${AZL_STATE_DIR}/native_runtime_state.json"
 START_TS="$(date +%s)"
 echo "{\"status\":\"starting\",\"entry\":\"$ENTRY\",\"combined\":\"$COMBINED_PATH\",\"started_at\":$START_TS}" > "$STATE_PATH"
 

@@ -16,7 +16,16 @@ WARMUP = int(os.environ.get("LLM_BENCH_WARMUP", "0"))
 NUM_PREDICT = int(os.environ.get("LLM_BENCH_NUM_PREDICT", "16"))
 MODEL = os.environ.get("LLM_BENCH_MODEL", "llama3.2:1b")
 PROMPT = os.environ.get("LLM_BENCH_PROMPT", "Say hello in one word.")
-LAT_FILE = os.environ.get("LLM_BENCH_LAT_FILE", ".azl/benchmark_llm_python.lat")
+
+
+def _default_bench_lat_path() -> str:
+    root = (os.environ.get("AZL_BENCHMARKS_DIR") or "").strip()
+    if not root:
+        root = os.path.join(".azl", "benchmarks")
+    return os.path.join(root, "benchmark_llm_python.lat")
+
+
+LAT_FILE = os.environ.get("LLM_BENCH_LAT_FILE") or _default_bench_lat_path()
 
 
 def call_ollama(prompt: str, model: str) -> tuple[float, bool]:

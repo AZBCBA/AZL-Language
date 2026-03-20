@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 GGUF="${AZL_GGUF_PATH:-}"
 if [ -z "$GGUF" ] || [ ! -f "$GGUF" ]; then
@@ -110,8 +112,8 @@ if [ "$ready" != "1" ]; then
   exit 12
 fi
 
-curl -fsS -H "Authorization: Bearer ${AZL_API_TOKEN}" "http://127.0.0.1:${PORT}/api/llm/capabilities" > .azl/benchmark_policy_capabilities.json
-OUT=".azl/benchmark_policy_vs_direct_$(date +%Y%m%d_%H%M%S).txt"
+curl -fsS -H "Authorization: Bearer ${AZL_API_TOKEN}" "http://127.0.0.1:${PORT}/api/llm/capabilities" > "${AZL_BENCHMARKS_DIR}/benchmark_policy_capabilities.json"
+OUT="${AZL_BENCHMARKS_DIR}/benchmark_policy_vs_direct_$(date +%Y%m%d_%H%M%S).txt"
 python3 scripts/benchmark_llm_policy_vs_direct.py > "$OUT"
 echo "$OUT"
 

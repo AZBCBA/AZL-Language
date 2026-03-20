@@ -10,8 +10,8 @@ This folder holds **redacted, repo-safe** snapshots of runtime diagnostics.
 | `daemon.err` | **~2.0 GB** | Runtime stderr; dominated by repeated lines |
 | `daemon.out` | 0 bytes (when last checked) | Runtime stdout |
 | `daemon.run.log` | ~1.7 KB | Enterprise runner banner; **may contain API token in plaintext** |
-| `policy_infer_audit.jsonl` | 101 lines | Policy decisions for `/api/llm/policy_infer` (no full prompts in sampled lines) |
-| `native_engine_runs.jsonl` | 199 lines | Native engine bundle paths, ports, combined-file hints |
+| `state/policy_infer_audit.jsonl` | (varies) | Policy decisions for `/api/llm/policy_infer` (no full prompts in typical lines); legacy flat `.azl/policy_infer_audit.jsonl` if not migrated |
+| `state/native_engine_runs.jsonl` | (varies) | Native engine bundle paths, ports, combined-file hints |
 
 ## Dominant signals in `daemon.err` (from sampled head/tail)
 
@@ -30,8 +30,8 @@ Low unique information per megabyte: safe to **truncate** `daemon.err` after arc
 | `daemon_err_sanitized_tail.txt` | Last **400** lines of `.azl/daemon.err`, sanitized |
 | `daemon_err_sanitized_sample.txt` | First **120** lines + last **250** lines (labeled sections), sanitized |
 | `daemon_run_log_sanitized.txt` | Full `.azl/daemon.run.log` with token-like lines redacted |
-| `policy_infer_audit.jsonl` | Copy of audit trail (no prompt bodies in typical lines) |
-| `native_engine_runs.jsonl` | Copy of native engine run metadata |
+| `policy_infer_audit.jsonl` | Copy of audit trail from `.azl/state/` when present (no prompt bodies in typical lines) |
+| `native_engine_runs.jsonl` | Copy of native engine run metadata from `.azl/state/` when present |
 
 ## Sanitization rules applied
 

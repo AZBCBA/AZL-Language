@@ -22,6 +22,7 @@ This project mixes **versioned source**, **local runtime state**, and **historic
 Everything under **`.azl/`** is **intentionally not categorized into git**: engine binaries, FIFOs, PIDs, `daemon.err`, audit JSONL, benchmark outputs you dropped there, rebuilt combined `.azl`, chat env, CMake build trees, etc.
 
 - **Rule:** Treat `.azl/` as a **runtime workspace**, not product source.
+- **Layout:** Subfolders (`benchmarks/`, `state/`, `bundles/`, `quarantine/`, …) are defined in **`docs/LOCAL_WORKSPACE_LAYOUT.md`** and created by **`scripts/azl_local_layout.sh`**. Move existing flat files with **`scripts/azl_migrate_local_workspace.sh`**.
 - **Hygiene:** Use `scripts/azl_truncate_daemon_err.sh`, rotate tmp combined files under `/tmp`, and keep secrets out of anything you `git add -f`.
 
 ## 3. Repository root — mixed legacy + ops

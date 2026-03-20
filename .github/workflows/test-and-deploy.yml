@@ -120,12 +120,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-native-api
-          path: .azl/benchmark_native_api_*.txt
+          path: .azl/benchmarks/benchmark_native_api_*.txt
           if-no-files-found: warn
 
       - name: Write benchmark summary
         run: |
-          f="$(ls -t .azl/benchmark_native_api_*.txt 2>/dev/null | head -1 || true)"
+          f="$(ls -t .azl/benchmarks/benchmark_native_api_*.txt 2>/dev/null | head -1 || true)"
           if [ -z "$f" ] || [ ! -f "$f" ]; then
             echo "No benchmark result file for summary" >> "$GITHUB_STEP_SUMMARY"
             exit 0

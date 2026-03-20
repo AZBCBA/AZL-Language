@@ -18,11 +18,13 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/azl_local_layout.sh"
 
 PORT="${AZL_ENTERPRISE_PORT:-8080}"
 REQS="${LLM_BENCH_REQS:-10}"
 PROMPT="${LLM_BENCH_PROMPT:-Say hello in one word.}"
-mkdir -p .azl
+mkdir -p "$AZL_BENCHMARKS_DIR"
 
 if [ -z "${AZL_API_TOKEN:-}" ] && [ -f .azl/local_api_token ]; then
   export AZL_API_TOKEN="$(head -1 .azl/local_api_token | tr -d '\r\n')"
@@ -71,7 +73,7 @@ echo "=== Enterprise /v1/chat benchmark ==="
 echo "  PORT=$PORT REQS=$REQS"
 echo ""
 
-: > .azl/benchmark_enterprise_v1_chat.lat
+: > "${AZL_BENCHMARKS_DIR}/benchmark_enterprise_v1_chat.lat"
 ok=0
 fail=0
 for i in $(seq 1 "$REQS"); do
@@ -85,10 +87,10 @@ for i in $(seq 1 "$REQS"); do
   end_ns="$(date +%s%N)"
   dur_us=$(( (end_ns - start_ns) / 1000 ))
   if [ "$code" -eq 0 ]; then
-    echo "chat,$dur_us" >> .azl/benchmark_enterprise_v1_chat.lat
+    echo "chat,$dur_us" >> "${AZL_BENCHMARKS_DIR}/benchmark_enterprise_v1_chat.lat"
     ok=$((ok + 1))
   else
-    echo "chat_fail,$dur_us" >> .azl/benchmark_enterprise_v1_chat.lat
+    echo "chat_fail,$dur_us" >> "${AZL_BENCHMARKS_DIR}/benchmark_enterprise_v1_chat.lat"
     fail=$((fail + 1))
   fi
 done
@@ -96,7 +98,7 @@ done
 summary() {
   local tmp
   tmp="$(mktemp)"
-  awk -F',' '$1=="chat"{print $2}' .azl/benchmark_enterprise_v1_chat.lat | sort -n > "$tmp"
+  awk -F',' '$1=="chat"{print $2}' "${AZL_BENCHMARKS_DIR}/benchmark_enterprise_v1_chat.lat" | sort -n > "$tmp"
   local n
   n="$(wc -l < "$tmp" | tr -d ' ')"
   if [ "$n" -eq 0 ]; then echo "chat,0,0,0,0"; rm -f "$tmp"; return; fi
@@ -111,7 +113,7 @@ summary() {
 }
 
 LINE="$(summary)"
-REPORT=".azl/benchmark_enterprise_v1_chat_$(date +%Y%m%d_%H%M%S).txt"
+REPORT="${AZL_BENCHMARKS_DIR}/benchmark_enterprise_v1_chat_$(date +%Y%m%d_%H%M%S).txt"
 {
   echo "=============================================="
   echo "  Enterprise POST /v1/chat latency"
@@ -123,7 +125,7 @@ REPORT=".azl/benchmark_enterprise_v1_chat_$(date +%Y%m%d_%H%M%S).txt"
   printf "%-20s %12s %12s %12s\n" "----" "--------" "--------" "--------"
   echo "$LINE" | awk -F',' '{printf "%-20s %12s %12s %12s\n","/v1/chat",$3,$4,$5}'
   echo ""
-  echo "Raw: .azl/benchmark_enterprise_v1_chat.lat"
+  echo "Raw: ${AZL_BENCHMARKS_DIR}/benchmark_enterprise_v1_chat.lat"
 } | tee "$REPORT"
 
 echo ""
