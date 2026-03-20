@@ -59,9 +59,17 @@ bash scripts/verify_azl_strength_bar.sh
 
 That runs **`check_azl_native_gates.sh`**, **`verify_native_runtime_live.sh`**, and **`verify_enterprise_native_http_live.sh`**. It does **not** replace the full release sequence — use **`scripts/run_full_repo_verification.sh`** (see `RELEASE_READY.md`).
 
+## Native gates (local tooling + exit codes)
+
+**`bash scripts/check_azl_native_gates.sh`** is the main native gate runner. Install on the host (examples for Debian/Ubuntu):
+
+- **`ripgrep`** (`rg`), **`jq`**, **`python3`**, **`gcc`**, **`curl`** — required for gate 0 ( **`self_check_release_helpers.sh`** ), F2/F3 parity, engine build, and live verify scripts you may run afterward.
+
+**Numeric exits (no silent failures):** full tables live in **[ERROR_SYSTEM.md](ERROR_SYSTEM.md)** under **§ Shell helpers** (release/`verify_*` scripts), **§ Native gates (`check_azl_native_gates.sh`)** ( **10–31** + gate 0 / G / H notes), **§ Runtime spine contract** ( **90–96** ), **§ Strength bar**, and **§ Release checkout assertion** (`gh_assert_checkout_matches_tag.sh`). Use the printed **`ERROR:`** / **`ERROR[...]`** lines first; the doc maps codes to meaning.
+
 ## GitHub Releases (maintainers)
 
-Publishing sample assets to a **GitHub Release** is **not** part of `run_full_repo_verification.sh`. Flow, **`workflow_dispatch`**, and **`gh`/`ERROR` exits** are documented in **`RELEASE_READY.md`** § GitHub Release and **`docs/CI_CD_PIPELINE.md`**. Tag naming is defined once in **`scripts/azl_release_tag_policy.sh`** (sourced by **`scripts/gh_verify_remote_tag.sh`** and **`scripts/gh_create_sample_release.sh`**). Shell exit tables: **`docs/ERROR_SYSTEM.md`** § Shell helpers. **`scripts/self_check_release_helpers.sh`** runs as **gate 0** inside **`check_azl_native_gates.sh`** (**`rg`**, **`jq`**); it verifies **`release/native/manifest.json`** (**`gates[]`** and **`github_release`** paths). When you add a GitHub release script, list it under **`github_release.scripts`** in the manifest. **`gh_verify_remote_tag.sh`** uses **`jq @uri`** for the GitHub REST ref path (no Python in that path).
+Publishing sample assets to a **GitHub Release** is **not** part of `run_full_repo_verification.sh`. Flow, **`workflow_dispatch`**, and **`gh`/`ERROR` exits** are documented in **`RELEASE_READY.md`** § GitHub Release and **`docs/CI_CD_PIPELINE.md`**. Tag naming is defined once in **`scripts/azl_release_tag_policy.sh`** (sourced by **`scripts/gh_verify_remote_tag.sh`** and **`scripts/gh_create_sample_release.sh`**). Shell exit tables: **`docs/ERROR_SYSTEM.md`** (§ Shell helpers, Native gates, spine contract, strength bar, release checkout assertion). **`scripts/self_check_release_helpers.sh`** runs as **gate 0** inside **`check_azl_native_gates.sh`** (**`rg`**, **`jq`**); it verifies **`release/native/manifest.json`** (**`gates[]`** and **`github_release`** paths). When you add a GitHub release script, list it under **`github_release.scripts`** in the manifest. **`gh_verify_remote_tag.sh`** uses **`jq @uri`** for the GitHub REST ref path (no Python in that path).
 
 ## Standards
 

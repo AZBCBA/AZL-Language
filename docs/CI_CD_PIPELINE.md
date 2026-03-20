@@ -15,6 +15,8 @@ This repository’s automation is **bash + native AZL gates** (no Rust toolchain
 
 To save GitHub Actions minutes, consider **disabling or slimming** overlapping workflows once you standardize on `test-and-deploy.yml` + one lightweight gate workflow.
 
+**Consolidation sketch (policy, not enforced in YAML):** pick **one** of **`ci.yml`** vs **`native-release-gates.yml`** for “main branch strict gates” if both feel redundant; keep **`azl-ci.yml`** if you need **all-branch** coverage; keep **`test-and-deploy.yml`** when you want Docker/GHCR + benchmarks + lcov in one place. Document the team choice in repo **Settings → Rules** or an issue so contributors know which badge is canonical.
+
 ## Release helper self-check
 
 - **`scripts/self_check_release_helpers.sh`** — **`bash -n`** on **`azl_release_tag_policy.sh`**, **`gh_verify_remote_tag.sh`**, **`gh_assert_checkout_matches_tag.sh`**, **`gh_create_sample_release.sh`**, plus **`azl_release_tag_policy.sh`** direct-run guard, sourced assert tests, **`gh_verify_remote_tag.sh`** usage, and **`jq`** validation of **`release/native/manifest.json`** (JSON parse, **`gates[]`** / **`github_release.workflow`** / **`github_release.scripts`** paths on disk). **`gh_verify_remote_tag.sh`** encodes **`refs/tags/<tag>`** with **`jq @uri`** for **`gh api`**. Invoked at the start of **`scripts/check_azl_native_gates.sh`** (**gate 0**). Workflows that run gates install **`jq`** (**`native-release-gates.yml`**, **`azl-ci.yml`**, **`ci.yml`**, **`test-and-deploy.yml`** already include it where needed; **`release.yml`** installs **`jq`** on **`workflow_dispatch`** before verify).

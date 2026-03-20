@@ -13,4 +13,4 @@ Brief description of the change.
 - [ ] No placeholders or mocks in production paths; error handling used where appropriate.
 
 ## How was this tested?
-How did you verify the change (e.g. `bash scripts/check_azl_native_gates.sh` — **gate 0** runs `self_check_release_helpers.sh` + manifest checks — `bash scripts/verify_native_runtime_live.sh`, `bash scripts/run_all_tests.sh`)? Non-zero exits: [docs/ERROR_SYSTEM.md](docs/ERROR_SYSTEM.md) § Shell helpers.
+How did you verify the change (e.g. `bash scripts/check_azl_native_gates.sh` — **gate 0** runs `self_check_release_helpers.sh` + manifest checks — `bash scripts/verify_native_runtime_live.sh`, `bash scripts/run_all_tests.sh`)? Exit code map: [docs/ERROR_SYSTEM.md](docs/ERROR_SYSTEM.md) — **Shell helpers**, **Native gates** (`check_azl_native_gates.sh`), **Strength bar**, **Runtime spine contract**, **Release checkout assertion** (see also [CONTRIBUTING.md](docs/CONTRIBUTING.md) § Native gates).
