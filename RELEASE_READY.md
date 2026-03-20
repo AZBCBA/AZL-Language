@@ -82,7 +82,7 @@ If any gate fails:
 
 ## CI Requirement
 
-The `native-release-gates` workflow must pass on the release branch before deploy. The consolidated **`test-and-deploy.yml`** workflow also runs the full test suite plus Docker/GHCR and optional staging; see `docs/CI_CD_PIPELINE.md`.
+The **`test-and-deploy.yml`** workflow (PR/push to **`main`**/**`master`**) must pass before you treat the branch as release-ready: it runs the same strict path as historical **`native-release-gates`** + **`ci.yml`** (guards, **`run_all_tests.sh`**, **`perf_smoke`**, AZME E2E) plus Docker/GHCR and optional staging. For a gates-only manual rerun, use **Actions → `native-release-gates (manual)`**. See `docs/CI_CD_PIPELINE.md`.
 
 ## GitHub Release (sample assets on tag)
 

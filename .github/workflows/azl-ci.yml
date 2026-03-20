@@ -1,4 +1,4 @@
-# Runs on all branches; canonical main-gates workflow is ci.yml (same repo, narrower triggers).
+# Runs on all branches. Canonical main/master PR CI is test-and-deploy.yml; this job keeps strict tests on feature branches.
 name: AZL CI (all branches)
 
 env:
@@ -20,13 +20,34 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y ripgrep gcc curl iproute2 openssl jq
+          sudo apt-get install -y ripgrep gcc curl iproute2 openssl jq python3
 
       - name: Make test scripts executable
         run: chmod +x scripts/run_all_tests.sh scripts/run_pure_tests.sh scripts/check_no_placeholders.sh scripts/run_examples.sh || true
 
       - name: Check no placeholders
         run: ./scripts/check_no_placeholders.sh
+
+      - name: Gate — no stale v2 references
+        run: |
+          set +e
+          rg -n -i -E '::parser\.v2|azl_v2_(interpreter|runner|parser)\.azl|AZL v2' .
+          rg_rc=$?
+          set -e
+          if [ "$rg_rc" -eq 0 ]; then
+            echo 'ERROR: stale v2 references found (see ripgrep output above)' >&2
+            exit 1
+          fi
+          if [ "$rg_rc" -ne 1 ]; then
+            echo "ERROR: ripgrep failed (exit ${rg_rc})" >&2
+            exit "$rg_rc"
+          fi
+
+      - name: Prepare combined run script
+        run: bash scripts/run_full.sh
+
+      - name: Audit live paths
+        run: bash scripts/audit_live_path.sh
 
       - name: Run all AZL tests (strict)
         run: |

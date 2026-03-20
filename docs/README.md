@@ -59,7 +59,7 @@ Broader / historical spec draft: [../azl/docs/AZL_LANGUAGE_SPECIFICATION.md](../
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
 | [OBSERVABILITY.md](OBSERVABILITY.md) | Logs / metrics hooks |
 
-Workflows live under `.github/workflows/` — including **`test-and-deploy.yml`** (tests, native matrix, benchmarks, coverage artifact, Docker → GHCR, optional staging webhook).
+Workflows live under `.github/workflows/` — **`test-and-deploy.yml`** is **canonical** for PR/push to **`main`**/**`master`** (repo guards, **`run_all_tests.sh`**, **`perf_smoke`**, AZME E2E, native matrix, benchmarks, coverage, Docker → GHCR, optional staging). **`ci.yml`** / **`native-release-gates.yml`** are **`workflow_dispatch` only**; **`azl-ci.yml`** covers all branches; **`nightly.yml`** runs native gates then sysproxy E2E. Details: [CI_CD_PIPELINE.md](CI_CD_PIPELINE.md).
 
 **Native gates** (`scripts/check_azl_native_gates.sh`) start with **gate 0** (`self_check_release_helpers.sh`: **`rg`**, **`jq`**, release script **`bash -n`**, tag policy, **`release/native/manifest.json`** paths), then **F3** (P0 interpreter slice C↔Python), **H** (`verify_p0_interpreter_tokenizer_boundary.sh` on `azl_interpreter.azl`). **Exit codes:** [ERROR_SYSTEM.md](ERROR_SYSTEM.md) § Native gates / Shell helpers. **Strength bar:** `scripts/verify_azl_strength_bar.sh` — see [AZL_DOCUMENTATION_CANON.md](AZL_DOCUMENTATION_CANON.md) §1.7. **Full tree:** `scripts/run_full_repo_verification.sh`. **P0 smoke:** `scripts/run_semantic_interpreter_slice.sh`. **Product LLM benches:** `scripts/run_product_benchmark_suite.sh` (see `RELEASE_READY.md`).
 

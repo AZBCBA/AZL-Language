@@ -36,6 +36,7 @@
 - No `placeholder|TODO|FIXME` in `.azl` sources committed to main.
 - Event recursion/cycle detection must be active by default.
 - I/O and HTTP in pure mode must route through virtual OS stores.
+- **GitHub Actions:** PR/push to **`main`**/**`master`** is gated by **`test-and-deploy.yml`** (failing job/step surfaces script **`ERROR:`** / numeric exits below — no silent green). **`ci.yml`** and **`native-release-gates.yml`** are **`workflow_dispatch` only** (manual reruns). **`nightly.yml`** runs **`check_azl_native_gates.sh`** then sysproxy E2E. Full matrix: **`docs/CI_CD_PIPELINE.md`**.
 
 ### Shell helpers (release + live verify)
 

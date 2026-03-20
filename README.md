@@ -92,10 +92,10 @@ See [docs/LLM_INFRASTRUCTURE_AUDIT.md](docs/LLM_INFRASTRUCTURE_AUDIT.md).
 **Shipped vs open milestones:** [docs/AZL_DOCUMENTATION_CANON.md](docs/AZL_DOCUMENTATION_CANON.md) · **HTTP profiles (C vs enterprise):** [docs/CANONICAL_HTTP_PROFILE.md](docs/CANONICAL_HTTP_PROFILE.md) · **P0 semantic slice:** `bash scripts/run_semantic_interpreter_slice.sh`
 
 ## CI
-- **`test-and-deploy.yml`**: PR/main tests, native engine matrix, benchmark regression gate, C coverage artifacts, Docker (push to GHCR on `main`), optional staging webhook — see [docs/CI_CD_PIPELINE.md](docs/CI_CD_PIPELINE.md)
-- `ci.yml`: placeholder/v2 guards, smoke tests, perf smoke, full tests, AZME E2E
-- `native-release-gates.yml`: canonical stack + native gates + full tests
-- `nightly.yml`: sysproxy E2E with logs
+- **`test-and-deploy.yml`**: **Canonical** PR/main CI/CD — repo guards (`run_full`, `audit_live`, stale v2), **`run_all_tests.sh`**, **`perf_smoke`**, AZME E2E job, native engine matrix, benchmarks, C coverage, Docker → GHCR, optional staging — see [docs/CI_CD_PIPELINE.md](docs/CI_CD_PIPELINE.md)
+- `ci.yml` / `native-release-gates.yml`: **`workflow_dispatch` only** (legacy / focused reruns)
+- `azl-ci.yml`: all branches — same guards + **`run_all_tests.sh`** + **`run_examples.sh`**
+- `nightly.yml`: **`check_azl_native_gates.sh`** + sysproxy E2E + logs
 
 Documentation index: [docs/README.md](docs/README.md).
 

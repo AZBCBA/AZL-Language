@@ -1,14 +1,12 @@
-name: AZL CI
+# Legacy manual CI — superseded for PR/push by test-and-deploy.yml (canonical guards + run_all_tests + perf + AZME E2E).
+# Run from Actions tab when you need this exact job layout without the full deploy pipeline.
+name: AZL CI (manual)
 
-# Use Node 24 for JavaScript actions (avoids Node 20 deprecation on GitHub-hosted runners).
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build:

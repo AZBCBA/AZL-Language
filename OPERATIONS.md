@@ -37,12 +37,10 @@ This runbook documents how to run the enterprise daemon and validate host integr
 The shipped **`Dockerfile`** installs **`jq`**, **`ripgrep`**, **`gcc`**, **`curl`**, etc. If you **`docker exec`** into the image and run **`check_azl_native_gates.sh`**, **gate 0** (**`jq`** manifest checks) matches typical CI. The image does **not** run full gates at **`docker build`** time.
 
 ## CI
-- Main CI (`.github/workflows/ci.yml`):
-  - Fails on any placeholders/TODO/FIXME in `.azl`
-  - Fails on any stale v2 references
-  - Runs native gate and live runtime verification
-- Nightly sysproxy E2E (`.github/workflows/nightly.yml`):
-  - Builds sysproxy, runs `scripts/test_sysproxy_setup.sh`, uploads logs
+- **Main CI / PR (`test-and-deploy.yml`):** placeholders (`.azl`/`.rs`), stale v2 **`rg`** gate, **`run_full.sh`**, **`audit_live_path.sh`**, **`run_all_tests.sh`** (native gates + live verify via **`run_tests.sh`**), **`perf_smoke.sh`**, benchmark matrix, coverage, Docker/GHCR; **`azme-e2e`** job after gates.
+- **All branches (`azl-ci.yml`):** same repo guards as above (without Docker deploy graph) + **`run_examples.sh`**.
+- **Nightly (`nightly.yml`):** **`check_azl_native_gates.sh`** then sysproxy build + **`scripts/test_sysproxy_setup.sh`** + health checks + log artifacts.
+- **Manual only:** **`ci.yml`**, **`native-release-gates.yml`** — run from the Actions tab if you need those layouts in isolation.
 
 ## Troubleshooting
 - Permission denied on `.azl/logs/daemon.out`:
