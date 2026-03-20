@@ -1,4 +1,4 @@
-.PHONY: test ci predeploy check-placeholders install-git-hooks examples
+.PHONY: test ci predeploy check-placeholders install-git-hooks examples branch-protection-apply
 
 test:
 	./scripts/run_all_tests.sh
@@ -19,4 +19,7 @@ install-git-hooks:
 examples:
 	./scripts/run_examples.sh
 
+# Maintainer: requires gh auth + repo admin (see docs/GITHUB_BRANCH_PROTECTION.md)
+branch-protection-apply:
+	bash scripts/gh_apply_main_branch_protection.sh
 

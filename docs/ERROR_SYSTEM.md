@@ -161,4 +161,17 @@ Used by **`.github/workflows/release.yml`** after **`actions/checkout`** at the 
 | **4** | **`HEAD`** ≠ peeled tag commit |
 | **5** | **`git`** not found |
 
+### Branch protection (`scripts/gh_apply_main_branch_protection.sh`)
+
+Maintainer-only: applies **required status checks** on **`main`** (see **`docs/GITHUB_BRANCH_PROTECTION.md`**). Uses **`gh api`** + **`jq`**; not invoked from Actions.
+
+| Exit | Meaning |
+|------|---------|
+| **0** | **`--help`** / **`-h`** (usage on stderr) |
+| **2** | Invalid arguments (extra branch after branch name, etc.) |
+| **3** | **`GITHUB_REPOSITORY`** unset and **`gh repo view`** could not resolve owner/repo |
+| **5** | **`gh`** or **`jq`** not found |
+| **6** | **`gh`** not authenticated |
+| **7** | GitHub API **PUT** **`…/branches/<branch>/protection`** failed (**stderr** includes API body if present) |
+
 

@@ -19,7 +19,20 @@ No required approving reviews are enforced by this payload (solo/small-team defa
 gh api repos/AZBCBA/AZL-Language/branches/main/protection --jq '.required_status_checks'
 ```
 
-## Re-apply (maintainers, repo admin)
+## Apply via script (preferred)
+
+From repo root, with **`gh auth login`** and **admin** on the repository:
+
+```bash
+bash scripts/gh_apply_main_branch_protection.sh
+```
+
+- **`--dry-run`** — print JSON only, no API call.
+- Optional second argument — branch name (default **`main`**).
+
+Exit codes: **`docs/ERROR_SYSTEM.md`** § **Branch protection (`gh_apply_main_branch_protection.sh`)**.
+
+## Re-apply manually (maintainers, repo admin)
 
 Save body to a file (adjust org/repo if you fork):
 
