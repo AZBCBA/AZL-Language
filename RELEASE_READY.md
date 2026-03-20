@@ -24,6 +24,15 @@ RUN_OPTIONAL_BENCHES=0 bash scripts/run_full_repo_verification.sh
 
 Use `RUN_OPTIONAL_BENCHES=1` (default) to also run native + enterprise LLM benches when backends are available.
 
+**Declare native release profile complete (Tier A — includes contract + strength bar):**
+
+```bash
+bash scripts/verify_native_release_profile_complete.sh
+# or: make native-release-profile-complete
+```
+
+See **`docs/PROJECT_COMPLETION_STATEMENT.md`** (Tier A vs Tier B roadmap).
+
 **Or** run in this exact order:
 
 1. `bash scripts/enforce_canonical_stack.sh`

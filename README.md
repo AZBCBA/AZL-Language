@@ -98,6 +98,8 @@ See [docs/LLM_INFRASTRUCTURE_AUDIT.md](docs/LLM_INFRASTRUCTURE_AUDIT.md).
 - `azl-ci.yml`: all branches — same guards + **`run_all_tests.sh`** + **`run_examples.sh`**
 - `nightly.yml`: **`check_azl_native_gates.sh`** + sysproxy E2E + logs
 
+**Completion (precise wording):** [docs/PROJECT_COMPLETION_STATEMENT.md](docs/PROJECT_COMPLETION_STATEMENT.md) — Tier **A** = `make native-release-profile-complete` / `bash scripts/verify_native_release_profile_complete.sh`. Tier **B** = full roadmap ([docs/PROJECT_COMPLETION_ROADMAP.md](docs/PROJECT_COMPLETION_ROADMAP.md)).
+
 Documentation index: [docs/README.md](docs/README.md).
 
 ## Syntax samples

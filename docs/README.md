@@ -19,6 +19,7 @@ Single entry point for **accurate** project docs. Older “status report”, “
 
 | Document | Use |
 |----------|-----|
+| [PROJECT_COMPLETION_STATEMENT.md](PROJECT_COMPLETION_STATEMENT.md) | **Tier A vs B:** when you may say “complete” (`verify_native_release_profile_complete.sh`) |
 | [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md) | Phased completion vs contract (P0 executor gap, P1–P5) |
 | [AZL_PERFECTION_PLAN.md](AZL_PERFECTION_PLAN.md) | Strategic gaps and phased goals |
 | [CANONICAL_HTTP_PROFILE.md](CANONICAL_HTTP_PROFILE.md) | C native engine vs enterprise `http_server` — pick per deployment |

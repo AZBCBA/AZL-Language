@@ -81,7 +81,17 @@ Source of truth for current vs target: [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE
 bash scripts/verify_azl_strength_bar.sh   # rg, jq, python3, gcc required
 ```
 
-### 1.8 Verified stack snapshot (formerly `STATUS.md`)
+### 1.8 Native release profile “complete” (Tier A)
+
+**Shipping bar** — not the same as the full language roadmap (Tier B). When all pass, you may say **“native release profile complete”**:
+
+```bash
+bash scripts/verify_native_release_profile_complete.sh
+```
+
+**Make:** `make native-release-profile-complete`. Definition: [PROJECT_COMPLETION_STATEMENT.md](PROJECT_COMPLETION_STATEMENT.md).
+
+### 1.9 Verified stack snapshot (formerly `STATUS.md`)
 
 - **Interpreter (AZL source):** `azl/runtime/interpreter/azl_interpreter.azl` — large surface; default native **child** remains C minimal or Python parity subset unless spine env says otherwise.  
 - **Virtual OS / stdlib:** `azl_system_interface.azl`, `azl_stdlib.azl` — as exercised by tests and semantic path.  
@@ -102,9 +112,14 @@ bash scripts/verify_azl_strength_bar.sh   # rg, jq, python3, gcc required
 
 ---
 
-## 3. Open milestones (short)
+## 3. Completion tiers and open milestones
 
-Full phased map: [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md). Strategy / competitive gaps: [AZL_PERFECTION_PLAN.md](AZL_PERFECTION_PLAN.md). HAVE vs NEED inventory: [AUDIT_STRENGTH_ITEMS.md](AUDIT_STRENGTH_ITEMS.md).
+**Two tiers** — [PROJECT_COMPLETION_STATEMENT.md](PROJECT_COMPLETION_STATEMENT.md):
+
+- **Tier A (native release profile):** Declared **complete** when **`verify_native_release_profile_complete.sh`** exits **0** (contract + full repo verification without optional benches + strength bar). This is the **honest “shipping complete”** line for the current native profile.
+- **Tier B (roadmap):** Language/platform work below — **not** implied by Tier A.
+
+**Tier B — phased map:** [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md). Strategy: [AZL_PERFECTION_PLAN.md](AZL_PERFECTION_PLAN.md). HAVE vs NEED: [AUDIT_STRENGTH_ITEMS.md](AUDIT_STRENGTH_ITEMS.md).
 
 - **P0 remainder:** Semantic engine wide enough to run `azl_interpreter.azl` as the runtime child (or verified equivalent); default spine choice documented in [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md).  
 - **Bootstrap executor:** `scripts/azl_bootstrap.sh` → `scripts/azl_seed_runner.sh` requires **`AZL_NATIVE_EXEC_CMD`** (path to `azl-native-engine`). **`start_azl_native_mode.sh`** and **`run_enterprise_daemon.sh`** both ensure it (build via **`build_azl_native_engine.sh`** if unset, then validate executable; **`ERROR[AZL_ENTERPRISE_DAEMON]`** exits **64/65** if invalid). Distinct from **`AZL_NATIVE_RUNTIME_CMD`**, which the C engine passes to its **child**.  

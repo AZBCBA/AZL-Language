@@ -161,6 +161,14 @@ Used by **`.github/workflows/release.yml`** after **`actions/checkout`** at the 
 | **4** | **`HEAD`** ≠ peeled tag commit |
 | **5** | **`git`** not found |
 
+### Native release profile completeness (`scripts/verify_native_release_profile_complete.sh`)
+
+**Tier A** ceremony: runs **`verify_required_github_status_checks_contract.sh`**, **`run_full_repo_verification.sh`** with **`RUN_OPTIONAL_BENCHES=0`**, **`verify_azl_strength_bar.sh`**. See **`docs/PROJECT_COMPLETION_STATEMENT.md`**.
+
+| Exit | Meaning |
+|------|---------|
+| *(propagated)* | Same code as the first failing child script (contract **11–17**, release/verify/strength-bar tables, etc.) |
+
 ### Required GitHub status checks contract (`scripts/verify_required_github_status_checks_contract.sh`)
 
 Runs in **CI** ( **`test-and-deploy.yml`**, **`azl-ci.yml`** ): validates **`release/ci/required_github_status_checks.json`** against **`.github/workflows/test-and-deploy.yml`** (job ids, **`name:`** lines, matrix variants). No GitHub API.

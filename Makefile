@@ -1,4 +1,4 @@
-.PHONY: test ci predeploy check-placeholders install-git-hooks examples branch-protection-apply branch-protection-verify branch-protection-contract
+.PHONY: test ci predeploy check-placeholders install-git-hooks examples branch-protection-apply branch-protection-verify branch-protection-contract native-release-profile-complete
 
 test:
 	./scripts/run_all_tests.sh
@@ -28,3 +28,7 @@ branch-protection-verify:
 
 branch-protection-contract:
 	bash scripts/verify_required_github_status_checks_contract.sh
+
+# Tier A — see docs/PROJECT_COMPLETION_STATEMENT.md (long run; optional benches off)
+native-release-profile-complete:
+	bash scripts/verify_native_release_profile_complete.sh

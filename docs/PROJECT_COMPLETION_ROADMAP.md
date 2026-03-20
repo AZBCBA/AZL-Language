@@ -2,6 +2,8 @@
 
 This is the **honest** map from **today’s repository** to the **contract goals** in [AZL_NATIVE_RUNTIME_CONTRACT.md](AZL_NATIVE_RUNTIME_CONTRACT.md) and the **spine decision** in [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md). “Finishing the whole project” is **phased**; some layers depend on others.
 
+**Not the same as “shipping complete”:** when the **native release profile** is done for release purposes, see [PROJECT_COMPLETION_STATEMENT.md](PROJECT_COMPLETION_STATEMENT.md) **Tier A** and `scripts/verify_native_release_profile_complete.sh`. This roadmap is **Tier B** — language/platform depth beyond that bar.
+
 ## Layer 0 — Done / continuously verified
 
 - Native HTTP engine, sysproxy wiring, gates in `scripts/check_azl_native_gates.sh`, `scripts/run_all_tests.sh`.
