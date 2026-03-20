@@ -597,6 +597,94 @@ static void handle_gguf_infer(int cfd, const char *req, ssize_t n, EngineState *
   free(resp);
 }
 
+static void handle_policy_infer(int cfd, const char *req, ssize_t n, EngineState *st) {
+  (void)st;
+  const char *body_start = strstr(req, "\r\n\r\n");
+  if (body_start) body_start += 4;
+  else {
+    body_start = strstr(req, "\n\n");
+    if (body_start) body_start += 2;
+    else body_start = req;
+  }
+  size_t body_len = (size_t)(req + n - body_start);
+  if (body_len > 16384) body_len = 16384;
+  char *body_copy = malloc(body_len + 1);
+  if (!body_copy) {
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+    return;
+  }
+  memcpy(body_copy, body_start, body_len);
+  body_copy[body_len] = '\0';
+
+  char prompt[12288] = {0};
+  if (json_extract_string_field(body_copy, "prompt", prompt, sizeof(prompt)) != 0) {
+    free(body_copy);
+    write_response(cfd, 400, "Bad Request", "{\"ok\":false,\"error\":\"missing_prompt_json\"}");
+    return;
+  }
+  free(body_copy);
+
+  int max_chars = 4000;
+  const char *mc = getenv("AZL_POLICY_MAX_PROMPT_CHARS");
+  if (mc && mc[0] != '\0') {
+    int v = atoi(mc);
+    if (v > 0) max_chars = v;
+  }
+  int block_secrets = 1;
+  const char *bs = getenv("AZL_POLICY_BLOCK_SECRETS");
+  if (bs && bs[0] == '0') block_secrets = 0;
+
+  char lower[12288];
+  size_t plen = strlen(prompt);
+  if (plen >= sizeof(lower)) plen = sizeof(lower) - 1;
+  for (size_t i = 0; i < plen; i++) {
+    char c = prompt[i];
+    if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+    lower[i] = c;
+  }
+  lower[plen] = '\0';
+
+  int blocked = 0;
+  const char *reason = "allowed";
+  if ((int)plen > max_chars) {
+    blocked = 1;
+    reason = "prompt_too_long";
+  } else if (strstr(lower, "ignore previous instructions") != NULL) {
+    blocked = 1;
+    reason = "prompt_injection_pattern";
+  } else if (block_secrets &&
+             (strstr(lower, "api_key") != NULL || strstr(lower, "password") != NULL ||
+              strstr(lower, "private key") != NULL || strstr(lower, "secret token") != NULL)) {
+    blocked = 1;
+    reason = "secret_exfiltration_pattern";
+  }
+
+  FILE *af = fopen(".azl/policy_infer_audit.jsonl", "a");
+  if (af) {
+    char esc_reason[256];
+    json_escape_text(reason, esc_reason, sizeof(esc_reason));
+    fprintf(af,
+            "{\"ts\":%ld,\"path\":\"/api/llm/policy_infer\",\"decision\":\"%s\",\"reason\":\"%s\","
+            "\"prompt_chars\":%zu}\n",
+            (long)time(NULL), blocked ? "blocked" : "allowed", esc_reason, plen);
+    fclose(af);
+  }
+
+  if (blocked) {
+    char esc_reason[256];
+    json_escape_text(reason, esc_reason, sizeof(esc_reason));
+    char resp[1024];
+    (void)snprintf(resp, sizeof(resp),
+                   "{\"ok\":false,\"error\":\"policy_blocked\",\"reason\":\"%s\","
+                   "\"hint\":\"Adjust prompt or policy env AZL_POLICY_* if intended.\"}",
+                   esc_reason);
+    write_response(cfd, 403, "Forbidden", resp);
+    return;
+  }
+
+  handle_gguf_infer(cfd, req, n, st);
+}
+
 static void write_response(int fd, int status, const char *status_text, const char *body) {
   char header[4096];
   int body_len = (int)strlen(body);
@@ -828,6 +916,7 @@ static void handle_conn(int cfd, EngineState *st) {
         "\"ollama_upstream_env\":\"OLLAMA_HOST\","
         "\"gguf_in_process\":true,\"gguf_embedded_llamacpp\":true,"
         "\"gguf_cli_infer\":%s,\"gguf_infer_path\":\"/api/llm/gguf_infer\","
+        "\"policy_guard_enabled\":true,\"policy_infer_path\":\"/api/llm/policy_infer\","
         "\"gguf_model_configured\":%s,"
         "\"llama_server_http_proxy\":%s,\"llama_server_completion_path\":\"/api/llm/llama_server/completion\","
         "\"llama_server_upstream_configured\":%s,"
@@ -845,6 +934,7 @@ static void handle_conn(int cfd, EngineState *st) {
         "\"ollama_upstream_env\":\"OLLAMA_HOST\","
         "\"gguf_in_process\":false,"
         "\"gguf_cli_infer\":%s,\"gguf_infer_path\":\"/api/llm/gguf_infer\","
+        "\"policy_guard_enabled\":true,\"policy_infer_path\":\"/api/llm/policy_infer\","
         "\"gguf_model_configured\":%s,"
         "\"llama_server_http_proxy\":%s,\"llama_server_completion_path\":\"/api/llm/llama_server/completion\","
         "\"llama_server_upstream_configured\":%s,"
@@ -870,6 +960,12 @@ static void handle_conn(int cfd, EngineState *st) {
   /* POST /api/llm/gguf_infer: run local llama-cli on AZL_GGUF_PATH (no Ollama) */
   if (strcmp(path, "/api/llm/gguf_infer") == 0 && strcmp(method, "POST") == 0) {
     handle_gguf_infer(cfd, req, n, st);
+    return;
+  }
+
+  /* POST /api/llm/policy_infer: policy-gated GGUF inference with audit trail */
+  if (strcmp(path, "/api/llm/policy_infer") == 0 && strcmp(method, "POST") == 0) {
+    handle_policy_infer(cfd, req, n, st);
     return;
   }
 
