@@ -1,5 +1,9 @@
 name: AZL CI
 
+# Use Node 24 for JavaScript actions (avoids Node 20 deprecation on GitHub-hosted runners).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   push:
     branches: [ main, master ]
@@ -11,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install tools
         run: |
@@ -64,7 +68,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install deps
         run: |
           sudo apt-get update -y
@@ -81,7 +85,7 @@ jobs:
           bash scripts/azme_e2e.sh | cat
       - name: Upload AZME E2E logs (always)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: azme-e2e-logs
           path: |

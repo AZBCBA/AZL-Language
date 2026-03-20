@@ -28,9 +28,10 @@ permissions:
   id-token: write
 
 env:
-  AZL_BENCH_BASELINE_healthz: "6000"
-  AZL_BENCH_BASELINE_status: "5500"
-  AZL_BENCH_BASELINE_exec_state: "5500"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  AZL_BENCH_BASELINE_healthz: "9000"
+  AZL_BENCH_BASELINE_status: "8800"
+  AZL_BENCH_BASELINE_exec_state: "8800"
   AZL_BENCH_REGRESSION_THRESHOLD: "10"
 
 jobs:
@@ -40,7 +41,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install dependencies
         run: |
@@ -73,7 +74,7 @@ jobs:
             flags: "-Os -Wall -Wextra -Werror"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install gcc
         run: |
@@ -86,7 +87,7 @@ jobs:
           gcc ${{ matrix.flags }} -o ".azl/bin/azl-native-engine-${{ matrix.name }}" tools/azl_native_engine.c
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: native-engine-${{ matrix.name }}
           path: .azl/bin/azl-native-engine-${{ matrix.name }}
@@ -98,7 +99,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install dependencies
         run: |
@@ -117,7 +118,7 @@ jobs:
         run: bash scripts/benchmark_gate.sh
 
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: benchmark-native-api
           path: .azl/benchmarks/benchmark_native_api_*.txt
@@ -142,7 +143,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install dependencies
         run: |
@@ -156,13 +157,13 @@ jobs:
           bash scripts/ci_native_engine_coverage.sh
 
       - name: Upload coverage HTML
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-html-native-engine
           path: .azl/coverage-html/
 
       - name: Upload lcov info
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-lcov-info
           path: .azl/coverage.info
@@ -175,7 +176,7 @@ jobs:
       image: ${{ steps.meta.outputs.image }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Image name (lowercase for GHCR)
         id: meta
@@ -216,7 +217,7 @@ jobs:
       name: staging
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install curl and jq
         run: |
