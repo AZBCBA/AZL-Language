@@ -380,6 +380,43 @@ static int azl_llm_ngl_env_is_set(void) {
 }
 
 #define GGUF_READ_MAX (192 * 1024)
+#define CHAT_SESS_MAX 64
+#define CHAT_SESS_ID_MAX 96
+#define CHAT_SESS_HIST_MAX (96 * 1024)
+
+typedef struct {
+  int in_use;
+  char id[CHAT_SESS_ID_MAX];
+  char history[CHAT_SESS_HIST_MAX];
+} ChatSession;
+
+static ChatSession g_chat_sessions[CHAT_SESS_MAX];
+
+static ChatSession *chat_session_get_or_create(const char *sid) {
+  if (!sid || sid[0] == '\0') return NULL;
+  for (int i = 0; i < CHAT_SESS_MAX; i++) {
+    if (g_chat_sessions[i].in_use && strcmp(g_chat_sessions[i].id, sid) == 0) return &g_chat_sessions[i];
+  }
+  for (int i = 0; i < CHAT_SESS_MAX; i++) {
+    if (!g_chat_sessions[i].in_use) {
+      g_chat_sessions[i].in_use = 1;
+      (void)snprintf(g_chat_sessions[i].id, sizeof(g_chat_sessions[i].id), "%s", sid);
+      g_chat_sessions[i].history[0] = '\0';
+      return &g_chat_sessions[i];
+    }
+  }
+  return NULL;
+}
+
+static int request_json_has_true_flag(const char *body, const char *field) {
+  if (!body || !field) return 0;
+  char pat[96];
+  (void)snprintf(pat, sizeof(pat), "\"%s\":true", field);
+  if (strstr(body, pat)) return 1;
+  (void)snprintf(pat, sizeof(pat), "\"%s\": true", field);
+  if (strstr(body, pat)) return 1;
+  return 0;
+}
 
 static void handle_gguf_infer(int cfd, const char *req, ssize_t n, EngineState *st) {
   (void)st;
@@ -685,6 +722,91 @@ static void handle_policy_infer(int cfd, const char *req, ssize_t n, EngineState
   handle_gguf_infer(cfd, req, n, st);
 }
 
+static void handle_chat_session(int cfd, const char *req, ssize_t n, EngineState *st) {
+  const char *body_start = strstr(req, "\r\n\r\n");
+  if (body_start) body_start += 4;
+  else {
+    body_start = strstr(req, "\n\n");
+    if (body_start) body_start += 2;
+    else body_start = req;
+  }
+  size_t body_len = (size_t)(req + n - body_start);
+  if (body_len > 32768) body_len = 32768;
+  char *body_copy = malloc(body_len + 1);
+  if (!body_copy) {
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
+    return;
+  }
+  memcpy(body_copy, body_start, body_len);
+  body_copy[body_len] = '\0';
+
+  char sid[CHAT_SESS_ID_MAX] = {0};
+  char message[8192] = {0};
+  if (json_extract_string_field(body_copy, "session_id", sid, sizeof(sid)) != 0) {
+    free(body_copy);
+    write_response(cfd, 400, "Bad Request", "{\"ok\":false,\"error\":\"missing_session_id\"}");
+    return;
+  }
+  if (json_extract_string_field(body_copy, "message", message, sizeof(message)) != 0) {
+    free(body_copy);
+    write_response(cfd, 400, "Bad Request", "{\"ok\":false,\"error\":\"missing_message\"}");
+    return;
+  }
+  int n_predict = 96;
+  (void)json_extract_int_field(body_copy, "n_predict", &n_predict, 96);
+  if (n_predict < 1) n_predict = 1;
+  if (n_predict > 1024) n_predict = 1024;
+  int reset = request_json_has_true_flag(body_copy, "reset");
+  free(body_copy);
+
+  ChatSession *sess = chat_session_get_or_create(sid);
+  if (!sess) {
+    write_response(cfd, 503, "Service Unavailable", "{\"ok\":false,\"error\":\"session_capacity_exceeded\"}");
+    return;
+  }
+  if (reset) sess->history[0] = '\0';
+
+  size_t hlen = strlen(sess->history);
+  size_t mlen = strlen(message);
+  if (hlen + mlen + 64 >= sizeof(sess->history)) {
+    /* Trim old history by keeping the newest half. */
+    size_t keep = sizeof(sess->history) / 2;
+    if (hlen > keep) {
+      memmove(sess->history, sess->history + (hlen - keep), keep);
+      sess->history[keep] = '\0';
+      hlen = keep;
+    } else {
+      sess->history[0] = '\0';
+      hlen = 0;
+    }
+  }
+  (void)snprintf(sess->history + hlen, sizeof(sess->history) - hlen, "\nUser: %s\nAssistant:", message);
+
+  char prompt[12288];
+  (void)snprintf(
+      prompt, sizeof(prompt),
+      "You are AZL chat assistant. Keep answers concise and helpful.\nConversation history:%s\n",
+      sess->history);
+
+  char esc_prompt[24576];
+  json_escape_text(prompt, esc_prompt, sizeof(esc_prompt));
+
+  char policy_body[26000];
+  int bn = snprintf(policy_body, sizeof(policy_body), "{\"prompt\":\"%s\",\"n_predict\":%d}", esc_prompt, n_predict);
+  if (bn <= 0 || (size_t)bn >= sizeof(policy_body)) {
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"prompt_build_failed\"}");
+    return;
+  }
+  char fake_req[28672];
+  int rn = snprintf(fake_req, sizeof(fake_req),
+                    "POST /api/llm/policy_infer HTTP/1.1\r\nContent-Length: %d\r\n\r\n%s", bn, policy_body);
+  if (rn <= 0 || (size_t)rn >= sizeof(fake_req)) {
+    write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"request_build_failed\"}");
+    return;
+  }
+  handle_policy_infer(cfd, fake_req, (ssize_t)rn, st);
+}
+
 static void write_response(int fd, int status, const char *status_text, const char *body) {
   char header[4096];
   int body_len = (int)strlen(body);
@@ -917,6 +1039,7 @@ static void handle_conn(int cfd, EngineState *st) {
         "\"gguf_in_process\":true,\"gguf_embedded_llamacpp\":true,"
         "\"gguf_cli_infer\":%s,\"gguf_infer_path\":\"/api/llm/gguf_infer\","
         "\"policy_guard_enabled\":true,\"policy_infer_path\":\"/api/llm/policy_infer\","
+        "\"chat_session_path\":\"/api/llm/chat_session\","
         "\"gguf_model_configured\":%s,"
         "\"llama_server_http_proxy\":%s,\"llama_server_completion_path\":\"/api/llm/llama_server/completion\","
         "\"llama_server_upstream_configured\":%s,"
@@ -935,6 +1058,7 @@ static void handle_conn(int cfd, EngineState *st) {
         "\"gguf_in_process\":false,"
         "\"gguf_cli_infer\":%s,\"gguf_infer_path\":\"/api/llm/gguf_infer\","
         "\"policy_guard_enabled\":true,\"policy_infer_path\":\"/api/llm/policy_infer\","
+        "\"chat_session_path\":\"/api/llm/chat_session\","
         "\"gguf_model_configured\":%s,"
         "\"llama_server_http_proxy\":%s,\"llama_server_completion_path\":\"/api/llm/llama_server/completion\","
         "\"llama_server_upstream_configured\":%s,"
@@ -966,6 +1090,10 @@ static void handle_conn(int cfd, EngineState *st) {
   /* POST /api/llm/policy_infer: policy-gated GGUF inference with audit trail */
   if (strcmp(path, "/api/llm/policy_infer") == 0 && strcmp(method, "POST") == 0) {
     handle_policy_infer(cfd, req, n, st);
+    return;
+  }
+  if (strcmp(path, "/api/llm/chat_session") == 0 && strcmp(method, "POST") == 0) {
+    handle_chat_session(cfd, req, n, st);
     return;
   }
 
