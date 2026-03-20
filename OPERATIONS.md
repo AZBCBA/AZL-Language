@@ -25,6 +25,9 @@ This runbook documents how to run the enterprise daemon and validate host integr
   - `bash scripts/run_product_benchmark_suite.sh` — native LLM bench + enterprise `/v1/chat` if `AZL_API_TOKEN` is set
   - `bash scripts/run_native_engine_llm_bench.sh` — C `azl-native-engine` + Ollama (`ollama serve` + model)
   - `bash scripts/benchmark_llm_ollama.sh` — Python vs curl vs C Ollama proxy (detects proxy via `GET /api/llm/capabilities`)
+  - **`bash scripts/run_proof_llm_python_vs_azl.sh`** — **1000×** identical requests: Python → Ollama vs client → **`azl-native-engine`** `POST /api/ollama/generate` → Ollama; writes **`.azl/proof_llm_python_vs_azl_*.md`** (mean/p95 **AZL/Python** ratios). Override count: `PROOF_REQS=500 …`.
+  - **`bash scripts/run_proof_llm_enterprise_bundle.sh`** — same proof as above, but the **child runtime** loads the **full enterprise concatenated .azl** (same component list as **`run_enterprise_daemon.sh`**: quantum, LHA3, neural, AZME, …). Stops other daemons if they hold **`.azl/engine.out` / `9099`**. Default **`PROOF_REQS=200`** (set **`PROOF_REQS=1000`** for a full run). Report includes an explicit **Scope** section (native C Ollama proxy vs `/v1/chat`).
+  - **`bash scripts/build_enterprise_combined.sh <out.azl>`** — writes the enterprise combined file only (for inspection or custom bundles).
   - `AZL_API_TOKEN=… bash scripts/benchmark_enterprise_v1_chat.sh` — enterprise `POST /v1/chat` (daemon on `AZL_ENTERPRISE_PORT`, default 8080)
 
 ## CI

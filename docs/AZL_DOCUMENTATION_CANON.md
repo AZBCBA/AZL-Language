@@ -39,6 +39,9 @@ Source of truth for current vs target: [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE
 | Subprocess GGUF (no Ollama) | `POST /api/llm/gguf_infer` — `scripts/run_benchmark_gguf_direct.sh` |
 | Loaded model (`llama-server`) | `POST /api/llm/llama_server/completion` — `scripts/run_benchmark_llama_server.sh` |
 | Enterprise chat (not C proxy) | `POST /v1/chat` — `scripts/benchmark_enterprise_v1_chat.sh` |
+| **Partner LLM proof (minimal bundle)** | `scripts/run_proof_llm_python_vs_azl.sh` + `scripts/proof_llm_python_vs_azl.py` — default **1000×** per path (Python → Ollama vs `POST /api/ollama/generate`); `.azl/proof_llm_python_vs_azl_*.md` (mean/p95 **AZL/Python** ratios). |
+| **Partner LLM proof (enterprise `.azl` loaded)** | `scripts/run_proof_llm_enterprise_bundle.sh` — same comparison after loading the **fat** combined file from `scripts/build_enterprise_combined.sh` (same component list as `run_enterprise_daemon.sh`); report **`PROOF_REPORT_DISCLAIMER`** states C proxy vs `/v1/chat` scope. |
+| **Host `getenv` via sysproxy** | `tools/sysproxy.c` op **`getenv`**; `export fn host_getenv` + syscall **`proc.getenv`** in `azl/system/azl_system_interface.azl`; `azl/host/exec_bridge.azl` seeds **`::internal`** after `link ::azl.system_interface`. Ops: [OPERATIONS.md](../OPERATIONS.md). |
 | Inventory | [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md) |
 
 ### 1.4 HTTP request handling (engine)
@@ -68,7 +71,7 @@ Source of truth for current vs target: [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE
 
 1. **Predictable semantics** — [language/AZL_CURRENT_SPECIFICATION.md](language/AZL_CURRENT_SPECIFICATION.md); gates F2, F3, G.  
 2. **Operational strength** — gates script; `verify_native_runtime_live.sh`; `run_full_repo_verification.sh`; [ERROR_SYSTEM.md](ERROR_SYSTEM.md).  
-3. **Honest benchmarks** — scripts in §1.3; never mix C proxy port with enterprise stack.  
+3. **Honest benchmarks** — scripts in §1.3 (including §1.3 proof harnesses); never mix C proxy port with enterprise stack.  
 4. **Ecosystem** — §1.5; [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ```bash
@@ -101,6 +104,7 @@ bash scripts/verify_azl_strength_bar.sh   # rg, python3, gcc required
 Full phased map: [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md). Strategy / competitive gaps: [AZL_PERFECTION_PLAN.md](AZL_PERFECTION_PLAN.md). HAVE vs NEED inventory: [AUDIT_STRENGTH_ITEMS.md](AUDIT_STRENGTH_ITEMS.md).
 
 - **P0 remainder:** Semantic engine wide enough to run `azl_interpreter.azl` as the runtime child (or verified equivalent); default spine choice documented in [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md).  
+- **Bootstrap footgun:** `scripts/azl_bootstrap.sh` → `scripts/azl_seed_runner.sh` requires **`AZL_NATIVE_EXEC_CMD`** (path to `azl-native-engine`). **`start_azl_native_mode.sh`** builds and exports it before **`start_enterprise_daemon.sh`**. Calling **`run_enterprise_daemon.sh`** directly without **`AZL_NATIVE_EXEC_CMD`** set causes seed exit **65** (distinct from **`AZL_NATIVE_RUNTIME_CMD`**, which the C engine passes to its **child**).  
 - **P1+:** HTTP profile per deployment, proc policy, VM breadth, packages, in-process GGUF (deferred unless product requires).  
 - **Quality:** `scripts/check_no_placeholders.sh`, grammar / LHA3 verifiers in `run_all_tests.sh`.
 

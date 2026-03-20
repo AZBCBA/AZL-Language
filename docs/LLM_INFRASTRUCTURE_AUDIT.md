@@ -40,6 +40,7 @@
 | `azl/stdlib/core/azl_stdlib.azl` `http_get` / `http_post` | ❌ Simulated | Backing store / stubs for non-URL keys. |
 | `azl/ffi/http.azl` | ❌ Simulated | Cache layer; not a network client by itself. |
 | **sysproxy** + **`http_client`** | ✅ Yes | Outbound HTTP when wired (see `azl_system_interface.azl`). |
+| **sysproxy** + **`getenv`** | ✅ Yes | Reads the **sysproxy process** environment (libc `getenv`); AZL uses **`host_getenv`** / syscall **`proc.getenv`** to seed **`::internal`** (see `exec_bridge.azl`, `OPERATIONS.md`). |
 | **C native engine** | ✅ Outbound | `curl` to Ollama from `/api/ollama/generate`. |
 | **C native engine** | ✅ Inbound | Serves HTTP API (health, status, LLM proxy, capabilities). |
 
