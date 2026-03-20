@@ -21,6 +21,14 @@ jobs:
   build-release:
     runs-on: ubuntu-latest
     steps:
+      - name: Verify remote tag exists (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          chmod +x scripts/gh_verify_remote_tag.sh
+          bash scripts/gh_verify_remote_tag.sh "${{ github.event.inputs.tag }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Checkout
         uses: actions/checkout@v6
         with:

@@ -94,6 +94,6 @@ After gates are green on the commit you intend to ship:
 
 **Errors (no silent fallback):** the script exits **2–8** with **`ERROR:`** on stderr for missing **`gh`**, bad/missing env, non-tag **`GITHUB_REF`** (when **`AZL_RELEASE_TAG`** is unset), invalid tag shape, missing **`dist/*`**, existing release for that tag, or **`gh`** failure.
 
-**Manual release (Actions UI):** run **Release** → **Run workflow** and set **tag** to an existing remote tag (e.g. **`v1.2.3`**). The job checks out that ref, builds **`dist/`**, sets **`AZL_RELEASE_TAG`**, and creates the GitHub Release. **Do not** run the workflow without the **tag** input (it is **required**). Tag-push runs leave **`AZL_RELEASE_TAG`** empty and use **`GITHUB_REF`** as before.
+**Manual release (Actions UI):** run **Release** → **Run workflow** and set **tag** to an existing remote tag (e.g. **`v1.2.3`**). The first step runs **`scripts/gh_verify_remote_tag.sh`**: **`gh api`** resolves URL-encoded **`refs/tags/<tag>`** on the remote; if missing or malformed, the job fails with **`ERROR`** before checkout or **`dist/`** work. Then the job checks out that ref, builds **`dist/`**, sets **`AZL_RELEASE_TAG`**, and creates the GitHub Release. **Do not** run the workflow without the **tag** input (it is **required**). Tag-push runs skip the verify step and leave **`AZL_RELEASE_TAG`** empty (**`GITHUB_REF`** drives the script).
 
 **Permissions:** the workflow sets **`contents: write`** for **`GITHUB_TOKEN`** so the release can be created.

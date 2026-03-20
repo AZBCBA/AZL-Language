@@ -43,6 +43,12 @@ Production scripts return **non-zero** with **`ERROR:`** on **stderr**; no silen
 
 | Script | Exit | Meaning |
 |--------|------|---------|
+| `scripts/gh_verify_remote_tag.sh` | **2** | Usage: missing **`<tag>`** argument |
+| | **3** | **`GITHUB_REPOSITORY`** unset |
+| | **4** | **`GH_TOKEN`** unset |
+| | **5** | **`gh`** or **`python3`** not found |
+| | **6** | Tag shape invalid (must match **`gh_create_sample_release`** pattern) |
+| | **7** | **`refs/tags/<tag>`** not found on remote (**`gh api`** failed) |
 | `scripts/gh_create_sample_release.sh` | **2** | **`gh`** not found |
 | | **3** | **`GITHUB_REPOSITORY`** or **`GH_TOKEN`** unset; or **`GITHUB_REF`** unset when **`AZL_RELEASE_TAG`** unset |
 | | **4** | **`GITHUB_REF`** not **`refs/tags/v*.*.*`** and **`AZL_RELEASE_TAG`** unset |
