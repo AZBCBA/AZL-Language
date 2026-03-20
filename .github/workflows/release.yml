@@ -7,9 +7,12 @@ on:
   push:
     tags:
       - 'v*.*.*'
-  # Manual runs use the branch ref (refs/heads/*) — the release script exits with ERROR unless the
-  # workflow was triggered by a version tag push. Re-run a failed tag workflow from the Actions UI.
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag to publish (e.g. v1.2.3). Repository is checked out at this ref; must exist on the remote.'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -20,6 +23,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
 
       - name: Prepare sample bundles
         run: |
@@ -36,3 +42,4 @@ jobs:
           bash scripts/gh_create_sample_release.sh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AZL_RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}

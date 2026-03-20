@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Create a GitHub Release for the current tag with sample bundle assets (dist/*).
 # Used by .github/workflows/release.yml instead of a Node 20 JS action (GitHub Node 24 policy).
-# Requires: gh (GitHub CLI), env GITHUB_REF, GITHUB_REPOSITORY, GH_TOKEN.
+# Requires: gh (GitHub CLI), GITHUB_REPOSITORY, GH_TOKEN, and either:
+#   - Tag push CI: GITHUB_REF=refs/tags/v*.*.* (default), or
+#   - workflow_dispatch / local: AZL_RELEASE_TAG=vX.Y.Z… (GITHUB_REF may be refs/heads/*).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -14,10 +16,6 @@ for cmd in gh; do
   fi
 done
 
-if [ -z "${GITHUB_REF:-}" ]; then
-  echo "ERROR: GITHUB_REF is unset" >&2
-  exit 3
-fi
 if [ -z "${GITHUB_REPOSITORY:-}" ]; then
   echo "ERROR: GITHUB_REPOSITORY is unset" >&2
   exit 3
@@ -27,15 +25,23 @@ if [ -z "${GH_TOKEN:-}" ]; then
   exit 3
 fi
 
-case "${GITHUB_REF}" in
-  refs/tags/v*.*.*) ;;
-  *)
-    echo "ERROR: expected GITHUB_REF refs/tags/v*.*.* (push a version tag); got: ${GITHUB_REF}" >&2
-    exit 4
-    ;;
-esac
+if [ -n "${AZL_RELEASE_TAG:-}" ]; then
+  TAG="${AZL_RELEASE_TAG}"
+else
+  if [ -z "${GITHUB_REF:-}" ]; then
+    echo "ERROR: GITHUB_REF is unset and AZL_RELEASE_TAG is unset" >&2
+    exit 3
+  fi
+  case "${GITHUB_REF}" in
+    refs/tags/v*.*.*) ;;
+    *)
+      echo "ERROR: expected GITHUB_REF refs/tags/v*.*.* (push a version tag) or set AZL_RELEASE_TAG (e.g. workflow_dispatch); got: ${GITHUB_REF}" >&2
+      exit 4
+      ;;
+  esac
+  TAG="${GITHUB_REF_NAME}"
+fi
 
-TAG="${GITHUB_REF_NAME}"
 # vMAJOR.MINOR.PATCH with optional SemVer prerelease (-alpha.1) and/or build (+gabc)
 if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
   echo "ERROR: tag name must match vMAJOR.MINOR.PATCH[-prerelease][+build] (e.g. v1.0.0, v1.0.0-rc.1); got: ${TAG}" >&2

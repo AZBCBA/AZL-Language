@@ -37,4 +37,26 @@
 - Event recursion/cycle detection must be active by default.
 - I/O and HTTP in pure mode must route through virtual OS stores.
 
+### Shell helpers (release + live verify)
+
+Production scripts return **non-zero** with **`ERROR:`** on **stderr**; no silent fallback.
+
+| Script | Exit | Meaning |
+|--------|------|---------|
+| `scripts/gh_create_sample_release.sh` | **2** | **`gh`** not found |
+| | **3** | **`GITHUB_REPOSITORY`** or **`GH_TOKEN`** unset; or **`GITHUB_REF`** unset when **`AZL_RELEASE_TAG`** unset |
+| | **4** | **`GITHUB_REF`** not **`refs/tags/v*.*.*`** and **`AZL_RELEASE_TAG`** unset |
+| | **5** | Tag does not match **`vMAJOR.MINOR.PATCH`** (+ optional **`-prerelease`** / **`+build`**) |
+| | **6** | Missing file under **`dist/`** |
+| | **7** | GitHub Release already exists for that tag |
+| | **8** | **`gh release create`** failed |
+| `scripts/verify_native_runtime_live.sh` | **69** | **`AZL_NATIVE_ENGINE_BIN`** set but file missing or not executable |
+| | **70** | Engine did not reach **`/healthz`** + **`/readyz`** HTTP **200** in time |
+| | **71** | **`/healthz`**, **`/readyz`**, **`/status`**, or **`/api/exec_state`** contract failed |
+| | **72** | Native-only **`scripts/azl run`** not blocked (**rc ≠ 64**) |
+| | **74** | **`/api/llm/capabilities`** not **`ok`** |
+| | **75** | Capabilities missing **`ollama_http_proxy`** |
+| | **76** | Invalid **`gguf_in_process`** shape |
+| | **77** | Capabilities stub/embedded contract mismatch |
+
 

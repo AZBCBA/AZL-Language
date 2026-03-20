@@ -92,6 +92,8 @@ After gates are green on the commit you intend to ship:
 2. Push the tag: `git push origin v1.2.3` (example).
 3. **`.github/workflows/release.yml`** runs: prepares **`dist/`** (sample `.azl` + **`README.md`** / **`OPERATIONS.md`**), then **`gh release create`** with **`--verify-tag`**.
 
-**Errors (no silent fallback):** the script exits **2–8** with **`ERROR:`** on stderr for missing **`gh`**, bad/missing env, non-tag **`GITHUB_REF`**, invalid tag shape, missing **`dist/*`**, existing release for that tag, or **`gh`** failure. **`workflow_dispatch`** from a **branch** uses **`refs/heads/…`** → the script exits **4**; use a **tag push** or **Re-run jobs** on a workflow run that was triggered by the tag.
+**Errors (no silent fallback):** the script exits **2–8** with **`ERROR:`** on stderr for missing **`gh`**, bad/missing env, non-tag **`GITHUB_REF`** (when **`AZL_RELEASE_TAG`** is unset), invalid tag shape, missing **`dist/*`**, existing release for that tag, or **`gh`** failure.
+
+**Manual release (Actions UI):** run **Release** → **Run workflow** and set **tag** to an existing remote tag (e.g. **`v1.2.3`**). The job checks out that ref, builds **`dist/`**, sets **`AZL_RELEASE_TAG`**, and creates the GitHub Release. **Do not** run the workflow without the **tag** input (it is **required**). Tag-push runs leave **`AZL_RELEASE_TAG`** empty and use **`GITHUB_REF`** as before.
 
 **Permissions:** the workflow sets **`contents: write`** for **`GITHUB_TOKEN`** so the release can be created.
