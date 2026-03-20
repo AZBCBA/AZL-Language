@@ -1275,7 +1275,15 @@ component ::azl.system_interface {
     say "TRACE SEND " + line
     say "@sysproxy " + line
 
-    # wait ~3s max without real clock
+    # Per-op tick budget (10ms per tick via time_advance_ms below).
+    # Default 300 ~= 3s; listen/accept need headroom when sysproxy or wire is busy.
+    set max_ticks = 300
+    if (op == "listen") { set max_ticks = 2000 }
+    if (op == "accept") { set max_ticks = 2000 }
+    if (op == "keepalive") { set max_ticks = 1000 }
+    if (op == "read") { set max_ticks = 800 }
+    if (op == "write") { set max_ticks = 800 }
+
     set ticks = 0
     loop {
       listen for "@sysproxy.response" then {
@@ -1293,8 +1301,8 @@ component ::azl.system_interface {
       sleep 0.01
       ::stdlib.mini.time_advance_ms(10)
       set ticks = ticks + 1
-      if (ticks >= 300) {
-        emit log_error with { type: "sysproxy_timeout", message: "sysproxy_call timeout", context: { op: op, id: id, args: args } }
+      if (ticks >= max_ticks) {
+        emit log_error with { type: "sysproxy_timeout", message: "sysproxy_call timeout", context: { op: op, id: id, args: args, max_ticks: max_ticks } }
         return { ok:false, errno:110, msg:"sysproxy timeout", id:id }
       }
     }

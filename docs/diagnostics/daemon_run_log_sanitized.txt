@@ -1,0 +1,47 @@
+🚀 AZL Enterprise Daemon Runner
+⚡ PURE AZL EXECUTION - NO EXTERNAL DEPENDENCIES!
+
+🔑 API Token: [REDACTED]
+📁 Config: config/prod.azl.json
+🌐 Port: 8081
+🔌 Starting wire...
+📦 Creating combined AZL file...
+📦 Adding: azl/host/exec_bridge.azl
+📦 Adding: azl/runtime/bootstrap.azl
+📦 Adding: azl/core/events.azl
+📦 Adding: azl/core/internal.azl
+📦 Adding: azl/api/endpoints.azl
+📦 Adding: azl/system/http_server.azl
+📦 Adding: azl/system/http_server_compat.azl
+📦 Adding: azl/build/build_daemon_enterprise.azl
+📦 Adding: azl/build/build_orchestrator.azl
+📦 Adding: azl/build/worker_pool.azl
+📦 Adding: azl/build/cache_manager.azl
+📦 Adding: azl/system/azl_system_interface.azl
+📦 Adding: azl/stdlib/core/azl_stdlib.azl
+📦 Adding: azl/core/error_system.azl
+📦 Adding: azl/runtime/interpreter/azl_interpreter.azl
+📦 Adding: azl/bootstrap/azl_pure_launcher.azl
+📦 Adding: azl/compat/launcher_shim.azl
+📦 Adding: azl/compat/interpreter_shim.azl
+📦 Adding: azl/diag/env_probe.azl
+📦 Adding: azl/diag/net_probe.azl
+📦 Adding: azl/integrations/anythingllm/azme_anythingllm_provider.azl
+📦 Adding: azl/integrations/anythingllm/azme_proxy.azl
+✅ Combined file created: /tmp/azl_enterprise_153499.azl
+🚀 Starting AZL Enterprise Daemon...
+📁 Combined file: /tmp/azl_enterprise_153499.azl
+🎯 Entry point: ::build.daemon.enterprise
+
+🧠 Loading and executing AZL components...
+
+🎉 AZL Enterprise Daemon execution initiated!
+🌐 API: http://localhost:8081
+🔑 Token: [REDACTED]
+
+
+📊 Test endpoints:
+  curl http://localhost:8081/healthz
+  curl http://localhost:8081/readyz
+  curl http://localhost:8081/status
+
