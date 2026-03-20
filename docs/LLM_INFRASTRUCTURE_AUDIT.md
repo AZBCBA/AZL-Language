@@ -57,7 +57,7 @@
 
 1. **Shipped (optional build):** link **llama.cpp** into **`azl-native-engine`** — see **`scripts/build_azl_native_engine_with_llamacpp.sh`**, **`tools/azl_gguf_infer_llamacpp.cpp`**, **`GET /api/llm/capabilities`** when `gguf_embedded_llamacpp: true`.
 2. **Still open:** pure **`.azl`** `load_gguf_native` mmap + forward (no llama.cpp) — multi-year scope unless constrained to a tiny reference model.
-3. **Kernels** — matmul, attention; GPU optional (`AZL_LLAMA_NGL` passes **`n_gpu_layers`** to llama.cpp in the embedded path).
+3. **Kernels** — matmul, attention; GPU optional — **`AZL_LLAMA_NGL`** or **`AZL_LLM_GPU_LAYERS`** (alias) → **`n_gpu_layers`** (embedded) or **`-ngl`** (`llama-cli` subprocess). Requires a **GPU-enabled llama.cpp** build.
 4. **Tokenization** — inside llama.cpp for GGUF; `tokenizer_bpe32k.json` remains for training pipelines.
 
 ### 4.2 Optional hardening

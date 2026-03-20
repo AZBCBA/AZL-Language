@@ -14,11 +14,21 @@ namespace {
 
 struct ModelCache {
   std::string path;
+  int n_gpu_layers = -999999;
   llama_model *model = nullptr;
 };
 
 ModelCache g_model;
 bool g_backends_loaded = false;
+
+/* Prefer AZL_LLAMA_NGL; AZL_LLM_GPU_LAYERS is model-agnostic alias (any GGUF llama.cpp loads). */
+static int resolve_n_gpu_layers(void) {
+  const char *a = std::getenv("AZL_LLAMA_NGL");
+  if (a && a[0] != '\0') return std::atoi(a);
+  const char *b = std::getenv("AZL_LLM_GPU_LAYERS");
+  if (b && b[0] != '\0') return std::atoi(b);
+  return 0;
+}
 
 static void set_err(char *err, size_t err_cap, const char *msg) {
   if (!err || err_cap == 0) return;
@@ -31,6 +41,7 @@ static void unload_model_locked() {
     g_model.model = nullptr;
   }
   g_model.path.clear();
+  g_model.n_gpu_layers = -999999;
 }
 
 static int append_piece(const llama_vocab *vocab, llama_token id, std::string *acc, char *err, size_t err_cap) {
@@ -64,21 +75,18 @@ int azl_llamacpp_gguf_infer(const char *model_path, const char *prompt, int n_pr
     g_backends_loaded = true;
   }
 
-  if (g_model.path != model_path) {
+  const int ngl = resolve_n_gpu_layers();
+  if (g_model.path != model_path || g_model.n_gpu_layers != ngl) {
     unload_model_locked();
     llama_model_params model_params = llama_model_default_params();
-    const char *ngl = std::getenv("AZL_LLAMA_NGL");
-    if (ngl && ngl[0] != '\0') {
-      model_params.n_gpu_layers = std::atoi(ngl);
-    } else {
-      model_params.n_gpu_layers = 0;
-    }
+    model_params.n_gpu_layers = ngl;
     g_model.model = llama_model_load_from_file(model_path, model_params);
     if (!g_model.model) {
       set_err(err, err_cap, "model_load_failed");
       return -2;
     }
     g_model.path = model_path;
+    g_model.n_gpu_layers = ngl;
   }
 
   llama_model *model = g_model.model;

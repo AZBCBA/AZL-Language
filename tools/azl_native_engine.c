@@ -362,6 +362,23 @@ static void json_escape_text(const char *in, char *out, size_t outsz) {
   out[j] = '\0';
 }
 
+/* llama.cpp n_gpu_layers: AZL_LLAMA_NGL wins; else AZL_LLM_GPU_LAYERS (model-agnostic). */
+static int azl_llm_n_gpu_layers_from_env(void) {
+  const char *a = getenv("AZL_LLAMA_NGL");
+  if (a && a[0] != '\0') return atoi(a);
+  const char *b = getenv("AZL_LLM_GPU_LAYERS");
+  if (b && b[0] != '\0') return atoi(b);
+  return 0;
+}
+
+static int azl_llm_ngl_env_is_set(void) {
+  const char *a = getenv("AZL_LLAMA_NGL");
+  if (a && a[0] != '\0') return 1;
+  const char *b = getenv("AZL_LLM_GPU_LAYERS");
+  if (b && b[0] != '\0') return 1;
+  return 0;
+}
+
 #define GGUF_READ_MAX (192 * 1024)
 
 static void handle_gguf_infer(int cfd, const char *req, ssize_t n, EngineState *st) {
@@ -427,7 +444,7 @@ static void handle_gguf_infer(int cfd, const char *req, ssize_t n, EngineState *
         (void)snprintf(
             resp, rsz,
             "{\"ok\":false,\"error\":\"llamacpp_infer_failed\",\"code\":%d,\"message\":\"%s\","
-            "\"hint\":\"Check AZL_GGUF_PATH, GGUF compatibility, RAM, and optional AZL_LLAMA_NGL.\"}",
+            "\"hint\":\"Check AZL_GGUF_PATH, GGUF compatibility, RAM, and optional AZL_LLAMA_NGL or AZL_LLM_GPU_LAYERS.\"}",
             ir, eesc);
         write_response(cfd, 502, "Bad Gateway", resp);
         free(resp);
@@ -504,17 +521,26 @@ static void handle_gguf_infer(int cfd, const char *req, ssize_t n, EngineState *
     close(pipefd[1]);
     const char *use_no_cnv = getenv("AZL_LLAMA_SKIP_NO_CNV");
     const char *simple_io = getenv("AZL_LLAMA_SIMPLE_IO");
-    if (use_no_cnv && use_no_cnv[0] == '1') {
-      if (simple_io && simple_io[0] == '1')
-        execlp(cli, cli, "-m", gguf, "-f", tpl, "-n", nbuf, "--simple-io", (char *)NULL);
-      else
-        execlp(cli, cli, "-m", gguf, "-f", tpl, "-n", nbuf, (char *)NULL);
-    } else {
-      if (simple_io && simple_io[0] == '1')
-        execlp(cli, cli, "-m", gguf, "-f", tpl, "-n", nbuf, "-no-cnv", "--simple-io", (char *)NULL);
-      else
-        execlp(cli, cli, "-m", gguf, "-f", tpl, "-n", nbuf, "-no-cnv", (char *)NULL);
+    int cli_ngl = azl_llm_n_gpu_layers_from_env();
+    char ngbuf[32];
+    char *argv[24];
+    int ai = 0;
+    argv[ai++] = (char *)cli;
+    argv[ai++] = "-m";
+    argv[ai++] = (char *)gguf;
+    if (cli_ngl > 0) {
+      (void)snprintf(ngbuf, sizeof(ngbuf), "%d", cli_ngl);
+      argv[ai++] = "-ngl";
+      argv[ai++] = ngbuf;
     }
+    argv[ai++] = "-f";
+    argv[ai++] = tpl;
+    argv[ai++] = "-n";
+    argv[ai++] = nbuf;
+    if (!(use_no_cnv && use_no_cnv[0] == '1')) argv[ai++] = "-no-cnv";
+    if (simple_io && simple_io[0] == '1') argv[ai++] = "--simple-io";
+    argv[ai++] = NULL;
+    (void)execvp(cli, argv);
     _exit(127);
   }
   close(pipefd[1]);
@@ -791,6 +817,8 @@ static void handle_conn(int cfd, EngineState *st) {
     if (gp && gp[0] != '\0' && stat(gp, &gst) == 0 && S_ISREG(gst.st_mode)) gp_ok = 1;
     const char *lsu = getenv("AZL_LLAMA_SERVER_URL");
     int ls_ok = (lsu && lsu[0] != '\0');
+    int llm_ngl = azl_llm_n_gpu_layers_from_env();
+    int llm_ngl_set = azl_llm_ngl_env_is_set();
     char cap[8192];
 #ifdef AZL_WITH_LLAMACPP
     int cn = snprintf(
@@ -803,9 +831,12 @@ static void handle_conn(int cfd, EngineState *st) {
         "\"gguf_model_configured\":%s,"
         "\"llama_server_http_proxy\":%s,\"llama_server_completion_path\":\"/api/llm/llama_server/completion\","
         "\"llama_server_upstream_configured\":%s,"
+        "\"llm_n_gpu_layers\":%d,\"llm_n_gpu_layers_env_set\":%s,"
+        "\"llm_n_gpu_layers_env_keys\":\"AZL_LLAMA_NGL|AZL_LLM_GPU_LAYERS\","
+        "\"llm_gpu_stack\":\"llama.cpp\","
         "\"error\":null}",
         gp_ok ? "true" : "false", gp_ok ? "true" : "false", ls_ok ? "true" : "false",
-        ls_ok ? "true" : "false");
+        ls_ok ? "true" : "false", llm_ngl, llm_ngl_set ? "true" : "false");
 #else
     int cn = snprintf(
         cap, sizeof(cap),
@@ -817,6 +848,9 @@ static void handle_conn(int cfd, EngineState *st) {
         "\"gguf_model_configured\":%s,"
         "\"llama_server_http_proxy\":%s,\"llama_server_completion_path\":\"/api/llm/llama_server/completion\","
         "\"llama_server_upstream_configured\":%s,"
+        "\"llm_n_gpu_layers\":%d,\"llm_n_gpu_layers_env_set\":%s,"
+        "\"llm_n_gpu_layers_env_keys\":\"AZL_LLAMA_NGL|AZL_LLM_GPU_LAYERS\","
+        "\"llm_gpu_stack\":\"llama.cpp\","
         "\"error\":{\"code\":\"ERR_NATIVE_GGUF_NOT_IN_PROCESS\","
         "\"message\":\"Weights are not linked inside this binary; use POST /api/llm/gguf_infer "
         "(set AZL_GGUF_PATH to a .gguf file and install llama.cpp llama-cli) or "
@@ -824,7 +858,7 @@ static void handle_conn(int cfd, EngineState *st) {
         "POST /api/llm/llama_server/completion (llama-server + AZL_LLAMA_SERVER_URL) or "
         "POST /api/ollama/generate (Ollama).\"}}",
         gp_ok ? "true" : "false", gp_ok ? "true" : "false", ls_ok ? "true" : "false",
-        ls_ok ? "true" : "false");
+        ls_ok ? "true" : "false", llm_ngl, llm_ngl_set ? "true" : "false");
 #endif
     if (cn > 0 && (size_t)cn < sizeof(cap))
       write_response(cfd, 200, "OK", cap);

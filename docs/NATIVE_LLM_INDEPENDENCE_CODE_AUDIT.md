@@ -17,7 +17,9 @@ This document lists **gaps and facts** inferred from the repository **source**, 
 | `tools/azl_native_engine.c` `GET /api/llm/capabilities` | **`gguf_in_process`**: `false` unless built with **`scripts/build_azl_native_engine_with_llamacpp.sh`**, then `true` + **`gguf_embedded_llamacpp: true`** and **`error: null`**. |
 | `scripts/build_azl_native_engine.sh` | **gcc** only — **no** llama.cpp; this remains the **default CI/gate** build. |
 | `scripts/build_azl_native_engine_with_llamacpp.sh` | **CMake** links **`llama`** into **`.azl/bin/azl-native-engine`**. |
-| `tools/azl_gguf_infer_llamacpp.cpp` | Greedy sampling loop (llama.cpp API); caches **`llama_model`** per **`AZL_GGUF_PATH`**; **`AZL_LLAMA_NGL`** → **`n_gpu_layers`**. |
+| `tools/azl_gguf_infer_llamacpp.cpp` | Greedy sampling loop (llama.cpp API); caches **`llama_model`** per **`(path, n_gpu_layers)`**; **`AZL_LLAMA_NGL`** then **`AZL_LLM_GPU_LAYERS`** → **`n_gpu_layers`**. |
+| `tools/azl_native_engine.c` `handle_gguf_infer` (subprocess) | **`execvp`** **`llama-cli`** with **`-ngl`** when those env vars yield a positive integer. |
+| `GET /api/llm/capabilities` | **`llm_n_gpu_layers`**, **`llm_n_gpu_layers_env_set`**, **`llm_gpu_stack":"llama.cpp"`**. |
 | `azl/neural/model_loader.azl` `load_gguf_native` | AZL-layer event still **does not** mmap weights; it documents the **HTTP/native** path instead of claiming in-process AZL bytecode. |
 
 ## 3. Remaining gaps (realistic)

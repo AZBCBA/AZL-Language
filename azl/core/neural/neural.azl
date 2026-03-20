@@ -54,6 +54,19 @@ component ::neural.core {
         }
       }
     }
+
+    # Native-engine GGUF (llama.cpp): GPU layer count is read from the host process, not from this component.
+    # Training/orchestration GPU flags (AZL_HAS_GPU, cuda device) are separate until a syscall bridges them.
+    listen for "neural.llm.native_infer_gpu_hint" then {
+      emit "neural.llm.native_infer_gpu_hint.response" with {
+        AZL_LLAMA_NGL: ("" + (::internal.env("AZL_LLAMA_NGL") or "")),
+        AZL_LLM_GPU_LAYERS: ("" + (::internal.env("AZL_LLM_GPU_LAYERS") or "")),
+        AZL_HAS_GPU: ("" + (::internal.env("AZL_HAS_GPU") or "")),
+        AZL_GGUF_PATH: ("" + (::internal.env("AZL_GGUF_PATH") or "")),
+        note: "Set AZL_LLAMA_NGL or AZL_LLM_GPU_LAYERS before starting azl-native-engine for POST /api/llm/gguf_infer. Build llama.cpp with a GPU backend for non-zero layers. Training uses AZL_DEVICE / ::ffi.torch separately."
+      }
+    }
+
     // Initialize neural processor
     listen for "initialize_neural" then {
       set ::status = "initializing"

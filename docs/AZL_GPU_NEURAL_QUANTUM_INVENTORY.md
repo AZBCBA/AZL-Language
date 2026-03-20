@@ -12,7 +12,7 @@
 |------|-------------|
 | Default native mode runs **C minimal** or **Python semantic subset** on the **combined** bundle | Most `.azl` files below are **not executed** on that path unless linked into the bundle **and** reached by a full interpreter. |
 | **No CUDA/Metal/OpenCL kernel bridge** in-tree for AZL tensors today | `device: "cuda"` in APIs is mostly **configuration + orchestration shape** until a native FFI path exists. |
-| **Native GGUF** | **Not** in-process in the engine binary — `neural.model_loader` still emits `ERR_NATIVE_GGUF_NOT_IMPLEMENTED`; HTTP **`POST /api/llm/gguf_infer`** + **`AZL_GGUF_PATH`** runs **`llama-cli`** (llama.cpp) for local `.gguf`; Ollama proxy remains **`POST /api/ollama/generate`**. |
+| **Native GGUF** | **`POST /api/llm/gguf_infer`** + **`AZL_GGUF_PATH`** — default engine forks **`llama-cli`**; optional CMake build links **llama.cpp** in-process ([`LLM_INFRASTRUCTURE_AUDIT.md`](LLM_INFRASTRUCTURE_AUDIT.md)). `neural.model_loader` **`load_gguf_native`** stays an honest stub (orchestrate via engine, not mmap in bytecode). |
 | **“Quantum” in file names** | Often **state-vector / symbolic / event** models on a **normal CPU** — not a lab QPU unless you add hardware integration. |
 
 ---
@@ -22,6 +22,7 @@
 | Location | Role | Binding to real GPU? |
 |----------|------|------------------------|
 | `azl/api/endpoints.azl` | `device` / `cuda` / `gpu_limit` / `num_gpus` validation, training toggles | **Config & policy**; no device kernels here |
+| `azl/core/neural/neural.azl` | **`neural.core.configure_device`**, **`initialize_neural`**, **`neural.llm.native_infer_gpu_hint`** | Training GPU **policy** + **hint** for native-engine LLM env (§2.1); not llama.cpp itself |
 | `azl/orchestrator/parallel_training_orchestrator.azl` | Multi-GPU orchestration narrative, `per_device` metrics | **Logical** scheduling shape |
 | `azl/orchestrator/comprehensive_training_controller.azl` | Default `device: "cpu"` | Baseline |
 | `azl/system/http_server.azl` | Training config JSON includes `device`, `gpu_limit` | **API shape** |
@@ -31,7 +32,20 @@
 | `azl/ffi/torch.azl` | Optional **Torch FFI** bridge (`AZL_ENABLE_TORCH_FFI`); default `::device = "cuda"` in **data** | **Not** the native C engine; requires external Python/torch helper when enabled |
 | `azl/system/hw.azl` | Hardware / capability hints | Check file for env-driven behavior |
 
-**Gap (documented):** [DEEP_AUDIT §4](DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md) — native tensor is pure AZL; **GPU/tensor bridge** is future work.
+**Gap (documented):** [DEEP_AUDIT §4](DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md) — native tensor is pure AZL; **GPU/tensor bridge** for arbitrary AZL-defined ops is future work.
+
+### 2.1 LLM inference GPU (native `azl-native-engine`, llama.cpp)
+
+Orchestration `.azl` surfaces (`device: "cuda"`, **`AZL_HAS_GPU`**, parallel training) describe **training / policy shape** and **Torch FFI** — they do **not** automatically reconfigure the C engine. For **whatever GGUF** you point at, **GPU offload is llama.cpp’s job**:
+
+| Mechanism | Role |
+|-----------|------|
+| **`AZL_LLAMA_NGL`** or **`AZL_LLM_GPU_LAYERS`** | Integer passed to llama.cpp as **`n_gpu_layers`** (embedded build) or **`-ngl`** on **`llama-cli`** (subprocess build). Second var is a **model-agnostic** alias. |
+| **`GET /api/llm/capabilities`** | Reports **`llm_n_gpu_layers`**, **`llm_n_gpu_layers_env_set`**, **`llm_gpu_stack":"llama.cpp"`**. |
+| **`::neural.core`** event **`neural.llm.native_infer_gpu_hint`** | Echoes host-seeded **`::internal.env`** for those keys (after **`exec_bridge`** **`merge_host_env_into_internal`**). |
+| **Build** | llama.cpp must be compiled with the relevant **CUDA / Vulkan / Metal** backend; otherwise non-zero layers are ignored or fail at runtime. |
+
+Training stack remains: **`AZL_DEVICE`**, **`::ffi.torch`**, **`CUDA_VISIBLE_DEVICES`** on Python helpers — orthogonal until you explicitly unify ops.
 
 ---
 

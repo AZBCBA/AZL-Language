@@ -57,7 +57,7 @@ component ::neural.model_loader {
     say ::path
     emit "log_error" with {
       type: "ERR_NATIVE_GGUF_NOT_IMPLEMENTED",
-      message: "Pure AZL bytecode does not mmap GGUF; use native engine POST /api/llm/gguf_infer with AZL_GGUF_PATH (build with scripts/build_azl_native_engine_with_llamacpp.sh for in-process llama.cpp, or default engine + llama-cli). See GET /api/llm/capabilities.",
+      message: "Pure AZL bytecode does not mmap GGUF; use native engine POST /api/llm/gguf_infer with AZL_GGUF_PATH. GPU offload: set AZL_LLAMA_NGL or AZL_LLM_GPU_LAYERS on the engine process (llama.cpp -ngl / n_gpu_layers). In-process: build with scripts/build_azl_native_engine_with_llamacpp.sh. See GET /api/llm/capabilities; emit neural.llm.native_infer_gpu_hint for ::internal snapshot.",
       context: { path: ::path, where: "neural.model_loader.load_gguf_native" }
     }
     emit "model_load_failed" with ::path "ERR_NATIVE_GGUF_NOT_IMPLEMENTED"

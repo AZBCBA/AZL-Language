@@ -57,6 +57,12 @@ component ::host.exec_bridge {
     ::pull_env_if_set("OLLAMA_HOST")
     ::pull_env_if_set("AZL_GGUF_PATH")
     ::pull_env_if_set("AZL_LLAMA_SERVER_URL")
+    ::pull_env_if_set("AZL_LLAMA_NGL")
+    ::pull_env_if_set("AZL_LLM_GPU_LAYERS")
+    ::pull_env_if_set("AZL_HAS_GPU")
+    ::pull_env_if_set("AZL_NUM_GPUS")
+    ::pull_env_if_set("AZL_GPU_COUNT")
+    ::pull_env_if_set("CUDA_VISIBLE_DEVICES")
     ::pull_env_if_set("AZL_FILE_CACHE")
   }
   

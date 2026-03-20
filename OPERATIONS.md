@@ -29,6 +29,7 @@ This runbook documents how to run the enterprise daemon and validate host integr
   - **`bash scripts/run_proof_llm_enterprise_bundle.sh`** — same proof as above, but the **child runtime** loads the **full enterprise concatenated .azl** (same component list as **`run_enterprise_daemon.sh`**: quantum, LHA3, neural, AZME, …). Stops other daemons if they hold **`.azl/engine.out` / `9099`**. Default **`PROOF_REQS=200`** (set **`PROOF_REQS=1000`** for a full run). Report includes an explicit **Scope** section (native C Ollama proxy vs `/v1/chat`).
   - **`bash scripts/build_enterprise_combined.sh <out.azl>`** — writes the enterprise combined file only (for inspection or custom bundles).
   - `AZL_API_TOKEN=… bash scripts/benchmark_enterprise_v1_chat.sh` — enterprise `POST /v1/chat` (daemon on `AZL_ENTERPRISE_PORT`, default 8080)
+- **Native GGUF + GPU (llama.cpp):** on the **`azl-native-engine` process**, set **`AZL_GGUF_PATH`** and either **`AZL_LLAMA_NGL`** or **`AZL_LLM_GPU_LAYERS`** (integer layer offload count). Same vars apply to the default **`llama-cli`** subprocess path (**`-ngl`**) and the optional in-process build (**`n_gpu_layers`**). Training/orchestration flags like **`AZL_HAS_GPU`** / **`device: cuda`** in `.azl` are a **separate** track (Torch / policy) until a syscall unifies them — see **`docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md` §2.1**.
 
 ## CI
 - Main CI (`.github/workflows/ci.yml`):
