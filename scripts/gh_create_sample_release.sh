@@ -6,8 +6,12 @@
 #   - workflow_dispatch / local: AZL_RELEASE_TAG=vX.Y.Z… (GITHUB_REF may be refs/heads/*).
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=azl_release_tag_policy.sh
+source "${SCRIPT_DIR}/azl_release_tag_policy.sh"
 
 for cmd in gh; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -68,12 +72,18 @@ if gh release view "$TAG" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
   exit 7
 fi
 
+GH_CREATE_ERR="$(mktemp)"
+trap 'rm -f "${GH_CREATE_ERR}"' EXIT
 if ! gh release create "$TAG" \
   --repo "${GITHUB_REPOSITORY}" \
   --title "$TAG" \
   --verify-tag \
-  "${ASSETS[@]}"; then
+  "${ASSETS[@]}" 2>"${GH_CREATE_ERR}"; then
   echo "ERROR: gh release create failed for tag: ${TAG}" >&2
+  if [ -s "${GH_CREATE_ERR}" ]; then
+    echo "ERROR: gh stderr:" >&2
+    cat "${GH_CREATE_ERR}" >&2
+  fi
   exit 8
 fi
 

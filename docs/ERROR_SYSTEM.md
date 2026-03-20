@@ -43,16 +43,17 @@ Production scripts return **non-zero** with **`ERROR:`** on **stderr**; no silen
 
 | Script | Exit | Meaning |
 |--------|------|---------|
+| `scripts/azl_release_tag_policy.sh` | **2** | Run directly — **source** from release scripts only |
 | `scripts/gh_verify_remote_tag.sh` | **2** | Usage: missing **`<tag>`** argument |
 | | **3** | **`GITHUB_REPOSITORY`** unset |
 | | **4** | **`GH_TOKEN`** unset |
 | | **5** | **`gh`** or **`python3`** not found |
-| | **6** | Tag shape invalid (must match **`gh_create_sample_release`** pattern) |
+| | **6** | Tag shape invalid (see **`scripts/azl_release_tag_policy.sh`**) |
 | | **7** | **`refs/tags/<tag>`** not found on remote (**`gh api`** failed) |
 | `scripts/gh_create_sample_release.sh` | **2** | **`gh`** not found |
 | | **3** | **`GITHUB_REPOSITORY`** or **`GH_TOKEN`** unset; or **`GITHUB_REF`** unset when **`AZL_RELEASE_TAG`** unset |
 | | **4** | **`GITHUB_REF`** not **`refs/tags/v*.*.*`** and **`AZL_RELEASE_TAG`** unset |
-| | **5** | Tag does not match **`vMAJOR.MINOR.PATCH`** (+ optional **`-prerelease`** / **`+build`**) |
+| | **5** | Tag does not match **`vMAJOR.MINOR.PATCH`** (+ optional **`-prerelease`** / **`+build`**) — **`azl_release_tag_policy.sh`** |
 | | **6** | Missing file under **`dist/`** |
 | | **7** | GitHub Release already exists for that tag |
 | | **8** | **`gh release create`** failed |

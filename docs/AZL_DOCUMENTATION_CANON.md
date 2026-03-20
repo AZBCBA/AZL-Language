@@ -18,7 +18,7 @@
 | Full release sequence | `scripts/run_full_repo_verification.sh` — see [RELEASE_READY.md](../RELEASE_READY.md) |
 | End-to-end connectivity map | [CONNECTIVITY_AUDIT.md](CONNECTIVITY_AUDIT.md) — release-gated stack vs alternate launchers vs optional backends |
 | Changelog | [CHANGELOG.md](../CHANGELOG.md) |
-| GitHub Release (sample bundle assets) | Push tag **`v*.*.*`** or **Actions → Release → Run workflow** (input **`tag`**) → **`.github/workflows/release.yml`**. **Dispatch:** **`scripts/gh_verify_remote_tag.sh`** (remote **`refs/tags/<tag>`**) then checkout → **`dist/`** → **`scripts/gh_create_sample_release.sh`** (`gh release create`, **`AZL_RELEASE_TAG`**; **`permissions: contents: write`**; no Node 20 composite action). See [RELEASE_READY.md](../RELEASE_READY.md) § GitHub Release, [ERROR_SYSTEM.md](ERROR_SYSTEM.md) shell table. |
+| GitHub Release (sample bundle assets) | Push tag **`v*.*.*`** or **Actions → Release → Run workflow** (input **`tag`**) → **`.github/workflows/release.yml`**. **Dispatch:** **`scripts/gh_verify_remote_tag.sh`** (remote **`refs/tags/<tag>`**) then checkout → **`dist/`** → **`scripts/gh_create_sample_release.sh`** (`gh release create`, **`AZL_RELEASE_TAG`**; **`permissions: contents: write`**; no Node 20 composite action). Tag shape: **`scripts/azl_release_tag_policy.sh`**. [CONNECTIVITY_AUDIT.md](CONNECTIVITY_AUDIT.md) §1.1. See [RELEASE_READY.md](../RELEASE_READY.md) § GitHub Release, [ERROR_SYSTEM.md](ERROR_SYSTEM.md) shell table. |
 
 ### 1.2 Interpreter spine (done phases; not full self-host)
 

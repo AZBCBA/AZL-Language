@@ -59,6 +59,10 @@ bash scripts/verify_azl_strength_bar.sh
 
 That runs **`check_azl_native_gates.sh`**, **`verify_native_runtime_live.sh`**, and **`verify_enterprise_native_http_live.sh`**. It does **not** replace the full release sequence — use **`scripts/run_full_repo_verification.sh`** (see `RELEASE_READY.md`).
 
+## GitHub Releases (maintainers)
+
+Publishing sample assets to a **GitHub Release** is **not** part of `run_full_repo_verification.sh`. Flow, **`workflow_dispatch`**, and **`gh`/`ERROR` exits** are documented in **`RELEASE_READY.md`** § GitHub Release and **`docs/CI_CD_PIPELINE.md`**. Tag naming is defined once in **`scripts/azl_release_tag_policy.sh`** (sourced by **`scripts/gh_verify_remote_tag.sh`** and **`scripts/gh_create_sample_release.sh`**). Shell exit tables: **`docs/ERROR_SYSTEM.md`** § Shell helpers.
+
 ## Standards
 
 - **No placeholders or mocks** in production code.

@@ -22,6 +22,10 @@ This document maps **what is actually wired and verified** versus **alternate en
 
 **Optional tail** (`RUN_OPTIONAL_BENCHES=1`): Ollama at `127.0.0.1:11434`, enterprise `POST /v1/chat` only if a daemon is already up and the probe is not 404/000.
 
+### 1.1 GitHub Release automation (not in `run_full_repo_verification`)
+
+**Out of band** on GitHub only: push tag **`v*.*.*`** or **Actions → Release → Run workflow** (input **`tag`**). Workflow **`.github/workflows/release.yml`** runs **`scripts/gh_verify_remote_tag.sh`** (dispatch only: **`gh api`** + URL-encoded **`refs/tags/<tag>`**, **`gh` stderr** on failure) → checkout → **`dist/`** → **`scripts/gh_create_sample_release.sh`** (**`gh release create`**, **`gh` stderr** on failure). Shared tag shape: **`scripts/azl_release_tag_policy.sh`**. See **`RELEASE_READY.md`** § GitHub Release, **`docs/CI_CD_PIPELINE.md`**, **`docs/ERROR_SYSTEM.md`** (shell helpers).
+
 ---
 
 ## 2. Canonical native product startup (full enterprise composition)

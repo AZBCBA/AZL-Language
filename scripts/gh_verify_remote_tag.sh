@@ -4,6 +4,10 @@
 # Requires: gh, python3, GH_TOKEN, GITHUB_REPOSITORY, argv1 = tag (e.g. v1.2.3).
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=azl_release_tag_policy.sh
+source "${SCRIPT_DIR}/azl_release_tag_policy.sh"
+
 TAG="${1-}"
 if [ -z "$TAG" ]; then
   echo "ERROR: usage: gh_verify_remote_tag.sh <tag>" >&2
@@ -25,11 +29,7 @@ for cmd in gh python3; do
   fi
 done
 
-# Align with scripts/gh_create_sample_release.sh
-if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
-  echo "ERROR: tag must match vMAJOR.MINOR.PATCH[-prerelease][+build]; got: ${TAG}" >&2
-  exit 6
-fi
+azl_assert_release_tag_shape_or_die "$TAG" 6
 
 FULL_REF="refs/tags/${TAG}"
 ENC="$(
@@ -37,9 +37,15 @@ ENC="$(
 )"
 
 export GH_TOKEN
-# --fail: non-2xx → non-zero exit (e.g. 404 missing ref)
-if ! gh api --fail "repos/${GITHUB_REPOSITORY}/git/ref/${ENC}" >/dev/null 2>&1; then
+GH_ERR="$(mktemp)"
+trap 'rm -f "${GH_ERR}"' EXIT
+# Non-2xx → non-zero exit (e.g. 404 missing ref). Do not use curl's --fail; gh versions differ.
+if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ENC}" >/dev/null 2>"${GH_ERR}"; then
   echo "ERROR: tag not found on remote: ${TAG} (expected git ref ${FULL_REF})" >&2
+  if [ -s "${GH_ERR}" ]; then
+    echo "ERROR: gh api stderr:" >&2
+    cat "${GH_ERR}" >&2
+  fi
   exit 7
 fi
 
