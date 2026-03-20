@@ -17,7 +17,7 @@ To save GitHub Actions minutes, consider **disabling or slimming** overlapping w
 
 ## Release helper self-check
 
-- **`scripts/self_check_release_helpers.sh`** — **`bash -n`** on GitHub release helpers, **`azl_release_tag_policy.sh`** direct-run guard, sourced assert tests, **`gh_verify_remote_tag.sh`** usage. Invoked at the start of **`scripts/check_azl_native_gates.sh`** (**gate 0**), so any workflow that runs native gates (including **`ci.yml`** runtime smoke and **`run_tests.sh`**) validates release scripts. Listed under **`github_release`** in **`release/native/manifest.json`**.
+- **`scripts/self_check_release_helpers.sh`** — **`bash -n`** on GitHub release helpers, **`azl_release_tag_policy.sh`** direct-run guard, sourced assert tests, **`gh_verify_remote_tag.sh`** usage, and **`python3`** validation of **`release/native/manifest.json`** (JSON parse, every **`gates[]`** path exists, **`github_release.workflow`** + **`github_release.scripts`** exist on disk). Invoked at the start of **`scripts/check_azl_native_gates.sh`** (**gate 0**), so any workflow that runs native gates (including **`ci.yml`** runtime smoke and **`run_tests.sh`**) validates release scripts. Manifest schema is enforced only by this script (keep **`github_release`** in sync when adding release files).
 
 ## Local parity
 

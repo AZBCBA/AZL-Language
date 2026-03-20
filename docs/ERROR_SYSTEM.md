@@ -52,6 +52,16 @@ Production scripts return **non-zero** with **`ERROR:`** on **stderr**; no silen
 | | **46** | Invalid tag assert did not exit **87** |
 | | **47** | **`gh_verify_remote_tag.sh`** no-arg exit not **2** |
 | | **48** | **`gh_verify_remote_tag.sh`** usage text missing |
+| | **49** | **`python3`** not found |
+| | **50** | **`release/native/manifest.json`** unreadable or invalid JSON |
+| | **51** | **`gates[]`** entry not a non-empty string |
+| | **57** | **`gates[]`** path not a file on disk |
+| | **52** | **`github_release`** not an object |
+| | **53** | **`github_release.workflow`** missing or not a non-empty string |
+| | **54** | **`github_release.workflow`** file missing on disk |
+| | **55** | **`github_release.scripts`** not an array |
+| | **56** | **`github_release.scripts`** entry not a non-empty string |
+| | **58** | **`github_release.scripts`** path not a file on disk |
 | `scripts/azl_release_tag_policy.sh` | **2** | Run directly — **source** from release scripts only |
 | `scripts/gh_verify_remote_tag.sh` | **2** | Usage: missing **`<tag>`** argument |
 | | **3** | **`GITHUB_REPOSITORY`** unset |
@@ -74,5 +84,14 @@ Production scripts return **non-zero** with **`ERROR:`** on **stderr**; no silen
 | | **75** | Capabilities missing **`ollama_http_proxy`** |
 | | **76** | Invalid **`gguf_in_process`** shape |
 | | **77** | Capabilities stub/embedded contract mismatch |
+| `scripts/verify_enterprise_native_http_live.sh` | **80** | **`healthz` + `readyz`** not HTTP **200** within deadline |
+| | **81** | **`healthz` / `readyz` / `status` / `exec_state`** contract failed |
+| | **82** | **`healthz`** missing enterprise entry hint (**`build.daemon.enterprise`**) |
+| | **83** | Could not parse **`combined`** path from **`/status`** |
+| | **84** | **`/status` `combined`** path mismatch vs built enterprise combined |
+| | **85** | **`/api/llm/capabilities`** not **`ok`** |
+| | **86** | Capabilities missing **`ollama_http_proxy`** |
+| | **87** | Stub/embedded capabilities contract mismatch (**`ERR_*` / `error:null`**) |
+| | **88** | Embedded **`gguf`** shape invalid or **`gguf_in_process`** boolean missing |
 
 

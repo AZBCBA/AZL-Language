@@ -42,7 +42,7 @@ bash scripts/start_azl_native_mode.sh
 
 When `AZL_NATIVE_ONLY=1`, Python legacy startup paths are blocked by design.
 
-Run native completion gates:
+Run native completion gates (`check_azl_native_gates.sh` runs **gate 0** — `self_check_release_helpers.sh` for release scripts + `release/native/manifest.json` — before A–H):
 
 ```bash
 bash scripts/check_azl_native_gates.sh
