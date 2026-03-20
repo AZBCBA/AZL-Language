@@ -11,7 +11,7 @@
 | Item | Proof |
 |------|--------|
 | C HTTP engine | `tools/azl_native_engine.c` — health, readiness, status, exec_state, capabilities, Ollama proxy, GGUF CLI infer, llama-server completion proxy |
-| Native gates | `scripts/check_azl_native_gates.sh` — guards A–E, VM opcode contract D, C minimal F, Python parity F2, P0 slice F3, spine G, tokenizer/brace H |
+| Native gates | `scripts/check_azl_native_gates.sh` — **gate 0:** `self_check_release_helpers.sh` (GitHub release script **`bash -n`** + tag policy); guards A–E, VM opcode contract D, C minimal F, Python parity F2, P0 slice F3, spine G, tokenizer/brace H |
 | Live HTTP + LLM honesty (minimal bundle) | `scripts/verify_native_runtime_live.sh` — `azl-native-engine` + minimal bootstrap (`c_minimal_link_ping`), `/api/llm/capabilities`, native-only `scripts/azl` block |
 | Live HTTP + enterprise combined | `scripts/verify_enterprise_native_http_live.sh` — same HTTP contract + `build_enterprise_combined.sh` + `::build.daemon.enterprise`; `/status` `combined` must match built path |
 | Strength bar (one command) | `scripts/verify_azl_strength_bar.sh` — gates + `verify_native_runtime_live.sh` + `verify_enterprise_native_http_live.sh`; failures: `ERROR[AZL_STRENGTH_BAR]: …` |

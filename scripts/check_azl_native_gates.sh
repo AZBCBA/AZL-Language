@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+echo "[gate] 0: release helper scripts (GitHub release path; bash -n + tag policy)"
+bash scripts/self_check_release_helpers.sh
+
 echo "[gate] A: native-only guard checks"
 if ! rg -q "AZL_NATIVE_ONLY" scripts/start_azl_native_mode.sh; then
   echo "ERROR: start_azl_native_mode.sh is missing AZL_NATIVE_ONLY guard"

@@ -15,6 +15,10 @@ This repository’s automation is **bash + native AZL gates** (no Rust toolchain
 
 To save GitHub Actions minutes, consider **disabling or slimming** overlapping workflows once you standardize on `test-and-deploy.yml` + one lightweight gate workflow.
 
+## Release helper self-check
+
+- **`scripts/self_check_release_helpers.sh`** — **`bash -n`** on GitHub release helpers, **`azl_release_tag_policy.sh`** direct-run guard, sourced assert tests, **`gh_verify_remote_tag.sh`** usage. Invoked at the start of **`scripts/check_azl_native_gates.sh`** (**gate 0**), so any workflow that runs native gates (including **`ci.yml`** runtime smoke and **`run_tests.sh`**) validates release scripts. Listed under **`github_release`** in **`release/native/manifest.json`**.
+
 ## Local parity
 
 - Tests: `./scripts/run_all_tests.sh` (see root `Makefile` `make test`).

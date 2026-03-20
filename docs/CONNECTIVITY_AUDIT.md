@@ -13,7 +13,7 @@ This document maps **what is actually wired and verified** versus **alternate en
 | Step | Script | What it proves |
 |------|--------|----------------|
 | 1 | `scripts/enforce_canonical_stack.sh` | Repo layout / stack policy |
-| 2 | `scripts/check_azl_native_gates.sh` | Native-only defaults, engine build, C minimal + Python parity (F2/F3), VM tokens, spine resolver, tokenizer/brace gate, legacy-host defaults; **executable** `verify_enterprise_native_http_live.sh` |
+| 2 | `scripts/check_azl_native_gates.sh` | **Gate 0:** **`scripts/self_check_release_helpers.sh`** (GitHub release helper **`bash -n`** + **`azl_release_tag_policy`** invariants). Then native-only defaults, engine build, C minimal + Python parity (F2/F3), VM tokens, spine resolver, tokenizer/brace gate, legacy-host defaults; **executable** `verify_enterprise_native_http_live.sh` |
 | 3 | `scripts/enforce_legacy_entrypoint_blocklist.sh` | Blocked legacy entrypoints stay blocked |
 | 4 | `scripts/verify_native_runtime_live.sh` | **`azl-native-engine`** + **minimal** bootstrap bundle (`azl/tests/c_minimal_link_ping.azl`), HTTP **`/healthz`**, **`/readyz`**, **`/status`**, **`/api/exec_state`**, LLM honesty surface, native-only `scripts/azl` block. Default: builds engine via **`build_azl_native_engine.sh`**. **CI lcov** sets **`AZL_NATIVE_ENGINE_BIN`** to the **`gcc --coverage`** binary (required — verify otherwise replaces it and **`lcov --capture`** fails). |
 | 5 | `scripts/run_all_tests.sh` | Invokes **`scripts/run_tests.sh`**: repeats minimal live verify, then **`verify_enterprise_native_http_live.sh`**, **`verify_quantum_lha3_stack.sh`**, **`verify_azl_grammar_conformance.sh`**, then VM/azlpack/LSP checks |

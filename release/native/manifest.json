@@ -13,6 +13,15 @@
     "scripts/verify_enterprise_native_http_live.sh",
     "scripts/run_all_tests.sh"
   ],
+  "github_release": {
+    "workflow": ".github/workflows/release.yml",
+    "scripts": [
+      "scripts/azl_release_tag_policy.sh",
+      "scripts/gh_verify_remote_tag.sh",
+      "scripts/gh_create_sample_release.sh",
+      "scripts/self_check_release_helpers.sh"
+    ]
+  },
   "canonical_core": {
     "runtime": [
       "azl/runtime/interpreter/azl_interpreter.azl",

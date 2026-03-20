@@ -43,6 +43,15 @@ Production scripts return **non-zero** with **`ERROR:`** on **stderr**; no silen
 
 | Script | Exit | Meaning |
 |--------|------|---------|
+| `scripts/self_check_release_helpers.sh` | **40** | **`rg`** not found |
+| | **41** | Expected release helper file missing |
+| | **42** | **`bash -n`** failed on a helper script |
+| | **43** | **`azl_release_tag_policy.sh`** direct run did not exit **2** |
+| | **44** | Direct-run **ERROR** message contract broken |
+| | **45** | Valid tag **`v1.2.3`** rejected by policy |
+| | **46** | Invalid tag assert did not exit **87** |
+| | **47** | **`gh_verify_remote_tag.sh`** no-arg exit not **2** |
+| | **48** | **`gh_verify_remote_tag.sh`** usage text missing |
 | `scripts/azl_release_tag_policy.sh` | **2** | Run directly — **source** from release scripts only |
 | `scripts/gh_verify_remote_tag.sh` | **2** | Usage: missing **`<tag>`** argument |
 | | **3** | **`GITHUB_REPOSITORY`** unset |

@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 
 echo "Running native AZL tests..."
 chmod +x \
+  scripts/self_check_release_helpers.sh \
   scripts/enforce_canonical_stack.sh \
   scripts/check_azl_native_gates.sh \
   scripts/enforce_legacy_entrypoint_blocklist.sh \
