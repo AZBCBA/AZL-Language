@@ -39,6 +39,12 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
 
+      - name: Assert checkout matches release tag (peeled commit)
+        run: |
+          chmod +x scripts/gh_assert_checkout_matches_tag.sh
+          TAG="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}"
+          bash scripts/gh_assert_checkout_matches_tag.sh "$TAG"
+
       - name: Prepare sample bundles
         run: |
           mkdir -p dist

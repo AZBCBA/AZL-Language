@@ -2,6 +2,9 @@
 # Provable "strength bar": native gates + minimal live verify + enterprise combined live verify.
 # Prereqs: ripgrep (rg), jq (gate 0 manifest + gh ref encoding contract), python3, gcc — same family as check_azl_native_gates.sh.
 #
+# Exit codes (script-owned): 1 repo root, 2 rg, 3 jq, 4 python3, 5 gcc; 10 gates, 11 verify_native, 12 verify_enterprise.
+# See docs/ERROR_SYSTEM.md § Strength bar.
+#
 # This does NOT replace scripts/run_full_repo_verification.sh
 # (no enforce_canonical_stack, enforce_legacy_entrypoint_blocklist, run_all_tests).
 set -euo pipefail

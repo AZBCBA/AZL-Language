@@ -95,4 +95,69 @@ Production scripts return **non-zero** with **`ERROR:`** on **stderr**; no silen
 | | **87** | Stub/embedded capabilities contract mismatch (**`ERR_*` / `error:null`**) |
 | | **88** | Embedded **`gguf`** shape invalid or **`gguf_in_process`** boolean missing |
 
+### Native gates (`scripts/check_azl_native_gates.sh`)
+
+**Gate 0** runs **`self_check_release_helpers.sh`** — its exits **40–58** propagate unchanged.
+
+| Exit | Meaning |
+|------|---------|
+| **10** | **`start_azl_native_mode.sh`** missing **`AZL_NATIVE_ONLY`** guard |
+| **12** | **`verify_native_runtime_live.sh`** not executable |
+| **13** | **`verify_quantum_lha3_stack.sh`** not executable |
+| **14** | **`verify_azl_grammar_conformance.sh`** not executable |
+| **16** | **`verify_enterprise_native_http_live.sh`** not executable |
+| **19** | VM opcode token missing in **`azl/runtime/vm/azl_vm.azl`** |
+| **20** | Native engine binary not built or not executable |
+| **21** | **`tools/azl_native_engine.c`** not enforcing **`AZL_NATIVE_RUNTIME_CMD`** |
+| **22** | Native engine missing **`GET /api/llm/capabilities`** |
+| **23** | **`azl-interpreter-minimal`** missing after build |
+| **24** | C minimal **`c_minimal_link_ping`** run failed |
+| **25** | C minimal output missing **`C_MINIMAL_LINK_PING_OK`** |
+| **26** | Python spine host **`c_minimal_link_ping`** run failed |
+| **27** | C vs Python **`c_minimal_link_ping`** stdout mismatch |
+| **28** | P0 slice C run failed or output missing **`P0_SEMANTIC_INTERPRETER_SLICE_OK`** |
+| **29** | Python spine host P0 slice run failed |
+| **30** | C vs Python P0 slice stdout mismatch |
+| **31** | Script defaults **`AZL_ENABLE_LEGACY_HOST`** to **1** (**forbidden**) |
+
+**Gate G** runs **`verify_runtime_spine_contract.sh`** — exits **90–96** propagate (table below). **Gate H** runs **`verify_p0_interpreter_tokenizer_boundary.sh`** (Python **`SystemExit`**, typically **1** with **`ERROR:`** on stderr).
+
+### Runtime spine contract (`scripts/verify_runtime_spine_contract.sh`)
+
+| Exit | Meaning |
+|------|---------|
+| **90** | Default **`AZL_RUNTIME_SPINE`** must resolve to C minimal launcher |
+| **91** | **`AZL_RUNTIME_SPINE=azl_interpreter`** must resolve to semantic launcher |
+| **92** | **`python3`** not found |
+| **93** | Spine host invalid combined path did not exit **71** |
+| **94** | Spine host stderr missing **`ERR_AZL_COMBINED_PATH_INVALID`** |
+| **95** | Spine host **`c_minimal_link_ping`** did not exit **0** |
+| **96** | Spine host output missing **`C_MINIMAL_LINK_PING_OK`** |
+
+### Strength bar (`scripts/verify_azl_strength_bar.sh`)
+
+Prefix **`ERROR[AZL_STRENGTH_BAR]:`** on stderr for script-owned failures.
+
+| Exit | Meaning |
+|------|---------|
+| **1** | Not run from repo root |
+| **2** | **`rg`** not found |
+| **3** | **`jq`** not found |
+| **4** | **`python3`** not found |
+| **5** | **`gcc`** not found |
+| **10** | Step 1: **`check_azl_native_gates.sh`** failed (see exits above) |
+| **11** | Step 2: **`verify_native_runtime_live.sh`** failed |
+| **12** | Step 3: **`verify_enterprise_native_http_live.sh`** failed |
+
+### Release checkout assertion (`scripts/gh_assert_checkout_matches_tag.sh`)
+
+Used by **`.github/workflows/release.yml`** after **`actions/checkout`** at the release tag.
+
+| Exit | Meaning |
+|------|---------|
+| **2** | Usage: missing **`<tag>`** argument |
+| **3** | **`refs/tags/<tag>^{commit}`** not found (shallow clone or wrong tag) |
+| **4** | **`HEAD`** ≠ peeled tag commit |
+| **5** | **`git`** not found |
+
 

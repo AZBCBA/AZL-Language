@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# CI/local guard: syntax-check GitHub release helper scripts, tag-policy invariants, and
-# release/native/manifest.json (JSON + gates[] + github_release paths on disk).
+# CI/local guard: syntax-check GitHub release helper scripts (incl. gh_assert_checkout_matches_tag),
+# tag-policy invariants, and release/native/manifest.json (JSON + gates[] + github_release paths).
 # Requires: bash, rg, jq (JSON + schema-shaped checks; no Python).
 set -euo pipefail
 
@@ -21,6 +21,7 @@ fi
 SCRIPTS=(
   "${ROOT_DIR}/scripts/azl_release_tag_policy.sh"
   "${ROOT_DIR}/scripts/gh_verify_remote_tag.sh"
+  "${ROOT_DIR}/scripts/gh_assert_checkout_matches_tag.sh"
   "${ROOT_DIR}/scripts/gh_create_sample_release.sh"
 )
 for f in "${SCRIPTS[@]}"; do

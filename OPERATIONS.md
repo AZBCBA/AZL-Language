@@ -32,6 +32,10 @@ This runbook documents how to run the enterprise daemon and validate host integr
   - `AZL_API_TOKEN=… bash scripts/benchmark_enterprise_v1_chat.sh` — enterprise `POST /v1/chat` (daemon on `AZL_ENTERPRISE_PORT`, default 8080)
 - **Native GGUF + GPU (llama.cpp):** on the **`azl-native-engine` process**, set **`AZL_GGUF_PATH`** and either **`AZL_LLAMA_NGL`** or **`AZL_LLM_GPU_LAYERS`** (integer layer offload count). Same vars apply to the default **`llama-cli`** subprocess path (**`-ngl`**) and the optional in-process build (**`n_gpu_layers`**). Training/orchestration flags like **`AZL_HAS_GPU`** / **`device: cuda`** in `.azl` are a **separate** track (Torch / policy) until a syscall unifies them — see **`docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md` §2.1**.
 
+## Docker image (`Dockerfile`)
+
+The shipped **`Dockerfile`** installs **`jq`**, **`ripgrep`**, **`gcc`**, **`curl`**, etc. If you **`docker exec`** into the image and run **`check_azl_native_gates.sh`**, **gate 0** (**`jq`** manifest checks) matches typical CI. The image does **not** run full gates at **`docker build`** time.
+
 ## CI
 - Main CI (`.github/workflows/ci.yml`):
   - Fails on any placeholders/TODO/FIXME in `.azl`

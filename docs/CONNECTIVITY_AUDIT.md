@@ -24,7 +24,7 @@ This document maps **what is actually wired and verified** versus **alternate en
 
 ### 1.1 GitHub Release automation (not in `run_full_repo_verification`)
 
-**Out of band** on GitHub only: push tag **`v*.*.*`** or **Actions → Release → Run workflow** (input **`tag`**). Workflow **`.github/workflows/release.yml`** runs **`scripts/gh_verify_remote_tag.sh`** (dispatch only: **`jq @uri`** on **`refs/tags/<tag>`** + **`gh api`**, **`gh` stderr** on failure; **`jq`** installed on that step) → checkout → **`dist/`** → **`scripts/gh_create_sample_release.sh`** (**`gh release create`**, **`gh` stderr** on failure). Shared tag shape: **`scripts/azl_release_tag_policy.sh`**. See **`RELEASE_READY.md`** § GitHub Release, **`docs/CI_CD_PIPELINE.md`**, **`docs/ERROR_SYSTEM.md`** (shell helpers).
+**Out of band** on GitHub only: push tag **`v*.*.*`** or **Actions → Release → Run workflow** (input **`tag`**). Workflow **`.github/workflows/release.yml`** runs **`scripts/gh_verify_remote_tag.sh`** (dispatch only: **`jq @uri`** on **`refs/tags/<tag>`** + **`gh api`**, **`gh` stderr** on failure; **`jq`** installed on that step) → checkout → **`scripts/gh_assert_checkout_matches_tag.sh`** (**`HEAD`** = peeled **`refs/tags/<tag>^{commit}`**) → **`dist/`** → **`scripts/gh_create_sample_release.sh`** (**`gh release create`**, **`gh` stderr** on failure). Shared tag shape: **`scripts/azl_release_tag_policy.sh`**. See **`RELEASE_READY.md`** § GitHub Release, **`docs/CI_CD_PIPELINE.md`**, **`docs/ERROR_SYSTEM.md`** (shell helpers + release checkout assertion).
 
 ---
 

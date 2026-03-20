@@ -18,6 +18,7 @@
     "scripts": [
       "scripts/azl_release_tag_policy.sh",
       "scripts/gh_verify_remote_tag.sh",
+      "scripts/gh_assert_checkout_matches_tag.sh",
       "scripts/gh_create_sample_release.sh",
       "scripts/self_check_release_helpers.sh"
     ]
