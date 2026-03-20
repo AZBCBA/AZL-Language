@@ -7,7 +7,12 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  # Manual runs use the branch ref (refs/heads/*) — the release script exits with ERROR unless the
+  # workflow was triggered by a version tag push. Re-run a failed tag workflow from the Actions UI.
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-release:
@@ -25,13 +30,9 @@ jobs:
           # Include runbooks
           cp README.md OPERATIONS.md dist/
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/smoke_test.azl
-            dist/test_canonical_azl.azl
-            dist/README.md
-            dist/OPERATIONS.md
+      - name: Create GitHub Release (gh CLI; no Node 20 composite action)
+        run: |
+          chmod +x scripts/gh_create_sample_release.sh
+          bash scripts/gh_create_sample_release.sh
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
