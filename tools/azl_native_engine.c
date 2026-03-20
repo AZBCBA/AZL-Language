@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <errno.h>
+#include <ctype.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -663,6 +664,63 @@ static int request_json_has_true_flag(const char *body, const char *field) {
   return 0;
 }
 
+static void trim_ascii_whitespace(char *s) {
+  if (!s || s[0] == '\0') return;
+  size_t n = strlen(s);
+  size_t i = 0;
+  while (i < n && isspace((unsigned char)s[i])) i++;
+  if (i > 0) {
+    memmove(s, s + i, n - i + 1);
+    n = strlen(s);
+  }
+  while (n > 0 && isspace((unsigned char)s[n - 1])) {
+    s[n - 1] = '\0';
+    n--;
+  }
+}
+
+static void trim_end_of_text_marker(char *s) {
+  if (!s || s[0] == '\0') return;
+  const char *marker = "[end of text]";
+  size_t ml = strlen(marker);
+  size_t n = strlen(s);
+  while (n > 0 && isspace((unsigned char)s[n - 1])) n--;
+  if (n >= ml && strncmp(s + (n - ml), marker, ml) == 0) {
+    s[n - ml] = '\0';
+  }
+  trim_ascii_whitespace(s);
+}
+
+/* Remove prompt echo / wrappers from chat answers before persisting and returning. */
+static void sanitize_chat_answer(const char *prompt, char *answer, size_t answer_cap) {
+  (void)answer_cap;
+  if (!answer || answer[0] == '\0') return;
+  trim_ascii_whitespace(answer);
+
+  if (prompt && prompt[0] != '\0') {
+    size_t pl = strlen(prompt);
+    if (strncmp(answer, prompt, pl) == 0) {
+      memmove(answer, answer + pl, strlen(answer + pl) + 1);
+    }
+  }
+
+  if (strstr(answer, "System:") && strstr(answer, "Conversation:")) {
+    char *scan = answer;
+    char *last = NULL;
+    while ((scan = strstr(scan, "\nAssistant:")) != NULL) {
+      last = scan;
+      scan += 11;
+    }
+    if (last) memmove(answer, last + 11, strlen(last + 11) + 1);
+  }
+
+  trim_ascii_whitespace(answer);
+  if (strncmp(answer, "Assistant:", 10) == 0) {
+    memmove(answer, answer + 10, strlen(answer + 10) + 1);
+  }
+  trim_end_of_text_marker(answer);
+}
+
 static void handle_gguf_infer(int cfd, const char *req, ssize_t n, EngineState *st) {
   (void)st;
   const char *body_start = strstr(req, "\r\n\r\n");
@@ -904,6 +962,7 @@ static void handle_chat_session(int cfd, const char *req, ssize_t n, EngineState
     write_response(cfd, 502, "Bad Gateway", resp);
     return;
   }
+  sanitize_chat_answer(prompt, answer, sizeof(answer));
   hlen = strlen(sess->history);
   size_t alen = strlen(answer);
   if (hlen + alen + 20 >= sizeof(sess->history)) {
