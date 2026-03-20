@@ -90,7 +90,7 @@ After gates are green on the commit you intend to ship:
 
 1. Create an annotated or lightweight tag matching **`vMAJOR.MINOR.PATCH`** with optional SemVer suffixes, e.g. **`v1.2.3`**, **`v1.2.3-rc.1`**, **`v1.2.3+build.1`** (see **`scripts/gh_create_sample_release.sh`** for the exact pattern).
 2. Push the tag: `git push origin v1.2.3` (example).
-3. **`.github/workflows/release.yml`** runs: prepares **`dist/`** (sample `.azl` + **`README.md`** / **`OPERATIONS.md`**), then **`gh release create`** with **`--verify-tag`**.
+3. **`.github/workflows/release.yml`** runs: prepares **`dist/`** (sample `.azl` + **`README.md`** / **`OPERATIONS.md`**), asserts **`git HEAD`** matches the peeled commit for **`refs/tags/<tag>`** (**`scripts/gh_assert_checkout_matches_tag.sh`**), then **`gh release create`** with **`--verify-tag`**.
 
 **Errors (no silent fallback):** the script exits **2–8** with **`ERROR:`** on stderr for missing **`gh`**, bad/missing env, non-tag **`GITHUB_REF`** (when **`AZL_RELEASE_TAG`** is unset), invalid tag shape, missing **`dist/*`**, existing release for that tag, or **`gh`** failure.
 
