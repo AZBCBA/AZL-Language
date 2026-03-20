@@ -18,6 +18,7 @@
 | Full release sequence | `scripts/run_full_repo_verification.sh` — see [RELEASE_READY.md](../RELEASE_READY.md) |
 | End-to-end connectivity map | [CONNECTIVITY_AUDIT.md](CONNECTIVITY_AUDIT.md) — release-gated stack vs alternate launchers vs optional backends |
 | Changelog | [CHANGELOG.md](../CHANGELOG.md) |
+| GitHub Release (sample bundle assets) | Push tag **`v*.*.*`** → **`.github/workflows/release.yml`** → **`scripts/gh_create_sample_release.sh`** (`gh release create`, **`permissions: contents: write`**; no Node 20 composite action). See [RELEASE_READY.md](../RELEASE_READY.md) § GitHub Release. |
 
 ### 1.2 Interpreter spine (done phases; not full self-host)
 

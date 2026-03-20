@@ -83,3 +83,15 @@ If any gate fails:
 ## CI Requirement
 
 The `native-release-gates` workflow must pass on the release branch before deploy. The consolidated **`test-and-deploy.yml`** workflow also runs the full test suite plus Docker/GHCR and optional staging; see `docs/CI_CD_PIPELINE.md`.
+
+## GitHub Release (sample assets on tag)
+
+After gates are green on the commit you intend to ship:
+
+1. Create an annotated or lightweight tag matching **`vMAJOR.MINOR.PATCH`** with optional SemVer suffixes, e.g. **`v1.2.3`**, **`v1.2.3-rc.1`**, **`v1.2.3+build.1`** (see **`scripts/gh_create_sample_release.sh`** for the exact pattern).
+2. Push the tag: `git push origin v1.2.3` (example).
+3. **`.github/workflows/release.yml`** runs: prepares **`dist/`** (sample `.azl` + **`README.md`** / **`OPERATIONS.md`**), then **`gh release create`** with **`--verify-tag`**.
+
+**Errors (no silent fallback):** the script exits **2–8** with **`ERROR:`** on stderr for missing **`gh`**, bad/missing env, non-tag **`GITHUB_REF`**, invalid tag shape, missing **`dist/*`**, existing release for that tag, or **`gh`** failure. **`workflow_dispatch`** from a **branch** uses **`refs/heads/…`** → the script exits **4**; use a **tag push** or **Re-run jobs** on a workflow run that was triggered by the tag.
+
+**Permissions:** the workflow sets **`contents: write`** for **`GITHUB_TOKEN`** so the release can be created.

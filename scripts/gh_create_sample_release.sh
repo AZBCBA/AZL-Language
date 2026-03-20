@@ -36,8 +36,9 @@ case "${GITHUB_REF}" in
 esac
 
 TAG="${GITHUB_REF_NAME}"
-if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-  echo "ERROR: tag name must match vMAJOR.MINOR.PATCH (digits only in each segment); got: ${TAG}" >&2
+# vMAJOR.MINOR.PATCH with optional SemVer prerelease (-alpha.1) and/or build (+gabc)
+if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+  echo "ERROR: tag name must match vMAJOR.MINOR.PATCH[-prerelease][+build] (e.g. v1.0.0, v1.0.0-rc.1); got: ${TAG}" >&2
   exit 5
 fi
 

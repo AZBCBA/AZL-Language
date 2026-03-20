@@ -11,7 +11,7 @@ This repository’s automation is **bash + native AZL gates** (no Rust toolchain
 | `native-release-gates.yml` | PR + push `main`/`master` | Canonical stack, native gates, legacy blocklist, live verify, `run_all_tests.sh`. |
 | **`azl-ci.yml`** (*AZL CI (all branches)*) | PR + push (all branches) | Installs `ripgrep`/build deps; placeholders + `run_all_tests.sh` + `run_examples.sh`. |
 | `nightly.yml` | Schedule + manual | Sysproxy integration / health checks. |
-| `release.yml` | Tags `v*.*.*` | GitHub Release assets (sample bundles + runbooks) via **`gh release create`** in **`scripts/gh_create_sample_release.sh`** (no **`softprops/action-gh-release`** / Node 20 composite). **`permissions: contents: write`**. **`workflow_dispatch`** from a branch **fails** with **`ERROR`** (only tag pushes create a release; re-run failed jobs from the tag workflow). |
+| `release.yml` | Tags `v*.*.*` | GitHub Release assets (sample bundles + runbooks) via **`gh release create`** in **`scripts/gh_create_sample_release.sh`** (no **`softprops/action-gh-release`** / Node 20 composite). Tag shape: **`vMAJOR.MINOR.PATCH`** plus optional **`-prerelease`** / **`+build`** (see script). **`permissions: contents: write`**. **`workflow_dispatch`** from a branch **fails** with **`ERROR`** (only tag pushes create a release; re-run failed jobs from the tag workflow). |
 
 To save GitHub Actions minutes, consider **disabling or slimming** overlapping workflows once you standardize on `test-and-deploy.yml` + one lightweight gate workflow.
 
