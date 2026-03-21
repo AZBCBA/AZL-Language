@@ -3070,6 +3070,68 @@ if [ "$PCE_C_OUT" != "$PCE_PY_OUT" ]; then
   exit 358
 fi
 
+echo "[gate] F86: C vs Python — execute ast/scope payload + emit execute_complete { result: ::result }"
+EEC="${ROOT_DIR}/azl/tests/p0_semantic_execute_payload_emit_complete.azl"
+set +e
+EEC_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$EEC" boot.entry 2>&1)"
+eec_c_rc=$?
+set -e
+if [ "$eec_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_payload_emit_complete exited $eec_c_rc: $EEC_C_OUT"
+  exit 359
+fi
+if ! printf '%s\n' "$EEC_C_OUT" | awk 'NR==1{if($0!="ast-body")exit 1} NR==2{if($0!="scope-body")exit 1} NR==3{if($0!="EXEC_LINE")exit 1} NR==4{if($0!="EC_INNER")exit 1} NR==5{if($0!="tw-result")exit 1} NR==6{if($0!="P0_SEM_F86_OK")exit 1} END{if(NR!=6)exit 1}'; then
+  echo "ERROR: expected stdout order for execute payload emit complete, got: $EEC_C_OUT"
+  exit 359
+fi
+set +e
+EEC_PY_OUT="$(env -u AZL_INTERPRETER_DAEMON -u AZL_USE_VM AZL_COMBINED_PATH="$EEC" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+eec_py_rc=$?
+set -e
+if [ "$eec_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_payload_emit_complete exited $eec_py_rc: $EEC_PY_OUT"
+  exit 360
+fi
+if [ "$EEC_C_OUT" != "$EEC_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_payload_emit_complete" >&2
+  echo "C:  $EEC_C_OUT" >&2
+  echo "Py: $EEC_PY_OUT" >&2
+  exit 361
+fi
+
+echo "[gate] F87: C vs Python — AZL_USE_VM env off branch ((env or \"\") == \"1\")"
+UVO="${ROOT_DIR}/azl/tests/p0_semantic_execute_use_vm_env_off.azl"
+set +e
+UVO_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$UVO" boot.entry 2>&1)"
+uvo_c_rc=$?
+set -e
+if [ "$uvo_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_use_vm_env_off exited $uvo_c_rc: $UVO_C_OUT"
+  exit 362
+fi
+if ! printf '%s\n' "$UVO_C_OUT" | rg -q '^P0_SEM_USE_VM_OFF_OK$'; then
+  echo "ERROR: expected P0_SEM_USE_VM_OFF_OK (AZL_USE_VM must be unset for F87), got: $UVO_C_OUT"
+  exit 362
+fi
+if ! printf '%s\n' "$UVO_C_OUT" | awk 'NR==1{if($0!="P0_SEM_USE_VM_OFF_OK")exit 1} END{if(NR!=1)exit 1}'; then
+  echo "ERROR: expected single-line stdout for use_vm env off probe, got: $UVO_C_OUT"
+  exit 362
+fi
+set +e
+UVO_PY_OUT="$(env -u AZL_INTERPRETER_DAEMON -u AZL_USE_VM AZL_COMBINED_PATH="$UVO" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+uvo_py_rc=$?
+set -e
+if [ "$uvo_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_use_vm_env_off exited $uvo_py_rc: $UVO_PY_OUT"
+  exit 363
+fi
+if [ "$UVO_C_OUT" != "$UVO_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_use_vm_env_off" >&2
+  echo "C:  $UVO_C_OUT" >&2
+  echo "Py: $UVO_PY_OUT" >&2
+  exit 364
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

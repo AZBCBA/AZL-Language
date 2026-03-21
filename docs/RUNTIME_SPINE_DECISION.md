@@ -74,7 +74,11 @@ the trace today is: **`start_azl_native_mode.sh`** → **`run_enterprise_daemon.
 
 **P0parseemit (parse cache hit + `emit parse_complete`, 2026-03-22):** Hit path + **`emit parse_complete with { ast: ::ast }`**; inner **`listen for "parse_complete"`** reads **`::event.data.ast`**. Gate **F85**: **`azl/tests/p0_semantic_parse_cache_hit_emit_complete.azl`** (exits **356–358**).
 
-**Open next (spine queue):** **`listen for "execute"`** / **`execute_complete`**, **`AZL_USE_VM`** branch shapes, **`::execute_ast`** / VM stubs — **F86+** fixtures + **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** phase **E — Vertical slice: execute**.
+**P0execpayload (execute listener payload + `execute_complete`, 2026-03-22):** **`set ::ast = ::event.data.ast`**, **`set ::scope = ::event.data.scope`**, stub **`::result`**, **`emit execute_complete with { result: ::result }`** — aligns **`listen for "execute"`** ~**130–132**, tree-walk tail ~**159–162** (no **`::execute_ast`** / VM in fixture). Gate **F86**: **`azl/tests/p0_semantic_execute_payload_emit_complete.azl`** (exits **359–361**).
+
+**P0usevmoff (`AZL_USE_VM` env probe, 2026-03-22):** **`set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")`**; miss branch when env unset — ~**141**. Native gate runs C + Python with **`AZL_USE_VM` unset** (**`env -u`**). Gate **F87**: **`azl/tests/p0_semantic_execute_use_vm_env_off.azl`** (exits **362–364**).
+
+**Open next (spine queue):** **`listen for "halt_execution"`**, pre-exec **`if ::ast && ::ast.nodes`** / **`for ::n in ::ast.nodes`**, VM **`::vm_compile_ast`** path — **F88+** when minimal builtins exist; **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** phase **E** depth + phase **F** behavior claim.
 
 **P0.1 execution order (vertical slices):** Maintainership sequence for **`azl_interpreter.azl`** on the semantic spine — parity gates (**A**), real-file **`init`** smoke (**B**), then **tokenize → parse → execute** slices (**C–E**) before claiming full **behavior** (**F**). Single source: **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** § **P0.1 — Long-term execution order** and **[TIER_B_BACKLOG.md](TIER_B_BACKLOG.md)** § **P0.1 execution checklist**.
 

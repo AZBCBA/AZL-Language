@@ -1,0 +1,23 @@
+# Gate F87: `set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")` when env unset / not "1" — `if (::use_vm)` skipped (mirrors `azl_interpreter.azl` ~141; gate runner must not set `AZL_USE_VM=1`).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p87_usevm_probe with { }
+  }
+  behavior {
+    listen for "p87_usevm_probe" {
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "USE_VM_BRANCH_BAD"
+        say "P0_SEM_F87_FAIL"
+        return
+      }
+      say "P0_SEM_USE_VM_OFF_OK"
+    }
+  }
+}

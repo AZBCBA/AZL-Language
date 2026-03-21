@@ -1,0 +1,28 @@
+# Gate F86: `listen for "execute"` tree-walk tail — `set ::ast` / `::scope` from `::event.data.*`, stub `::result`, `emit execute_complete with { result: ::result }` (mirrors `azl_interpreter.azl` ~130–132, ~159–162; no `::execute_ast` / VM).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p86_execute_shape with { ast: "ast-body", scope: "scope-body" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC_INNER"
+      say ::event.data.result
+      say "P0_SEM_F86_OK"
+    }
+    listen for "p86_execute_shape" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      say ::ast
+      say ::scope
+      set ::result = "tw-result"
+      say "EXEC_LINE"
+      emit execute_complete with { result: ::result }
+    }
+  }
+}
