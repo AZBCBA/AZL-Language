@@ -6,7 +6,7 @@
  * Usage: azl_interpreter_minimal <file.azl> [entry_component]
  * Env: AZL_COMBINED_PATH, AZL_ENTRY
  *
- * emit ... with { k: v } binds ::event.data.<k> per queued event (see azl/tests/p0_semantic_*.azl, gates F10-F81).
+ * emit ... with { k: v } binds ::event.data.<k> per queued event (see azl/tests/p0_semantic_*.azl, gates F10-F82).
  * return exits the current listener body (including from inside if { }); return in init skips rest of init.
  */
 

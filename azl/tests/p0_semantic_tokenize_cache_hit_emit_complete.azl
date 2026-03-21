@@ -1,0 +1,32 @@
+# Gate F82: tokenize cache hit + `emit tokenize_complete with { tokens: ::tokens }` (mirrors `azl_interpreter.azl` ~76–82). Nested `listen for "tokenize_complete"` must be registered before the hit-path `emit`.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    set ::cached_tok = "hit-body"
+    emit p82_tok_hit_emit with { }
+  }
+  behavior {
+    listen for "tokenize_complete" {
+      say "TC_INNER"
+      say ::event.data.tokens
+      say "P0_SEM_F82_OK"
+    }
+    listen for "p82_tok_hit_emit" {
+      if (::cached_tok != null) {
+        say "CACHE_HIT"
+        set ::perf.stats.tok_hits = 0
+        set ::perf.stats.tok_hits = ::perf.stats.tok_hits + 1
+        set ::tokens = ::cached_tok
+        emit tokenize_complete with { tokens: ::tokens }
+        return
+      }
+      say "P82_BAD_MISS"
+      say "P0_SEM_F82_FAIL"
+    }
+  }
+}
