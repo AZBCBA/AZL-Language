@@ -1,0 +1,25 @@
+# P0 semantic spine — payload string value in single quotes (F20).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.squote.payload.stub {
+  init {
+  }
+  behavior {
+    listen for "ping" {
+      say ::event.data.msg
+      say "P0_SEMANTIC_SQUOTE_PAYLOAD_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.squote.payload.stub
+    emit ping with { msg: 'sq-val' }
+  }
+}

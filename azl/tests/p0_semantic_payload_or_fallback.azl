@@ -1,0 +1,26 @@
+# P0 semantic spine — missing ::event.data key + or fallback in set RHS (F18).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.payload.or.stub {
+  init {
+  }
+  behavior {
+    listen for "interpret" {
+      set ::x = ::event.data.extra or "fallback"
+      say ::x
+      say "P0_SEMANTIC_PAYLOAD_OR_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.payload.or.stub
+    emit interpret with { trace: "t" }
+  }
+}

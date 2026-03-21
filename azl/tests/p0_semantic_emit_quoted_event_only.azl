@@ -1,0 +1,24 @@
+# P0 semantic spine — emit "event" with no with { } block (F45).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.quoted.emit.only.stub {
+  init {
+  }
+  behavior {
+    listen for "solo" {
+      say "F45_QUOTED_EMIT_NO_WITH_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.quoted.emit.only.stub
+    emit "solo"
+  }
+}

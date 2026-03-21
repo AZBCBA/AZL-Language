@@ -1,0 +1,28 @@
+# P0 semantic spine — set ::u = ::a + ::b string concat (F64).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.set.concat.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      set ::a = "hel"
+      set ::b = "lo"
+      set ::u = ::a + ::b
+      say ::u
+      say "P0_SEMANTIC_SET_GLOBAL_CONCAT_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.set.concat.stub
+    emit e
+  }
+}

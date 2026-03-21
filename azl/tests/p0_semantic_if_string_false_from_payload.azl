@@ -1,0 +1,28 @@
+# P0 semantic spine — if (::flag) skips when ::flag is payload string "false" (F51).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.if.str.false.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      set ::flag = ::event.data.on
+      if (::flag) {
+        say "F51_BAD"
+      }
+      say "P0_SEMANTIC_IF_STRING_FALSE_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.if.str.false.stub
+    emit e with { on: "false" }
+  }
+}

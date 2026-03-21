@@ -1,0 +1,28 @@
+# P0 semantic spine — two listen for same event: first registered wins (F30).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.dup.listener.stub {
+  init {
+  }
+  behavior {
+    listen for "dup" {
+      say "FIRST"
+    }
+    listen for "dup" {
+      say "SECOND"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.dup.listener.stub
+    emit dup
+    say "P0_SEMANTIC_FIRST_LISTENER_OK"
+  }
+}

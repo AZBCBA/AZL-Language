@@ -35,6 +35,7 @@ See **`docs/PROJECT_COMPLETION_STATEMENT.md`** (Tier A vs Tier B roadmap).
 
 **Or** run in this exact order:
 
+0. `bash scripts/verify_documentation_pieces.sh --promoted-only` — **`release/doc_verification_pieces.json`**; see **`docs/INTEGRATION_VERIFY.md`**
 1. `bash scripts/enforce_canonical_stack.sh`
 2. `bash scripts/check_azl_native_gates.sh` — **gate 0** runs **`scripts/self_check_release_helpers.sh`** (release helper **`bash -n`**, **`azl_release_tag_policy`** invariants, **`release/native/manifest.json`** via **`jq`** + **`gates[]` / `github_release`** paths on disk; needs **`rg`** + **`jq`**).
 3. `bash scripts/enforce_legacy_entrypoint_blocklist.sh`
@@ -45,7 +46,7 @@ All commands must pass with exit code `0`.
 
 ## Contributor quick bar (subset of release)
 
-For a fast, scripted check that still exercises **native gates** (F2/F3/G/H, engine build) and the **live** `GET /api/llm/capabilities` probe:
+For a fast, scripted check that still exercises **native gates** (F2–F67, G, G2, H, engine build) and the **live** `GET /api/llm/capabilities` probe:
 
 ```bash
 bash scripts/verify_azl_strength_bar.sh

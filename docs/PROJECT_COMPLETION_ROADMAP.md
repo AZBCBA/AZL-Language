@@ -2,7 +2,11 @@
 
 This is the **honest** map from **today’s repository** to the **contract goals** in [AZL_NATIVE_RUNTIME_CONTRACT.md](AZL_NATIVE_RUNTIME_CONTRACT.md) and the **spine decision** in [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md). “Finishing the whole project” is **phased**; some layers depend on others.
 
+**Strategic consensus (vision, compression policy, research wedges, phased plan):** [AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md](AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md) — read this **before** starting new initiatives so narrative and execution stay aligned.
+
 **Not the same as “shipping complete”:** when the **native release profile** is done for release purposes, see [PROJECT_COMPLETION_STATEMENT.md](PROJECT_COMPLETION_STATEMENT.md) **Tier A** and `scripts/verify_native_release_profile_complete.sh`. This roadmap is **Tier B** — language/platform depth beyond that bar.
+
+**Actionable queue (IDs, acceptance hints):** [TIER_B_BACKLOG.md](TIER_B_BACKLOG.md).
 
 ## Layer 0 — Done / continuously verified
 
@@ -20,6 +24,70 @@ This is the **honest** map from **today’s repository** to the **contract goals
 - `AZL_RUNTIME_SPINE=c_minimal` (default): `scripts/azl_c_interpreter_runtime.sh` → `azl-interpreter-minimal` (C).
 - `AZL_RUNTIME_SPINE=azl_interpreter` or `semantic`: `scripts/azl_azl_interpreter_runtime.sh` → `tools/azl_runtime_spine_host.py` → **`tools/azl_semantic_engine/`** (`minimal_runtime.py`), a **Python** executor with **execution parity** to the C minimal contract (say / set / emit / link / component init+behavior / quoted `listen for`). **Gate F2** in `check_azl_native_gates.sh` asserts **byte-identical stdout** vs C on `azl/tests/c_minimal_link_ping.azl`.
 - **Gate F3:** `azl/tests/p0_semantic_interpreter_slice.azl` — C vs Python **byte parity** on interpreter **`init`** prefix including **`.toInt()`** on parenthesized env/or, dotted **`::perf.stats`** / **`::perf.expr_cache`**, `set []` / `{ }`, `link`, `say`; `scripts/run_semantic_interpreter_slice.sh`.
+- **Gate F4:** `azl/tests/p0_nested_listen_emit_chain.azl` — nested **`listen`** registered during a listener body, then **`emit`** drains the queue (**`process_events`** from **`exec_block`**) so chained handlers match the **`azl_interpreter.azl`** interpret→downstream pattern; C vs Python **byte parity**.
+- **Gate F5:** `azl/tests/p0_semantic_var_alias.azl` — **`set ::mirror = ::seed`** (copy global) + **`say ::mirror`**; C vs Python **byte parity**.
+- **Gate F6:** `azl/tests/p0_semantic_expr_plus_chain.azl` — **`+`** in expressions, **`::var + n`**, **`5 == 2 + 3`**; C vs Python **byte parity**.
+- **Gate F7:** `azl/tests/p0_semantic_dotted_counter.azl` — dotted global **`::perf.stats.tok_hits`** with **`+`** increments; C vs Python **byte parity**.
+- **Gate F8:** `azl/tests/p0_semantic_behavior_interpret_listen.azl` — **`behavior`** + **`listen for "interpret"`** + **`emit interpret`** (no payload); C vs Python **byte parity**.
+- **Gate F9:** `azl/tests/p0_semantic_behavior_listen_then.azl` — same as F8 with explicit **`then`** before **`{`**; C vs Python **byte parity**.
+- **Gate F10:** `azl/tests/p0_semantic_emit_event_payload.azl` — **`emit … with { key: "value" }`** binds **`::event.data.<key>`** for the listener body; C vs Python **byte parity**.
+- **Gate F11:** `azl/tests/p0_semantic_emit_multi_payload.azl` — **`emit … with { a: "…", b: "…" }`** (multi-key payload); C vs Python **byte parity**.
+- **Gate F12:** `azl/tests/p0_semantic_emit_queued_payloads.azl` — two **`emit … with`** in one **`init`**, distinct events and payloads; C vs Python **byte parity**.
+- **Gate F13:** `azl/tests/p0_semantic_payload_expr_chain.azl` — **`::event.data.*`** on **`set`** RHS with **`+`**; C vs Python **byte parity**.
+- **Gate F14:** `azl/tests/p0_semantic_payload_if_branch.azl` — **`if`** condition compares **`::event.data.*`** while payload is active; C vs Python **byte parity**.
+- **Gate F15:** `azl/tests/p0_semantic_nested_emit_payload.azl` — nested **`emit`** + inner **`with`**; outer payload keys preserved across inner dispatch when distinct; C vs Python **byte parity**.
+- **Gate F16:** `azl/tests/p0_semantic_quoted_emit_with_payload.azl` — quoted **`emit "…" with { … }`**; C vs Python **byte parity**.
+- **Gate F17:** `azl/tests/p0_semantic_payload_ne_branch.azl` — **`!=`** on **`::event.data.*`** in **`if`**; C vs Python **byte parity**.
+- **Gate F18:** `azl/tests/p0_semantic_payload_or_fallback.azl` — **`or`** fallback when **`::event.data.*`** is unset; C vs Python **byte parity**.
+- **Gate F19:** `azl/tests/p0_semantic_emit_empty_with.azl` — **`emit … with { }`**; C vs Python **byte parity**.
+- **Gate F20:** `azl/tests/p0_semantic_payload_single_quote.azl` — single-quoted payload values; C vs Python **byte parity**.
+- **Gate F21:** `azl/tests/p0_semantic_payload_key_collide.azl` — same payload key **`trace`** on nested **`emit`**; clear semantics after inner; C vs Python **byte parity**.
+- **Gate F22:** `azl/tests/p0_semantic_nested_listen_emit_payload.azl` — dynamic **`listen`** inside listener + **`emit … with { … }`**; C vs Python **byte parity**.
+- **Gate F23:** `azl/tests/p0_semantic_nested_listen_then_payload.azl` — nested **`listen … then`** + **`emit with`**; C vs Python **byte parity**.
+- **Gate F24:** `azl/tests/p0_semantic_payload_numeric_value.azl` — **`with`** payload bare integer; C vs Python **byte parity**.
+- **Gate F25:** `azl/tests/p0_semantic_link_in_listener.azl` — **`link`** from listener body; C vs Python **byte parity**.
+- **Gate F26:** `azl/tests/p0_semantic_payload_bool_true.azl` — payload value **`true`**; C vs Python **byte parity**.
+- **Gate F27:** `azl/tests/p0_semantic_nested_multikey_payload.azl` — nested **`listen`** + inner **`emit … with { a:, b: }`**; C vs Python **byte parity**.
+- **Gate F28:** `azl/tests/p0_semantic_payload_bool_false.azl` — payload value **`false`**; C vs Python **byte parity**.
+- **Gate F29:** `azl/tests/p0_semantic_payload_null_value.azl` — payload token **`null`** (literal line **`null`**); C vs Python **byte parity**.
+- **Gate F30:** `azl/tests/p0_semantic_first_matching_listener.azl` — duplicate **`listen for`** same event, first wins; C vs Python **byte parity**.
+- **Gate F31:** `azl/tests/p0_semantic_payload_float_value.azl` — payload **`3.14`**; C vs Python **byte parity**.
+- **Gate F32:** `azl/tests/p0_semantic_payload_missing_eq_null.azl` — absent **`::event.data.*`** **`== null`**; C vs Python **byte parity**.
+- **Gate F33:** `azl/tests/p0_semantic_payload_big_int.azl` — payload **`65535`**; C vs Python **byte parity**.
+- **Gate F34:** `azl/tests/p0_semantic_set_from_payload.azl` — **`set ::… = ::event.data.*`**; C vs Python **byte parity**.
+- **Gate F35:** `azl/tests/p0_semantic_payload_present_ne_null.azl` — present field **`!= null`**; C vs Python **byte parity**.
+- **Gate F36:** `azl/tests/p0_semantic_payload_quoted_negative.azl` — payload **`"-7"`**; C vs Python **byte parity**.
+- **Gate F37:** `azl/tests/p0_semantic_emit_from_listener_chain.azl` — **`emit`** inside listener; nested stdout order; C vs Python **byte parity**.
+- **Gate F38:** `azl/tests/p0_semantic_payload_trailing_colon_key.azl` — **`traceid:`** key token; C vs Python **byte parity**.
+- **Gate F39:** `azl/tests/p0_semantic_if_true_literal_listener.azl` — **`if (true)`** in listener; C vs Python **byte parity**.
+- **Gate F40:** `azl/tests/p0_semantic_if_false_literal_listener.azl` — **`if (false)`** skips branch; C vs Python **byte parity**.
+- **Gate F41:** `azl/tests/p0_semantic_listen_in_init_emit.azl` — **`listen`** in **`init`** then **`emit`**; C vs Python **byte parity**.
+- **Gate F42:** `azl/tests/p0_semantic_payload_squote_space.azl` — single-quoted payload with space; C vs Python **byte parity**.
+- **Gate F43:** `azl/tests/p0_semantic_sequential_payload_events.azl` — two **`emit … with`** distinct events/payloads; C vs Python **byte parity**.
+- **Gate F44:** `azl/tests/p0_semantic_if_one_literal_listener.azl` — **`if (1)`**; C vs Python **byte parity**.
+- **Gate F45:** `azl/tests/p0_semantic_emit_quoted_event_only.azl` — **`emit "…"`** without **`with`**; C vs Python **byte parity**.
+- **Gate F46:** `azl/tests/p0_semantic_say_unset_blank_line.azl` — **`say`** unset **`::event.data.*`** → blank line; C vs Python **byte parity**.
+- **Gate F47:** `azl/tests/p0_semantic_if_global_from_payload.azl` — **`set ::flag`** from payload then **`if (::flag)`**; C vs Python **byte parity**.
+- **Gate F48:** `azl/tests/p0_semantic_if_zero_literal_listener.azl` — **`if (0)`** skips branch; C vs Python **byte parity**.
+- **Gate F49:** `azl/tests/p0_semantic_emit_unquoted_event_only.azl` — **`emit bare`** without **`with`**; C vs Python **byte parity**.
+- **Gate F50:** `azl/tests/p0_semantic_say_empty_string_global.azl` — **`say ::empty`** with **`""`**; C vs Python **byte parity**.
+- **Gate F51:** `azl/tests/p0_semantic_if_string_false_from_payload.azl` — string **`"false"`** not truthy in **`if (::flag)`**; C vs Python **byte parity**.
+- **Gate F52:** `azl/tests/p0_semantic_if_var_true_string.azl` — **`set ::t = "true"`** then **`if (::t)`**; C vs Python **byte parity**.
+- **Gate F53:** `azl/tests/p0_semantic_same_event_twice_payload.azl` — same event name twice, different payloads, queue order; C vs Python **byte parity**.
+- **Gate F54:** `azl/tests/p0_semantic_listen_in_boot_entry.azl` — **`listen`** + **`emit`** in **`::boot.entry`** **`init`**; C vs Python **byte parity**.
+- **Gate F55:** `azl/tests/p0_semantic_if_var_one_string.azl` — **`set ::t = "1"`** then **`if (::t)`**; C vs Python **byte parity**.
+- **Gate F56:** `azl/tests/p0_semantic_if_var_zero_string.azl` — string **`"0"`** not truthy in **`if (::t)`**; C vs Python **byte parity**.
+- **Gate F57:** `azl/tests/p0_semantic_if_var_empty_string.azl` — empty string not truthy in **`if (::t)`**; C vs Python **byte parity**.
+- **Gate F58:** `azl/tests/p0_semantic_cross_component_first_listener.azl` — duplicate event across two components: first **`link`** wins; C vs Python **byte parity**.
+- **Gate F59:** `azl/tests/p0_semantic_double_emit_same_event.azl` — two bare **`emit`** same name, listener runs twice; C vs Python **byte parity**.
+- **Gate F60:** `azl/tests/p0_semantic_if_or_empty_then_one_string.azl` — **`if (::a or "1")`** with empty **`::a`**; C vs Python **byte parity**.
+- **Gate F61:** `azl/tests/p0_semantic_if_global_eq_globals.azl` — **`if (::a == ::b)`** on equal string globals; C vs Python **byte parity**.
+- **Gate F62:** `azl/tests/p0_semantic_if_global_ne_globals.azl` — **`if (::a != ::b)`** when globals differ; C vs Python **byte parity**.
+- **Gate F63:** `azl/tests/p0_semantic_if_global_ne_equal_skip.azl` — **`if (::a != ::b)`** skipped when equal; C vs Python **byte parity**.
+- **Gate F64:** `azl/tests/p0_semantic_set_global_concat_globals.azl` — **`set ::u = ::a + ::b`** string concat; C vs Python **byte parity**.
+- **Gate F65:** `azl/tests/p0_semantic_if_literal_eq_strings.azl` — **`if ("x" == "x")`**; C vs Python **byte parity**.
+- **Gate F66:** `azl/tests/p0_semantic_if_literal_ne_strings.azl` — **`if ("a" != "b")`**; C vs Python **byte parity**.
+- **Gate F67:** `azl/tests/p0_semantic_set_triple_concat_mixed.azl` — **`set ::out = "pre" + ::mid + "post"`**; C vs Python **byte parity**.
 - **Gate H:** `scripts/verify_p0_interpreter_tokenizer_boundary.sh` — tokenizer on interpreter prefix, **`component ::azl.interpreter` anchor**, and **`{` / `}` token balance** on the full file (structural milestone; not execution).
 
 **Still open (full P0):**

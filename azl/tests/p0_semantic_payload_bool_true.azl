@@ -1,0 +1,25 @@
+# P0 semantic spine — payload value true (bare boolean) (F26).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.payload.bool.true.stub {
+  init {
+  }
+  behavior {
+    listen for "b" {
+      say ::event.data.flag
+      say "P0_SEMANTIC_PAYLOAD_BOOL_TRUE_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.payload.bool.true.stub
+    emit b with { flag: true }
+  }
+}

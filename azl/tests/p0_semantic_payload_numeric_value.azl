@@ -1,0 +1,25 @@
+# P0 semantic spine — payload value as bare integer token (F24).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.payload.numeric.stub {
+  init {
+  }
+  behavior {
+    listen for "n" {
+      say ::event.data.count
+      say "P0_SEMANTIC_PAYLOAD_NUM_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.payload.numeric.stub
+    emit n with { count: 42 }
+  }
+}

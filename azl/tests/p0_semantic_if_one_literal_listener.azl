@@ -1,0 +1,27 @@
+# P0 semantic spine — if (1) is true (same as true/1 condition rule) (F44).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.if.one.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      if (1) {
+        say "F44_ONE_BRANCH"
+      }
+      say "P0_SEMANTIC_IF_ONE_LITERAL_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.if.one.stub
+    emit e
+  }
+}

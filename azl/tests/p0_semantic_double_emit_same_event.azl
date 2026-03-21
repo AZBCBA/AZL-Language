@@ -1,0 +1,26 @@
+# P0 semantic spine — two emit same bare event, listener runs twice (F59).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.double.emit.stub {
+  init {
+  }
+  behavior {
+    listen for "tick" {
+      say "F59_TICK_HIT"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.double.emit.stub
+    emit tick
+    emit tick
+    say "P0_SEMANTIC_DOUBLE_EMIT_SAME_OK"
+  }
+}

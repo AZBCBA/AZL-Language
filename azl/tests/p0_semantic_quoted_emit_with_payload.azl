@@ -1,0 +1,25 @@
+# P0 semantic spine — quoted event name: emit "ev" with { … } (F16).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.quoted.emit.stub {
+  init {
+  }
+  behavior {
+    listen for "tick" {
+      say ::event.data.id
+      say "P0_SEMANTIC_QUOTED_EMIT_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.quoted.emit.stub
+    emit "tick" with { id: "quoted-id" }
+  }
+}

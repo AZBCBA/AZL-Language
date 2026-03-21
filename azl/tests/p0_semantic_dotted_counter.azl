@@ -1,0 +1,22 @@
+# P0 semantic spine — dotted ::global.name paths (interpreter-shaped perf counters).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.dotted.counter {
+  init {
+    set ::perf.stats.tok_hits = 0
+    set ::perf.stats.tok_hits = ::perf.stats.tok_hits + 1
+    set ::perf.stats.tok_hits = ::perf.stats.tok_hits + 2
+    say ::perf.stats.tok_hits
+    say "P0_SEMANTIC_DOTTED_COUNTER_OK"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::p0.dotted.counter
+  }
+}

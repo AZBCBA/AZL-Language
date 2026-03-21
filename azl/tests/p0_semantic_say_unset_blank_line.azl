@@ -1,0 +1,25 @@
+# P0 semantic spine — say ::unset path → blank line then continues (F46).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.say.unset.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      say ::event.data.absent_key_for_say
+      say "P0_SEMANTIC_SAY_UNSET_BLANK_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.say.unset.stub
+    emit e
+  }
+}

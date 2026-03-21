@@ -1,0 +1,29 @@
+# P0 semantic spine — nested listen for "…" then { } inside listener + emit with payload (F23).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.nested.listen.then.payload.stub {
+  init {
+  }
+  behavior {
+    listen for "outer" {
+      listen for "child" then {
+        say ::event.data.tag
+        say "P23_THEN_CHILD_OK"
+      }
+      emit child with { tag: "then-payload" }
+      say "P0_SEMANTIC_NESTED_LISTEN_THEN_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.nested.listen.then.payload.stub
+    emit outer
+  }
+}

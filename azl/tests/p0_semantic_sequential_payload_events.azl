@@ -1,0 +1,29 @@
+# P0 semantic spine — two emits, two listeners, distinct payload values (F43).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.seq.payload.stub {
+  init {
+  }
+  behavior {
+    listen for "first" {
+      say ::event.data.v
+    }
+    listen for "second" {
+      say ::event.data.v
+      say "P0_SEMANTIC_TWO_EVENTS_TWO_PAYLOADS_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.seq.payload.stub
+    emit first with { v: "one" }
+    emit second with { v: "two" }
+  }
+}

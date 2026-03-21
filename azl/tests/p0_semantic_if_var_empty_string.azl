@@ -1,0 +1,28 @@
+# P0 semantic spine — if (::t) skips when ::t holds empty string (F57).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.if.var.empty.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      set ::t = ""
+      if (::t) {
+        say "F57_BAD"
+      }
+      say "P0_SEMANTIC_IF_VAR_EMPTY_STRING_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.if.var.empty.stub
+    emit e
+  }
+}

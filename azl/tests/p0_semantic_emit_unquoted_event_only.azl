@@ -1,0 +1,24 @@
+# P0 semantic spine — emit bare identifier event name, no with { } (F49).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.emit.unquoted.only.stub {
+  init {
+  }
+  behavior {
+    listen for "bare" {
+      say "F49_UNQUOTED_EMIT_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.emit.unquoted.only.stub
+    emit bare
+  }
+}

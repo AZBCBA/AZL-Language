@@ -1,0 +1,25 @@
+# P0 semantic spine — behavior listen with explicit `then` (alternate surface vs F8).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.behavior.listen.then.stub {
+  init {
+  }
+  behavior {
+    listen for "interpret" then {
+      say "with-then"
+      say "P0_SEMANTIC_LISTEN_THEN_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.behavior.listen.then.stub
+    emit interpret
+  }
+}

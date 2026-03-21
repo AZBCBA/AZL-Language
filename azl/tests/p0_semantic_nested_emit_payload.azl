@@ -1,0 +1,31 @@
+# P0 semantic spine — listener emit + inner payload; outer ::event.data.* survives on other keys (F15).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.nested.emit.payload.stub {
+  init {
+  }
+  behavior {
+    listen for "outer" {
+      emit inner with { trace: "nested-val" }
+      say ::event.data.stage
+      say "P15_AFTER_INNER"
+      say "P0_SEMANTIC_NESTED_EMIT_OK"
+    }
+    listen for "inner" {
+      say ::event.data.trace
+      say "P15_INNER_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.nested.emit.payload.stub
+    emit outer with { stage: "hold" }
+  }
+}

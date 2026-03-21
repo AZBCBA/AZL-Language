@@ -1,0 +1,27 @@
+# P0 semantic spine — if ("a" == "b") with two string literals (F65).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.if.lit.eq.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      if ("x" == "x") {
+        say "F65_LITERAL_EQ_BRANCH"
+      }
+      say "P0_SEMANTIC_IF_LITERAL_EQ_STRINGS_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.if.lit.eq.stub
+    emit e
+  }
+}

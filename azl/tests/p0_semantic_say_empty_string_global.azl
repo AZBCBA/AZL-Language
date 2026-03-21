@@ -1,0 +1,26 @@
+# P0 semantic spine — say ::var when var is empty string → blank line (F50).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.say.empty.global.stub {
+  init {
+    set ::empty = ""
+  }
+  behavior {
+    listen for "e" {
+      say ::empty
+      say "P0_SEMANTIC_SAY_EMPTY_STRING_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.say.empty.global.stub
+    emit e
+  }
+}

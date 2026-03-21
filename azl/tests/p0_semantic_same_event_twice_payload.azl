@@ -1,0 +1,26 @@
+# P0 semantic spine — two emit same event name, different payloads, queue order (F53).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.same.ev.twice.stub {
+  init {
+  }
+  behavior {
+    listen for "x" {
+      say ::event.data.a
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.same.ev.twice.stub
+    emit x with { a: "first" }
+    emit x with { a: "second" }
+    say "P0_SEMANTIC_SAME_EVENT_TWICE_OK"
+  }
+}

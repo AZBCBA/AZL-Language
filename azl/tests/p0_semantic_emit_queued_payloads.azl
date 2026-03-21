@@ -1,0 +1,31 @@
+# P0 semantic spine — two sequential emit + with { … } in same init; distinct payloads per event (F12).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.emit.queued.payloads.stub {
+  init {
+  }
+  behavior {
+    listen for "first" {
+      say ::event.data.trace
+      say "P12_AFTER_FIRST"
+    }
+    listen for "second" {
+      say ::event.data.trace
+      say "P12_AFTER_SECOND"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.emit.queued.payloads.stub
+    emit first with { trace: "spine-f12a" }
+    emit second with { trace: "spine-f12b" }
+    say "P0_SEMANTIC_EMIT_QUEUED_OK"
+  }
+}

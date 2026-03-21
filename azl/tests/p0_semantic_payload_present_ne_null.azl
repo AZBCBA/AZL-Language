@@ -1,0 +1,27 @@
+# P0 semantic spine — present payload field: != null is true (F35).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.payload.pres.ne.null.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      if (::event.data.a != null) {
+        say "F35_PRES_NOT_NULL"
+      }
+      say "P0_SEMANTIC_PAYLOAD_NE_NULL_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.payload.pres.ne.null.stub
+    emit e with { a: "hi" }
+  }
+}

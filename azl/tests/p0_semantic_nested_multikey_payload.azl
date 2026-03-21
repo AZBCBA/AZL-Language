@@ -1,0 +1,30 @@
+# P0 semantic spine — nested listen + emit inner with two comma-separated keys (F27).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.nested.multikey.stub {
+  init {
+  }
+  behavior {
+    listen for "outer" {
+      listen for "inner" {
+        say ::event.data.a
+        say ::event.data.b
+        say "P27_INNER_OK"
+      }
+      emit inner with { a: "one", b: "two" }
+      say "P0_SEMANTIC_NESTED_MULTIKEY_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.nested.multikey.stub
+    emit outer
+  }
+}

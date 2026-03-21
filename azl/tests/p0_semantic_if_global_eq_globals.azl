@@ -1,0 +1,29 @@
+# P0 semantic spine — if (::a == ::b) on two equal string globals (F61).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.if.eq.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      set ::a = "x"
+      set ::b = "x"
+      if (::a == ::b) {
+        say "F61_EQ_TRUE_BRANCH"
+      }
+      say "P0_SEMANTIC_IF_GLOBAL_EQ_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.if.eq.stub
+    emit e
+  }
+}

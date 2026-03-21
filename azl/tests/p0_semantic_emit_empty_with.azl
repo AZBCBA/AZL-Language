@@ -1,0 +1,25 @@
+# P0 semantic spine — emit ev with { } (empty payload object) (F19).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.empty.with.stub {
+  init {
+  }
+  behavior {
+    listen for "ping" {
+      say "after-empty-payload"
+      say "P0_SEMANTIC_EMPTY_WITH_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.empty.with.stub
+    emit ping with { }
+  }
+}

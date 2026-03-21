@@ -1,0 +1,36 @@
+# P0 semantic spine — same event in two components: first linked wins (F58).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.cross.first.stub {
+  init {
+  }
+  behavior {
+    listen for "shared" {
+      say "F58_FIRST_LINKED"
+    }
+  }
+}
+
+component ::p0.cross.second.stub {
+  init {
+  }
+  behavior {
+    listen for "shared" {
+      say "F58_SECOND_BAD"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.cross.first.stub
+    link ::p0.cross.second.stub
+    emit shared
+    say "P0_SEMANTIC_CROSS_COMP_FIRST_OK"
+  }
+}

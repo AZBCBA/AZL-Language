@@ -1,0 +1,26 @@
+# P0 semantic spine — emit with { … } multiple keys (comma-separated) → ::event.data.* (F11).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.emit.multi.payload.stub {
+  init {
+  }
+  behavior {
+    listen for "interpret" {
+      say ::event.data.trace
+      say ::event.data.job
+      say "P0_SEMANTIC_EMIT_MULTI_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.emit.multi.payload.stub
+    emit interpret with { trace: "spine-f11a", job: "spine-f11b" }
+  }
+}

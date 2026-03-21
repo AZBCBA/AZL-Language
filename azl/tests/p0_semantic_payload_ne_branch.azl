@@ -1,0 +1,27 @@
+# P0 semantic spine — if ::event.data.* != literal (F17).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.payload.ne.stub {
+  init {
+  }
+  behavior {
+    listen for "interpret" {
+      if ::event.data.mode != "loose" {
+        say "not-loose"
+      }
+      say "P0_SEMANTIC_PAYLOAD_NE_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.payload.ne.stub
+    emit interpret with { mode: "strict" }
+  }
+}

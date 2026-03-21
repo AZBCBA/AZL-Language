@@ -1,0 +1,28 @@
+# P0 semantic spine — if (::a or "1") when ::a is empty string (F60).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.if.or.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      set ::a = ""
+      if (::a or "1") {
+        say "F60_OR_TRUE_BRANCH"
+      }
+      say "P0_SEMANTIC_IF_OR_EMPTY_ONE_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.if.or.stub
+    emit e
+  }
+}

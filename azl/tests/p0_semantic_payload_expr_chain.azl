@@ -1,0 +1,26 @@
+# P0 semantic spine — ::event.data.* in set RHS (+ chain) while payload is active (F13).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.payload.expr.stub {
+  init {
+  }
+  behavior {
+    listen for "interpret" {
+      set ::out = ::event.data.trace + "-sfx"
+      say ::out
+      say "P0_SEMANTIC_PAYLOAD_EXPR_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.payload.expr.stub
+    emit interpret with { trace: "spine-f13" }
+  }
+}

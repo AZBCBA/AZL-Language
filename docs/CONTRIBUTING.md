@@ -1,6 +1,15 @@
 # Contributing to AZL Language
 
+**Read [AGENTS.md](../AGENTS.md) first.**
+
 Thank you for contributing to **AZL** — the component-based, event-driven programming language. This project is **AZL language**, not Java, TypeScript, or any other language. Please follow AZL's rules and architecture.
+
+## Before you edit (maintainers + AI)
+
+1. **[AGENTS.md](../AGENTS.md)** — entry order for assistants and continuity.  
+2. **[AI_MAINTAINER_CONTINUITY_HANDOFF.md](AI_MAINTAINER_CONTINUITY_HANDOFF.md)** — reality vs aspiration; do not claim shipped what the spine trace does not show.  
+3. **[AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md](AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md)** — phased plan (native/AOT north star, literal vs serving artifacts).  
+4. **[RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md)** — what **actually** runs on the default native path today.
 
 ## Repository layout (native-first AZL)
 
@@ -11,12 +20,13 @@ Thank you for contributing to **AZL** — the component-based, event-driven prog
 
 There is **no** `src/lib.rs` or `Cargo.toml` at repo root. The release runtime path is native-first AZL.
 
+External **Rust** or **dataset** trees on other disks are indexed in [RELATED_WORKSPACES.md](RELATED_WORKSPACES.md) and [migration/INVENTORY.csv](../migration/INVENTORY.csv). They are **out of scope** for default PR verification (**`make verify`**).
+
 ## Research and capability libraries
 
 Subtrees such as `azl/quantum/`, `azl/memory/`, `azl/neural/`, and `azl/ffi/` contain **event-driven modules** that may not be executed by the **default native runtime child** (minimal C / Python subset on the enterprise combined file). Before treating a file as “what AZL does in production,” read:
 
-- [AZL_GPU_NEURAL_QUANTUM_INVENTORY.md](AZL_GPU_NEURAL_QUANTUM_INVENTORY.md) — GPU/device/neural/quantum **file map** and mathematics stack audit (§8)
-- [DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md](DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md) — symbolic vs implemented quantum/memory claims
+- [AZL_GPU_NEURAL_SURFACE_MAP.md](AZL_GPU_NEURAL_SURFACE_MAP.md) — **Whole-field semantics** (what “quantum” means in-repo, §0) + GPU / neural / LHA3 / `azl/quantum/` **file map**
 - [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md) — which stack owns semantics on the canonical command
 
 Refresh local counts: `bash scripts/audit_gpu_neural_quantum_surfaces.sh`
@@ -63,9 +73,9 @@ That runs **`check_azl_native_gates.sh`**, **`verify_native_runtime_live.sh`**, 
 
 **`bash scripts/check_azl_native_gates.sh`** is the main native gate runner. Install on the host (examples for Debian/Ubuntu):
 
-- **`ripgrep`** (`rg`), **`jq`**, **`python3`**, **`gcc`**, **`curl`** — required for gate 0 ( **`self_check_release_helpers.sh`** ), F2/F3 parity, engine build, and live verify scripts you may run afterward.
+- **`ripgrep`** (`rg`), **`jq`**, **`python3`**, **`gcc`**, **`curl`** — required for gate 0 ( **`self_check_release_helpers.sh`** ), F2–F67 parity, literal codec round-trip, engine build, and live verify scripts you may run afterward.
 
-**Numeric exits (no silent failures):** full tables live in **[ERROR_SYSTEM.md](ERROR_SYSTEM.md)** under **§ Shell helpers** (release/`verify_*` scripts), **§ Native gates (`check_azl_native_gates.sh`)** ( **10–31** + gate 0 / G / H notes), **§ Runtime spine contract** ( **90–96** ), **§ Strength bar**, and **§ Release checkout assertion** (`gh_assert_checkout_matches_tag.sh`). Use the printed **`ERROR:`** / **`ERROR[...]`** lines first; the doc maps codes to meaning.
+**Numeric exits (no silent failures):** full tables live in **[ERROR_SYSTEM.md](ERROR_SYSTEM.md)** under **§ Shell helpers** (release/`verify_*` scripts), **§ Native gates (`check_azl_native_gates.sh`)** (parity **F2–F67** and engine rows **10–285** — e.g. **59** = F9 C↔Python stdout mismatch, **not** **`verify_native_runtime_live.sh`** **69**; **111–125** = F10–F14; **126–137** = F15–F18; **138–143** = F19–F20; **144–146** = F21; **147–149** = F22; **150–158** = F23–F25; **159–167** = F26–F28; **168–176** = F29–F31; **177–188** = F32–F35; **189–200** = F36–F39; **201–212** = F40–F43; **213–224** = F44–F47; **225–236** = F48–F51; **237–248** = F52–F55; **249–257** = F56–F58; **258–266** = F59–F61; **267–269** = F62; **270** / **272** / **273** = F63 ( **271** skipped — literal codec ); **274–276** = F64; **277–285** = F65–F67; **97–100** = G2; gate **0** propagates **40–58**; **G** / **H** as in that section), **§ Runtime spine contract** ( **90–96** ), **§ Semantic spine owner** ( **92**, **97–100** ), **§ Strength bar**, and **§ Release checkout assertion** (`gh_assert_checkout_matches_tag.sh`). Use the printed **`ERROR:`** / **`ERROR[...]`** lines first; the doc maps codes to meaning.
 
 ## GitHub Releases (maintainers)
 
@@ -90,7 +100,7 @@ Publishing sample assets to a **GitHub Release** is **not** part of `run_full_re
 2. Create a feature branch (`git checkout -b feature/your-feature`).
 3. Make changes; update specs/docs under `docs/` when changing behavior.
 4. Add or adjust tests under `azl/testing/` and runtime gate scripts.
-5. Ensure the project runs — **`bash scripts/run_full_repo_verification.sh`** (or `RUN_OPTIONAL_BENCHES=0` for CI-style without LLM benches), or individually: `scripts/run_tests.sh`, `scripts/run_all_tests.sh`, `scripts/verify_native_runtime_live.sh`, `scripts/verify_enterprise_native_http_live.sh`. **Declaring native release profile complete (maintainers):** **`docs/PROJECT_COMPLETION_STATEMENT.md`**, **`make native-release-profile-complete`**.
+5. Ensure the project runs — **one command:** **`make verify`** (same as `RUN_OPTIONAL_BENCHES=0 bash scripts/run_full_repo_verification.sh` — see **`docs/INTEGRATION_VERIFY.md`**; step **0** runs promoted **doc pieces** from **`release/doc_verification_pieces.json`**). **`make verify-doc-pieces`** — every manifest entry. Or full script with optional benches: **`bash scripts/run_full_repo_verification.sh`**, or individually: `scripts/run_tests.sh`, `scripts/run_all_tests.sh`, `scripts/verify_native_runtime_live.sh`, `scripts/verify_enterprise_native_http_live.sh`. **Declaring native release profile complete (maintainers):** **`docs/PROJECT_COMPLETION_STATEMENT.md`**, **`make native-release-profile-complete`**. **Tier B / roadmap work queue:** **`docs/TIER_B_BACKLOG.md`**.
 6. Push and open a Pull Request. **`main`**/**`master`** PRs run **`.github/workflows/test-and-deploy.yml`** (see **`docs/CI_CD_PIPELINE.md`**); feature branches also run **`azl-ci.yml`**. Keep PRs small and reviewable.
 
 ## Documentation

@@ -1,0 +1,27 @@
+# P0 semantic spine — absent ::event.data key compares == null (both sides nullish) (F32).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.payload.missing.null.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      if (::event.data.nope == null) {
+        say "F32_ABSENT_EQ_NULL"
+      }
+      say "P0_SEMANTIC_PAYLOAD_MISSING_EQ_NULL_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.payload.missing.null.stub
+    emit e with { a: "only" }
+  }
+}

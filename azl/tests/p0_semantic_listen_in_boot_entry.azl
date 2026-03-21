@@ -1,0 +1,17 @@
+# P0 semantic spine — listen + emit in ::boot.entry init (F54).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    listen for "bootdyn" {
+      say "F54_BOOT_LISTEN_OK"
+    }
+    emit bootdyn
+    say "P0_SEMANTIC_LISTEN_IN_BOOT_ENTRY_OK"
+  }
+}

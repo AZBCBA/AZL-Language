@@ -1,0 +1,20 @@
+# P0 semantic spine — nested listen registration inside a listener + emit dispatch (C ↔ Python parity).
+# Mirrors the azl_interpreter pattern: register downstream listeners before emit in the same handler.
+
+component ::p0.nested.chain {
+  behavior {
+    listen for "step1" {
+      listen for "step2" then {
+        say "P0_NESTED_LISTEN_EMIT_CHAIN_OK"
+      }
+      emit step2
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::p0.nested.chain
+    emit step1
+  }
+}

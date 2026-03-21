@@ -1,0 +1,25 @@
+# P0 semantic spine — payload bare float (F31).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.payload.float.stub {
+  init {
+  }
+  behavior {
+    listen for "pi" {
+      say ::event.data.x
+      say "P0_SEMANTIC_PAYLOAD_FLOAT_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.payload.float.stub
+    emit pi with { x: 3.14 }
+  }
+}

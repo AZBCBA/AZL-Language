@@ -1,0 +1,25 @@
+# P0 semantic spine — multi-digit bare integer in payload (F33).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.payload.bigint.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      say ::event.data.big
+      say "P0_SEMANTIC_PAYLOAD_BIG_INT_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.payload.bigint.stub
+    emit e with { big: 65535 }
+  }
+}

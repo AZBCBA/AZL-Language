@@ -1,0 +1,25 @@
+# P0 semantic spine — behavior + listen for "interpret" (matches ::azl.interpreter entry shape).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.behavior.interpret.stub {
+  init {
+  }
+  behavior {
+    listen for "interpret" {
+      say "got-interpret"
+      say "P0_SEMANTIC_BEHAVIOR_INTERPRET_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.behavior.interpret.stub
+    emit interpret
+  }
+}

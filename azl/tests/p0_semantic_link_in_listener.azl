@@ -1,0 +1,37 @@
+# P0 semantic spine — link ::component from inside a listener body (F25).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.link.target.stub {
+  init {
+    say "F25_LINKED_INIT"
+  }
+  behavior {
+    listen for "h" {
+      say "F25_H_OK"
+    }
+  }
+}
+
+component ::p0.link.outer.stub {
+  init {
+  }
+  behavior {
+    listen for "go" {
+      link ::p0.link.target.stub
+      emit h
+      say "P0_SEMANTIC_LINK_IN_LISTENER_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.link.outer.stub
+    emit go
+  }
+}

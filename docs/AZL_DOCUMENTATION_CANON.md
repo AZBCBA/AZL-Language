@@ -11,7 +11,7 @@
 | Item | Proof |
 |------|--------|
 | C HTTP engine | `tools/azl_native_engine.c` — health, readiness, status, exec_state, capabilities, Ollama proxy, GGUF CLI infer, llama-server completion proxy |
-| Native gates | `scripts/check_azl_native_gates.sh` — **gate 0:** `self_check_release_helpers.sh` (**`jq`** manifest + **`rg`** + release script **`bash -n`** + tag policy); guards A–E, VM opcode contract D, C minimal F, Python parity F2, P0 slice F3, spine G, tokenizer/brace H |
+| Native gates | `scripts/check_azl_native_gates.sh` — **gate 0:** `self_check_release_helpers.sh` (**`jq`** manifest + **`rg`** + release script **`bash -n`** + tag policy); guards A–E, VM opcode contract D, C minimal F, Python parity F2, P0 slice F3, nested listen + emit flush F4 (`p0_nested_listen_emit_chain.azl`), var alias F5 (`p0_semantic_var_alias.azl`), additive expr F6 (`p0_semantic_expr_plus_chain.azl`), dotted global F7 (`p0_semantic_dotted_counter.azl`), behavior interpret F8 (`p0_semantic_behavior_interpret_listen.azl`), listen **then** F9 (`p0_semantic_behavior_listen_then.azl`), emit **with** payload F10 (`p0_semantic_emit_event_payload.azl` → **`::event.data.*`**), multi-key **with** F11 (`p0_semantic_emit_multi_payload.azl`), queued **emit**+payload F12 (`p0_semantic_emit_queued_payloads.azl`), payload in **`set`** **`+`** F13 (`p0_semantic_payload_expr_chain.azl`), **`if`** on payload F14 (`p0_semantic_payload_if_branch.azl`), nested **emit**+payload F15 (`p0_semantic_nested_emit_payload.azl`), quoted **`emit`**+**`with`** F16 (`p0_semantic_quoted_emit_with_payload.azl`), payload **`!=`** F17 (`p0_semantic_payload_ne_branch.azl`), **`or`** fallback F18 (`p0_semantic_payload_or_fallback.azl`), empty **`with { }`** F19 (`p0_semantic_emit_empty_with.azl`), single-quoted payload F20 (`p0_semantic_payload_single_quote.azl`), payload key collision F21 (`p0_semantic_payload_key_collide.azl`), nested **`listen`** + **`emit with`** F22 (`p0_semantic_nested_listen_emit_payload.azl`), nested **`listen … then`** + payload F23 (`p0_semantic_nested_listen_then_payload.azl`), numeric payload F24 (`p0_semantic_payload_numeric_value.azl`), **`link`** in listener F25 (`p0_semantic_link_in_listener.azl`), payload **`true`** F26 (`p0_semantic_payload_bool_true.azl`), nested multi-key inner **`with`** F27 (`p0_semantic_nested_multikey_payload.azl`), payload **`false`** F28 (`p0_semantic_payload_bool_false.azl`), payload **`null`** F29 (`p0_semantic_payload_null_value.azl`), first matching listener F30 (`p0_semantic_first_matching_listener.azl`), payload float F31 (`p0_semantic_payload_float_value.azl`), missing key **`== null`** F32 (`p0_semantic_payload_missing_eq_null.azl`), big int payload F33 (`p0_semantic_payload_big_int.azl`), **`set`** from payload F34 (`p0_semantic_set_from_payload.azl`), present **`!= null`** F35 (`p0_semantic_payload_present_ne_null.azl`), quoted **`-7`** F36 (`p0_semantic_payload_quoted_negative.azl`), **`emit`** from listener F37 (`p0_semantic_emit_from_listener_chain.azl`), trailing-colon key F38 (`p0_semantic_payload_trailing_colon_key.azl`), **`if (true)`** F39 (`p0_semantic_if_true_literal_listener.azl`), **`if (false)`** F40 (`p0_semantic_if_false_literal_listener.azl`), **`listen`** in **`init`** F41 (`p0_semantic_listen_in_init_emit.azl`), squote+space payload F42 (`p0_semantic_payload_squote_space.azl`), sequential payload F43 (`p0_semantic_sequential_payload_events.azl`), **`if (1)`** F44 (`p0_semantic_if_one_literal_listener.azl`), quoted **`emit`** only F45 (`p0_semantic_emit_quoted_event_only.azl`), **`say`** unset blank F46 (`p0_semantic_say_unset_blank_line.azl`), **`if (::global)`** from payload F47 (`p0_semantic_if_global_from_payload.azl`), **`if (0)`** F48 (`p0_semantic_if_zero_literal_listener.azl`), unquoted **`emit`** only F49 (`p0_semantic_emit_unquoted_event_only.azl`), **`say`** empty global F50 (`p0_semantic_say_empty_string_global.azl`), string **`"false"`** not truthy F51 (`p0_semantic_if_string_false_from_payload.azl`), string **`"true"`** global **`if`** F52 (`p0_semantic_if_var_true_string.azl`), same event twice payloads F53 (`p0_semantic_same_event_twice_payload.azl`), **`listen`** in **`boot.entry`** F54 (`p0_semantic_listen_in_boot_entry.azl`), string **`"1"`** global **`if`** F55 (`p0_semantic_if_var_one_string.azl`), string **`"0"`** not truthy F56 (`p0_semantic_if_var_zero_string.azl`), empty string not truthy F57 (`p0_semantic_if_var_empty_string.azl`), cross-component first **`link`** listener F58 (`p0_semantic_cross_component_first_listener.azl`), double bare **`emit`** same event F59 (`p0_semantic_double_emit_same_event.azl`), **`if`** **`or`** empty + string F60 (`p0_semantic_if_or_empty_then_one_string.azl`), global **`==`** F61 (`p0_semantic_if_global_eq_globals.azl`), global **`!=`** F62/F63 (`p0_semantic_if_global_ne_globals.azl`, `p0_semantic_if_global_ne_equal_skip.azl`), global **`+`** concat **`set`** F64 (`p0_semantic_set_global_concat_globals.azl`), literal string **`==`**/**`!=`** in **`if`** F65/F66 (`p0_semantic_if_literal_eq_strings.azl`, `p0_semantic_if_literal_ne_strings.azl`), triple **`+`** **`set`** F67 (`p0_semantic_set_triple_concat_mixed.azl`), spine G, semantic owner G2 (`verify_semantic_spine_owner_contract.sh`), tokenizer/brace H |
 | Live HTTP + LLM honesty (minimal bundle) | `scripts/verify_native_runtime_live.sh` — `azl-native-engine` + minimal bootstrap (`c_minimal_link_ping`), `/api/llm/capabilities`, native-only `scripts/azl` block |
 | Live HTTP + enterprise combined | `scripts/verify_enterprise_native_http_live.sh` — same HTTP contract + `build_enterprise_combined.sh` + `::build.daemon.enterprise`; `/status` `combined` must match built path |
 | Strength bar (one command) | `scripts/verify_azl_strength_bar.sh` — gates + `verify_native_runtime_live.sh` + `verify_enterprise_native_http_live.sh`; failures: `ERROR[AZL_STRENGTH_BAR]: …` |
@@ -28,6 +28,7 @@
 | Semantic spine (Python, parity subset) | `AZL_RUNTIME_SPINE=azl_interpreter` → `tools/azl_runtime_spine_host.py` / `tools/azl_semantic_engine/` |
 | Byte parity C vs Python | Gate **F2** on `azl/tests/c_minimal_link_ping.azl` |
 | P0 interpreter-shaped slice | Gate **F3** on `azl/tests/p0_semantic_interpreter_slice.azl` (includes **`.toInt()`**, dotted **`::perf.*`**, aligned with `azl_interpreter.azl` init prefix) |
+| P0 interpret-shaped dispatch | Gate **F4** on `azl/tests/p0_nested_listen_emit_chain.azl` (nested **`listen`** inside listener + **`emit`** drains queue; C ↔ Python byte match) |
 | Tokenizer + `{`/`}` balance on real interpreter file | Gate **H** — `scripts/verify_p0_interpreter_tokenizer_boundary.sh` |
 | Spine resolver + error surface | Gate **G** — `scripts/verify_runtime_spine_contract.sh` |
 
@@ -72,7 +73,7 @@ Source of truth for current vs target: [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE
 
 ### 1.7 Provable strength (four pillars; formerly `AZL_STRENGTH_BAR.md`)
 
-1. **Predictable semantics** — [language/AZL_CURRENT_SPECIFICATION.md](language/AZL_CURRENT_SPECIFICATION.md); gates F2, F3, G.  
+1. **Predictable semantics** — [language/AZL_CURRENT_SPECIFICATION.md](language/AZL_CURRENT_SPECIFICATION.md); gates F2, F3, G; semantic parity slices F4–F67 (C minimal vs Python **`minimal_runtime`**).  
 2. **Operational strength** — gates script; `verify_native_runtime_live.sh`; `run_full_repo_verification.sh`; [ERROR_SYSTEM.md](ERROR_SYSTEM.md).  
 3. **Honest benchmarks** — scripts in §1.3 (including §1.3 proof harnesses); never mix C proxy port with enterprise stack.  
 4. **Ecosystem** — §1.5; [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -119,7 +120,7 @@ bash scripts/verify_native_release_profile_complete.sh
 - **Tier A (native release profile):** Declared **complete** when **`verify_native_release_profile_complete.sh`** exits **0** (contract + full repo verification without optional benches + strength bar). This is the **honest “shipping complete”** line for the current native profile.
 - **Tier B (roadmap):** Language/platform work below — **not** implied by Tier A.
 
-**Tier B — phased map:** [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md). Strategy: [AZL_PERFECTION_PLAN.md](AZL_PERFECTION_PLAN.md). HAVE vs NEED: [AUDIT_STRENGTH_ITEMS.md](AUDIT_STRENGTH_ITEMS.md).
+**Tier B — phased map:** [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md). **Sprint-style backlog:** [TIER_B_BACKLOG.md](TIER_B_BACKLOG.md). **AI / maintainer continuity (new sessions):** [AI_MAINTAINER_CONTINUITY_HANDOFF.md](AI_MAINTAINER_CONTINUITY_HANDOFF.md), root [AGENTS.md](../AGENTS.md), `.cursor/rules/azl-continuity.mdc`. **Strategic consensus + execution plan:** [AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md](AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md). Older strategy draft: [AZL_PERFECTION_PLAN.md](AZL_PERFECTION_PLAN.md). HAVE vs NEED: [AUDIT_STRENGTH_ITEMS.md](AUDIT_STRENGTH_ITEMS.md).
 
 - **P0 remainder:** Semantic engine wide enough to run `azl_interpreter.azl` as the runtime child (or verified equivalent); default spine choice documented in [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md).  
 - **Bootstrap executor:** `scripts/azl_bootstrap.sh` → `scripts/azl_seed_runner.sh` requires **`AZL_NATIVE_EXEC_CMD`** (path to `azl-native-engine`). **`start_azl_native_mode.sh`** and **`run_enterprise_daemon.sh`** both ensure it (build via **`build_azl_native_engine.sh`** if unset, then validate executable; **`ERROR[AZL_ENTERPRISE_DAEMON]`** exits **64/65** if invalid). Distinct from **`AZL_NATIVE_RUNTIME_CMD`**, which the C engine passes to its **child**.  
@@ -145,11 +146,20 @@ bash scripts/verify_native_release_profile_complete.sh
 | Document | Purpose |
 |----------|---------|
 | [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md) | Phased completion vs contract |
-| [AZL_PERFECTION_PLAN.md](AZL_PERFECTION_PLAN.md) | Strategic gaps / AI positioning |
+| [AI_MAINTAINER_CONTINUITY_HANDOFF.md](AI_MAINTAINER_CONTINUITY_HANDOFF.md) | **New session handoff** — how we got here; anti-loop; reality vs aspiration; read before big changes |
+| [../AGENTS.md](../AGENTS.md) | **Agent entry** — pointer to handoff + consensus + spine (tools/Cursor) |
+| [AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md](AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md) | **Vision + compression policy + research wedges + phased plan** (do not lose maintainer consensus) |
+| [AZL_LITERAL_CODEC_CONTAINER_V0.md](AZL_LITERAL_CODEC_CONTAINER_V0.md) | **Exact** tier literal container wire format + **`CODEC_*`** errors; **`verify_azl_literal_codec_container_doc_contract.sh`** |
+| [AZL_PERFECTION_PLAN.md](AZL_PERFECTION_PLAN.md) | Strategic gaps / AI positioning (older draft; reconcile with consensus doc) |
 | [CANONICAL_HTTP_PROFILE.md](CANONICAL_HTTP_PROFILE.md) | C engine vs enterprise `http_server` |
-| [DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md](DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md) | Quantum / memory: real vs symbolic |
-| [AZL_GPU_NEURAL_QUANTUM_INVENTORY.md](AZL_GPU_NEURAL_QUANTUM_INVENTORY.md) | File map vs default runtime |
+| [AZL_GPU_NEURAL_SURFACE_MAP.md](AZL_GPU_NEURAL_SURFACE_MAP.md) | **RepertoireField** (public) / legacy `azl/quantum/` + GPU / neural / LHA3 file map vs default runtime |
+| [AZL_BCBA_NAMING_FRAME.md](AZL_BCBA_NAMING_FRAME.md) | BCBA intent (ABA = human-like learning for AI), **public name** options for whole-picture reasoning, **LHA3** meaning or rename |
+| [AZL_ENGINEERING_REALITY_AUDIT.md](AZL_ENGINEERING_REALITY_AUDIT.md) | **Honest** map: RepertoireField vs `azl/quantum/`, LHA3 compression (real vs heuristic), security demo, Rust (none in-tree), black hole labels |
+| [INTEGRATION_VERIFY.md](INTEGRATION_VERIFY.md) | **Single command:** **`make verify`** — full integration check without optional benches; **doc pieces** (**`release/doc_verification_pieces.json`**, **`make verify-doc-pieces`**) |
+| [RELATED_WORKSPACES.md](RELATED_WORKSPACES.md) | External **Rust** / data-disk paths; **not** part of **`make verify`**; links **migration** inventory |
 | [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md) | LLM paths and benchmarks |
+| [BENCHMARKS_AZL_VS_REAL_WORLD.md](BENCHMARKS_AZL_VS_REAL_WORLD.md) | Plain English: full AZL vs language charts; **`make benchmark-azl-full-report`** |
+| [BENCHMARKS_REAL_WORLD.md](BENCHMARKS_REAL_WORLD.md) | Benchmarks Game **spectral-norm** (C vs Python) + **hyperfine** — industry reference language workload |
 | [INTEGRATIONS_HOST_VS_NATIVE.md](INTEGRATIONS_HOST_VS_NATIVE.md) | Integrations scope |
 | [AUDIT_STRENGTH_ITEMS.md](AUDIT_STRENGTH_ITEMS.md) | HAVE vs NEED matrix |
 
@@ -172,6 +182,7 @@ bash scripts/verify_native_release_profile_complete.sh
 | [VIRTUAL_OS_API.md](VIRTUAL_OS_API.md) | Virtual OS / syscalls |
 | [STRICT_MODE_AND_FEATURE_FLAGS.md](STRICT_MODE_AND_FEATURE_FLAGS.md) | Flags |
 | [LHA3_STDLIB_API.md](LHA3_STDLIB_API.md) | LHA3 API surface |
+| [LHA3_COMPRESSION_HONESTY.md](LHA3_COMPRESSION_HONESTY.md) | **Honesty contract** for **compress** / ratios (heuristic retention, not byte codecs); **`verify_lha3_compression_honesty_contract.sh`** inside **`verify_quantum_lha3_stack.sh`** |
 | [API_REFERENCE.md](API_REFERENCE.md) | API reference |
 
 ### CI and contributing

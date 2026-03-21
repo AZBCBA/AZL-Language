@@ -1,0 +1,29 @@
+# P0 semantic spine — listen for "child" inside outer listener, then emit child with { … } (F22).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.nested.listen.emit.payload.stub {
+  init {
+  }
+  behavior {
+    listen for "outer" {
+      listen for "child" {
+        say ::event.data.tag
+        say "P22_CHILD_OK"
+      }
+      emit child with { tag: "nested-reg" }
+      say "P0_SEMANTIC_NESTED_LISTEN_PAYLOAD_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.nested.listen.emit.payload.stub
+    emit outer
+  }
+}

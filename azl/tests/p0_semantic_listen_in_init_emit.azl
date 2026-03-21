@@ -1,0 +1,23 @@
+# P0 semantic spine — listen registered in init then emit (F41).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.listen.init.stub {
+  init {
+    listen for "dyn" {
+      say "F41_DYN_OK"
+    }
+    emit dyn
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.listen.init.stub
+    say "P0_SEMANTIC_LISTEN_IN_INIT_OK"
+  }
+}

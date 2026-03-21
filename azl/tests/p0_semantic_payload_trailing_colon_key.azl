@@ -1,0 +1,25 @@
+# P0 semantic spine — payload key as single token ending with ':' (e.g. traceid:) (F38).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.payload.trailcolon.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      say ::event.data.traceid
+      say "P0_SEMANTIC_PAYLOAD_TRAILING_COLON_KEY_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.payload.trailcolon.stub
+    emit e with { traceid: "z9" }
+  }
+}

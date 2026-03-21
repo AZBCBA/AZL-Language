@@ -1,0 +1,26 @@
+# P0 semantic spine — set ::var = ::event.data.* in listener (F34).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.set.from.payload.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      set ::copy = ::event.data.msg
+      say ::copy
+      say "P0_SEMANTIC_SET_FROM_PAYLOAD_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.set.from.payload.stub
+    emit e with { msg: "cloned" }
+  }
+}

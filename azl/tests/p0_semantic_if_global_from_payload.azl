@@ -1,0 +1,28 @@
+# P0 semantic spine — set ::flag from payload then if (::flag) (F47).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.if.global.payload.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      set ::flag = ::event.data.on
+      if (::flag) {
+        say "F47_FLAG_BRANCH"
+      }
+      say "P0_SEMANTIC_IF_GLOBAL_FROM_PAYLOAD_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.if.global.payload.stub
+    emit e with { on: "true" }
+  }
+}

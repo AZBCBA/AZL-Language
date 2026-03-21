@@ -1,0 +1,26 @@
+# P0 semantic spine — additive expressions (+) and sum on RHS of == (interpreter-shaped).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.expr.plus {
+  init {
+    set ::a = 1 + 2 + 3
+    say ::a
+    set ::seed = 40
+    set ::b = ::seed + 2
+    say ::b
+    set ::ok = 5 == 2 + 3
+    if ::ok {
+      say "P0_SEMANTIC_EXPR_PLUS_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::p0.expr.plus
+  }
+}

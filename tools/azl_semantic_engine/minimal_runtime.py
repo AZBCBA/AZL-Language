@@ -1,6 +1,11 @@
 """
 Faithful port of tools/azl_interpreter_minimal.c token stream + execution semantics.
 Single source of behavioral truth: keep in sync with C when changing the minimal contract.
+
+Nested ``listen`` may run inside ``init`` / listener bodies; ``emit`` inside ``exec_block``
+drains the event queue (``process_events``) so chained handlers match the interpret→tokenize shape.
+Each queued event may carry a ``with { … }`` payload bound as ``::event.data.<key>`` for that dispatch
+(F10–F67 parity fixtures under ``azl/tests/p0_semantic_*.azl``).
 """
 
 from __future__ import annotations
@@ -14,6 +19,7 @@ MAX_TOKS = 65536
 MAX_VARS = 256
 MAX_LISTENERS = 64
 MAX_EVENTS = 32
+MAX_PAYLOAD_KEYS = 8
 
 
 class SemanticEngineError(Exception):
@@ -83,7 +89,7 @@ def tokenize_source(src: str) -> list[str]:
             p += 2
             pos[0] = p
             continue
-        if ch in "{}();=,[]!":
+        if ch in "{}();=,[]!+":
             tokens.append(ch)
             p += 1
             pos[0] = p
@@ -114,7 +120,7 @@ class MinimalAZLRuntime:
     ntok: int = field(init=False)
     vars: list[Var] = field(default_factory=list)
     listeners: list[Listener] = field(default_factory=list)
-    queue: list[str] = field(default_factory=list)
+    queue: list[tuple[str, list[tuple[str, str]]]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.ntok = len(self.tok)
@@ -150,12 +156,13 @@ class MinimalAZLRuntime:
         if len(self.vars) < MAX_VARS:
             self.vars.append(Var(k=k[:63], v=v[:255]))
 
-    def queue_push(self, ev: str) -> None:
+    def queue_push(self, ev: str, payload: list[tuple[str, str]] | None = None) -> None:
         if len(self.queue) >= MAX_EVENTS:
             return
-        self.queue.append(ev[:63])
+        pl = [(k[:47], v[:255]) for k, v in (payload or [])][:MAX_PAYLOAD_KEYS]
+        self.queue.append((ev[:63], pl))
 
-    def queue_pop(self) -> str | None:
+    def queue_pop(self) -> tuple[str, list[tuple[str, str]]] | None:
         if not self.queue:
             return None
         return self.queue.pop(0)
@@ -295,13 +302,42 @@ class MinimalAZLRuntime:
             return vv, 0
         raise SemanticEngineError(5, f"azl_semantic_engine: bad primary {t!r}")
 
+    def _eval_sum(self, i: list[int]) -> tuple[str, int]:
+        """Primary (+ primary)* — integer + if both parse as base-10 int, else string concat."""
+
+        def parse_full_int(s: str, nullish: int) -> int | None:
+            if nullish:
+                return None
+            s = s.strip()
+            if not s:
+                return None
+            try:
+                v = int(s, 10)
+            except ValueError:
+                return None
+            return v if str(v) == s else None
+
+        acc_s, acc_n = self._eval_primary(i)
+        while i[0] < self.ntok and self.tok[i[0]] == "+":
+            i[0] += 1
+            rh_s, rh_n = self._eval_primary(i)
+            ai = parse_full_int(acc_s, acc_n)
+            bi = parse_full_int(rh_s, rh_n)
+            if ai is not None and bi is not None:
+                acc_s = str(ai + bi)
+                acc_n = 0
+            else:
+                acc_s = ("" if acc_n else acc_s) + ("" if rh_n else rh_s)
+                acc_n = 0
+        return acc_s, acc_n
+
     def _eval_eq(self, i: list[int]) -> tuple[str, int]:
-        left, ln = self._eval_primary(i)
+        left, ln = self._eval_sum(i)
         if i[0] >= self.ntok or self.tok[i[0]] not in ("==", "!="):
             return left, ln
         op = self.tok[i[0]]
         i[0] += 1
-        right, rn = self._eval_primary(i)
+        right, rn = self._eval_sum(i)
         eq = self._values_eq(ln, left, rn, right)
         if op == "!=":
             eq = not eq
@@ -374,6 +410,61 @@ class MinimalAZLRuntime:
         val = self.eval_expr(i)
         self.var_set(k, val)
 
+    @staticmethod
+    def _payload_key_ok(t: str) -> bool:
+        if not t or t.startswith(":"):
+            return False
+        return all(c.isalnum() or c == "_" for c in t)
+
+    def _parse_emit_with_payload(self, i: list[int]) -> list[tuple[str, str]]:
+        out: list[tuple[str, str]] = []
+        if i[0] >= self.ntok or self.tok[i[0]] != "with":
+            return out
+        i[0] += 1
+        if i[0] >= self.ntok or self.tok[i[0]] != "{":
+            return out
+        i[0] += 1
+        depth = 1
+        while i[0] < self.ntok and depth > 0:
+            t = self.tok[i[0]]
+            if t == "{":
+                depth += 1
+                i[0] += 1
+                continue
+            if t == "}":
+                depth -= 1
+                i[0] += 1
+                continue
+            if depth != 1:
+                i[0] += 1
+                continue
+            key: str | None = None
+            if len(t) >= 2 and t.endswith(":") and self._payload_key_ok(t[:-1]):
+                key = t[:-1]
+                i[0] += 1
+            elif self._payload_key_ok(t):
+                key = t
+                i[0] += 1
+                if i[0] >= self.ntok or self.tok[i[0]] != ":":
+                    continue
+                i[0] += 1
+            else:
+                i[0] += 1
+                continue
+            if i[0] >= self.ntok:
+                break
+            valtok = self.tok[i[0]]
+            if len(valtok) >= 2 and valtok[0] in "\"'":
+                inner = valtok[1:-1] if len(valtok) >= 2 else ""
+            else:
+                inner = valtok
+            i[0] += 1
+            if key and len(out) < MAX_PAYLOAD_KEYS:
+                out.append((key, inner[:255]))
+            if i[0] < self.ntok and self.tok[i[0]] == ",":
+                i[0] += 1
+        return out
+
     def exec_emit(self, i: list[int]) -> None:
         i[0] += 1
         if i[0] >= self.ntok:
@@ -387,20 +478,12 @@ class MinimalAZLRuntime:
         elif s:
             ev = s[:63]
             have = True
-        if have:
-            self.queue_push(ev)
         i[0] += 1
-        if i[0] < self.ntok and self.tok[i[0]] == "with":
-            i[0] += 1
-            if i[0] < self.ntok and self.tok[i[0]] == "{":
-                d = 1
-                i[0] += 1
-                while i[0] < self.ntok and d > 0:
-                    if self.tok[i[0]] == "{":
-                        d += 1
-                    elif self.tok[i[0]] == "}":
-                        d -= 1
-                    i[0] += 1
+        payload: list[tuple[str, str]] = []
+        if have and i[0] < self.ntok and self.tok[i[0]] == "with":
+            payload = self._parse_emit_with_payload(i)
+        if have:
+            self.queue_push(ev, payload)
 
     def exec_link(self, i: list[int]) -> None:
         i[0] += 1
@@ -488,6 +571,37 @@ class MinimalAZLRuntime:
                         self.register_listener(evname, block_start, i)
             i += 1
 
+    def exec_listen(self, i: list[int]) -> None:
+        """Dynamic listen for "ev" [then] { ... } inside init or listener bodies."""
+        if i[0] >= self.ntok or self.tok[i[0]] != "listen":
+            return
+        if i[0] + 2 >= self.ntok or self.tok[i[0] + 1] != "for":
+            i[0] += 1
+            return
+        i[0] += 2
+        ev = self.tok[i[0]]
+        if not ev or len(ev) < 2 or ev[0] not in "\"'":
+            if i[0] < self.ntok:
+                i[0] += 1
+            return
+        evname = ev[1:-1] if len(ev) >= 2 else ""
+        i[0] += 1
+        if i[0] < self.ntok and self.tok[i[0]] == "then":
+            i[0] += 1
+        if i[0] < self.ntok and self.tok[i[0]] == "{":
+            block_start = i[0] + 1
+            d = 1
+            i[0] += 1
+            while i[0] < self.ntok and d > 0:
+                if self.tok[i[0]] == "{":
+                    d += 1
+                elif self.tok[i[0]] == "}":
+                    d -= 1
+                i[0] += 1
+            i[0] -= 1
+            self.register_listener(evname, block_start, i[0])
+            i[0] += 1
+
     def exec_block(self, start: int, end: int) -> None:
         depth = 1
         i = start
@@ -513,6 +627,7 @@ class MinimalAZLRuntime:
                 ii = [i]
                 self.exec_emit(ii)
                 i = ii[0]
+                self.process_events()
             elif depth == 1 and t == "link":
                 ii = [i]
                 self.exec_link(ii)
@@ -521,18 +636,27 @@ class MinimalAZLRuntime:
                 ii = [i]
                 self.exec_if(ii)
                 i = ii[0]
+            elif depth == 1 and t == "listen":
+                ii = [i]
+                self.exec_listen(ii)
+                i = ii[0]
             else:
                 i += 1
 
     def process_events(self) -> None:
         while True:
-            ev = self.queue_pop()
-            if ev is None:
+            popped = self.queue_pop()
+            if popped is None:
                 break
+            ev, payload = popped
+            for pk, pv in payload:
+                self.var_set(f"::event.data.{pk}", pv)
             for j, ln in enumerate(self.listeners):
                 if ln.event == ev:
                     self.exec_block(ln.block_start, ln.block_end)
                     break
+            for pk, _ in payload:
+                self.var_set(f"::event.data.{pk}", "")
 
     def exec_init_block(self, i: list[int]) -> None:
         depth = 1
@@ -557,6 +681,8 @@ class MinimalAZLRuntime:
                 self.exec_link(i)
             elif depth == 1 and t == "if":
                 self.exec_if(i)
+            elif depth == 1 and t == "listen":
+                self.exec_listen(i)
             else:
                 i[0] += 1
 

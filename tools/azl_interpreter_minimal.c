@@ -5,6 +5,8 @@
  *
  * Usage: azl_interpreter_minimal <file.azl> [entry_component]
  * Env: AZL_COMBINED_PATH, AZL_ENTRY
+ *
+ * emit ... with { k: v } binds ::event.data.<k> per queued event (see azl/tests/p0_semantic_*.azl, gates F10-F67).
  */
 
 #define _GNU_SOURCE
@@ -13,12 +15,21 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 
 #define BUF_SIZE  (2 * 1024 * 1024)   /* 2MB for enterprise combined files */
 #define MAX_TOKS  65536
 #define MAX_VARS  256
 #define MAX_LISTENERS 64
 #define MAX_EVENTS 32
+#define MAX_PAYLOAD_KEYS 8
+
+typedef struct { char key[48]; char v[256]; } PayloadKV;
+typedef struct {
+  char ev[64];
+  PayloadKV kv[MAX_PAYLOAD_KEYS];
+  int nkv;
+} QueuedEvent;
 
 static char *g_src;
 static size_t g_src_len;
@@ -35,8 +46,8 @@ typedef struct { char event[64]; int block_start; int block_end; } Listener;
 static Listener g_listeners[MAX_LISTENERS];
 static int g_nlisteners;
 
-/* Event queue for dispatch */
-static char g_event_queue[MAX_EVENTS][64];
+/* Event queue for dispatch (event name + optional emit with { k: v, ... } payload) */
+static QueuedEvent g_event_queue[MAX_EVENTS];
 static int g_queue_head, g_queue_tail;
 
 static void skip_whitespace_and_comments(const char **p) {
@@ -95,7 +106,7 @@ static int tokenize(void) {
       p += 2;
       continue;
     }
-    if (*p == '{' || *p == '}' || *p == '(' || *p == ')' || *p == ';' || *p == '=' || *p == ',' || *p == '[' || *p == ']' || *p == '!') {
+    if (*p == '{' || *p == '}' || *p == '(' || *p == ')' || *p == ';' || *p == '=' || *p == ',' || *p == '[' || *p == ']' || *p == '!' || *p == '+') {
       char *s = malloc(2);
       if (!s) return -1;
       s[0] = *p++;
@@ -131,18 +142,113 @@ static void var_set(const char *k, const char *v) {
     g_nvars++;
   }
 }
-static void queue_push(const char *ev) {
-  if ((g_queue_tail + 1) % MAX_EVENTS != g_queue_head) {
-    (void)snprintf(g_event_queue[g_queue_tail], sizeof(g_event_queue[g_queue_tail]), "%s",
-                   ev ? ev : "");
-    g_queue_tail = (g_queue_tail + 1) % MAX_EVENTS;
-  }
+static int payload_key_ok(const char *key) {
+  if (!key || !key[0]) return 0;
+  if (key[0] == ':') return 0;
+  for (const char *p = key; *p; p++)
+    if (!isalnum((unsigned char)*p) && *p != '_') return 0;
+  return 1;
 }
-static int queue_pop(char *ev) {
+
+/*
+ * Parse `with { key: "value", ... }` for emit payload; *i must point at `with`.
+ * Advances *i past the closing `}` of the object (or leaves *i after `with` if no `{`).
+ */
+static int parse_emit_with_payload(int *i, PayloadKV *out, int max_out) {
+  int n = 0;
+  if (*i >= g_ntok || strcmp(g_tok[*i], "with") != 0) return 0;
+  (*i)++;
+  if (*i >= g_ntok || strcmp(g_tok[*i], "{") != 0) return 0;
+  (*i)++;
+  int depth = 1;
+  while (*i < g_ntok && depth > 0) {
+    const char *t = g_tok[*i];
+    if (strcmp(t, "{") == 0) { depth++; (*i)++; continue; }
+    if (strcmp(t, "}") == 0) { depth--; (*i)++; continue; }
+    if (depth != 1) { (*i)++; continue; }
+    char keybuf[48];
+    const char *key = NULL;
+    size_t tl = strlen(t);
+    if (tl >= 2 && t[tl - 1U] == ':') {
+      if (tl - 1U >= sizeof(keybuf)) { (*i)++; continue; }
+      memcpy(keybuf, t, tl - 1U);
+      keybuf[tl - 1U] = '\0';
+      if (!payload_key_ok(keybuf)) { (*i)++; continue; }
+      key = keybuf;
+      (*i)++;
+    } else {
+      if (!payload_key_ok(t)) { (*i)++; continue; }
+      if (tl >= sizeof(keybuf)) { (*i)++; continue; }
+      memcpy(keybuf, t, tl);
+      keybuf[tl] = '\0';
+      key = keybuf;
+      (*i)++;
+      if (*i >= g_ntok || strcmp(g_tok[*i], ":") != 0) continue;
+      (*i)++;
+    }
+    if (*i >= g_ntok) break;
+    const char *valtok = g_tok[*i];
+    char valbuf[256] = {0};
+    if (valtok && strlen(valtok) >= 2 && (valtok[0] == '"' || valtok[0] == '\'')) {
+      size_t L = strlen(valtok);
+      size_t nc = L >= 2 ? L - 2 : 0;
+      if (nc >= sizeof(valbuf)) nc = sizeof(valbuf) - 1U;
+      memcpy(valbuf, valtok + 1, nc);
+      valbuf[nc] = '\0';
+    } else {
+      (void)snprintf(valbuf, sizeof(valbuf), "%s", valtok ? valtok : "");
+    }
+    (*i)++;
+    if (n < max_out && key) {
+      (void)snprintf(out[n].key, sizeof(out[n].key), "%s", key);
+      (void)snprintf(out[n].v, sizeof(out[n].v), "%s", valbuf);
+      n++;
+    }
+    if (*i < g_ntok && strcmp(g_tok[*i], ",") == 0) (*i)++;
+  }
+  return n;
+}
+
+static void queue_push_event(const char *ev, const PayloadKV *kv, int nkv) {
+  if ((g_queue_tail + 1) % MAX_EVENTS == g_queue_head) return;
+  QueuedEvent *qe = &g_event_queue[g_queue_tail];
+  (void)snprintf(qe->ev, sizeof(qe->ev), "%s", ev ? ev : "");
+  if (nkv > MAX_PAYLOAD_KEYS) nkv = MAX_PAYLOAD_KEYS;
+  qe->nkv = nkv;
+  for (int k = 0; k < nkv; k++) {
+    size_t lk = strlen(kv[k].key);
+    if (lk >= sizeof(qe->kv[k].key)) lk = sizeof(qe->kv[k].key) - 1U;
+    memcpy(qe->kv[k].key, kv[k].key, lk);
+    qe->kv[k].key[lk] = '\0';
+    size_t lv = strlen(kv[k].v);
+    if (lv >= sizeof(qe->kv[k].v)) lv = sizeof(qe->kv[k].v) - 1U;
+    memcpy(qe->kv[k].v, kv[k].v, lv);
+    qe->kv[k].v[lv] = '\0';
+  }
+  g_queue_tail = (g_queue_tail + 1) % MAX_EVENTS;
+}
+
+static int queue_pop_event(QueuedEvent *qe) {
   if (g_queue_head == g_queue_tail) return 0;
-  (void)snprintf(ev, 64, "%s", g_event_queue[g_queue_head]);
+  *qe = g_event_queue[g_queue_head];
   g_queue_head = (g_queue_head + 1) % MAX_EVENTS;
   return 1;
+}
+
+static void apply_event_payload(const QueuedEvent *qe) {
+  char fullkey[96];
+  for (int k = 0; k < qe->nkv; k++) {
+    (void)snprintf(fullkey, sizeof(fullkey), "::event.data.%s", qe->kv[k].key);
+    var_set(fullkey, qe->kv[k].v);
+  }
+}
+
+static void clear_event_payload(const QueuedEvent *qe) {
+  char fullkey[96];
+  for (int k = 0; k < qe->nkv; k++) {
+    (void)snprintf(fullkey, sizeof(fullkey), "::event.data.%s", qe->kv[k].key);
+    var_set(fullkey, "");
+  }
 }
 static void register_listener(const char *ev, int start, int end) {
   if (g_nlisteners < MAX_LISTENERS) {
@@ -161,6 +267,8 @@ static void exec_link(int *i);
 static void run_linked_component(const char *link_target);
 static void exec_if(int *i);
 static int eval_expr(int *i, char *out, size_t outsz);
+static void process_events(void);
+static void exec_listen(int *i);
 
 /* Execute say "string" or say ::var - print to stdout */
 static void exec_say(int *i) {
@@ -212,11 +320,12 @@ static int values_eq(int l_nullish, const char *l, int r_nullish, const char *r)
 }
 
 static int eval_primary(int *i, char *out, size_t outsz, int *nullish);
+static int eval_sum(int *i, char *out, size_t outsz, int *nullish_out);
 
 static int eval_eq(int *i, char *out, size_t outsz, int *nullish_out) {
   char left[256], right[256];
   int ln = 0, rn = 0;
-  if (eval_primary(i, left, sizeof(left), &ln) != 0) return -1;
+  if (eval_sum(i, left, sizeof(left), &ln) != 0) return -1;
   if (*i >= g_ntok ||
       (strcmp(g_tok[*i], "==") != 0 && strcmp(g_tok[*i], "!=") != 0)) {
     (void)snprintf(out, outsz, "%s", left);
@@ -225,7 +334,7 @@ static int eval_eq(int *i, char *out, size_t outsz, int *nullish_out) {
   }
   const char *op = g_tok[*i];
   (*i)++;
-  if (eval_primary(i, right, sizeof(right), &rn) != 0) return -1;
+  if (eval_sum(i, right, sizeof(right), &rn) != 0) return -1;
   int eq = values_eq(ln, left, rn, right);
   if (strcmp(op, "!=") == 0) eq = !eq;
   (void)snprintf(out, outsz, "%s", eq ? "true" : "false");
@@ -348,6 +457,49 @@ static int eval_primary(int *i, char *out, size_t outsz, int *nullish) {
   return -1;
 }
 
+/* Primary (+ primary)* — int + if both canonical base-10, else string concat. */
+static int parse_full_long(const char *s, long *out) {
+  if (!s || !*s) return 0;
+  char *e = NULL;
+  errno = 0;
+  long v = strtol(s, &e, 10);
+  if (errno == ERANGE || e == s || (e && *e != '\0')) return 0;
+  char canon[256];
+  (void)snprintf(canon, sizeof(canon), "%ld", v);
+  if (strcmp(canon, s) != 0) return 0;
+  *out = v;
+  return 1;
+}
+
+static int eval_sum(int *i, char *out, size_t outsz, int *nullish_out) {
+  char acc[256];
+  int acc_n = 0;
+  if (eval_primary(i, acc, sizeof(acc), &acc_n) != 0) return -1;
+  while (*i < g_ntok && strcmp(g_tok[*i], "+") == 0) {
+    (*i)++;
+    char rh[256];
+    int rn = 0;
+    if (eval_primary(i, rh, sizeof(rh), &rn) != 0) return -1;
+    long la, lb;
+    int a_int = !acc_n && parse_full_long(acc, &la);
+    int b_int = !rn && parse_full_long(rh, &lb);
+    if (a_int && b_int) {
+      (void)snprintf(acc, sizeof(acc), "%ld", la + lb);
+      acc_n = 0;
+    } else {
+      char tmp[512];
+      (void)snprintf(tmp, sizeof(tmp), "%s%s", acc_n ? "" : acc, rn ? "" : rh);
+      size_t tl = strlen(tmp);
+      if (tl >= sizeof(acc)) return -1;
+      memcpy(acc, tmp, tl + 1);
+      acc_n = 0;
+    }
+  }
+  (void)snprintf(out, outsz, "%s", acc);
+  *nullish_out = acc_n;
+  return 0;
+}
+
 static int eval_expr(int *i, char *out, size_t outsz) {
   return eval_or(i, out, outsz);
 }
@@ -439,21 +591,12 @@ static void exec_emit(int *i) {
     have_ev = 1;
   }
   if (!have_ev) return;
-  queue_push(ev);
   (*i)++;
-  /* Skip "with" { ... } if present */
-  if (*i < g_ntok && strcmp(g_tok[*i], "with") == 0) {
-    (*i)++;
-    if (*i < g_ntok && strcmp(g_tok[*i], "{") == 0) {
-      int d = 1;
-      (*i)++;
-      while (*i < g_ntok && d > 0) {
-        if (strcmp(g_tok[*i], "{") == 0) d++;
-        else if (strcmp(g_tok[*i], "}") == 0) d--;
-        (*i)++;
-      }
-    }
-  }
+  PayloadKV payload[MAX_PAYLOAD_KEYS];
+  int npayload = 0;
+  if (*i < g_ntok && strcmp(g_tok[*i], "with") == 0)
+    npayload = parse_emit_with_payload(i, payload, MAX_PAYLOAD_KEYS);
+  queue_push_event(ev, payload, npayload);
 }
 
 /* link ::component.name — register listeners + run init for that component */
@@ -508,6 +651,47 @@ static void run_linked_component(const char *link_target) {
   fprintf(stderr, "azl_interpreter_minimal: link: component not found: %s\n", link_target);
 }
 
+/*
+ * Dynamic listen registration inside init / listener bodies (nested listeners).
+ * Same surface as register_behavior_listeners: listen for "ev" [then] { ... }
+ */
+static void exec_listen(int *i) {
+  if (*i >= g_ntok || strcmp(g_tok[*i], "listen") != 0) return;
+  if (*i + 2 >= g_ntok || strcmp(g_tok[*i + 1], "for") != 0) {
+    (*i)++;
+    return;
+  }
+  *i += 2;
+  const char *ev = g_tok[*i];
+  if (!ev || strlen(ev) < 2 || (ev[0] != '"' && ev[0] != '\'')) {
+    if (*i < g_ntok) (*i)++;
+    return;
+  }
+  char evname[64] = {0};
+  size_t len = strlen(ev);
+  if (len >= 2) {
+    size_t n = len - 2;
+    if (n >= sizeof(evname)) n = sizeof(evname) - 1;
+    memcpy(evname, ev + 1, n);
+    evname[n] = '\0';
+  }
+  (*i)++;
+  if (*i < g_ntok && strcmp(g_tok[*i], "then") == 0) (*i)++;
+  if (*i < g_ntok && strcmp(g_tok[*i], "{") == 0) {
+    int block_start = *i + 1;
+    int d = 1;
+    (*i)++;
+    while (*i < g_ntok && d > 0) {
+      if (strcmp(g_tok[*i], "{") == 0) d++;
+      else if (strcmp(g_tok[*i], "}") == 0) d--;
+      (*i)++;
+    }
+    (*i)--;
+    register_listener(evname, block_start, *i);
+    (*i)++;
+  }
+}
+
 /* Execute a block from start to end (exclusive) */
 static void exec_block(int start, int end) {
   int depth = 1;
@@ -519,22 +703,27 @@ static void exec_block(int start, int end) {
     else if (depth == 1 && strcmp(t, "say") == 0) exec_say(&i);
     else if (depth == 1 && strcmp(t, "set") == 0) exec_set(&i);
     else if (depth == 1 && strcmp(t, "if") == 0) exec_if(&i);
-    else if (depth == 1 && strcmp(t, "emit") == 0) exec_emit(&i);
-    else if (depth == 1 && strcmp(t, "link") == 0) exec_link(&i);
+    else if (depth == 1 && strcmp(t, "listen") == 0) exec_listen(&i);
+    else if (depth == 1 && strcmp(t, "emit") == 0) {
+      exec_emit(&i);
+      process_events();
+    } else if (depth == 1 && strcmp(t, "link") == 0) exec_link(&i);
     else i++;
   }
 }
 
 /* Process event queue: dispatch to listeners */
 static void process_events(void) {
-  char ev[64];
-  while (queue_pop(ev)) {
+  QueuedEvent qe;
+  while (queue_pop_event(&qe)) {
+    apply_event_payload(&qe);
     for (int j = 0; j < g_nlisteners; j++) {
-      if (strcmp(g_listeners[j].event, ev) == 0) {
+      if (strcmp(g_listeners[j].event, qe.ev) == 0) {
         exec_block(g_listeners[j].block_start, g_listeners[j].block_end);
         break;
       }
     }
+    clear_event_payload(&qe);
   }
 }
 
@@ -549,6 +738,7 @@ static void exec_init_block(int *i) {
     else if (depth == 1 && strcmp(t, "say") == 0) exec_say(i);
     else if (depth == 1 && strcmp(t, "set") == 0) exec_set(i);
     else if (depth == 1 && strcmp(t, "if") == 0) exec_if(i);
+    else if (depth == 1 && strcmp(t, "listen") == 0) exec_listen(i);
     else if (depth == 1 && strcmp(t, "emit") == 0) { exec_emit(i); process_events(); }
     else if (depth == 1 && strcmp(t, "link") == 0) exec_link(i);
     else (*i)++;

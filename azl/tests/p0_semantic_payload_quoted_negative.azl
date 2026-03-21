@@ -1,0 +1,25 @@
+# P0 semantic spine — payload string "-7" (quoted; works around bare negative token split) (F36).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.payload.quoted.neg.stub {
+  init {
+  }
+  behavior {
+    listen for "e" {
+      say ::event.data.x
+      say "P0_SEMANTIC_PAYLOAD_QUOTED_NEG_OK"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.payload.quoted.neg.stub
+    emit e with { x: "-7" }
+  }
+}

@@ -1,0 +1,30 @@
+# P0 semantic spine — outer + inner payload share key "trace": inner wins, then clear empties ::event.data.trace (F21).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.payload.key.collide.stub {
+  init {
+  }
+  behavior {
+    listen for "outer" {
+      say ::event.data.trace
+      emit inner with { trace: "inner-val" }
+      say ::event.data.trace
+      say "P0_SEMANTIC_PAYLOAD_KEY_COLLIDE_OK"
+    }
+    listen for "inner" {
+      say ::event.data.trace
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.payload.key.collide.stub
+    emit outer with { trace: "outer-val" }
+  }
+}

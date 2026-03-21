@@ -1,0 +1,29 @@
+# P0 semantic spine — emit inside listener drains nested event before listener continues (F37).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.emit.chain.stub {
+  init {
+  }
+  behavior {
+    listen for "a" {
+      emit b
+      say "P37_AFTER_EMIT_B"
+    }
+    listen for "b" {
+      say "P37_IN_B"
+    }
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    link ::p0.emit.chain.stub
+    emit a
+    say "P0_SEMANTIC_EMIT_FROM_LISTENER_OK"
+  }
+}

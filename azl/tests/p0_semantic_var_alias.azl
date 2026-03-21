@@ -1,0 +1,21 @@
+# P0 semantic spine — variable copy via set ::dst = ::src (minimal contract).
+
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p0.var.alias {
+  init {
+    set ::seed = "hello-alias"
+    set ::mirror = ::seed
+    say ::mirror
+    say "P0_SEMANTIC_VAR_ALIAS_OK"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::p0.var.alias
+  }
+}
