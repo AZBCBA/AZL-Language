@@ -6,7 +6,7 @@
  * Usage: azl_interpreter_minimal <file.azl> [entry_component]
  * Env: AZL_COMBINED_PATH, AZL_ENTRY
  *
- * emit ... with { k: v } binds ::event.data.<k> per queued event (see azl/tests/p0_semantic_*.azl, gates F10-F71).
+ * emit ... with { k: v } binds ::event.data.<k> per queued event (see azl/tests/p0_semantic_*.azl, gates F10-F76).
  * return exits the current listener body (including from inside if { }); return in init skips rest of init.
  */
 
@@ -312,6 +312,122 @@ static void consume_agg_literal(int *i) {
     else if (strcmp(g_tok[*i], close) == 0) d--;
     (*i)++;
   }
+}
+
+static void tz_esc_field_c(const char *in, char *out, size_t cap) {
+  if (!out || cap == 0) return;
+  out[0] = '\0';
+  size_t o = 0;
+  for (const char *p = in ? in : ""; *p && o + 2 < cap; p++) {
+    if (*p == '\\' || *p == '|') {
+      out[o++] = '\\';
+      if (o + 1 >= cap) break;
+    }
+    out[o++] = *p;
+  }
+  if (o < cap)
+    out[o] = '\0';
+  else
+    out[cap - 1U] = '\0';
+}
+
+static int push_obj_value_uint_str(const char *vt) {
+  if (!vt || !*vt) return 0;
+  for (const char *p = vt; *p; p++)
+    if (!isdigit((unsigned char)*p)) return 0;
+  return 1;
+}
+
+/* Parse `{ type: "…", value: "…", line: N, column: M }` for .push → tz|…|…|…|… */
+static int parse_push_tz_object(int *i, char *seg, size_t seg_sz) {
+  if (*i >= g_ntok || strcmp(g_tok[*i], "{") != 0) return -1;
+  (*i)++;
+  char ty[96] = {0}, vl[96] = {0}, ln[48] = {0}, col[48] = {0};
+  int depth = 1;
+  while (*i < g_ntok && depth > 0) {
+    const char *t = g_tok[*i];
+    if (strcmp(t, "{") == 0) return -1;
+    if (strcmp(t, "}") == 0) {
+      depth--;
+      (*i)++;
+      if (depth == 0) break;
+      continue;
+    }
+    if (depth != 1) return -1;
+    char keybuf[48];
+    const char *key = NULL;
+    size_t tl = strlen(t);
+    if (tl >= 2 && t[tl - 1U] == ':') {
+      if (tl - 1U >= sizeof(keybuf)) return -1;
+      memcpy(keybuf, t, tl - 1U);
+      keybuf[tl - 1U] = '\0';
+      if (!payload_key_ok(keybuf)) return -1;
+      key = keybuf;
+      (*i)++;
+    } else {
+      if (!payload_key_ok(t)) return -1;
+      if (tl >= sizeof(keybuf)) return -1;
+      memcpy(keybuf, t, tl);
+      keybuf[tl] = '\0';
+      key = keybuf;
+      (*i)++;
+      if (*i >= g_ntok || strcmp(g_tok[*i], ":") != 0) return -1;
+      (*i)++;
+    }
+    if (*i >= g_ntok) return -1;
+    const char *valtok = g_tok[*i];
+    char raw[128] = {0};
+    if (valtok && strlen(valtok) >= 2U && (valtok[0] == '"' || valtok[0] == '\'')) {
+      size_t L = strlen(valtok);
+      size_t nc = L >= 2U ? L - 2U : 0U;
+      if (nc >= sizeof(raw)) nc = sizeof(raw) - 1U;
+      memcpy(raw, valtok + 1, nc);
+      raw[nc] = '\0';
+    } else if (valtok && push_obj_value_uint_str(valtok)) {
+      (void)snprintf(raw, sizeof(raw), "%s", valtok);
+    } else
+      return -1;
+    (*i)++;
+    if (strcmp(key, "type") == 0) {
+      char tmp[96];
+      (void)snprintf(tmp, sizeof(tmp), "%.63s", raw);
+      (void)snprintf(ty, sizeof(ty), "%s", tmp);
+    } else if (strcmp(key, "value") == 0) {
+      char tmp[96];
+      (void)snprintf(tmp, sizeof(tmp), "%.63s", raw);
+      (void)snprintf(vl, sizeof(vl), "%s", tmp);
+    } else if (strcmp(key, "line") == 0) {
+      (void)snprintf(ln, sizeof(ln), "%.31s", raw);
+    } else if (strcmp(key, "column") == 0) {
+      (void)snprintf(col, sizeof(col), "%.31s", raw);
+    } else
+      return -1;
+    if (*i < g_ntok && strcmp(g_tok[*i], ",") == 0) (*i)++;
+  }
+  if (depth != 0) return -1;
+  char et[112], ev[112], el[64], ec[64];
+  tz_esc_field_c(ty, et, sizeof(et));
+  tz_esc_field_c(vl, ev, sizeof(ev));
+  tz_esc_field_c(ln, el, sizeof(el));
+  tz_esc_field_c(col, ec, sizeof(ec));
+  (void)snprintf(seg, seg_sz, "tz|%s|%s|%s|%s", et, ev, el, ec);
+  return 0;
+}
+
+static int rhs_is_var_concat_call(const char *v, char *base_out, size_t base_sz) {
+  if (!v || !base_out || base_sz == 0) return 0;
+  base_out[0] = '\0';
+  if (v[0] != ':' || v[1] != ':') return 0;
+  size_t L = strlen(v);
+  const char *suf = ".concat";
+  size_t sl = strlen(suf);
+  if (L <= 2U + sl) return 0;
+  if (strcmp(v + L - sl, suf) != 0) return 0;
+  size_t bl = L - sl;
+  if (bl >= base_sz) bl = base_sz - 1U;
+  memcpy(base_out, v, bl);
+  base_out[bl] = '\0';
+  return 1;
 }
 
 static void mini_expr_error(const char *ctx) {
@@ -743,8 +859,10 @@ static void exec_set(int *i) {
       seg[n] = '\0';
       (*i)++;
     } else if (arg && strcmp(arg, "{") == 0) {
-      consume_agg_literal(i);
-      (void)snprintf(seg, sizeof(seg), "{}");
+      if (parse_push_tz_object(i, seg, sizeof(seg)) != 0) {
+        fprintf(stderr, "azl_interpreter_minimal: .push object parse failed\n");
+        exit(5);
+      }
     } else if (arg && arg[0] == ':' && arg[1] == ':') {
       const char *vv = var_get(arg);
       if (vv) (void)snprintf(seg, sizeof(seg), "%s", vv);
@@ -774,6 +892,42 @@ static void exec_set(int *i) {
   if (*i >= g_ntok) return;
   const char *v = g_tok[*i];
   char val[256] = {0};
+  char concat_base[64];
+  if (v && rhs_is_var_concat_call(v, concat_base, sizeof(concat_base))) {
+    (*i)++;
+    if (*i >= g_ntok || strcmp(g_tok[*i], "(") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: .concat missing (\n");
+      exit(5);
+    }
+    (*i)++;
+    if (*i >= g_ntok) {
+      fprintf(stderr, "azl_interpreter_minimal: .concat missing arg\n");
+      exit(5);
+    }
+    const char *carg = g_tok[*i];
+    if (!carg || carg[0] != ':' || carg[1] != ':') {
+      fprintf(stderr, "azl_interpreter_minimal: .concat bad arg\n");
+      exit(5);
+    }
+    (*i)++;
+    if (*i >= g_ntok || strcmp(g_tok[*i], ")") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: .concat missing )\n");
+      exit(5);
+    }
+    (*i)++;
+    const char *l0 = var_get(concat_base);
+    const char *r0 = var_get(carg);
+    const char *lp = (l0 && l0[0] && strcmp(l0, "[]") != 0) ? l0 : "";
+    const char *rp = (r0 && r0[0] && strcmp(r0, "[]") != 0) ? r0 : "";
+    if (!lp[0])
+      (void)snprintf(val, sizeof(val), "%s", rp);
+    else if (!rp[0])
+      (void)snprintf(val, sizeof(val), "%s", lp);
+    else
+      (void)snprintf(val, sizeof(val), "%s\n%s", lp, rp);
+    var_set(k, val);
+    return;
+  }
   if (v && strcmp(v, "[") == 0) {
     consume_agg_literal(i);
     (void)snprintf(val, sizeof(val), "[]");

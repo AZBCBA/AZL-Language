@@ -1,0 +1,28 @@
+# Gate F76: ::line = ::line + 1 and ::current = ::current + ::c inside split_chars loop (tokenize_line increment + accumulator).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    say "P0_SEMANTIC_TOK_INCR_INIT_OK"
+    emit tok_incr with { }
+  }
+  behavior {
+    listen for "tok_incr" {
+      set ::line = 1
+      set ::line = ::line + 1
+      say ::line
+      set ::current = ""
+      set ::src = "ab"
+      set ::chars = ::src.split_chars()
+      for ::c in ::chars {
+        set ::current = ::current + ::c
+      }
+      say ::current
+      say "P0_SEMANTIC_TOK_INCR_OK"
+    }
+  }
+}

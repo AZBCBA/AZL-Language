@@ -1,0 +1,50 @@
+# Gate F74: tokenize_line-shaped state — ::in_string, quote toggle, for ::c in ::split_chars (no else; ::handled disambiguates close vs open on same char).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    say "P0_SEMANTIC_IN_STRING_INIT_OK"
+    emit tok_in_string with { }
+  }
+  behavior {
+    listen for "tok_in_string" {
+      set ::line = 'a"b"c'
+      set ::chars = ::line.split_chars()
+      set ::in_string = false
+      for ::c in ::chars {
+        set ::handled = false
+        if (::c == '"') {
+          if (::in_string == "true") {
+            set ::in_string = false
+            set ::handled = true
+            say "STRING_END"
+          }
+        }
+        if (::handled == "false") {
+          if (::c == '"') {
+            if (::in_string == "false") {
+              set ::in_string = true
+              set ::handled = true
+              say "STRING_START"
+            }
+          }
+        }
+        if (::in_string == "true") {
+          if (::handled == "false") {
+            say ::c
+          }
+        }
+        if (::in_string == "false") {
+          if (::handled == "false") {
+            say "OUTSIDE"
+          }
+        }
+      }
+      say "P0_SEMANTIC_IN_STRING_OK"
+    }
+  }
+}

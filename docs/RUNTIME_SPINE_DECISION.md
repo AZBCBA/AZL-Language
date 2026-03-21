@@ -46,9 +46,15 @@ the trace today is: **`start_azl_native_mode.sh`** → **`run_enterprise_daemon.
 
 **P0u (`split_chars` + char **`for`**, 2026-03-21):** **`set ::dst = ::src.split_chars()`** stores UTF-8 **scalar values** (Python **`str`** elements / C **`utf8_scalar_byte_len`**) joined by newline; **`for ::c in ::dst`** iterates them — matches **`for ::char in ::line_text`** in **`azl_interpreter.azl`**. Gate **F71**: **`azl/tests/p0_semantic_split_chars_for.azl`**, C ↔ Python byte-identical stdout (exits **311–313**).
 
-**P0push (`set ::buf.push`, 2026-03-21):** **`set ::buf.push("literal")`**, **`{…}`** (stored as **`{}`**), or **`::var`** appends one segment; unset / **`[]`** starts fresh; result is newline-joined like **`split`** / **`for ::row in`**. Gate **F72**: **`azl/tests/p0_semantic_push_string_listener.azl`**, C ↔ Python byte-identical stdout (exits **314–316**).
+**P0push (`set ::buf.push`, 2026-03-21):** **`set ::buf.push("literal")`** or **`::var`** appends one newline-delimited segment; unset / **`[]`** starts fresh (same encoding as **`split`** / **`for ::row in`**). **Object-literal** **`push`** and list **`.concat`** — **P0tz**. Gate **F72**: **`azl/tests/p0_semantic_push_string_listener.azl`**, C ↔ Python byte-identical stdout (exits **314–316**).
 
 **P0sub (binary int `-`, 2026-03-21):** Expression **`::a - ::b`** when both sides are canonical base-10 integers (including **`::name.length`** primaries) subtracts; non-integer **`-`** is a **typed error** in Python (**`SemanticEngineError(5)`**) and **`eval_expr`** failure in C (**exit 5**). Gate **F73**: **`azl/tests/p0_semantic_int_sub_column_length.azl`**, C ↔ Python byte-identical stdout (exits **317–319**).
+
+**P0str (`in_string` + quote toggle, 2026-03-22):** **`for ::c in ::line.split_chars()`** with nested **`if`** and per-iteration **`::handled`** so closing and opening **`"`** on the same character do not double-toggle (minimal has no **`else`**). Gate **F74**: **`azl/tests/p0_semantic_tokenize_in_string_char.azl`** (exits **323–325**).
+
+**P0tz (token rows + **`.concat`**, 2026-03-22):** **`set ::buf.push({ type: "…", value: "…", line: N, column: M })`** (**flat** keys; values quoted or decimal) appends a **`tz|…|…|…|…`** segment (**`\|`** / **`\\`** escapes). **`set ::acc = ::lhs.concat(::rhs)`** joins two buffers with newline (**`[]`** / empty treated like other list walks). Gate **F75**: **`azl/tests/p0_semantic_tokens_push_tz_concat.azl`** (exits **326–328**).
+
+**P0inc (line + accumulator, 2026-03-22):** **`set ::line = ::line + 1`** (canonical int **`+`**) and **`set ::current = ::current + ::c`** (string concat) inside **`split_chars`** loops — matches **`tokenize_line`** increment / **`::current + ::char`**. Gate **F76**: **`azl/tests/p0_semantic_tokenize_line_inc_concat.azl`** (exits **329–331**).
 
 **P0.1 execution order (vertical slices):** Maintainership sequence for **`azl_interpreter.azl`** on the semantic spine — parity gates (**A**), real-file **`init`** smoke (**B**), then **tokenize → parse → execute** slices (**C–E**) before claiming full **behavior** (**F**). Single source: **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** § **P0.1 — Long-term execution order** and **[TIER_B_BACKLOG.md](TIER_B_BACKLOG.md)** § **P0.1 execution checklist**.
 

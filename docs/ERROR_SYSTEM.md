@@ -182,6 +182,18 @@ Runs at the start of **`scripts/run_tests.sh`**. Ensures **`docs/RELATED_WORKSPA
 | **306** | Empty output from C or Python at verification **N=100** |
 | **307** | C vs Python numerical mismatch at **N=100** |
 
+### AZL quality measurement (`scripts/measure_azl_quality_parallel.sh`)
+
+**Optional maintainer metrics** — maps **Python-style quality lenses** (correctness surface, **codebase inventory**, **doc manifest** counts, timings, optional reference C/Python spectral-norm) to **JSON** (**`azl_quality_measurement_v2`**) and a **plain-language Markdown report** (**`*_report.md`**) under **`.azl/benchmarks/`**. Always runs **timed** **`check_azl_native_gates.sh`**; optional **`AZL_MEASURE_COMPREHENSIVE=1`** (doc promoted + reference + perf smoke when runnable), **`AZL_MEASURE_FULL_VERIFY=1`**, **`AZL_MEASURE_REFERENCE=1`**, **`AZL_MEASURE_RUN_ALL_TESTS=1`**. Prefix **`ERROR[BENCHMARK_AZL_QUALITY_PARALLEL]:`** on stderr. See **`docs/AZL_QUALITY_MEASUREMENTS_VS_PYTHON.md`**.
+
+| Exit | Meaning |
+|------|---------|
+| **320** | Not repository root |
+| **321** | **`python3`** not found |
+| *(propagated)* | **`check_azl_native_gates.sh`** failure (**JSON still written** before exit) |
+| *(propagated)* | **`run_full_repo_verification.sh`** failure when **`AZL_MEASURE_FULL_VERIFY=1`** |
+| *(propagated)* | **`benchmark_language_real_world.sh`** failure when **`AZL_MEASURE_REFERENCE=1`** |
+
 ### Full AZL coverage report (`scripts/benchmark_azl_full_coverage_report.sh`)
 
 Writes **`.azl/benchmarks/azl_full_coverage_report_*.md`**: promoted doc pieces, **`run_full_repo_verification.sh`** (**`RUN_OPTIONAL_BENCHES=0`**), **`perf_smoke.sh`**, optional **spectral-norm** reference. Prefix **`ERROR[BENCHMARK_AZL_FULL_REPORT]:`** on stderr.
@@ -189,11 +201,11 @@ Writes **`.azl/benchmarks/azl_full_coverage_report_*.md`**: promoted doc pieces,
 | Exit | Meaning |
 |------|---------|
 | **310** | Not repository root |
-| *(propagated)* | First failing child phase (**doc pieces**, **verify**, **perf_smoke**, or reference script) |
+| *(propagated)* | First failing child phase (**doc pieces**, **verify**, **`perf_smoke.sh`**, or reference script) |
 
 ### Native gates (`scripts/check_azl_native_gates.sh`)
 
-Semantic parity slices **F5–F73** map to the rows below (**F9** stdout mismatch = **59**, intentionally **not** **`verify_native_runtime_live.sh`** **69**; **F10** = **111–113**; **F11** = **114–116**; **F12** = **117–119**; **F13** = **120–122**; **F14** = **123–125**; **F15** = **126–128**; **F16** = **129–131**; **F17** = **132–134**; **F18** = **135–137**; **F19** = **138–140**; **F20** = **141–143**; **F21** = **144–146**; **F22** = **147–149**; **F23** = **150–152**; **F24** = **153–155**; **F25** = **156–158**; **F26** = **159–161**; **F27** = **162–164**; **F28** = **165–167**; **F29** = **168–170**; **F30** = **171–173**; **F31** = **174–176**; **F32** = **177–179**; **F33** = **180–182**; **F34** = **183–185**; **F35** = **186–188**; **F36** = **189–191**; **F37** = **192–194**; **F38** = **195–197**; **F39** = **198–200**; **F40** = **201–203**; **F41** = **204–206**; **F42** = **207–209**; **F43** = **210–212**; **F44** = **213–215**; **F45** = **216–218**; **F46** = **219–221**; **F47** = **222–224**; **F48** = **225–227**; **F49** = **228–230**; **F50** = **231–233**; **F51** = **234–236**; **F52** = **237–239**; **F53** = **240–242**; **F54** = **243–245**; **F55** = **246–248**; **F56** = **249–251**; **F57** = **252–254**; **F58** = **255–257**; **F59** = **258–260**; **F60** = **261–263**; **F61** = **264–266**; **F62** = **267–269**; **F63** = **270** / **272** / **273** (Python failure uses **272**, not **271** — **271** is **`CODEC_DECOMPRESS_FAILED`** in literal codec harness); **F64** = **274–276**; **F65** = **277–279**; **F66** = **280–282**; **F67** = **283–285**; **F68** = **291–293**; **F69** = **294–296**; **F70** = **297–299**; **F71** = **311–313**; **F72** = **314–316**; **F73** = **317–319**).
+Semantic parity slices **F5–F76** map to the rows below (**F9** stdout mismatch = **59**, intentionally **not** **`verify_native_runtime_live.sh`** **69**; **F10** = **111–113**; **F11** = **114–116**; **F12** = **117–119**; **F13** = **120–122**; **F14** = **123–125**; **F15** = **126–128**; **F16** = **129–131**; **F17** = **132–134**; **F18** = **135–137**; **F19** = **138–140**; **F20** = **141–143**; **F21** = **144–146**; **F22** = **147–149**; **F23** = **150–152**; **F24** = **153–155**; **F25** = **156–158**; **F26** = **159–161**; **F27** = **162–164**; **F28** = **165–167**; **F29** = **168–170**; **F30** = **171–173**; **F31** = **174–176**; **F32** = **177–179**; **F33** = **180–182**; **F34** = **183–185**; **F35** = **186–188**; **F36** = **189–191**; **F37** = **192–194**; **F38** = **195–197**; **F39** = **198–200**; **F40** = **201–203**; **F41** = **204–206**; **F42** = **207–209**; **F43** = **210–212**; **F44** = **213–215**; **F45** = **216–218**; **F46** = **219–221**; **F47** = **222–224**; **F48** = **225–227**; **F49** = **228–230**; **F50** = **231–233**; **F51** = **234–236**; **F52** = **237–239**; **F53** = **240–242**; **F54** = **243–245**; **F55** = **246–248**; **F56** = **249–251**; **F57** = **252–254**; **F58** = **255–257**; **F59** = **258–260**; **F60** = **261–263**; **F61** = **264–266**; **F62** = **267–269**; **F63** = **270** / **272** / **273** (Python failure uses **272**, not **271** — **271** is **`CODEC_DECOMPRESS_FAILED`** in literal codec harness); **F64** = **274–276**; **F65** = **277–279**; **F66** = **280–282**; **F67** = **283–285**; **F68** = **291–293**; **F69** = **294–296**; **F70** = **297–299**; **F71** = **311–313**; **F72** = **314–316**; **F73** = **317–319**; **F74** = **323–325**; **F75** = **326–328**; **F76** = **329–331**).
 
 **Gate 0** runs **`self_check_release_helpers.sh`** — its exits **40–58** propagate unchanged.
 
@@ -429,6 +441,15 @@ Semantic parity slices **F5–F73** map to the rows below (**F9** stdout mismatc
 | **317** | C minimal **`p0_semantic_int_sub_column_length`** failed, wrong stdout order, or missing **`P0_SEMANTIC_INT_SUB_INIT_OK`** / **`3`** / **`P0_SEMANTIC_INT_SUB_OK`** (**F73**) |
 | **318** | Python spine host **`p0_semantic_int_sub_column_length`** failed (**F73**) |
 | **319** | C vs Python **`p0_semantic_int_sub_column_length`** stdout mismatch (**F73**) |
+| **323** | C minimal **`p0_semantic_tokenize_in_string_char`** failed, wrong stdout order, or missing **`P0_SEMANTIC_IN_STRING_INIT_OK`** / **`OUTSIDE`** / **`STRING_START`** / **`b`** / **`STRING_END`** / **`P0_SEMANTIC_IN_STRING_OK`** (**F74**) |
+| **324** | Python spine host **`p0_semantic_tokenize_in_string_char`** failed (**F74**) |
+| **325** | C vs Python **`p0_semantic_tokenize_in_string_char`** stdout mismatch (**F74**) |
+| **326** | C minimal **`p0_semantic_tokens_push_tz_concat`** failed, wrong stdout order, or missing **`P0_SEMANTIC_TOK_TZ_INIT_OK`** / **`tz|eol|;|1|0`** / **`tz|id|x|1|1`** / **`P0_SEMANTIC_TOK_TZ_OK`** (**F75**) |
+| **327** | Python spine host **`p0_semantic_tokens_push_tz_concat`** failed (**F75**) |
+| **328** | C vs Python **`p0_semantic_tokens_push_tz_concat`** stdout mismatch (**F75**) |
+| **329** | C minimal **`p0_semantic_tokenize_line_inc_concat`** failed, wrong stdout order, or missing **`P0_SEMANTIC_TOK_INCR_INIT_OK`** / **`2`** / **`ab`** / **`P0_SEMANTIC_TOK_INCR_OK`** (**F76**) |
+| **330** | Python spine host **`p0_semantic_tokenize_line_inc_concat`** failed (**F76**) |
+| **331** | C vs Python **`p0_semantic_tokenize_line_inc_concat`** stdout mismatch (**F76**) |
 | **97** | Semantic spine owner probe failed ( **`verify_semantic_spine_owner_contract.sh`**: bad **`--semantic-owner`** exit or missing host) |
 | **98** | Semantic spine owner line mismatch (expected **`AZL_SEMANTIC_OWNER=minimal_runtime_python`**) |
 | **99** | **`azl_azl_interpreter_runtime.sh`** no longer **`exec python3`** spine host (C must not own semantic spine) |

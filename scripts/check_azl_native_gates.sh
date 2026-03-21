@@ -2546,6 +2546,149 @@ if [ "$SUB_C_OUT" != "$SUB_PY_OUT" ]; then
   exit 319
 fi
 
+echo "[gate] F74: C vs Python — tokenize in_string + quote toggle + ::handled (split_chars loop)"
+INS="${ROOT_DIR}/azl/tests/p0_semantic_tokenize_in_string_char.azl"
+set +e
+INS_C_OUT="$("$MINI_BIN" "$INS" boot.entry 2>&1)"
+ins_c_rc=$?
+set -e
+if [ "$ins_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_tokenize_in_string_char exited $ins_c_rc: $INS_C_OUT"
+  exit 323
+fi
+if ! printf '%s\n' "$INS_C_OUT" | rg -q '^P0_SEMANTIC_IN_STRING_INIT_OK$'; then
+  echo "ERROR: expected P0_SEMANTIC_IN_STRING_INIT_OK in C output, got: $INS_C_OUT"
+  exit 323
+fi
+if ! printf '%s\n' "$INS_C_OUT" | rg -q '^OUTSIDE$'; then
+  echo "ERROR: expected OUTSIDE lines in C output, got: $INS_C_OUT"
+  exit 323
+fi
+if ! printf '%s\n' "$INS_C_OUT" | rg -q '^STRING_START$'; then
+  echo "ERROR: expected STRING_START in C output, got: $INS_C_OUT"
+  exit 323
+fi
+if ! printf '%s\n' "$INS_C_OUT" | rg -q '^b$'; then
+  echo "ERROR: expected literal b (in-string char) in C output, got: $INS_C_OUT"
+  exit 323
+fi
+if ! printf '%s\n' "$INS_C_OUT" | rg -q '^STRING_END$'; then
+  echo "ERROR: expected STRING_END in C output, got: $INS_C_OUT"
+  exit 323
+fi
+if ! printf '%s\n' "$INS_C_OUT" | rg -q '^P0_SEMANTIC_IN_STRING_OK$'; then
+  echo "ERROR: expected P0_SEMANTIC_IN_STRING_OK in C output, got: $INS_C_OUT"
+  exit 323
+fi
+if ! printf '%s\n' "$INS_C_OUT" | awk 'NR==1{if($0!="P0_SEMANTIC_IN_STRING_INIT_OK")exit 1} NR==2{if($0!="OUTSIDE")exit 1} NR==3{if($0!="STRING_START")exit 1} NR==4{if($0!="b")exit 1} NR==5{if($0!="STRING_END")exit 1} NR==6{if($0!="OUTSIDE")exit 1} NR==7{if($0!="P0_SEMANTIC_IN_STRING_OK")exit 1} END{if(NR!=7)exit 1}'; then
+  echo "ERROR: expected stdout order init_ok, OUTSIDE, STRING_START, b, STRING_END, OUTSIDE, IN_STRING_OK, got: $INS_C_OUT"
+  exit 323
+fi
+set +e
+INS_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$INS" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+ins_py_rc=$?
+set -e
+if [ "$ins_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_tokenize_in_string_char exited $ins_py_rc: $INS_PY_OUT"
+  exit 324
+fi
+if [ "$INS_C_OUT" != "$INS_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_tokenize_in_string_char" >&2
+  echo "C:  $INS_C_OUT" >&2
+  echo "Py: $INS_PY_OUT" >&2
+  exit 325
+fi
+
+echo "[gate] F75: C vs Python — .push({ type, value, line, column }) + ::acc.concat(::chunk)"
+TTZ="${ROOT_DIR}/azl/tests/p0_semantic_tokens_push_tz_concat.azl"
+set +e
+TTZ_C_OUT="$("$MINI_BIN" "$TTZ" boot.entry 2>&1)"
+ttz_c_rc=$?
+set -e
+if [ "$ttz_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_tokens_push_tz_concat exited $ttz_c_rc: $TTZ_C_OUT"
+  exit 326
+fi
+if ! printf '%s\n' "$TTZ_C_OUT" | rg -q '^P0_SEMANTIC_TOK_TZ_INIT_OK$'; then
+  echo "ERROR: expected P0_SEMANTIC_TOK_TZ_INIT_OK in C output, got: $TTZ_C_OUT"
+  exit 326
+fi
+if ! printf '%s\n' "$TTZ_C_OUT" | rg -q '^tz\|eol\|;\|1\|0$'; then
+  echo "ERROR: expected tz|eol|;|1|0 row in C output, got: $TTZ_C_OUT"
+  exit 326
+fi
+if ! printf '%s\n' "$TTZ_C_OUT" | rg -q '^tz\|id\|x\|1\|1$'; then
+  echo "ERROR: expected tz|id|x|1|1 row in C output, got: $TTZ_C_OUT"
+  exit 326
+fi
+if ! printf '%s\n' "$TTZ_C_OUT" | rg -q '^P0_SEMANTIC_TOK_TZ_OK$'; then
+  echo "ERROR: expected P0_SEMANTIC_TOK_TZ_OK in C output, got: $TTZ_C_OUT"
+  exit 326
+fi
+if ! printf '%s\n' "$TTZ_C_OUT" | awk 'NR==1{if($0!="P0_SEMANTIC_TOK_TZ_INIT_OK")exit 1} NR==2{if($0!="tz|eol|;|1|0")exit 1} NR==3{if($0!="tz|id|x|1|1")exit 1} NR==4{if($0!="P0_SEMANTIC_TOK_TZ_OK")exit 1} END{if(NR!=4)exit 1}'; then
+  echo "ERROR: expected stdout order init_ok, eol row, id row, TOK_TZ_OK, got: $TTZ_C_OUT"
+  exit 326
+fi
+set +e
+TTZ_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$TTZ" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+ttz_py_rc=$?
+set -e
+if [ "$ttz_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_tokens_push_tz_concat exited $ttz_py_rc: $TTZ_PY_OUT"
+  exit 327
+fi
+if [ "$TTZ_C_OUT" != "$TTZ_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_tokens_push_tz_concat" >&2
+  echo "C:  $TTZ_C_OUT" >&2
+  echo "Py: $TTZ_PY_OUT" >&2
+  exit 328
+fi
+
+echo "[gate] F76: C vs Python — ::line + 1 and ::current + ::c (tokenize_line loop)"
+INC="${ROOT_DIR}/azl/tests/p0_semantic_tokenize_line_inc_concat.azl"
+set +e
+INC_C_OUT="$("$MINI_BIN" "$INC" boot.entry 2>&1)"
+inc_c_rc=$?
+set -e
+if [ "$inc_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_tokenize_line_inc_concat exited $inc_c_rc: $INC_C_OUT"
+  exit 329
+fi
+if ! printf '%s\n' "$INC_C_OUT" | rg -q '^P0_SEMANTIC_TOK_INCR_INIT_OK$'; then
+  echo "ERROR: expected P0_SEMANTIC_TOK_INCR_INIT_OK in C output, got: $INC_C_OUT"
+  exit 329
+fi
+if ! printf '%s\n' "$INC_C_OUT" | rg -q '^2$'; then
+  echo "ERROR: expected 2 (::line + 1) in C output, got: $INC_C_OUT"
+  exit 329
+fi
+if ! printf '%s\n' "$INC_C_OUT" | rg -q '^ab$'; then
+  echo "ERROR: expected ab (::current + ::c loop) in C output, got: $INC_C_OUT"
+  exit 329
+fi
+if ! printf '%s\n' "$INC_C_OUT" | rg -q '^P0_SEMANTIC_TOK_INCR_OK$'; then
+  echo "ERROR: expected P0_SEMANTIC_TOK_INCR_OK in C output, got: $INC_C_OUT"
+  exit 329
+fi
+if ! printf '%s\n' "$INC_C_OUT" | awk 'NR==1{if($0!="P0_SEMANTIC_TOK_INCR_INIT_OK")exit 1} NR==2{if($0!="2")exit 1} NR==3{if($0!="ab")exit 1} NR==4{if($0!="P0_SEMANTIC_TOK_INCR_OK")exit 1} END{if(NR!=4)exit 1}'; then
+  echo "ERROR: expected stdout order init_ok, 2, ab, TOK_INCR_OK, got: $INC_C_OUT"
+  exit 329
+fi
+set +e
+INC_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$INC" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+inc_py_rc=$?
+set -e
+if [ "$inc_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_tokenize_line_inc_concat exited $inc_py_rc: $INC_PY_OUT"
+  exit 330
+fi
+if [ "$INC_C_OUT" != "$INC_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_tokenize_line_inc_concat" >&2
+  echo "C:  $INC_C_OUT" >&2
+  echo "Py: $INC_PY_OUT" >&2
+  exit 331
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

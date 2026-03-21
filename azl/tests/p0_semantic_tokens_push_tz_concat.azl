@@ -1,0 +1,26 @@
+# Gate F75: ::tokens.push({ type, value, line, column }) + ::acc.concat(::chunk) (azl_interpreter.azl token buffer shape).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    say "P0_SEMANTIC_TOK_TZ_INIT_OK"
+    emit tok_tz with { }
+  }
+  behavior {
+    listen for "tok_tz" {
+      set ::chunk = []
+      set ::chunk.push({ type: "id", value: "x", line: 1, column: 1 })
+      set ::acc = []
+      set ::acc.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::acc = ::acc.concat(::chunk)
+      for ::row in ::acc {
+        say ::row
+      }
+      say "P0_SEMANTIC_TOK_TZ_OK"
+    }
+  }
+}

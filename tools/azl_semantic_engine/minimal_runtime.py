@@ -5,13 +5,13 @@ Single source of behavioral truth: keep in sync with C when changing the minimal
 Nested ``listen`` may run inside ``init`` / listener bodies; ``emit`` inside ``exec_block``
 drains the event queue (``process_events``) so chained handlers match the interpret→tokenize shape.
 Each queued event may carry a ``with { … }`` payload bound as ``::event.data.<key>`` for that dispatch
-(F10–F72 parity fixtures under ``azl/tests/p0_semantic_*.azl``). ``return`` at listener depth exits the
+(F10–F76 parity fixtures under ``azl/tests/p0_semantic_*.azl``). ``return`` at listener depth exits the
 current listener body (including from inside ``if { … }``); ``return`` in top-level ``init`` skips the rest of ``init``.
 ``set ::dst = ::src.split("delim")`` stores split segments joined by newlines; ``for ::v in ::dst { … }`` (listener
 bodies only) iterates those segments — matches the ``::code.split("\\n")`` + line loop shape in ``azl_interpreter.azl``.
 ``::var.length`` in expressions yields the string length as a decimal string (unset base → ``0``).
 ``set ::dst = ::src.split_chars()`` stores Unicode code points of ``::src`` joined by newlines (``for ::c in ::dst`` matches ``for ::char in ::line_text`` in ``azl_interpreter.azl``).
-``set ::buf.push("literal")`` / ``{…}`` / ``::var`` appends one newline-delimited segment to ``::buf`` (same encoding as ``split`` / ``for ::row in``).
+``set ::buf.push("literal")`` / ``::var`` / ``{ type: "…", value: "…", line: N, column: M }`` appends one newline-delimited segment (object rows serialize as ``tz|…|…|…|…`` with ``\\|`` / ``\\\\`` escapes). ``set ::acc = ::lhs.concat(::rhs)`` joins two buffers with newline (``[]`` / empty same as ``for ::row in``).
 Binary ``-`` in expressions is supported only when both operands are canonical base-10 integers (``::column - ::name.length`` tokenize-line shape); otherwise use ``+`` string/int rules.
 """
 
@@ -235,6 +235,89 @@ class MinimalAZLRuntime:
             elif t == close_t:
                 d -= 1
             i[0] += 1
+
+    @staticmethod
+    def _tz_esc_field(s: str) -> str:
+        out: list[str] = []
+        for ch in s:
+            if ch in "|\\":
+                out.append("\\")
+            out.append(ch)
+        return "".join(out)
+
+    def _parse_push_tz_object(self, i: list[int]) -> str:
+        """Parse `{ type: "…", value: "…", line: N, column: M }` for .push (flat keys only)."""
+        if i[0] >= self.ntok or self.tok[i[0]] != "{":
+            raise SemanticEngineError(5, "azl_semantic_engine: .push object missing {")
+        i[0] += 1
+        fields: dict[str, str] = {
+            "type": "",
+            "value": "",
+            "line": "",
+            "column": "",
+        }
+        depth = 1
+        allowed = frozenset(fields)
+        while i[0] < self.ntok and depth > 0:
+            t = self.tok[i[0]]
+            if t == "{":
+                raise SemanticEngineError(5, "azl_semantic_engine: .push object nested {")
+            if t == "}":
+                depth -= 1
+                i[0] += 1
+                if depth == 0:
+                    break
+                continue
+            if depth != 1:
+                raise SemanticEngineError(5, "azl_semantic_engine: .push object bad depth")
+            key: str | None = None
+            if len(t) >= 2 and t.endswith(":") and self._payload_key_ok(t[:-1]):
+                key = t[:-1]
+                i[0] += 1
+            elif self._payload_key_ok(t):
+                key = t
+                i[0] += 1
+                if i[0] >= self.ntok or self.tok[i[0]] != ":":
+                    raise SemanticEngineError(5, "azl_semantic_engine: .push object key:")
+                i[0] += 1
+            else:
+                raise SemanticEngineError(5, "azl_semantic_engine: .push object bad key")
+            if key not in allowed:
+                raise SemanticEngineError(5, "azl_semantic_engine: .push object unknown key")
+            if i[0] >= self.ntok:
+                raise SemanticEngineError(5, "azl_semantic_engine: .push object eof value")
+            vt = self.tok[i[0]]
+            if len(vt) >= 2 and vt[0] in "\"'":
+                inner = vt[1:-1] if len(vt) >= 2 else ""
+                raw = inner
+            elif vt and vt.isdigit():
+                raw = vt
+            else:
+                raise SemanticEngineError(5, "azl_semantic_engine: .push object bad value")
+            i[0] += 1
+            fields[key] = raw[:64]
+            if i[0] < self.ntok and self.tok[i[0]] == ",":
+                i[0] += 1
+        if depth != 0:
+            raise SemanticEngineError(5, "azl_semantic_engine: .push object unclosed")
+        parts = [
+            self._tz_esc_field(fields["type"]),
+            self._tz_esc_field(fields["value"]),
+            self._tz_esc_field(fields["line"]),
+            self._tz_esc_field(fields["column"]),
+        ]
+        return "tz|" + "|".join(parts)
+
+    @staticmethod
+    def _rhs_concat_base(v: str) -> str | None:
+        suf = ".concat"
+        if (
+            not v.startswith("::")
+            or not v.endswith(suf)
+            or len(v) <= len(suf) + 2
+        ):
+            return None
+        return v[: -len(suf)]
 
     def _values_eq(self, l_nullish: int, l: str, r_nullish: int, r: str) -> bool:
         if l_nullish and r_nullish:
@@ -495,8 +578,7 @@ class MinimalAZLRuntime:
                 seg = inner
                 i[0] += 1
             elif arg == "{":
-                self._consume_agg_literal(i)
-                seg = "{}"
+                seg = self._parse_push_tz_object(i)
             elif arg.startswith("::"):
                 seg = self.var_get(arg) or ""
                 i[0] += 1
@@ -520,6 +602,37 @@ class MinimalAZLRuntime:
         if i[0] >= self.ntok:
             return
         v = self.tok[i[0]]
+        concat_lhs = self._rhs_concat_base(v)
+        if concat_lhs is not None:
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != "(":
+                raise SemanticEngineError(5, "azl_semantic_engine: .concat missing (")
+            i[0] += 1
+            if i[0] >= self.ntok:
+                raise SemanticEngineError(5, "azl_semantic_engine: .concat missing arg")
+            carg = self.tok[i[0]]
+            if not carg.startswith("::"):
+                raise SemanticEngineError(5, "azl_semantic_engine: .concat bad arg")
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                raise SemanticEngineError(5, "azl_semantic_engine: .concat missing )")
+            i[0] += 1
+            lft = self.var_get(concat_lhs)
+            rgt = self.var_get(carg) or ""
+            lp = (
+                ""
+                if (lft is None or lft == "" or lft == "[]")
+                else lft
+            )
+            rp = "" if (rgt == "" or rgt == "[]") else rgt
+            if not lp:
+                joined = rp
+            elif not rp:
+                joined = lp
+            else:
+                joined = lp + "\n" + rp
+            self.var_set(k, joined[:255])
+            return
         if v == "[":
             self._consume_agg_literal(i)
             self.var_set(k, "[]")
