@@ -5,7 +5,7 @@ Single source of behavioral truth: keep in sync with C when changing the minimal
 Nested ``listen`` may run inside ``init`` / listener bodies; ``emit`` inside ``exec_block``
 drains the event queue (``process_events``) so chained handlers match the interpret→tokenize shape.
 Each queued event may carry a ``with { … }`` payload bound as ``::event.data.<key>`` for that dispatch
-(F10–F80 parity fixtures under ``azl/tests/p0_semantic_*.azl``). ``return`` at listener depth exits the
+(F10–F81 parity fixtures under ``azl/tests/p0_semantic_*.azl``). ``return`` at listener depth exits the
 current listener body (including from inside ``if { … }``); ``return`` in top-level ``init`` skips the rest of ``init``.
 ``set ::dst = ::src.split("delim")`` stores split segments joined by newlines; ``for ::v in ::dst { … }`` (listener
 bodies only) iterates those segments — matches the ``::code.split("\\n")`` + line loop shape in ``azl_interpreter.azl``.

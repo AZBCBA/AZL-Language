@@ -1,0 +1,29 @@
+# Gate F81: tokenize cache HIT path — `if (::cached_tok != null) { tok_hits + 1; set ::tokens = ::cached_tok; … return }` (mirrors `azl_interpreter.azl` ~75–82). Init seeds `::cached_tok`; minimal uses `::` LHS stand-in for `cached_tok` / map lookup.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    set ::cached_tok = "hit-body"
+    emit tok_cache_hit with { }
+  }
+  behavior {
+    listen for "tok_cache_hit" {
+      if (::cached_tok != null) {
+        say "CACHE_HIT"
+        set ::perf.stats.tok_hits = 0
+        set ::perf.stats.tok_hits = ::perf.stats.tok_hits + 1
+        say ::perf.stats.tok_hits
+        set ::tokens = ::cached_tok
+        say ::tokens
+        say "P0_SEM_TOK_CACHE_HIT_OK"
+        return
+      }
+      say "CACHE_MISS_BAD"
+      say "P0_SEM_TOK_CACHE_HIT_FAIL"
+    }
+  }
+}

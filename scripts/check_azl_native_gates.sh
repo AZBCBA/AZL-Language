@@ -2877,6 +2877,51 @@ if [ "$TCM_C_OUT" != "$TCM_PY_OUT" ]; then
   exit 343
 fi
 
+echo "[gate] F81: C vs Python — tokenize cache-hit branch (tok_hits + 1, ::tokens = ::cached_tok, return)"
+TCH="${ROOT_DIR}/azl/tests/p0_semantic_tokenize_cache_hit_branch.azl"
+set +e
+TCH_C_OUT="$("$MINI_BIN" "$TCH" boot.entry 2>&1)"
+tch_c_rc=$?
+set -e
+if [ "$tch_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_tokenize_cache_hit_branch exited $tch_c_rc: $TCH_C_OUT"
+  exit 344
+fi
+if ! printf '%s\n' "$TCH_C_OUT" | rg -q '^CACHE_HIT$'; then
+  echo "ERROR: expected CACHE_HIT in C output, got: $TCH_C_OUT"
+  exit 344
+fi
+if ! printf '%s\n' "$TCH_C_OUT" | rg -q '^1$'; then
+  echo "ERROR: expected 1 (tok_hits) in C output, got: $TCH_C_OUT"
+  exit 344
+fi
+if ! printf '%s\n' "$TCH_C_OUT" | rg -q '^hit-body$'; then
+  echo "ERROR: expected hit-body (::tokens from cache) in C output, got: $TCH_C_OUT"
+  exit 344
+fi
+if ! printf '%s\n' "$TCH_C_OUT" | rg -q '^P0_SEM_TOK_CACHE_HIT_OK$'; then
+  echo "ERROR: expected P0_SEM_TOK_CACHE_HIT_OK in C output, got: $TCH_C_OUT"
+  exit 344
+fi
+if ! printf '%s\n' "$TCH_C_OUT" | awk 'NR==1{if($0!="CACHE_HIT")exit 1} NR==2{if($0!="1")exit 1} NR==3{if($0!="hit-body")exit 1} NR==4{if($0!="P0_SEM_TOK_CACHE_HIT_OK")exit 1} END{if(NR!=4)exit 1}'; then
+  echo "ERROR: expected stdout order CACHE_HIT, 1, hit-body, OK for tokenize cache hit branch, got: $TCH_C_OUT"
+  exit 344
+fi
+set +e
+TCH_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$TCH" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+tch_py_rc=$?
+set -e
+if [ "$tch_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_tokenize_cache_hit_branch exited $tch_py_rc: $TCH_PY_OUT"
+  exit 345
+fi
+if [ "$TCH_C_OUT" != "$TCH_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_tokenize_cache_hit_branch" >&2
+  echo "C:  $TCH_C_OUT" >&2
+  echo "Py: $TCH_PY_OUT" >&2
+  exit 346
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

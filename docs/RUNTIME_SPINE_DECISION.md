@@ -2,7 +2,7 @@
 
 **Purpose:** One place to read **how native execution is supposed to work** and **what is true today**. Contributors should use this doc instead of inferring architecture only from shell defaults.
 
-**Last updated:** 2026-03-21
+**Last updated:** 2026-03-22
 
 ---
 
@@ -63,6 +63,8 @@ the trace today is: **`start_azl_native_mode.sh`** → **`run_enterprise_daemon.
 **P0emitbind (`emit with` payload `::var`, 2026-03-22):** In **`emit … with { key: ::var }`**, payload values that are **`::…`** tokens are **`var_get`** at **emit** time (unset → empty string), so downstream **`::event.data.key`** receives the **value**, not the token text. Matches **`emit tokenize_complete with { tokens: ::tokens }`** in **`azl_interpreter.azl`**. Gate **F79**: **`azl/tests/p0_semantic_emit_payload_var_bind.azl`** (exits **338–340**).
 
 **P0tokcache (tokenize cache check + miss counter, 2026-03-22):** **`if (::cached_tok != null) { … return }`** on the cache-hit path; on miss, **`::perf.stats.tok_misses = ::perf.stats.tok_misses + 1`** — aligns **`listen for "tokenize"`** ~**75–83** vs ~**101** (fixture uses **`::cached_tok`** because minimal **`set`** requires **`::`** LHS; real file uses **`cached_tok`** / map lookup). Gate **F80**: **`azl/tests/p0_semantic_tokenize_cache_miss_branch.azl`** (exits **341–343**).
+
+**P0tokhit (tokenize cache hit + `tok_hits`, 2026-03-22):** When **`::cached_tok != null`**, **`::perf.stats.tok_hits = ::perf.stats.tok_hits + 1`**, **`set ::tokens = ::cached_tok`**, then **`return`** after the tokenize tail (real file: double-quoted **`say`**, **`emit tokenize_complete with { tokens: ::tokens }`**, **`return`** ~**76–82**). Fixture seeds **`::cached_tok`** in **`init`** and uses **`say`** markers (**`CACHE_HIT`**, **`hit-body`**) instead of **`emit`**. Gate **F81**: **`azl/tests/p0_semantic_tokenize_cache_hit_branch.azl`** (exits **344–346**).
 
 **P0.1 execution order (vertical slices):** Maintainership sequence for **`azl_interpreter.azl`** on the semantic spine — parity gates (**A**), real-file **`init`** smoke (**B**), then **tokenize → parse → execute** slices (**C–E**) before claiming full **behavior** (**F**). Single source: **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** § **P0.1 — Long-term execution order** and **[TIER_B_BACKLOG.md](TIER_B_BACKLOG.md)** § **P0.1 execution checklist**.
 
