@@ -6,7 +6,8 @@
  * Usage: azl_interpreter_minimal <file.azl> [entry_component]
  * Env: AZL_COMBINED_PATH, AZL_ENTRY
  *
- * emit ... with { k: v } binds ::event.data.<k> per queued event (see azl/tests/p0_semantic_*.azl, gates F10-F67).
+ * emit ... with { k: v } binds ::event.data.<k> per queued event (see azl/tests/p0_semantic_*.azl, gates F10-F71).
+ * return exits the current listener body (including from inside if { }); return in init skips rest of init.
  */
 
 #define _GNU_SOURCE
@@ -49,6 +50,9 @@ static int g_nlisteners;
 /* Event queue for dispatch (event name + optional emit with { k: v, ... } payload) */
 static QueuedEvent g_event_queue[MAX_EVENTS];
 static int g_queue_head, g_queue_tail;
+
+static int g_listener_nesting = 0;
+static int g_listener_break = 0;
 
 static void skip_whitespace_and_comments(const char **p) {
   for (;;) {
@@ -106,7 +110,7 @@ static int tokenize(void) {
       p += 2;
       continue;
     }
-    if (*p == '{' || *p == '}' || *p == '(' || *p == ')' || *p == ';' || *p == '=' || *p == ',' || *p == '[' || *p == ']' || *p == '!' || *p == '+') {
+    if (*p == '{' || *p == '}' || *p == '(' || *p == ')' || *p == ';' || *p == '=' || *p == ',' || *p == '[' || *p == ']' || *p == '!' || *p == '+' || *p == '-') {
       char *s = malloc(2);
       if (!s) return -1;
       s[0] = *p++;
@@ -269,6 +273,7 @@ static void exec_if(int *i);
 static int eval_expr(int *i, char *out, size_t outsz);
 static void process_events(void);
 static void exec_listen(int *i);
+static void exec_block_impl(int start, int end, int preserve_listener_break_exit);
 
 /* Execute say "string" or say ::var - print to stdout */
 static void exec_say(int *i) {
@@ -447,6 +452,26 @@ static int eval_primary(int *i, char *out, size_t outsz, int *nullish) {
       *nullish = 0;
       return 0;
     }
+    {
+      const char *suf = ".length";
+      size_t tl = strlen(t);
+      size_t sl = strlen(suf);
+      if (tl > sl + 3U && strcmp(t + tl - sl, suf) == 0) {
+        char base[128];
+        size_t bl = tl - sl;
+        if (bl >= sizeof(base)) return -1;
+        memcpy(base, t, bl);
+        base[bl] = '\0';
+        if (base[0] == ':' && base[1] == ':') {
+          (*i)++;
+          const char *vv = var_get(base);
+          unsigned long Ln = vv ? (unsigned long)strlen(vv) : 0UL;
+          (void)snprintf(out, outsz, "%lu", Ln);
+          *nullish = 0;
+          return 0;
+        }
+      }
+    }
     const char *vv = var_get(t);
     if (!vv) *nullish = 1;
     else (void)snprintf(out, outsz, "%s", vv);
@@ -475,7 +500,9 @@ static int eval_sum(int *i, char *out, size_t outsz, int *nullish_out) {
   char acc[256];
   int acc_n = 0;
   if (eval_primary(i, acc, sizeof(acc), &acc_n) != 0) return -1;
-  while (*i < g_ntok && strcmp(g_tok[*i], "+") == 0) {
+  while (*i < g_ntok &&
+         (strcmp(g_tok[*i], "+") == 0 || strcmp(g_tok[*i], "-") == 0)) {
+    int is_sub = (strcmp(g_tok[*i], "-") == 0);
     (*i)++;
     char rh[256];
     int rn = 0;
@@ -484,9 +511,11 @@ static int eval_sum(int *i, char *out, size_t outsz, int *nullish_out) {
     int a_int = !acc_n && parse_full_long(acc, &la);
     int b_int = !rn && parse_full_long(rh, &lb);
     if (a_int && b_int) {
-      (void)snprintf(acc, sizeof(acc), "%ld", la + lb);
+      long res = is_sub ? (la - lb) : (la + lb);
+      (void)snprintf(acc, sizeof(acc), "%ld", res);
       acc_n = 0;
     } else {
+      if (is_sub) return -1;
       char tmp[512];
       (void)snprintf(tmp, sizeof(tmp), "%s%s", acc_n ? "" : acc, rn ? "" : rh);
       size_t tl = strlen(tmp);
@@ -539,12 +568,206 @@ static void exec_if(int *i) {
   }
 }
 
+/* Unescape AZL quoted string token (minimal: \\n \\t \\r \\\\ \" \') into out. */
+static int unescape_azl_string_token(const char *quoted, char *out, size_t outsz) {
+  if (!out || outsz == 0) return -1;
+  out[0] = '\0';
+  if (!quoted) return -1;
+  size_t L = strlen(quoted);
+  if (L < 2) return -1;
+  char q = quoted[0];
+  if ((q != '"' && q != '\'') || quoted[L - 1U] != q) return -1;
+  const char *in = quoted + 1;
+  const char *end = quoted + L - 1U;
+  size_t o = 0;
+  while (in < end && o + 1 < outsz) {
+    if (*in == '\\' && in + 1 < end) {
+      char n = in[1];
+      if (n == 'n') out[o++] = '\n';
+      else if (n == 't') out[o++] = '\t';
+      else if (n == 'r') out[o++] = '\r';
+      else if (n == '\\') out[o++] = '\\';
+      else if (n == '"') out[o++] = '"';
+      else if (n == '\'') out[o++] = '\'';
+      else out[o++] = n;
+      in += 2;
+    } else {
+      out[o++] = *in++;
+    }
+  }
+  out[o] = '\0';
+  return (int)o;
+}
+
+static void split_join_newlines(const char *src, const char *delim, char *out, size_t cap) {
+  if (!out || cap == 0) return;
+  out[0] = '\0';
+  if (!delim || !delim[0]) return;
+  size_t o = 0;
+  const char *p = src ? src : "";
+  size_t dlen = strlen(delim);
+  int need_nl = 0;
+  for (;;) {
+    const char *found = strstr(p, delim);
+    size_t seglen = found ? (size_t)(found - p) : strlen(p);
+    if (need_nl && o + 1 < cap) out[o++] = '\n';
+    need_nl = 1;
+    for (size_t j = 0; j < seglen && o + 1 < cap; j++)
+      out[o++] = p[j];
+    out[o] = '\0';
+    if (!found) break;
+    p = found + dlen;
+  }
+}
+
+/* UTF-8: length in bytes of one scalar value starting at s; 0 at NUL; 1 on invalid lead. */
+static size_t utf8_scalar_byte_len(const unsigned char *s) {
+  if (!s || !*s) return 0;
+  unsigned char c0 = s[0];
+  if (c0 < 0x80) return 1;
+  if ((c0 & 0xE0) == 0xC0) {
+    if (!s[1] || (s[1] & 0xC0) != 0x80) return 1;
+    if (c0 < 0xC2) return 1;
+    return 2;
+  }
+  if ((c0 & 0xF0) == 0xE0) {
+    if (!s[1] || !s[2] || (s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80) return 1;
+    if (c0 == 0xE0 && s[1] < 0xA0) return 1;
+    if (c0 == 0xED && s[1] > 0x9F) return 1;
+    return 3;
+  }
+  if ((c0 & 0xF8) == 0xF0) {
+    if (!s[1] || !s[2] || !s[3]) return 1;
+    if ((s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80 || (s[3] & 0xC0) != 0x80) return 1;
+    if (c0 == 0xF0 && s[1] < 0x90) return 1;
+    if (c0 == 0xF4 && s[1] > 0x8F) return 1;
+    return 4;
+  }
+  return 1;
+}
+
+static void join_chars_newlines_utf8(const char *src, char *out, size_t cap) {
+  if (!out || cap == 0) return;
+  out[0] = '\0';
+  size_t o = 0;
+  const unsigned char *p = (const unsigned char *)(src ? src : "");
+  int need_nl = 0;
+  while (*p) {
+    size_t L = utf8_scalar_byte_len(p);
+    if (L == 0) break;
+    if (need_nl && o + 1 < cap) out[o++] = '\n';
+    need_nl = 1;
+    for (size_t j = 0; j < L && o + 1 < cap; j++)
+      out[o++] = (char)p[j];
+    out[o] = '\0';
+    p += L;
+  }
+}
+
+/* True if v is ::name.split_chars; copies ::name into base_out. */
+static int rhs_is_var_split_chars_call(const char *v, char *base_out, size_t base_sz) {
+  if (!v || !base_out || base_sz == 0) return 0;
+  base_out[0] = '\0';
+  if (v[0] != ':' || v[1] != ':') return 0;
+  size_t L = strlen(v);
+  const char *suf = ".split_chars";
+  size_t sl = strlen(suf);
+  if (L <= 2U + sl) return 0;
+  if (strcmp(v + L - sl, suf) != 0) return 0;
+  size_t bl = L - sl;
+  if (bl >= base_sz) bl = base_sz - 1U;
+  memcpy(base_out, v, bl);
+  base_out[bl] = '\0';
+  return bl >= 3U ? 1 : 0;
+}
+
+/* True if v is ::name.split; copies ::name into base_out. */
+static int rhs_is_var_split_call(const char *v, char *base_out, size_t base_sz) {
+  if (!v || !base_out || base_sz == 0) return 0;
+  base_out[0] = '\0';
+  if (v[0] != ':' || v[1] != ':') return 0;
+  size_t L = strlen(v);
+  const char *suf = ".split";
+  size_t sl = strlen(suf);
+  if (L <= 2U + sl) return 0;
+  if (strcmp(v + L - sl, suf) != 0) return 0;
+  size_t bl = L - sl;
+  if (bl >= base_sz) bl = base_sz - 1U;
+  memcpy(base_out, v, bl);
+  base_out[bl] = '\0';
+  return bl >= 3U ? 1 : 0;
+}
+
+/* True if k is ::name.push; copies ::name into base_out. */
+static int lhs_is_var_push_call(const char *k, char *base_out, size_t base_sz) {
+  if (!k || !base_out || base_sz == 0) return 0;
+  base_out[0] = '\0';
+  if (k[0] != ':' || k[1] != ':') return 0;
+  size_t L = strlen(k);
+  const char *suf = ".push";
+  size_t sl = strlen(suf);
+  if (L <= 2U + sl) return 0;
+  if (strcmp(k + L - sl, suf) != 0) return 0;
+  size_t bl = L - sl;
+  if (bl >= base_sz) bl = base_sz - 1U;
+  memcpy(base_out, k, bl);
+  base_out[bl] = '\0';
+  return bl >= 3U ? 1 : 0;
+}
+
 /* Execute set ::var = value */
 static void exec_set(int *i) {
   (*i)++;
   if (*i >= g_ntok) return;
   const char *k = g_tok[*i];
   if (!k || k[0] != ':' || k[1] != ':') { (*i)++; return; }
+  char push_base[64];
+  if (lhs_is_var_push_call(k, push_base, sizeof(push_base))) {
+    (*i)++;
+    if (*i >= g_ntok || strcmp(g_tok[*i], "(") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: .push missing (\n");
+      exit(5);
+    }
+    (*i)++;
+    if (*i >= g_ntok) {
+      fprintf(stderr, "azl_interpreter_minimal: .push missing arg\n");
+      exit(5);
+    }
+    const char *arg = g_tok[*i];
+    char seg[256] = {0};
+    if (arg && strlen(arg) >= 2U && (arg[0] == '"' || arg[0] == '\'')) {
+      size_t len = strlen(arg);
+      size_t n = (len >= 2U) ? len - 2U : 0U;
+      if (n >= sizeof(seg)) n = sizeof(seg) - 1U;
+      memcpy(seg, arg + 1, n);
+      seg[n] = '\0';
+      (*i)++;
+    } else if (arg && strcmp(arg, "{") == 0) {
+      consume_agg_literal(i);
+      (void)snprintf(seg, sizeof(seg), "{}");
+    } else if (arg && arg[0] == ':' && arg[1] == ':') {
+      const char *vv = var_get(arg);
+      if (vv) (void)snprintf(seg, sizeof(seg), "%s", vv);
+      (*i)++;
+    } else {
+      fprintf(stderr, "azl_interpreter_minimal: .push bad arg\n");
+      exit(5);
+    }
+    if (*i >= g_ntok || strcmp(g_tok[*i], ")") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: .push missing )\n");
+      exit(5);
+    }
+    (*i)++;
+    const char *cur0 = var_get(push_base);
+    const char *cur = (cur0 && cur0[0] && strcmp(cur0, "[]") != 0) ? cur0 : "";
+    char out[256] = {0};
+    if (!cur[0])
+      (void)snprintf(out, sizeof(out), "%s", seg);
+    else
+      (void)snprintf(out, sizeof(out), "%s\n%s", cur, seg);
+    var_set(push_base, out);
+    return;
+  }
   (*i)++;
   if (*i >= g_ntok || strcmp(g_tok[*i], "=") != 0) return;
   (*i)++;
@@ -560,6 +783,53 @@ static void exec_set(int *i) {
   if (v && strcmp(v, "{") == 0) {
     consume_agg_literal(i);
     (void)snprintf(val, sizeof(val), "{}");
+    var_set(k, val);
+    return;
+  }
+  char schars_base[64];
+  if (v && rhs_is_var_split_chars_call(v, schars_base, sizeof(schars_base))) {
+    (*i)++;
+    if (*i >= g_ntok || strcmp(g_tok[*i], "(") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: .split_chars missing (\n");
+      exit(5);
+    }
+    (*i)++;
+    if (*i >= g_ntok || strcmp(g_tok[*i], ")") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: .split_chars missing )\n");
+      exit(5);
+    }
+    (*i)++;
+    const char *srct = var_get(schars_base);
+    join_chars_newlines_utf8(srct, val, sizeof(val));
+    var_set(k, val);
+    return;
+  }
+  char split_base[64];
+  if (v && rhs_is_var_split_call(v, split_base, sizeof(split_base))) {
+    (*i)++;
+    if (*i >= g_ntok || strcmp(g_tok[*i], "(") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: .split missing (\n");
+      exit(5);
+    }
+    (*i)++;
+    if (*i >= g_ntok) {
+      fprintf(stderr, "azl_interpreter_minimal: .split missing literal\n");
+      exit(5);
+    }
+    char delimbuf[64];
+    if (unescape_azl_string_token(g_tok[*i], delimbuf, sizeof(delimbuf)) < 0 ||
+        !delimbuf[0]) {
+      fprintf(stderr, "azl_interpreter_minimal: split delimiter empty\n");
+      exit(5);
+    }
+    (*i)++;
+    if (*i >= g_ntok || strcmp(g_tok[*i], ")") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: .split missing )\n");
+      exit(5);
+    }
+    (*i)++;
+    const char *srct = var_get(split_base);
+    split_join_newlines(srct, delimbuf, val, sizeof(val));
     var_set(k, val);
     return;
   }
@@ -692,24 +962,85 @@ static void exec_listen(int *i) {
   }
 }
 
+static void exec_for_in(int *i) {
+  (*i)++;
+  if (*i >= g_ntok) return;
+  const char *loop_var = g_tok[*i];
+  if (!loop_var || loop_var[0] != ':' || loop_var[1] != ':') {
+    (*i)++;
+    return;
+  }
+  (*i)++;
+  if (*i >= g_ntok || strcmp(g_tok[*i], "in") != 0) return;
+  (*i)++;
+  if (*i >= g_ntok) return;
+  const char *seq_key = g_tok[*i];
+  if (!seq_key || seq_key[0] != ':' || seq_key[1] != ':') {
+    (*i)++;
+    return;
+  }
+  (*i)++;
+  if (*i >= g_ntok || strcmp(g_tok[*i], "{") != 0) {
+    fprintf(stderr, "azl_interpreter_minimal: for-in missing {\n");
+    exit(5);
+  }
+  int body_start = *i + 1;
+  int body_end = find_block_end(body_start);
+  *i = body_end + 1;
+  const char *raw = var_get(seq_key);
+  if (!raw) raw = "";
+  char segbuf[256];
+  const char *q = raw;
+  for (;;) {
+    const char *nl = strchr(q, '\n');
+    size_t slen = nl ? (size_t)(nl - q) : strlen(q);
+    if (slen >= sizeof(segbuf)) slen = sizeof(segbuf) - 1U;
+    memcpy(segbuf, q, slen);
+    segbuf[slen] = '\0';
+    var_set(loop_var, segbuf);
+    exec_block_impl(body_start, body_end, 1);
+    if (g_listener_break) break;
+    if (!nl) break;
+    q = nl + 1;
+  }
+}
+
 /* Execute a block from start to end (exclusive) */
-static void exec_block(int start, int end) {
+static void exec_block_impl(int start, int end, int preserve_listener_break_exit) {
+  g_listener_nesting++;
+  g_listener_break = 0;
   int depth = 1;
   for (int i = start; i < end && i < g_ntok; ) {
     const char *t = g_tok[i];
     if (!t) break;
     if (strcmp(t, "{") == 0) { depth++; i++; }
     else if (strcmp(t, "}") == 0) { depth--; if (depth <= 0) break; i++; }
-    else if (depth == 1 && strcmp(t, "say") == 0) exec_say(&i);
+    else if (depth == 1 && strcmp(t, "return") == 0) {
+      i++;
+      g_listener_break = 1;
+      break;
+    } else if (depth == 1 && strcmp(t, "say") == 0) exec_say(&i);
     else if (depth == 1 && strcmp(t, "set") == 0) exec_set(&i);
-    else if (depth == 1 && strcmp(t, "if") == 0) exec_if(&i);
-    else if (depth == 1 && strcmp(t, "listen") == 0) exec_listen(&i);
+    else if (depth == 1 && strcmp(t, "if") == 0) {
+      exec_if(&i);
+      if (g_listener_break) break;
+    } else if (depth == 1 && strcmp(t, "for") == 0) {
+      exec_for_in(&i);
+      if (g_listener_break) break;
+    } else if (depth == 1 && strcmp(t, "listen") == 0) exec_listen(&i);
     else if (depth == 1 && strcmp(t, "emit") == 0) {
       exec_emit(&i);
       process_events();
     } else if (depth == 1 && strcmp(t, "link") == 0) exec_link(&i);
     else i++;
   }
+  g_listener_nesting--;
+  if (!preserve_listener_break_exit)
+    g_listener_break = 0;
+}
+
+static void exec_block(int start, int end) {
+  exec_block_impl(start, end, 0);
 }
 
 /* Process event queue: dispatch to listeners */
@@ -735,10 +1066,29 @@ static void exec_init_block(int *i) {
     if (!t) break;
     if (strcmp(t, "{") == 0) { depth++; (*i)++; }
     else if (strcmp(t, "}") == 0) { depth--; if (depth <= 0) break; (*i)++; }
-    else if (depth == 1 && strcmp(t, "say") == 0) exec_say(i);
+    else if (depth == 1 && strcmp(t, "return") == 0) {
+      (*i)++;
+      int d = 1;
+      while (*i < g_ntok && d > 0) {
+        const char *t2 = g_tok[*i];
+        if (strcmp(t2, "{") == 0) {
+          d++;
+          (*i)++;
+        } else if (strcmp(t2, "}") == 0) {
+          d--;
+          if (d == 0) break;
+          (*i)++;
+        } else (*i)++;
+      }
+      if (g_listener_nesting > 0) g_listener_break = 1;
+      return;
+    } else if (depth == 1 && strcmp(t, "say") == 0) exec_say(i);
     else if (depth == 1 && strcmp(t, "set") == 0) exec_set(i);
     else if (depth == 1 && strcmp(t, "if") == 0) exec_if(i);
-    else if (depth == 1 && strcmp(t, "listen") == 0) exec_listen(i);
+    else if (depth == 1 && strcmp(t, "for") == 0) {
+      fprintf(stderr, "azl_interpreter_minimal: for-in not allowed in init\n");
+      exit(5);
+    } else if (depth == 1 && strcmp(t, "listen") == 0) exec_listen(i);
     else if (depth == 1 && strcmp(t, "emit") == 0) { exec_emit(i); process_events(); }
     else if (depth == 1 && strcmp(t, "link") == 0) exec_link(i);
     else (*i)++;

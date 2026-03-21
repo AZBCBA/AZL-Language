@@ -2292,6 +2292,260 @@ if [ "$STC_C_OUT" != "$STC_PY_OUT" ]; then
   exit 285
 fi
 
+echo "[gate] F68: C vs Python — return inside if in listener (early exit listener body)"
+RET="${ROOT_DIR}/azl/tests/p0_semantic_return_in_listener_if.azl"
+set +e
+RET_C_OUT="$("$MINI_BIN" "$RET" boot.entry 2>&1)"
+ret_c_rc=$?
+set -e
+if [ "$ret_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_return_in_listener_if exited $ret_c_rc: $RET_C_OUT"
+  exit 291
+fi
+if ! printf '%s\n' "$RET_C_OUT" | rg -q '^EARLY$'; then
+  echo "ERROR: expected EARLY line from listener, got: $RET_C_OUT"
+  exit 291
+fi
+if ! printf '%s\n' "$RET_C_OUT" | rg -q '^LATE$'; then
+  echo "ERROR: expected LATE line from listener, got: $RET_C_OUT"
+  exit 291
+fi
+if ! printf '%s\n' "$RET_C_OUT" | rg -q 'P0_SEMANTIC_RETURN_IN_LISTENER_OK'; then
+  echo "ERROR: expected P0_SEMANTIC_RETURN_IN_LISTENER_OK in C output, got: $RET_C_OUT"
+  exit 291
+fi
+if ! printf '%s\n' "$RET_C_OUT" | awk 'NR==1{if($0!="EARLY")exit 1} NR==2{if($0!="LATE")exit 1} NR==3{if($0!="P0_SEMANTIC_RETURN_IN_LISTENER_OK")exit 1} END{if(NR!=3)exit 1}'; then
+  echo "ERROR: expected stdout order EARLY, LATE, P0_SEMANTIC_RETURN_IN_LISTENER_OK, got: $RET_C_OUT"
+  exit 291
+fi
+set +e
+RET_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$RET" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+ret_py_rc=$?
+set -e
+if [ "$ret_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_return_in_listener_if exited $ret_py_rc: $RET_PY_OUT"
+  exit 292
+fi
+if [ "$RET_C_OUT" != "$RET_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_return_in_listener_if" >&2
+  echo "C:  $RET_C_OUT" >&2
+  echo "Py: $RET_PY_OUT" >&2
+  exit 293
+fi
+
+echo "[gate] F69: C vs Python — ::var.split(\"delim\") + for-in listener line loop"
+FSPL="${ROOT_DIR}/azl/tests/p0_semantic_for_split_line_loop.azl"
+set +e
+FSPL_C_OUT="$("$MINI_BIN" "$FSPL" boot.entry 2>&1)"
+fspl_c_rc=$?
+set -e
+if [ "$fspl_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_for_split_line_loop exited $fspl_c_rc: $FSPL_C_OUT"
+  exit 294
+fi
+if ! printf '%s\n' "$FSPL_C_OUT" | rg -q '^alpha$'; then
+  echo "ERROR: expected alpha line from for/split listener, got: $FSPL_C_OUT"
+  exit 294
+fi
+if ! printf '%s\n' "$FSPL_C_OUT" | rg -q '^beta$'; then
+  echo "ERROR: expected beta line, got: $FSPL_C_OUT"
+  exit 294
+fi
+if ! printf '%s\n' "$FSPL_C_OUT" | rg -q '^gamma$'; then
+  echo "ERROR: expected gamma line, got: $FSPL_C_OUT"
+  exit 294
+fi
+if ! printf '%s\n' "$FSPL_C_OUT" | rg -q 'P0_SEMANTIC_FOR_SPLIT_OK'; then
+  echo "ERROR: expected P0_SEMANTIC_FOR_SPLIT_OK in C output, got: $FSPL_C_OUT"
+  exit 294
+fi
+if ! printf '%s\n' "$FSPL_C_OUT" | awk 'NR==1{if($0!="alpha")exit 1} NR==2{if($0!="beta")exit 1} NR==3{if($0!="gamma")exit 1} NR==4{if($0!="P0_SEMANTIC_FOR_SPLIT_OK")exit 1} END{if(NR!=4)exit 1}'; then
+  echo "ERROR: expected stdout order alpha, beta, gamma, P0_SEMANTIC_FOR_SPLIT_OK, got: $FSPL_C_OUT"
+  exit 294
+fi
+set +e
+FSPL_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$FSPL" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+fspl_py_rc=$?
+set -e
+if [ "$fspl_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_for_split_line_loop exited $fspl_py_rc: $FSPL_PY_OUT"
+  exit 295
+fi
+if [ "$FSPL_C_OUT" != "$FSPL_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_for_split_line_loop" >&2
+  echo "C:  $FSPL_C_OUT" >&2
+  echo "Py: $FSPL_PY_OUT" >&2
+  exit 296
+fi
+
+echo "[gate] F70: C vs Python — ::global.length in if / expressions"
+DLEN="${ROOT_DIR}/azl/tests/p0_semantic_dot_length_global.azl"
+set +e
+DLEN_C_OUT="$("$MINI_BIN" "$DLEN" boot.entry 2>&1)"
+dlen_c_rc=$?
+set -e
+if [ "$dlen_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_dot_length_global exited $dlen_c_rc: $DLEN_C_OUT"
+  exit 297
+fi
+if ! printf '%s\n' "$DLEN_C_OUT" | rg -q '^ZERO$'; then
+  echo "ERROR: expected ZERO line (unset .length == 0), got: $DLEN_C_OUT"
+  exit 297
+fi
+if ! printf '%s\n' "$DLEN_C_OUT" | rg -q '^TWO$'; then
+  echo "ERROR: expected TWO line, got: $DLEN_C_OUT"
+  exit 297
+fi
+if ! printf '%s\n' "$DLEN_C_OUT" | rg -q 'P0_SEMANTIC_DOT_LENGTH_OK'; then
+  echo "ERROR: expected P0_SEMANTIC_DOT_LENGTH_OK in C output, got: $DLEN_C_OUT"
+  exit 297
+fi
+if ! printf '%s\n' "$DLEN_C_OUT" | awk 'NR==1{if($0!="ZERO")exit 1} NR==2{if($0!="TWO")exit 1} NR==3{if($0!="P0_SEMANTIC_DOT_LENGTH_OK")exit 1} END{if(NR!=3)exit 1}'; then
+  echo "ERROR: expected stdout order ZERO, TWO, P0_SEMANTIC_DOT_LENGTH_OK, got: $DLEN_C_OUT"
+  exit 297
+fi
+set +e
+DLEN_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$DLEN" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+dlen_py_rc=$?
+set -e
+if [ "$dlen_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_dot_length_global exited $dlen_py_rc: $DLEN_PY_OUT"
+  exit 298
+fi
+if [ "$DLEN_C_OUT" != "$DLEN_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_dot_length_global" >&2
+  echo "C:  $DLEN_C_OUT" >&2
+  echo "Py: $DLEN_PY_OUT" >&2
+  exit 299
+fi
+
+echo "[gate] F71: C vs Python — ::line.split_chars() + for ::c in ::chars"
+SCH="${ROOT_DIR}/azl/tests/p0_semantic_split_chars_for.azl"
+set +e
+SCH_C_OUT="$("$MINI_BIN" "$SCH" boot.entry 2>&1)"
+sch_c_rc=$?
+set -e
+if [ "$sch_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_split_chars_for exited $sch_c_rc: $SCH_C_OUT"
+  exit 311
+fi
+if ! printf '%s\n' "$SCH_C_OUT" | rg -q '^a$'; then
+  echo "ERROR: expected a line from split_chars for-loop, got: $SCH_C_OUT"
+  exit 311
+fi
+if ! printf '%s\n' "$SCH_C_OUT" | rg -q '^b$'; then
+  echo "ERROR: expected b line, got: $SCH_C_OUT"
+  exit 311
+fi
+if ! printf '%s\n' "$SCH_C_OUT" | rg -q 'P0_SEMANTIC_SPLIT_CHARS_OK'; then
+  echo "ERROR: expected P0_SEMANTIC_SPLIT_CHARS_OK in C output, got: $SCH_C_OUT"
+  exit 311
+fi
+if ! printf '%s\n' "$SCH_C_OUT" | awk 'NR==1{if($0!="a")exit 1} NR==2{if($0!="b")exit 1} NR==3{if($0!="P0_SEMANTIC_SPLIT_CHARS_OK")exit 1} END{if(NR!=3)exit 1}'; then
+  echo "ERROR: expected stdout order a, b, P0_SEMANTIC_SPLIT_CHARS_OK, got: $SCH_C_OUT"
+  exit 311
+fi
+set +e
+SCH_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$SCH" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+sch_py_rc=$?
+set -e
+if [ "$sch_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_split_chars_for exited $sch_py_rc: $SCH_PY_OUT"
+  exit 312
+fi
+if [ "$SCH_C_OUT" != "$SCH_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_split_chars_for" >&2
+  echo "C:  $SCH_C_OUT" >&2
+  echo "Py: $SCH_PY_OUT" >&2
+  exit 313
+fi
+
+echo "[gate] F72: C vs Python — set ::buf.push + for ::row in ::buf"
+PSH="${ROOT_DIR}/azl/tests/p0_semantic_push_string_listener.azl"
+set +e
+PSH_C_OUT="$("$MINI_BIN" "$PSH" boot.entry 2>&1)"
+psh_c_rc=$?
+set -e
+if [ "$psh_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_push_string_listener exited $psh_c_rc: $PSH_C_OUT"
+  exit 314
+fi
+if ! printf '%s\n' "$PSH_C_OUT" | rg -q '^P0_SEMANTIC_PUSH_INIT_OK$'; then
+  echo "ERROR: expected P0_SEMANTIC_PUSH_INIT_OK in C output, got: $PSH_C_OUT"
+  exit 314
+fi
+if ! printf '%s\n' "$PSH_C_OUT" | rg -q '^first$'; then
+  echo "ERROR: expected first line from push+for, got: $PSH_C_OUT"
+  exit 314
+fi
+if ! printf '%s\n' "$PSH_C_OUT" | rg -q '^second$'; then
+  echo "ERROR: expected second line, got: $PSH_C_OUT"
+  exit 314
+fi
+if ! printf '%s\n' "$PSH_C_OUT" | rg -q '^P0_SEMANTIC_PUSH_STRING_OK$'; then
+  echo "ERROR: expected P0_SEMANTIC_PUSH_STRING_OK in C output, got: $PSH_C_OUT"
+  exit 314
+fi
+if ! printf '%s\n' "$PSH_C_OUT" | awk 'NR==1{if($0!="P0_SEMANTIC_PUSH_INIT_OK")exit 1} NR==2{if($0!="first")exit 1} NR==3{if($0!="second")exit 1} NR==4{if($0!="P0_SEMANTIC_PUSH_STRING_OK")exit 1} END{if(NR!=4)exit 1}'; then
+  echo "ERROR: expected stdout order init_ok, first, second, PUSH_STRING_OK, got: $PSH_C_OUT"
+  exit 314
+fi
+set +e
+PSH_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$PSH" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+psh_py_rc=$?
+set -e
+if [ "$psh_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_push_string_listener exited $psh_py_rc: $PSH_PY_OUT"
+  exit 315
+fi
+if [ "$PSH_C_OUT" != "$PSH_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_push_string_listener" >&2
+  echo "C:  $PSH_C_OUT" >&2
+  echo "Py: $PSH_PY_OUT" >&2
+  exit 316
+fi
+
+echo "[gate] F73: C vs Python — integer ::column - ::var.length (tokenize column)"
+SUB="${ROOT_DIR}/azl/tests/p0_semantic_int_sub_column_length.azl"
+set +e
+SUB_C_OUT="$("$MINI_BIN" "$SUB" boot.entry 2>&1)"
+sub_c_rc=$?
+set -e
+if [ "$sub_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_int_sub_column_length exited $sub_c_rc: $SUB_C_OUT"
+  exit 317
+fi
+if ! printf '%s\n' "$SUB_C_OUT" | rg -q '^P0_SEMANTIC_INT_SUB_INIT_OK$'; then
+  echo "ERROR: expected P0_SEMANTIC_INT_SUB_INIT_OK in C output, got: $SUB_C_OUT"
+  exit 317
+fi
+if ! printf '%s\n' "$SUB_C_OUT" | rg -q '^3$'; then
+  echo "ERROR: expected 3 (5 - len(ab)), got: $SUB_C_OUT"
+  exit 317
+fi
+if ! printf '%s\n' "$SUB_C_OUT" | rg -q '^P0_SEMANTIC_INT_SUB_OK$'; then
+  echo "ERROR: expected P0_SEMANTIC_INT_SUB_OK in C output, got: $SUB_C_OUT"
+  exit 317
+fi
+if ! printf '%s\n' "$SUB_C_OUT" | awk 'NR==1{if($0!="P0_SEMANTIC_INT_SUB_INIT_OK")exit 1} NR==2{if($0!="3")exit 1} NR==3{if($0!="P0_SEMANTIC_INT_SUB_OK")exit 1} END{if(NR!=3)exit 1}'; then
+  echo "ERROR: expected stdout order init_ok, 3, INT_SUB_OK, got: $SUB_C_OUT"
+  exit 317
+fi
+set +e
+SUB_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$SUB" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+sub_py_rc=$?
+set -e
+if [ "$sub_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_int_sub_column_length exited $sub_py_rc: $SUB_PY_OUT"
+  exit 318
+fi
+if [ "$SUB_C_OUT" != "$SUB_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_int_sub_column_length" >&2
+  echo "C:  $SUB_C_OUT" >&2
+  echo "Py: $SUB_PY_OUT" >&2
+  exit 319
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

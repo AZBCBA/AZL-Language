@@ -17,7 +17,7 @@ This direction was **not** invented in one message. It comes from a **long discu
 | Read first | Why |
 |------------|-----|
 | **[AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md](AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md)** | North star, phases, literal vs serving vs semantic, wedges W1–W3, harness vs language |
-| **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** | P0–P5 spine, gates, what is **actually** queued |
+| **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** | P0–P5 spine, gates, what is **actually** queued; **§ P0.1** = ordered vertical-slice plan toward **`azl_interpreter.azl`** on the spine |
 | **[RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md)** | **Process trace truth** — what runs today (C minimal, semantic Python, etc.) |
 
 **Honesty about code vs narrative:**
@@ -34,6 +34,7 @@ This direction was **not** invented in one message. It comes from a **long discu
 
 - **Reality today:** Partial spine, narrow interpreters, docs and `.azl` files that sometimes **read** more complete than the **default trace**. Rust may live **off-repo**; **0** `*.rs` in-tree per audit.
 - **Target (not yet fully real):** Native **AOT/codegen** backbone; **literal** codecs **where Exact is claimed**; **serving/quantized** paths where scale matters; **LHA3/policy** as semantic layer; **bootstrap** then **self-host**; **CLI** install story; **tests/harness** separate from language with **explicit errors** per **[ERROR_SYSTEM.md](ERROR_SYSTEM.md)**.
+- **Release verify:** **`make verify`** runs **`scripts/verify_azl_interpreter_semantic_spine_smoke.sh`** (step **3** after native gates) — proves the **real** **`azl/runtime/interpreter/azl_interpreter.azl`** file completes **`init`** on the **Python** semantic spine with a harness **`::azl.security`** stub (**P0.1b**); **not** full **`behavior`**. See **[RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md)** **P0.1b**, **[CONNECTIVITY_AUDIT.md](CONNECTIVITY_AUDIT.md)** step **3**.
 
 **Any assistant must treat “target” as a roadmap, not as shipped fact** — unless a **gate, test, or trace** proves it.
 
@@ -76,5 +77,6 @@ This direction was **not** invented in one message. It comes from a **long discu
 
 | Date | Change |
 |------|--------|
-| 2026-03-21 | Native semantic parity **F10–F67** — **`emit with`**, listeners, **`link`**, **`if`** / nested **`emit`**, **`say`**, **`null`**, init / boot **`listen`**, payload scalars, nested multi-key inner **`with`**, first-matching listener (per-behavior and cross-component **`link`** order), string truthy/falsy **`if`**, same-event queue, double bare **`emit`**, **`or`** / **`==`** / **`!=`** / **`+`** on globals and **string literals** in **`if`** / **`set`** (**111–285**; **ERROR_SYSTEM** § Native gates; **271** skipped in native script — literal codec). **[RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md)** **P0k–P0z** + **F26–F67** blocks. Extend **`azl/tests/p0_semantic_*.azl`** only with matching C + Python + gate + **ERROR_SYSTEM** rows. |
+| 2026-03-21 | **P0.1 vertical-slice execution order** (phases **A–F**) in **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** § **P0.1** + checklist in **[TIER_B_BACKLOG.md](TIER_B_BACKLOG.md)**; pointers from **[RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md)**, strategic plan, **[INTEGRATION_VERIFY.md](INTEGRATION_VERIFY.md)**, **[AGENTS.md](../AGENTS.md)**. |
+| 2026-03-21 | Native semantic parity **F5–F73** on fixtures (**ERROR_SYSTEM** § Native gates; **271** skipped — literal codec): through **F71** **`split_chars()` + char `for`** (**311–313**, **P0u**); **F72** **`set ::buf.push(…)`** (**314–316**, **P0push**); **F73** int **`-`** + **`.length`** (**317–319**, **P0sub**). New behavior = **`p0_semantic_*.azl`** + C + Python + **`check_azl_native_gates.sh`** + doc rows — no silent exits. |
 | 2026-03-20 | Initial continuity handoff after long alignment discussion; links strategic plan + spine + audit. |

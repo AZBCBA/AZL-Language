@@ -19,10 +19,31 @@ This is the **honest** map from **today’s repository** to the **contract goals
 
 **Target (full P0):** The runtime child must be able to apply **full** language semantics from `azl_interpreter.azl` to the enterprise combined program (AZL-in-AZL self-host or equivalent).
 
+### P0.1 — Long-term execution order (vertical slices)
+
+**Principle:** Prefer increments that unlock a **contiguous** region of **`azl/runtime/interpreter/azl_interpreter.azl`** on the **Python semantic spine** (`tools/azl_semantic_engine/minimal_runtime.py`). Extend **C minimal** only where **`scripts/check_azl_native_gates.sh`** already enforces parity. **Gates F2–F73** (and successors) are **regression anchors**; they do **not** replace **deeper interpreter smokes** that prove the **real file** advances.
+
+| Phase | Intent | Exit criteria (claim “done” only if these hold) | Primary verification |
+|-------|--------|---------------------------------------------------|----------------------|
+| **A — Parity safety net** | C ↔ Python stay aligned on the **contracted** subset | `bash scripts/check_azl_native_gates.sh` exits **0** (includes **F**, **F2–F73**, **G**, **G2**, **H**, engine build as wired) | Native gates |
+| **B — Real interpreter file, shallow** | Stub + real source **`init`** completes on spine | `bash scripts/verify_azl_interpreter_semantic_spine_smoke.sh` exits **0**; marker **`azl-interpreter-semantic-spine-smoke-ok`**; see **ERROR_SYSTEM** **286–290** | **`make verify`** step **3** (`run_full_repo_verification.sh`) |
+| **C — Vertical slice: tokenize** | Match **`listen for "tokenize"`** control/data flow (line **`split`**, **`for`**, **`return`**, **`.length`**, **per-character** iteration via **`::line.split_chars()`** + **`for ::c in ::chars`**, **`set ::buf.push(…)`** token-buffer shape, then next real blockers in that listener) | Each feature lands with **fixture + F-gate + ERROR_SYSTEM** rows (**F71** = **`split_chars`** + char **`for`**; **F72** = **`push`**; **F73** = int **`-`** + **`.length`**); optional **extended smoke** or new **`verify_*`** script proves **more lines** of the real file execute **without silent failure** | Parity gates + smoke / verify script named in PR |
+| **D — Vertical slice: parse** | **`listen for "parse"`** and dependencies | Same pattern: fixtures + gates + deeper smoke when ready | Same |
+| **E — Vertical slice: execute** | **`listen for "execute"`** / execution path | Same | Same |
+| **F — Self-host / full behavior claim** | **`behavior`** from **`azl_interpreter.azl`** is **actually** driven by **`minimal_runtime`** (or a documented successor) | **Explicit** acceptance checklist (to be tightened when **C–E** narrow); **not** met by **init-only** smoke alone | Process trace + gates + integration |
+
+**Explicit non-goals until the matching roadmap work exists:**
+
+- Flipping **default** **`AZL_RUNTIME_SPINE`** to **`azl_interpreter`** (**Layer 1** item 2 below) before **C–E** materially advance — see **P0.2** in [TIER_B_BACKLOG.md](TIER_B_BACKLOG.md).
+- Claiming **Benchmarks Game–style “AZL on the chart”** before there is a **conforming `.azl` workload + stable entry + timed harness** — see [BENCHMARKS_AZL_VS_REAL_WORLD.md](BENCHMARKS_AZL_VS_REAL_WORLD.md).
+
+**Sprint pointer:** Same steps as a short checklist in [TIER_B_BACKLOG.md](TIER_B_BACKLOG.md) § **P0.1 execution checklist**.
+
 **Done (phase 1 — shipped):**
 
 - `AZL_RUNTIME_SPINE=c_minimal` (default): `scripts/azl_c_interpreter_runtime.sh` → `azl-interpreter-minimal` (C).
 - `AZL_RUNTIME_SPINE=azl_interpreter` or `semantic`: `scripts/azl_azl_interpreter_runtime.sh` → `tools/azl_runtime_spine_host.py` → **`tools/azl_semantic_engine/`** (`minimal_runtime.py`), a **Python** executor with **execution parity** to the C minimal contract (say / set / emit / link / component init+behavior / quoted `listen for`). **Gate F2** in `check_azl_native_gates.sh` asserts **byte-identical stdout** vs C on `azl/tests/c_minimal_link_ping.azl`.
+- **P0.1b (release smoke):** `scripts/verify_azl_interpreter_semantic_spine_smoke.sh` is step **3** of `scripts/run_full_repo_verification.sh` (**`make verify`**): concatenates **`azl/tests/stubs/azl_security_for_interpreter_spine.azl`** + **`azl/runtime/interpreter/azl_interpreter.azl`**, runs the spine host with **`AZL_ENTRY=azl.interpreter`**, asserts **`init`** completes without unresolved **`link ::azl.security`** (**`docs/ERROR_SYSTEM.md`** **286–290**). Does **not** prove **`behavior`** from that file runs on **`minimal_runtime`** yet.
 - **Gate F3:** `azl/tests/p0_semantic_interpreter_slice.azl` — C vs Python **byte parity** on interpreter **`init`** prefix including **`.toInt()`** on parenthesized env/or, dotted **`::perf.stats`** / **`::perf.expr_cache`**, `set []` / `{ }`, `link`, `say`; `scripts/run_semantic_interpreter_slice.sh`.
 - **Gate F4:** `azl/tests/p0_nested_listen_emit_chain.azl` — nested **`listen`** registered during a listener body, then **`emit`** drains the queue (**`process_events`** from **`exec_block`**) so chained handlers match the **`azl_interpreter.azl`** interpret→downstream pattern; C vs Python **byte parity**.
 - **Gate F5:** `azl/tests/p0_semantic_var_alias.azl` — **`set ::mirror = ::seed`** (copy global) + **`say ::mirror`**; C vs Python **byte parity**.
@@ -88,6 +109,12 @@ This is the **honest** map from **today’s repository** to the **contract goals
 - **Gate F65:** `azl/tests/p0_semantic_if_literal_eq_strings.azl` — **`if ("x" == "x")`**; C vs Python **byte parity**.
 - **Gate F66:** `azl/tests/p0_semantic_if_literal_ne_strings.azl` — **`if ("a" != "b")`**; C vs Python **byte parity**.
 - **Gate F67:** `azl/tests/p0_semantic_set_triple_concat_mixed.azl` — **`set ::out = "pre" + ::mid + "post"`**; C vs Python **byte parity**.
+- **Gate F68:** `azl/tests/p0_semantic_return_in_listener_if.azl` — **`return`** inside **`if`** in **`listen`** body; C vs Python **byte parity**; exits **291–293**.
+- **Gate F69:** `azl/tests/p0_semantic_for_split_line_loop.azl` — **`::blob.split("delim")`** + **`for ::line in ::lines`** in listener; C vs Python **byte parity**; exits **294–296**.
+- **Gate F70:** `azl/tests/p0_semantic_dot_length_global.azl` — **`::var.length`** in **`if`** (unset → **`0`**); C vs Python **byte parity**; exits **297–299**.
+- **Gate F71:** `azl/tests/p0_semantic_split_chars_for.azl` — **`set ::chars = ::line.split_chars()`** + **`for ::c in ::chars`** (UTF-8 scalar units; C mirrors Python); C vs Python **byte parity**; exits **311–313**.
+- **Gate F72:** `azl/tests/p0_semantic_push_string_listener.azl` — **`set ::buf.push("…")`** appends newline-delimited segments (same encoding as **`split`** / **`for ::row in`**); C vs Python **byte parity**; exits **314–316**.
+- **Gate F73:** `azl/tests/p0_semantic_int_sub_column_length.azl` — **`set ::start = ::column - ::current.length`** (binary **`-`**, both operands canonical integers); C vs Python **byte parity**; exits **317–319**.
 - **Gate H:** `scripts/verify_p0_interpreter_tokenizer_boundary.sh` — tokenizer on interpreter prefix, **`component ::azl.interpreter` anchor**, and **`{` / `}` token balance** on the full file (structural milestone; not execution).
 
 **Still open (full P0):**

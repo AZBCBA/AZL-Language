@@ -38,21 +38,22 @@ See **`docs/PROJECT_COMPLETION_STATEMENT.md`** (Tier A vs Tier B roadmap).
 0. `bash scripts/verify_documentation_pieces.sh --promoted-only` — **`release/doc_verification_pieces.json`**; see **`docs/INTEGRATION_VERIFY.md`**
 1. `bash scripts/enforce_canonical_stack.sh`
 2. `bash scripts/check_azl_native_gates.sh` — **gate 0** runs **`scripts/self_check_release_helpers.sh`** (release helper **`bash -n`**, **`azl_release_tag_policy`** invariants, **`release/native/manifest.json`** via **`jq`** + **`gates[]` / `github_release`** paths on disk; needs **`rg`** + **`jq`**).
-3. `bash scripts/enforce_legacy_entrypoint_blocklist.sh`
-4. `bash scripts/verify_native_runtime_live.sh` (minimal bundle — fast C-engine HTTP contract before the long suite)
-5. `bash scripts/run_all_tests.sh` — includes `scripts/run_tests.sh`, which runs **`verify_enterprise_native_http_live.sh`** (fat combined + `::build.daemon.enterprise`) after the minimal live verify, then quantum LHA3 + grammar + VM/azlpack/LSP checks.
+3. `bash scripts/verify_azl_interpreter_semantic_spine_smoke.sh` — Tier B **P0.1** crumb: real **`azl/runtime/interpreter/azl_interpreter.azl`** on Python semantic spine with harness **`::azl.security`** stub (see **`docs/ERROR_SYSTEM.md`**).
+4. `bash scripts/enforce_legacy_entrypoint_blocklist.sh`
+5. `bash scripts/verify_native_runtime_live.sh` (minimal bundle — fast C-engine HTTP contract before the long suite)
+6. `bash scripts/run_all_tests.sh` — includes `scripts/run_tests.sh`, which runs **`verify_enterprise_native_http_live.sh`** (fat combined + `::build.daemon.enterprise`) after the minimal live verify, then quantum LHA3 + grammar + VM/azlpack/LSP checks.
 
 All commands must pass with exit code `0`.
 
 ## Contributor quick bar (subset of release)
 
-For a fast, scripted check that still exercises **native gates** (F2–F67, G, G2, H, engine build) and the **live** `GET /api/llm/capabilities` probe:
+For a fast, scripted check that still exercises **native gates** (F2–F73, G, G2, H, engine build) and the **live** `GET /api/llm/capabilities` probe:
 
 ```bash
 bash scripts/verify_azl_strength_bar.sh
 ```
 
-Documented in `docs/AZL_DOCUMENTATION_CANON.md` §1.7. This **does not** replace the five-step block above (it omits `enforce_*` scripts and `run_all_tests.sh`).
+Documented in `docs/AZL_DOCUMENTATION_CANON.md` §1.7. This **does not** replace the **seven-step** release block above (steps **0–6**; it omits **`enforce_*`** scripts, **`verify_azl_interpreter_semantic_spine_smoke.sh`**, and **`run_all_tests.sh`**).
 
 ## Optional — product / LLM benchmarks
 

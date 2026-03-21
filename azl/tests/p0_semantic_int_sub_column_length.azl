@@ -1,0 +1,22 @@
+# Gate F73: integer binary `-` for ::column - ::current.length (tokenize_line column shape).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    say "P0_SEMANTIC_INT_SUB_INIT_OK"
+    emit go with { }
+  }
+  behavior {
+    listen for "go" {
+      set ::column = 5
+      set ::current = "ab"
+      set ::start = ::column - ::current.length
+      say ::start
+      say "P0_SEMANTIC_INT_SUB_OK"
+    }
+  }
+}

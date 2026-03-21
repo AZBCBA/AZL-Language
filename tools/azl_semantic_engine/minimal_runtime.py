@@ -5,7 +5,14 @@ Single source of behavioral truth: keep in sync with C when changing the minimal
 Nested ``listen`` may run inside ``init`` / listener bodies; ``emit`` inside ``exec_block``
 drains the event queue (``process_events``) so chained handlers match the interpret→tokenize shape.
 Each queued event may carry a ``with { … }`` payload bound as ``::event.data.<key>`` for that dispatch
-(F10–F67 parity fixtures under ``azl/tests/p0_semantic_*.azl``).
+(F10–F72 parity fixtures under ``azl/tests/p0_semantic_*.azl``). ``return`` at listener depth exits the
+current listener body (including from inside ``if { … }``); ``return`` in top-level ``init`` skips the rest of ``init``.
+``set ::dst = ::src.split("delim")`` stores split segments joined by newlines; ``for ::v in ::dst { … }`` (listener
+bodies only) iterates those segments — matches the ``::code.split("\\n")`` + line loop shape in ``azl_interpreter.azl``.
+``::var.length`` in expressions yields the string length as a decimal string (unset base → ``0``).
+``set ::dst = ::src.split_chars()`` stores Unicode code points of ``::src`` joined by newlines (``for ::c in ::dst`` matches ``for ::char in ::line_text`` in ``azl_interpreter.azl``).
+``set ::buf.push("literal")`` / ``{…}`` / ``::var`` appends one newline-delimited segment to ``::buf`` (same encoding as ``split`` / ``for ::row in``).
+Binary ``-`` in expressions is supported only when both operands are canonical base-10 integers (``::column - ::name.length`` tokenize-line shape); otherwise use ``+`` string/int rules.
 """
 
 from __future__ import annotations
@@ -89,7 +96,7 @@ def tokenize_source(src: str) -> list[str]:
             p += 2
             pos[0] = p
             continue
-        if ch in "{}();=,[]!+":
+        if ch in "{}();=,[]!+-":
             tokens.append(ch)
             p += 1
             pos[0] = p
@@ -121,6 +128,8 @@ class MinimalAZLRuntime:
     vars: list[Var] = field(default_factory=list)
     listeners: list[Listener] = field(default_factory=list)
     queue: list[tuple[str, list[tuple[str, str]]]] = field(default_factory=list)
+    _listener_nesting: int = field(default=0, repr=False)
+    _listener_break: bool = field(default=False, repr=False)
 
     def __post_init__(self) -> None:
         self.ntok = len(self.tok)
@@ -295,6 +304,12 @@ class MinimalAZLRuntime:
                     raise SemanticEngineError(5, "azl_semantic_engine: env ) expected")
                 i[0] += 1
                 return os.environ.get(key, ""), 0
+            if t.endswith(".length") and len(t) > len(".length") + 2:
+                base = t[: -len(".length")]
+                if base.startswith("::"):
+                    i[0] += 1
+                    vv = self.var_get(base)
+                    return (str(0 if vv is None else len(vv)), 0)
             vv = self.var_get(t)
             i[0] += 1
             if vv is None:
@@ -318,15 +333,21 @@ class MinimalAZLRuntime:
             return v if str(v) == s else None
 
         acc_s, acc_n = self._eval_primary(i)
-        while i[0] < self.ntok and self.tok[i[0]] == "+":
+        while i[0] < self.ntok and self.tok[i[0]] in ("+", "-"):
+            op = self.tok[i[0]]
             i[0] += 1
             rh_s, rh_n = self._eval_primary(i)
             ai = parse_full_int(acc_s, acc_n)
             bi = parse_full_int(rh_s, rh_n)
             if ai is not None and bi is not None:
-                acc_s = str(ai + bi)
+                acc_s = str(ai - bi if op == "-" else ai + bi)
                 acc_n = 0
             else:
+                if op == "-":
+                    raise SemanticEngineError(
+                        5,
+                        "azl_semantic_engine: - requires integer operands",
+                    )
                 acc_s = ("" if acc_n else acc_s) + ("" if rh_n else rh_s)
                 acc_n = 0
         return acc_s, acc_n
@@ -359,6 +380,36 @@ class MinimalAZLRuntime:
     def _cond_is_true(self, s: str) -> bool:
         return s in ("true", "1")
 
+    @staticmethod
+    def _unescape_azl_string_token(quoted: str) -> str:
+        if len(quoted) < 2 or quoted[0] not in "\"'":
+            return ""
+        inner = quoted[1:-1]
+        out: list[str] = []
+        p = 0
+        while p < len(inner):
+            if inner[p] == "\\" and p + 1 < len(inner):
+                n = inner[p + 1]
+                if n == "n":
+                    out.append("\n")
+                elif n == "t":
+                    out.append("\t")
+                elif n == "r":
+                    out.append("\r")
+                elif n == "\\":
+                    out.append("\\")
+                elif n == '"':
+                    out.append('"')
+                elif n == "'":
+                    out.append("'")
+                else:
+                    out.append(n)
+                p += 2
+            else:
+                out.append(inner[p])
+                p += 1
+        return "".join(out)
+
     def _skip_braced_block(self, i: list[int]) -> None:
         if i[0] >= self.ntok or self.tok[i[0]] != "{":
             return
@@ -384,14 +435,84 @@ class MinimalAZLRuntime:
         else:
             self._skip_braced_block(i)
 
+    def exec_for_in(self, i: list[int]) -> None:
+        """for ::var in ::seq { body } — listener bodies only (invoked from exec_block)."""
+        i[0] += 1
+        if i[0] >= self.ntok:
+            return
+        loop_var = self.tok[i[0]]
+        if not loop_var.startswith("::"):
+            i[0] += 1
+            return
+        i[0] += 1
+        if i[0] >= self.ntok or self.tok[i[0]] != "in":
+            return
+        i[0] += 1
+        if i[0] >= self.ntok:
+            return
+        seq_key = self.tok[i[0]]
+        if not seq_key.startswith("::"):
+            i[0] += 1
+            return
+        i[0] += 1
+        if i[0] >= self.ntok or self.tok[i[0]] != "{":
+            raise SemanticEngineError(5, "azl_semantic_engine: for-in missing {")
+        body_start = i[0] + 1
+        body_end = self.find_block_end(body_start)
+        i[0] = body_end + 1
+        raw = self.var_get(seq_key)
+        if raw is None:
+            raw = ""
+        for seg in raw.split("\n") if raw else [""]:
+            self.var_set(loop_var, seg[:255])
+            self.exec_block(
+                body_start, body_end, preserve_listener_break_on_exit=True
+            )
+            if self._listener_break:
+                break
+
     def exec_set(self, i: list[int]) -> None:
         i[0] += 1
         if i[0] >= self.ntok:
             return
-        k = self.tok[i[0]]
-        if not k or not k.startswith("::"):
+        t0 = self.tok[i[0]]
+        if not t0 or not t0.startswith("::"):
             i[0] += 1
             return
+        if t0.endswith(".push") and len(t0) > len(".push") + 2:
+            base = t0[: -len(".push")]
+            if not base.startswith("::"):
+                raise SemanticEngineError(5, "azl_semantic_engine: .push bad base")
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != "(":
+                raise SemanticEngineError(5, "azl_semantic_engine: .push missing (")
+            i[0] += 1
+            if i[0] >= self.ntok:
+                raise SemanticEngineError(5, "azl_semantic_engine: .push missing arg")
+            arg = self.tok[i[0]]
+            if len(arg) >= 2 and arg[0] in "\"'":
+                inner = arg[1:-1] if len(arg) >= 2 else ""
+                seg = inner
+                i[0] += 1
+            elif arg == "{":
+                self._consume_agg_literal(i)
+                seg = "{}"
+            elif arg.startswith("::"):
+                seg = self.var_get(arg) or ""
+                i[0] += 1
+            else:
+                raise SemanticEngineError(5, "azl_semantic_engine: .push bad arg")
+            if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                raise SemanticEngineError(5, "azl_semantic_engine: .push missing )")
+            i[0] += 1
+            cur = self.var_get(base) or ""
+            if cur == "" or cur == "[]":
+                joined = seg
+            else:
+                joined = cur + "\n" + seg
+            self.var_set(base, joined[:255])
+            return
+        k = t0
         i[0] += 1
         if i[0] >= self.ntok or self.tok[i[0]] != "=":
             return
@@ -406,6 +527,51 @@ class MinimalAZLRuntime:
         if v == "{":
             self._consume_agg_literal(i)
             self.var_set(k, "{}")
+            return
+        if (
+            v.startswith("::")
+            and v.endswith(".split_chars")
+            and len(v) > len(".split_chars") + 2
+        ):
+            base = v[: -len(".split_chars")]
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != "(":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: .split_chars missing ("
+                )
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: .split_chars missing )"
+                )
+            i[0] += 1
+            src = self.var_get(base) or ""
+            joined = "\n".join(tuple(src))
+            self.var_set(k, joined[:255])
+            return
+        if (
+            v.startswith("::")
+            and v.endswith(".split")
+            and len(v) > len(".split") + 2
+        ):
+            base = v[: -len(".split")]
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != "(":
+                raise SemanticEngineError(5, "azl_semantic_engine: .split missing (")
+            i[0] += 1
+            if i[0] >= self.ntok:
+                raise SemanticEngineError(5, "azl_semantic_engine: .split missing literal")
+            lit = self.tok[i[0]]
+            delim = self._unescape_azl_string_token(lit)
+            if delim == "":
+                raise SemanticEngineError(5, "azl_semantic_engine: split delimiter empty")
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                raise SemanticEngineError(5, "azl_semantic_engine: .split missing )")
+            i[0] += 1
+            src = self.var_get(base) or ""
+            joined = "\n".join(src.split(delim))
+            self.var_set(k, joined[:255])
             return
         val = self.eval_expr(i)
         self.var_set(k, val)
@@ -602,46 +768,71 @@ class MinimalAZLRuntime:
             self.register_listener(evname, block_start, i[0])
             i[0] += 1
 
-    def exec_block(self, start: int, end: int) -> None:
-        depth = 1
-        i = start
-        while i < end and i < self.ntok:
-            t = self.tok[i]
-            if t == "{":
-                depth += 1
-                i += 1
-            elif t == "}":
-                depth -= 1
-                if depth <= 0:
+    def exec_block(
+        self,
+        start: int,
+        end: int,
+        *,
+        preserve_listener_break_on_exit: bool = False,
+    ) -> None:
+        self._listener_nesting += 1
+        self._listener_break = False
+        try:
+            depth = 1
+            i = start
+            while i < end and i < self.ntok:
+                t = self.tok[i]
+                if t == "{":
+                    depth += 1
+                    i += 1
+                elif t == "}":
+                    depth -= 1
+                    if depth <= 0:
+                        break
+                    i += 1
+                elif depth == 1 and t == "return":
+                    i += 1
+                    self._listener_break = True
                     break
-                i += 1
-            elif depth == 1 and t == "say":
-                ii = [i]
-                self.exec_say(ii)
-                i = ii[0]
-            elif depth == 1 and t == "set":
-                ii = [i]
-                self.exec_set(ii)
-                i = ii[0]
-            elif depth == 1 and t == "emit":
-                ii = [i]
-                self.exec_emit(ii)
-                i = ii[0]
-                self.process_events()
-            elif depth == 1 and t == "link":
-                ii = [i]
-                self.exec_link(ii)
-                i = ii[0]
-            elif depth == 1 and t == "if":
-                ii = [i]
-                self.exec_if(ii)
-                i = ii[0]
-            elif depth == 1 and t == "listen":
-                ii = [i]
-                self.exec_listen(ii)
-                i = ii[0]
-            else:
-                i += 1
+                elif depth == 1 and t == "say":
+                    ii = [i]
+                    self.exec_say(ii)
+                    i = ii[0]
+                elif depth == 1 and t == "set":
+                    ii = [i]
+                    self.exec_set(ii)
+                    i = ii[0]
+                elif depth == 1 and t == "emit":
+                    ii = [i]
+                    self.exec_emit(ii)
+                    i = ii[0]
+                    self.process_events()
+                elif depth == 1 and t == "link":
+                    ii = [i]
+                    self.exec_link(ii)
+                    i = ii[0]
+                elif depth == 1 and t == "if":
+                    ii = [i]
+                    self.exec_if(ii)
+                    i = ii[0]
+                    if self._listener_break:
+                        break
+                elif depth == 1 and t == "for":
+                    ii = [i]
+                    self.exec_for_in(ii)
+                    i = ii[0]
+                    if self._listener_break:
+                        break
+                elif depth == 1 and t == "listen":
+                    ii = [i]
+                    self.exec_listen(ii)
+                    i = ii[0]
+                else:
+                    i += 1
+        finally:
+            self._listener_nesting -= 1
+            if not preserve_listener_break_on_exit:
+                self._listener_break = False
 
     def process_events(self) -> None:
         while True:
@@ -670,6 +861,24 @@ class MinimalAZLRuntime:
                 if depth <= 0:
                     break
                 i[0] += 1
+            elif depth == 1 and t == "return":
+                i[0] += 1
+                d = 1
+                while i[0] < self.ntok and d > 0:
+                    t2 = self.tok[i[0]]
+                    if t2 == "{":
+                        d += 1
+                        i[0] += 1
+                    elif t2 == "}":
+                        d -= 1
+                        if d == 0:
+                            break
+                        i[0] += 1
+                    else:
+                        i[0] += 1
+                if self._listener_nesting > 0:
+                    self._listener_break = True
+                return
             elif depth == 1 and t == "say":
                 self.exec_say(i)
             elif depth == 1 and t == "set":
@@ -681,6 +890,10 @@ class MinimalAZLRuntime:
                 self.exec_link(i)
             elif depth == 1 and t == "if":
                 self.exec_if(i)
+            elif depth == 1 and t == "for":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: for-in not allowed in init"
+                )
             elif depth == 1 and t == "listen":
                 self.exec_listen(i)
             else:
