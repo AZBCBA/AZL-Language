@@ -26,6 +26,10 @@ Two different HTTP personalities exist in this repository. **Pick one per deploy
 | **LLM** | Routed inside AZL (not the same as Profile A’s `/api/ollama/generate` unless explicitly bridged) |
 | **Bench** | `scripts/benchmark_enterprise_v1_chat.sh` (requires real token + route); **404 on `/v1/chat`** ⇒ you are **not** on Profile B for that port |
 
+## CI
+
+**Test and Deploy** exercises both stacks in separate jobs: native engine matrix / benchmark gate (Profile A–shaped) vs enterprise combined path inside **`run_all_tests.sh`** / **`verify_enterprise_native_http_live.sh`** (Profile B). Do not merge Profile A bench ports with Profile B daemon ports — see [LLM_INFRASTRUCTURE_AUDIT.md](LLM_INFRASTRUCTURE_AUDIT.md).
+
 ## Rules
 
 1. **Never assume port 8080** means a specific profile — probe routes or read the process startup command.

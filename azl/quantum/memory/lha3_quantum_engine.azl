@@ -1,3 +1,4 @@
+# LHA3_COMPRESSION_MODEL=heuristic_retention — NOT byte-level codec; ratios from config/counts (see docs/LHA3_COMPRESSION_HONESTY.md).
 component ::quantum.memory.lha3_quantum_engine {
   init {
     set ::status = "initializing"
@@ -85,7 +86,8 @@ component ::quantum.memory.lha3_quantum_engine {
       emit "quantum_engine.state_stored" with { state_id: ::state_id, success: true }
     }
 
-    listen for "quantum_engine.compress_memory" then {
+    # quantum_engine.apply_compaction — policy ratio × item counts (NOT byte codec); see docs/LHA3_COMPRESSION_HONESTY.md
+    listen for "quantum_engine.apply_compaction" then {
       set ::payload = ::event.data || {}
       set ::memory_items = ::payload.memory_items || 0
       set ::compression_level = ::payload.level || 1
@@ -100,7 +102,7 @@ component ::quantum.memory.lha3_quantum_engine {
       set ::stats.compressions = ::stats.compressions + 1
       set ::stats.last_compression_ratio = ::effective_ratio
 
-      emit "quantum_engine.compression_applied" with {
+      emit "quantum_engine.compaction_applied" with {
         level: ::compression_level,
         input_items: ::memory_items,
         compressed_items: ::compressed_items,

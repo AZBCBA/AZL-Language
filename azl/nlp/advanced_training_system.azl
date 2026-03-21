@@ -683,7 +683,7 @@ component ::nlp.advanced_training {
         }
       }
       # Every N steps, compress and optimize fractal memory (light cadence here)
-      emit compress_fractal_memory to ::memory.enhanced_lha3 with 5
+      emit compaction_fractal_memory to ::memory.enhanced_lha3 with 5
       emit optimize_fractal_memory to ::memory.enhanced_lha3 with "ACCESS_PATTERN"
       
       # Memory-neural integration

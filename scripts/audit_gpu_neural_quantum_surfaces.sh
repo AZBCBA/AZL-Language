@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lists AZL surfaces related to GPU, neural, memory/LHA3, quantum — for inventory doc maintenance.
-# Does not fail the tree; prints counts and paths. See docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md
+# Does not fail the tree; prints counts and paths. See docs/AZL_GPU_NEURAL_SURFACE_MAP.md
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"

@@ -1,0 +1,22 @@
+# Gate F69: ::blob.split("delim") + for ::line in ::lines (listener-only; interpreter line-loop shape).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    set ::blob = "alpha|beta|gamma"
+    set ::lines = ::blob.split("|")
+    emit go with { }
+    say "P0_SEMANTIC_FOR_SPLIT_OK"
+  }
+  behavior {
+    listen for "go" {
+      for ::line in ::lines {
+        say ::line
+      }
+    }
+  }
+}

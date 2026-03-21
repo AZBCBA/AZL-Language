@@ -22,8 +22,8 @@ Audit of what exists vs what needs to be built to make AZL stronger.
 |------|--------|----------|--------|
 | Parse cache | **HAVE** | `azl_interpreter.azl` perf.tok_cache, ast_cache | Cap 512 ✓ |
 | perf_smoke | **HAVE** | `scripts/perf_smoke.sh` | Thresholds (healthz≤1500ms, etc.) |
-| Benchmark gate | **NEED** | — | Add CI step: block if AZL regresses >10% vs baseline |
-| SIMD primitives | **NEED** | advanced_features.md describes, not implemented | Add simd_add, simd_mul to stdlib |
+| Benchmark gate | **HAVE** | `scripts/benchmark_gate.sh`, `test-and-deploy.yml` | Blocks regression vs baselines on **ubuntu-latest** |
+| SIMD primitives | **HAVE** | `azl/stdlib/core/simd.azl` | See Priority Build Order §8 |
 | Memory-mapped files | **NEED** | — | C interpreter uses malloc; add mmap for large files |
 
 ---
@@ -80,8 +80,10 @@ Audit of what exists vs what needs to be built to make AZL stronger.
 | Item | Status | Location | Action |
 |------|--------|----------|--------|
 | Native gates | **HAVE** | check_azl_native_gates.sh, verify_native_runtime_live, verify_enterprise_native_http_live | ✓ |
+| Tier A completion verifier | **HAVE** | `scripts/verify_native_release_profile_complete.sh` | [PROJECT_COMPLETION_STATEMENT.md](PROJECT_COMPLETION_STATEMENT.md) |
+| Branch protection / workflow contract | **HAVE** | `verify_required_github_status_checks_contract.sh`, `release/ci/required_github_status_checks.json` | [GITHUB_BRANCH_PROTECTION.md](GITHUB_BRANCH_PROTECTION.md) |
 | Grammar verify | **HAVE** | verify_azl_grammar_conformance.sh | ✓ |
-| Unit test framework | **NEED** | — | `azl test` with assert_eq, etc. |
+| Unit test framework | **HAVE** | `azl/testing/azl_test_framework.azl`, `azl/testing/core/test_framework.azl` | Expand coverage / ergonomics over time |
 | Integration tests | **PARTIAL** | azme_e2e, various test_*.azl | Expand coverage |
 | Fuzz testing | **NEED** | — | Parser/interpreter fuzz |
 

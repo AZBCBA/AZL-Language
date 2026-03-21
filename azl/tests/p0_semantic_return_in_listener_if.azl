@@ -1,0 +1,25 @@
+# Gate F68: return exits listener early (interpreter-shaped; tokenize listener uses return).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    set ::flag = "1"
+    emit check with { }
+    set ::flag = "0"
+    emit check with { }
+    say "P0_SEMANTIC_RETURN_IN_LISTENER_OK"
+  }
+  behavior {
+    listen for "check" {
+      if ::flag == "1" {
+        say "EARLY"
+        return
+      }
+      say "LATE"
+    }
+  }
+}

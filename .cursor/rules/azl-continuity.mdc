@@ -1,0 +1,29 @@
+---
+description: AZL project continuity — read handoff + strategic consensus; avoid narrative drift and wasted loops
+alwaysApply: true
+---
+
+# AZL — continuity for every session
+
+## You have no out-of-band memory
+
+Chat does not persist for the next AI session. **Git docs do.** Before architecture, runtime, compression, or “what AZL is” answers:
+
+1. Read **`docs/AI_MAINTAINER_CONTINUITY_HANDOFF.md`** (why we’re here; anti-fake rules).
+2. Read **`docs/AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md`** (consensus + phases).
+3. For what **actually runs**, read **`docs/RUNTIME_SPINE_DECISION.md`** and **`docs/PROJECT_COMPLETION_ROADMAP.md`**.
+
+## Ground truth vs target
+
+- **Target:** Native/AOT backbone, honest bootstrap, self-host staged, literal codecs where Exact is claimed, serving/quantized for scale, LHA3 semantic policy, CLI shipping, **[ERROR_SYSTEM.md](docs/ERROR_SYSTEM.md)** everywhere.
+- **Today:** May lag narrative — verify with spine trace + **[AZL_ENGINEERING_REALITY_AUDIT.md](docs/AZL_ENGINEERING_REALITY_AUDIT.md)**. Do not claim shipped what gates do not prove.
+
+## Do not waste maintainer time
+
+- Do **not** repeat long entropy/lossless lectures unless they claim **lossless magic compression** of high-entropy data — then **one** precise correction, move on.
+- Do **not** describe “pure AZL / interpreter-only / Rust replaced” as fact if **RUNTIME_SPINE_DECISION** says otherwise.
+- Do **not** silent-fail; use typed errors and harness contracts.
+
+## Maintainer rules (non-negotiable)
+
+Production quality, real error system, no placeholder demos, fix original files (no parallel “enhanced/simple” trees). Tests/verification live **outside** the language definition per strategic doc.

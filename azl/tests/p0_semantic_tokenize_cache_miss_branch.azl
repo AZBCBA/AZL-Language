@@ -1,0 +1,25 @@
+# Gate F80: tokenize cache-check shape — `if (::cached_tok != null) { … return }` on miss path, then `::perf.stats.tok_misses + 1` (mirrors `azl_interpreter.azl` ~75–83 vs ~101). Minimal `set` requires `::` LHS, so cache slot is `::cached_tok` (stand-in for `cached_tok` / `::perf.tok_cache[::key]`).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit tok_cache_shape with { }
+  }
+  behavior {
+    listen for "tok_cache_shape" {
+      if (::cached_tok != null) {
+        say "CACHE_HIT"
+        return
+      }
+      say "CACHE_MISS"
+      set ::perf.stats.tok_misses = 0
+      set ::perf.stats.tok_misses = ::perf.stats.tok_misses + 1
+      say ::perf.stats.tok_misses
+      say "P0_SEM_TOK_CACHE_MISS_OK"
+    }
+  }
+}

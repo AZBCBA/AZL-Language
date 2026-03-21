@@ -1,0 +1,24 @@
+# Gate F72: set ::buf.push("…") appends newline-delimited segments (interpreter token-buffer shape).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    say "P0_SEMANTIC_PUSH_INIT_OK"
+    emit go with { }
+  }
+  behavior {
+    listen for "go" {
+      set ::buf = ""
+      set ::buf.push("first")
+      set ::buf.push("second")
+      for ::row in ::buf {
+        say ::row
+      }
+      say "P0_SEMANTIC_PUSH_STRING_OK"
+    }
+  }
+}

@@ -11,7 +11,7 @@ This tier means: **the repository meets every automated gate we use to ship the 
 ### Criteria (all must pass)
 
 1. **`scripts/verify_required_github_status_checks_contract.sh`** — `release/ci/required_github_status_checks.json` ↔ `.github/workflows/test-and-deploy.yml`.
-2. **`RUN_OPTIONAL_BENCHES=0 bash scripts/run_full_repo_verification.sh`** — [RELEASE_READY.md](../RELEASE_READY.md) order + `run_all_tests.sh` (optional LLM/product benches **off** so completion does not depend on Ollama/daemon).
+2. **`RUN_OPTIONAL_BENCHES=0 bash scripts/run_full_repo_verification.sh`** — [RELEASE_READY.md](../RELEASE_READY.md) order (step **0:** promoted **doc pieces**; see **`docs/INTEGRATION_VERIFY.md`**), canonical stack, native gates, **`scripts/verify_azl_interpreter_semantic_spine_smoke.sh`** (Tier B P0.1b — real **`azl_interpreter.azl`** **`init`** on Python semantic spine), legacy blocklist, minimal live HTTP, **`run_all_tests.sh`** (optional LLM/product benches **off** so completion does not depend on Ollama/daemon).
 3. **`bash scripts/verify_azl_strength_bar.sh`** — four pillars stamp ([AZL_DOCUMENTATION_CANON.md](AZL_DOCUMENTATION_CANON.md) §1.7).
 
 ### One command

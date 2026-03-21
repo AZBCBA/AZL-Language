@@ -4,6 +4,17 @@ This document defines the hard direction for AZL as an independent language runt
 
 **Spine decision (current vs target, P0–P5):** [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md) — read this first so you do not confuse **today’s default runtime child** (C minimal on the combined file) with the **decided semantic core** (AZL interpreter).
 
+## Primary entry (clone → verify → run — operational truth)
+
+After **git clone** of this repository:
+
+1. **Read first (humans + AI):** [AGENTS.md](../AGENTS.md) → [AI_MAINTAINER_CONTINUITY_HANDOFF.md](AI_MAINTAINER_CONTINUITY_HANDOFF.md) → [AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md](AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md).
+2. **Full integration check (from repo root):** `make verify` — see [INTEGRATION_VERIFY.md](INTEGRATION_VERIFY.md).
+3. **Native enterprise path (canonical):** `bash scripts/start_azl_native_mode.sh` — requires a built **`azl-native-engine`** and runtime env as documented in [RELEASE_READY.md](../RELEASE_READY.md) and § Usage below.
+4. **Runtime spine selector:** `AZL_RUNTIME_SPINE` — **`unset` / `c_minimal`** → C minimal on combined bundle; **`azl_interpreter` / `semantic`** → `python3 tools/azl_runtime_spine_host.py` (minimal semantic engine; **full** `azl_interpreter.azl` self-host is **Tier B P0** — [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)). Override with **`AZL_NATIVE_RUNTIME_CMD`** when set.
+
+**Literal codec (Exact tier, normative bytes):** [AZL_LITERAL_CODEC_CONTAINER_V0.md](AZL_LITERAL_CODEC_CONTAINER_V0.md) — wire format + **`CODEC_*`** errors. **Reference:** Python **`tools/azl_literal_codec/`** — **`codec_id=0`** identity, **`codec_id=1`** zlib DEFLATE; verify: **`bash scripts/verify_azl_literal_codec_roundtrip.sh`** (**`run_tests.sh`**).
+
 ## Objective
 
 AZL must converge to a standalone language stack for end users:

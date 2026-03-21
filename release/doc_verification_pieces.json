@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "description": "Each entry is a runnable piece tied to a doc path. promoted=true runs at the start of make verify (integration vehicle). Run all entries: make verify-doc-pieces. See docs/INTEGRATION_VERIFY.md § Documentation trust.",
+  "pieces": [
+    {
+      "id": "integration_verify_make_target",
+      "doc": "docs/INTEGRATION_VERIFY.md",
+      "description": "Makefile exposes verify; dry-run prints run_full_repo_verification",
+      "promoted": true,
+      "shell": "make -n verify | rg -q run_full_repo_verification.sh"
+    },
+    {
+      "id": "full_repo_verification_script_syntax",
+      "doc": "docs/INTEGRATION_VERIFY.md",
+      "description": "run_full_repo_verification.sh parses under bash -n",
+      "promoted": true,
+      "shell": "bash -n scripts/run_full_repo_verification.sh"
+    },
+    {
+      "id": "verify_step_enforce_canonical_stack_syntax",
+      "doc": "docs/INTEGRATION_VERIFY.md",
+      "description": "enforce_canonical_stack.sh parses under bash -n",
+      "promoted": true,
+      "shell": "bash -n scripts/enforce_canonical_stack.sh"
+    },
+    {
+      "id": "verify_step_check_azl_native_gates_syntax",
+      "doc": "docs/INTEGRATION_VERIFY.md",
+      "description": "check_azl_native_gates.sh parses under bash -n",
+      "promoted": true,
+      "shell": "bash -n scripts/check_azl_native_gates.sh"
+    },
+    {
+      "id": "verify_step_interpreter_semantic_spine_smoke_syntax",
+      "doc": "docs/ERROR_SYSTEM.md",
+      "description": "verify_azl_interpreter_semantic_spine_smoke.sh parses under bash -n (P0.1b release step)",
+      "promoted": true,
+      "shell": "bash -n scripts/verify_azl_interpreter_semantic_spine_smoke.sh"
+    },
+    {
+      "id": "verify_step_legacy_blocklist_syntax",
+      "doc": "docs/INTEGRATION_VERIFY.md",
+      "description": "enforce_legacy_entrypoint_blocklist.sh parses under bash -n",
+      "promoted": true,
+      "shell": "bash -n scripts/enforce_legacy_entrypoint_blocklist.sh"
+    },
+    {
+      "id": "verify_step_verify_native_live_syntax",
+      "doc": "docs/INTEGRATION_VERIFY.md",
+      "description": "verify_native_runtime_live.sh parses under bash -n",
+      "promoted": true,
+      "shell": "bash -n scripts/verify_native_runtime_live.sh"
+    },
+    {
+      "id": "verify_step_run_all_tests_syntax",
+      "doc": "docs/INTEGRATION_VERIFY.md",
+      "description": "run_all_tests.sh parses under bash -n",
+      "promoted": true,
+      "shell": "bash -n scripts/run_all_tests.sh"
+    },
+    {
+      "id": "related_workspaces_doc_present",
+      "doc": "docs/RELATED_WORKSPACES.md",
+      "description": "RELATED_WORKSPACES.md and migration inventory exist on disk",
+      "promoted": true,
+      "shell": "test -f docs/RELATED_WORKSPACES.md && test -f migration/INVENTORY.csv && test -f migration/MAPPING.md"
+    },
+    {
+      "id": "verify_documentation_pieces_self_syntax",
+      "doc": "docs/INTEGRATION_VERIFY.md",
+      "description": "verify_documentation_pieces.sh parses under bash -n",
+      "promoted": true,
+      "shell": "bash -n scripts/verify_documentation_pieces.sh"
+    },
+    {
+      "id": "lha3_compression_honesty_contract",
+      "doc": "docs/LHA3_COMPRESSION_HONESTY.md",
+      "description": "LHA3 compression honesty doc + engine/memory source markers (see verify_quantum_lha3_stack.sh)",
+      "promoted": true,
+      "shell": "bash scripts/verify_lha3_compression_honesty_contract.sh"
+    },
+    {
+      "id": "repertoire_field_surface_contract_syntax",
+      "doc": "docs/AZL_GPU_NEURAL_SURFACE_MAP.md",
+      "description": "verify_repertoire_field_surface_contract.sh parses under bash -n",
+      "promoted": true,
+      "shell": "bash -n scripts/verify_repertoire_field_surface_contract.sh"
+    },
+    {
+      "id": "repertoire_field_surface_contract_run",
+      "doc": "docs/AZL_GPU_NEURAL_SURFACE_MAP.md",
+      "description": "RepertoireField surface doc anchor + canonical quantum processor file",
+      "promoted": true,
+      "shell": "bash scripts/verify_repertoire_field_surface_contract.sh"
+    },
+    {
+      "id": "rust_offtree_doc_contract_syntax",
+      "doc": "docs/RELATED_WORKSPACES.md",
+      "description": "verify_rust_offtree_doc_contract.sh parses under bash -n",
+      "promoted": true,
+      "shell": "bash -n scripts/verify_rust_offtree_doc_contract.sh"
+    },
+    {
+      "id": "rust_offtree_doc_contract_run",
+      "doc": "docs/RELATED_WORKSPACES.md",
+      "description": "Rust off-tree doc anchor + azme-azl mention",
+      "promoted": true,
+      "shell": "bash scripts/verify_rust_offtree_doc_contract.sh"
+    }
+  ]
+}

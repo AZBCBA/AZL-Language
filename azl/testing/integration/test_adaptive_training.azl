@@ -82,9 +82,9 @@ component ::tests.consciousness_and_lha3_integration {
     if (st && st.active == false && st.epoch >= 1) { say "✅ Consciousness lifecycle ok" } else { say "❌ Consciousness lifecycle failed" }
 
     # Trigger LHA3 optimization events explicitly
-    emit compress_fractal_memory to ::memory.enhanced_lha3 with 5
+    emit compaction_fractal_memory to ::memory.enhanced_lha3 with 5
     emit optimize_fractal_memory to ::memory.enhanced_lha3 with "ACCESS_PATTERN"
-    listen for "memory.lha3.compressed" then { say "✅ LHA3 compressed event ok" }
+    listen for "memory.lha3.compaction_applied" then { say "✅ LHA3 compaction_applied event ok" }
     listen for "memory.lha3.optimized" then { say "✅ LHA3 optimized event ok" }
 
     say "🧪 Consciousness + LHA3 tests completed"

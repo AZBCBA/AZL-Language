@@ -6,7 +6,7 @@
  * Usage: azl_interpreter_minimal <file.azl> [entry_component]
  * Env: AZL_COMBINED_PATH, AZL_ENTRY
  *
- * emit ... with { k: v } binds ::event.data.<k> per queued event (see azl/tests/p0_semantic_*.azl, gates F10-F76).
+ * emit ... with { k: v } binds ::event.data.<k> per queued event (see azl/tests/p0_semantic_*.azl, gates F10-F80).
  * return exits the current listener body (including from inside if { }); return in init skips rest of init.
  */
 
@@ -155,7 +155,7 @@ static int payload_key_ok(const char *key) {
 }
 
 /*
- * Parse `with { key: "value", ... }` for emit payload; *i must point at `with`.
+ * Parse `with { key: "value" | ::var, ... }` for emit payload; *i must point at `with`.
  * Advances *i past the closing `}` of the object (or leaves *i after `with` if no `{`).
  */
 static int parse_emit_with_payload(int *i, PayloadKV *out, int max_out) {
@@ -199,6 +199,10 @@ static int parse_emit_with_payload(int *i, PayloadKV *out, int max_out) {
       if (nc >= sizeof(valbuf)) nc = sizeof(valbuf) - 1U;
       memcpy(valbuf, valtok + 1, nc);
       valbuf[nc] = '\0';
+    } else if (valtok && valtok[0] == ':' && valtok[1] == ':') {
+      const char *vv = var_get(valtok);
+      if (vv) (void)snprintf(valbuf, sizeof(valbuf), "%s", vv);
+      else valbuf[0] = '\0';
     } else {
       (void)snprintf(valbuf, sizeof(valbuf), "%s", valtok ? valtok : "");
     }
@@ -275,12 +279,89 @@ static void process_events(void);
 static void exec_listen(int *i);
 static void exec_block_impl(int start, int end, int preserve_listener_break_exit);
 
+/*
+ * Double-quoted say: expand ::path and ::path.length (path = dotted segments;
+ * .length → decimal strlen of stored value, same as eval_expr).
+ * Single-quoted strings are literal. Returns 0 on success.
+ */
+static int say_expand_double_quoted(const char *inner, size_t n) {
+  size_t p = 0;
+  while (p < n) {
+    if (p + 1 < n && inner[p] == ':' && inner[p + 1] == ':') {
+      size_t path0 = p + 2;
+      if (path0 >= n || (!isalpha((unsigned char)inner[path0]) && inner[path0] != '_')) {
+        fputc(':', stdout);
+        p++;
+        continue;
+      }
+      size_t j = path0;
+      j++;
+      while (j < n && (isalnum((unsigned char)inner[j]) || inner[j] == '_')) j++;
+      int use_length = 0;
+      size_t end_hole = j;
+      for (;;) {
+        if (j + 7 <= n && memcmp(inner + j, ".length", 7) == 0) {
+          size_t after = j + 7;
+          if (after == n || !(isalnum((unsigned char)inner[after]) || inner[after] == '_' ||
+                              inner[after] == '.')) {
+            use_length = 1;
+            end_hole = after;
+            break;
+          }
+        }
+        if (j < n && inner[j] == '.') {
+          j++;
+          if (j >= n || (!isalpha((unsigned char)inner[j]) && inner[j] != '_')) {
+            fputc(':', stdout);
+            p++;
+            continue;
+          }
+          j++;
+          while (j < n && (isalnum((unsigned char)inner[j]) || inner[j] == '_')) j++;
+          continue;
+        }
+        end_hole = j;
+        break;
+      }
+      char kbuf[128];
+      size_t plen = j - path0;
+      if (plen + 3 >= sizeof(kbuf)) return -1;
+      kbuf[0] = ':';
+      kbuf[1] = ':';
+      memcpy(kbuf + 2, inner + path0, plen);
+      kbuf[2 + plen] = '\0';
+      const char *vv = var_get(kbuf);
+      if (use_length) {
+        unsigned long Ln = vv ? (unsigned long)strlen(vv) : 0UL;
+        fprintf(stdout, "%lu", Ln);
+      } else if (vv) {
+        fputs(vv, stdout);
+      }
+      p = end_hole;
+    } else {
+      fputc(inner[p], stdout);
+      p++;
+    }
+  }
+  return 0;
+}
+
 /* Execute say "string" or say ::var - print to stdout */
 static void exec_say(int *i) {
   (*i)++;
   if (*i >= g_ntok) return;
   const char *s = g_tok[*i];
-  if (s && strlen(s) >= 2 && (s[0] == '"' || s[0] == '\'')) {
+  if (s && strlen(s) >= 2 && s[0] == '"') {
+    size_t len = strlen(s);
+    size_t n = (len >= 2) ? len - 2 : 0;
+    if (say_expand_double_quoted(s + 1, n) != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: say double-quoted expand failed\n");
+      exit(5);
+    }
+    fputc('\n', stdout);
+    fflush(stdout);
+    (*i)++;
+  } else if (s && strlen(s) >= 2 && s[0] == '\'') {
     size_t len = strlen(s);
     fwrite(s + 1, 1, len - 2, stdout);
     fputc('\n', stdout);
@@ -385,6 +466,12 @@ static int parse_push_tz_object(int *i, char *seg, size_t seg_sz) {
       raw[nc] = '\0';
     } else if (valtok && push_obj_value_uint_str(valtok)) {
       (void)snprintf(raw, sizeof(raw), "%s", valtok);
+    } else if (valtok && valtok[0] == ':' && valtok[1] == ':') {
+      const char *vv = var_get(valtok);
+      if (vv)
+        (void)snprintf(raw, sizeof(raw), "%.127s", vv);
+      else
+        raw[0] = '\0';
     } else
       return -1;
     (*i)++;

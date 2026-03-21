@@ -1,0 +1,25 @@
+# Gate F78: double-quoted `say "…"` expands `::path` and `::path.length` (interpreter `say "📝 Generated ::tokens.length tokens"` shape; `.length` = byte length of stored value like expressions).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit say_dip with { }
+  }
+  behavior {
+    listen for "say_dip" {
+      set ::msg = "ab"
+      say "P0_SEM_SAY_DIP_INIT"
+      say "V=::msg"
+      say "LEN=::msg.length"
+      set ::perf.stats.hit = "9"
+      say "DOT=::perf.stats.hit"
+      say "NONE=::missing.x|Z"
+      say 'LIT=::msg'
+      say "P0_SEM_SAY_DIP_OK"
+    }
+  }
+}

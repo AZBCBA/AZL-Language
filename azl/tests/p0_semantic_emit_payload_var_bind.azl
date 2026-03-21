@@ -1,0 +1,22 @@
+# Gate F79: `emit … with { key: ::var }` resolves `::var` at emit time (interpreter `emit tokenize_complete with { tokens: ::tokens }`).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit epv_start with { }
+  }
+  behavior {
+    listen for "epv_start" {
+      set ::body = "carry-bytes"
+      emit epv_carry with { msg: ::body }
+    }
+    listen for "epv_carry" {
+      say ::event.data.msg
+      say "P0_SEMANTIC_EMIT_PAYLOAD_VAR_OK"
+    }
+  }
+}

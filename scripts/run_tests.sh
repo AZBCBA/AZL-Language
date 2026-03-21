@@ -14,7 +14,15 @@ chmod +x \
   scripts/verify_quantum_lha3_stack.sh \
   scripts/verify_azl_grammar_conformance.sh \
   scripts/azl_teardown_verify_native_stack.sh \
+  scripts/verify_repertoire_field_surface_contract.sh \
+  scripts/verify_rust_offtree_doc_contract.sh \
+  scripts/verify_azl_literal_codec_container_doc_contract.sh \
+  scripts/verify_azl_literal_codec_roundtrip.sh \
   2>/dev/null || true
+bash scripts/verify_repertoire_field_surface_contract.sh
+bash scripts/verify_rust_offtree_doc_contract.sh
+bash scripts/verify_azl_literal_codec_container_doc_contract.sh
+bash scripts/verify_azl_literal_codec_roundtrip.sh
 bash scripts/enforce_canonical_stack.sh
 bash scripts/check_azl_native_gates.sh
 bash scripts/enforce_legacy_entrypoint_blocklist.sh

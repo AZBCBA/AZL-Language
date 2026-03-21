@@ -2689,6 +2689,194 @@ if [ "$INC_C_OUT" != "$INC_PY_OUT" ]; then
   exit 331
 fi
 
+echo "[gate] F77: C vs Python — tokenize outer loop (split \\n, for line, concat, eol push, ::var in object push)"
+OUTL="${ROOT_DIR}/azl/tests/p0_semantic_tokenize_outer_line_loop.azl"
+set +e
+OUTL_C_OUT="$("$MINI_BIN" "$OUTL" boot.entry 2>&1)"
+outl_c_rc=$?
+set -e
+if [ "$outl_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_tokenize_outer_line_loop exited $outl_c_rc: $OUTL_C_OUT"
+  exit 332
+fi
+if ! printf '%s\n' "$OUTL_C_OUT" | rg -q '^P0_SEMANTIC_TOK_OUTER_INIT_OK$'; then
+  echo "ERROR: expected P0_SEMANTIC_TOK_OUTER_INIT_OK in C output, got: $OUTL_C_OUT"
+  exit 332
+fi
+if ! printf '%s\n' "$OUTL_C_OUT" | rg -q '^tz\|id\|x\|1\|1$'; then
+  echo "ERROR: expected tz|id|x|1|1 in C output, got: $OUTL_C_OUT"
+  exit 332
+fi
+if ! printf '%s\n' "$OUTL_C_OUT" | rg -q '^tz\|eol\|;\|1\|0$'; then
+  echo "ERROR: expected tz|eol|;|1|0 in C output, got: $OUTL_C_OUT"
+  exit 332
+fi
+if ! printf '%s\n' "$OUTL_C_OUT" | rg -q '^tz\|id\|y\|2\|1$'; then
+  echo "ERROR: expected tz|id|y|2|1 in C output, got: $OUTL_C_OUT"
+  exit 332
+fi
+if ! printf '%s\n' "$OUTL_C_OUT" | rg -q '^tz\|eol\|;\|2\|0$'; then
+  echo "ERROR: expected tz|eol|;|2|0 in C output, got: $OUTL_C_OUT"
+  exit 332
+fi
+if ! printf '%s\n' "$OUTL_C_OUT" | rg -q '^P0_SEMANTIC_TOK_OUTER_OK$'; then
+  echo "ERROR: expected P0_SEMANTIC_TOK_OUTER_OK in C output, got: $OUTL_C_OUT"
+  exit 332
+fi
+if ! printf '%s\n' "$OUTL_C_OUT" | awk 'NR==1{if($0!="P0_SEMANTIC_TOK_OUTER_INIT_OK")exit 1} NR==2{if($0!="tz|id|x|1|1")exit 1} NR==3{if($0!="tz|eol|;|1|0")exit 1} NR==4{if($0!="tz|id|y|2|1")exit 1} NR==5{if($0!="tz|eol|;|2|0")exit 1} NR==6{if($0!="P0_SEMANTIC_TOK_OUTER_OK")exit 1} END{if(NR!=6)exit 1}'; then
+  echo "ERROR: expected stdout order for tokenize outer loop, got: $OUTL_C_OUT"
+  exit 332
+fi
+set +e
+OUTL_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$OUTL" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+outl_py_rc=$?
+set -e
+if [ "$outl_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_tokenize_outer_line_loop exited $outl_py_rc: $OUTL_PY_OUT"
+  exit 333
+fi
+if [ "$OUTL_C_OUT" != "$OUTL_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_tokenize_outer_line_loop" >&2
+  echo "C:  $OUTL_C_OUT" >&2
+  echo "Py: $OUTL_PY_OUT" >&2
+  exit 334
+fi
+
+echo "[gate] F78: C vs Python — say double-quoted ::path / ::path.length (single quotes literal)"
+DIP="${ROOT_DIR}/azl/tests/p0_semantic_say_double_interpolate.azl"
+set +e
+DIP_C_OUT="$("$MINI_BIN" "$DIP" boot.entry 2>&1)"
+dip_c_rc=$?
+set -e
+if [ "$dip_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_say_double_interpolate exited $dip_c_rc: $DIP_C_OUT"
+  exit 335
+fi
+if ! printf '%s\n' "$DIP_C_OUT" | rg -q '^P0_SEM_SAY_DIP_INIT$'; then
+  echo "ERROR: expected P0_SEM_SAY_DIP_INIT in C output, got: $DIP_C_OUT"
+  exit 335
+fi
+if ! printf '%s\n' "$DIP_C_OUT" | rg -q '^V=ab$'; then
+  echo "ERROR: expected V=ab in C output, got: $DIP_C_OUT"
+  exit 335
+fi
+if ! printf '%s\n' "$DIP_C_OUT" | rg -q '^LEN=2$'; then
+  echo "ERROR: expected LEN=2 in C output, got: $DIP_C_OUT"
+  exit 335
+fi
+if ! printf '%s\n' "$DIP_C_OUT" | rg -q '^DOT=9$'; then
+  echo "ERROR: expected DOT=9 in C output, got: $DIP_C_OUT"
+  exit 335
+fi
+if ! printf '%s\n' "$DIP_C_OUT" | rg -q '^NONE=\|Z$'; then
+  echo "ERROR: expected NONE=|Z in C output, got: $DIP_C_OUT"
+  exit 335
+fi
+if ! printf '%s\n' "$DIP_C_OUT" | rg -q '^LIT=::msg$'; then
+  echo "ERROR: expected LIT=::msg in C output, got: $DIP_C_OUT"
+  exit 335
+fi
+if ! printf '%s\n' "$DIP_C_OUT" | rg -q '^P0_SEM_SAY_DIP_OK$'; then
+  echo "ERROR: expected P0_SEM_SAY_DIP_OK in C output, got: $DIP_C_OUT"
+  exit 335
+fi
+if ! printf '%s\n' "$DIP_C_OUT" | awk 'NR==1{if($0!="P0_SEM_SAY_DIP_INIT")exit 1} NR==2{if($0!="V=ab")exit 1} NR==3{if($0!="LEN=2")exit 1} NR==4{if($0!="DOT=9")exit 1} NR==5{if($0!="NONE=|Z")exit 1} NR==6{if($0!="LIT=::msg")exit 1} NR==7{if($0!="P0_SEM_SAY_DIP_OK")exit 1} END{if(NR!=7)exit 1}'; then
+  echo "ERROR: expected stdout order for say double interpolate, got: $DIP_C_OUT"
+  exit 335
+fi
+set +e
+DIP_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$DIP" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+dip_py_rc=$?
+set -e
+if [ "$dip_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_say_double_interpolate exited $dip_py_rc: $DIP_PY_OUT"
+  exit 336
+fi
+if [ "$DIP_C_OUT" != "$DIP_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_say_double_interpolate" >&2
+  echo "C:  $DIP_C_OUT" >&2
+  echo "Py: $DIP_PY_OUT" >&2
+  exit 337
+fi
+
+echo "[gate] F79: C vs Python — emit with payload value ::var resolved at emit time"
+EPV="${ROOT_DIR}/azl/tests/p0_semantic_emit_payload_var_bind.azl"
+set +e
+EPV_C_OUT="$("$MINI_BIN" "$EPV" boot.entry 2>&1)"
+epv_c_rc=$?
+set -e
+if [ "$epv_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_emit_payload_var_bind exited $epv_c_rc: $EPV_C_OUT"
+  exit 338
+fi
+if ! printf '%s\n' "$EPV_C_OUT" | rg -q '^carry-bytes$'; then
+  echo "ERROR: expected carry-bytes in C output, got: $EPV_C_OUT"
+  exit 338
+fi
+if ! printf '%s\n' "$EPV_C_OUT" | rg -q '^P0_SEMANTIC_EMIT_PAYLOAD_VAR_OK$'; then
+  echo "ERROR: expected P0_SEMANTIC_EMIT_PAYLOAD_VAR_OK in C output, got: $EPV_C_OUT"
+  exit 338
+fi
+if ! printf '%s\n' "$EPV_C_OUT" | awk 'NR==1{if($0!="carry-bytes")exit 1} NR==2{if($0!="P0_SEMANTIC_EMIT_PAYLOAD_VAR_OK")exit 1} END{if(NR!=2)exit 1}'; then
+  echo "ERROR: expected stdout order for emit payload ::var bind, got: $EPV_C_OUT"
+  exit 338
+fi
+set +e
+EPV_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$EPV" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+epv_py_rc=$?
+set -e
+if [ "$epv_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_emit_payload_var_bind exited $epv_py_rc: $EPV_PY_OUT"
+  exit 339
+fi
+if [ "$EPV_C_OUT" != "$EPV_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_emit_payload_var_bind" >&2
+  echo "C:  $EPV_C_OUT" >&2
+  echo "Py: $EPV_PY_OUT" >&2
+  exit 340
+fi
+
+echo "[gate] F80: C vs Python — tokenize cache-miss branch (::cached_tok != null, tok_misses + 1)"
+TCM="${ROOT_DIR}/azl/tests/p0_semantic_tokenize_cache_miss_branch.azl"
+set +e
+TCM_C_OUT="$("$MINI_BIN" "$TCM" boot.entry 2>&1)"
+tcm_c_rc=$?
+set -e
+if [ "$tcm_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_tokenize_cache_miss_branch exited $tcm_c_rc: $TCM_C_OUT"
+  exit 341
+fi
+if ! printf '%s\n' "$TCM_C_OUT" | rg -q '^CACHE_MISS$'; then
+  echo "ERROR: expected CACHE_MISS in C output, got: $TCM_C_OUT"
+  exit 341
+fi
+if ! printf '%s\n' "$TCM_C_OUT" | rg -q '^1$'; then
+  echo "ERROR: expected 1 (tok_misses) in C output, got: $TCM_C_OUT"
+  exit 341
+fi
+if ! printf '%s\n' "$TCM_C_OUT" | rg -q '^P0_SEM_TOK_CACHE_MISS_OK$'; then
+  echo "ERROR: expected P0_SEM_TOK_CACHE_MISS_OK in C output, got: $TCM_C_OUT"
+  exit 341
+fi
+if ! printf '%s\n' "$TCM_C_OUT" | awk 'NR==1{if($0!="CACHE_MISS")exit 1} NR==2{if($0!="1")exit 1} NR==3{if($0!="P0_SEM_TOK_CACHE_MISS_OK")exit 1} END{if(NR!=3)exit 1}'; then
+  echo "ERROR: expected stdout order CACHE_MISS, 1, OK for tokenize cache miss branch, got: $TCM_C_OUT"
+  exit 341
+fi
+set +e
+TCM_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$TCM" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+tcm_py_rc=$?
+set -e
+if [ "$tcm_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_tokenize_cache_miss_branch exited $tcm_py_rc: $TCM_PY_OUT"
+  exit 342
+fi
+if [ "$TCM_C_OUT" != "$TCM_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_tokenize_cache_miss_branch" >&2
+  echo "C:  $TCM_C_OUT" >&2
+  echo "Py: $TCM_PY_OUT" >&2
+  exit 343
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

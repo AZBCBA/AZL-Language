@@ -312,10 +312,10 @@ component ::memory.enhanced_lha3 {
       emit "store_quantum_state" to ::memory.lha3_quantum with ::event.data
     }
     
-    # Forward: compress_fractal_memory
-    listen for "compress_fractal_memory" then {
+    # Forward: compaction_fractal_memory (LHA3 heuristic retention — not byte codec)
+    listen for "compaction_fractal_memory" then {
       # Forward to the consolidated LHA3 system
-      emit "compress_fractal_memory" to ::memory.lha3_quantum with ::event.data
+      emit "compaction_fractal_memory" to ::memory.lha3_quantum with ::event.data
     }
     
     # Forward: optimize_fractal_memory
@@ -351,7 +351,7 @@ component ::memory.enhanced_lha3 {
   interface {
     initialize_lha3_memory
     store_quantum_state
-    compress_fractal_memory
+    compaction_fractal_memory
     optimize_fractal_memory
     get_quantum_memory_stats
     lha3.store.processing_queue

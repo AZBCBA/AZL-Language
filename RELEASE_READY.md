@@ -47,7 +47,7 @@ All commands must pass with exit code `0`.
 
 ## Contributor quick bar (subset of release)
 
-For a fast, scripted check that still exercises **native gates** (F2–F76, G, G2, H, engine build) and the **live** `GET /api/llm/capabilities` probe:
+For a fast, scripted check that still exercises **native gates** (F2–F80, G, G2, H, engine build) and the **live** `GET /api/llm/capabilities` probe:
 
 ```bash
 bash scripts/verify_azl_strength_bar.sh

@@ -1,0 +1,24 @@
+# Gate F70: ::var.length in expressions (interpreter uses ::current.length, ::s.length).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit len_check with { }
+  }
+  behavior {
+    listen for "len_check" {
+      if ::unset_txt.length == "0" {
+        say "ZERO"
+      }
+      set ::txt = "ab"
+      if ::txt.length == "2" {
+        say "TWO"
+      }
+      say "P0_SEMANTIC_DOT_LENGTH_OK"
+    }
+  }
+}

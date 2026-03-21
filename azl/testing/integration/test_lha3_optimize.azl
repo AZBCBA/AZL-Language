@@ -8,9 +8,9 @@ component ::tests.lha3_optimize_only {
     listen for "memory.lha3.ready" then { say "✅ LHA3 ready" }
 
     # trigger compress and optimize
-    listen for "memory.lha3.compressed" then { say "✅ compressed event received" }
+    listen for "memory.lha3.compaction_applied" then { say "✅ compaction_applied event received" }
     listen for "memory.lha3.optimized" then { say "✅ optimized event received" }
-    emit compress_fractal_memory to ::memory.enhanced_lha3 with 3
+    emit compaction_fractal_memory to ::memory.enhanced_lha3 with 3
     emit optimize_fractal_memory to ::memory.enhanced_lha3 with "ACCESS_PATTERN"
 
     say "🧪 LHA3 optimization events test done"

@@ -18,7 +18,7 @@ This runbook documents how to run the enterprise daemon and validate host integr
 
 ## Native Smoke Tests
 - **Exit codes (no silent failures):** live verify and release helper scripts document **`ERROR:`** + numeric exits in [docs/ERROR_SYSTEM.md](docs/ERROR_SYSTEM.md) § *Shell helpers* — e.g. **`verify_native_runtime_live.sh`** **69–77**, **`verify_enterprise_native_http_live.sh`** **80–88**, **`self_check_release_helpers.sh`** **40–58** (needs **`rg`**, **`jq`**). **`gh_verify_remote_tag.sh`** uses **`jq @uri`** (not Python) for GitHub ref paths.
-- **`bash scripts/run_full_repo_verification.sh`** — `RELEASE_READY.md` order + `run_all_tests.sh` + optional LLM benches (`RUN_OPTIONAL_BENCHES=0` to skip benches)
+- **`bash scripts/run_full_repo_verification.sh`** — `RELEASE_READY.md` order: step **0** **`scripts/verify_documentation_pieces.sh --promoted-only`**, canonical stack, native gates, **`scripts/verify_azl_interpreter_semantic_spine_smoke.sh`** (P0.1b — real **`azl_interpreter.azl`** on Python spine), legacy blocklist, minimal live HTTP, **`run_all_tests.sh`**, optional LLM benches (`RUN_OPTIONAL_BENCHES=0` to skip benches). **`make verify-doc-pieces`** — all entries in **`release/doc_verification_pieces.json`**.
 - `./scripts/run_tests.sh` — runs canonical native checks
 - `./scripts/run_all_tests.sh` — runs strict native suite + benchmark gates
 - `bash scripts/benchmark_native_api.sh` — native API latency benchmark
@@ -30,7 +30,7 @@ This runbook documents how to run the enterprise daemon and validate host integr
   - **`bash scripts/run_proof_llm_enterprise_bundle.sh`** — same proof as above, but the **child runtime** loads the **full enterprise concatenated .azl** (same component list as **`run_enterprise_daemon.sh`**: quantum, LHA3, neural, AZME, …). Stops other daemons if they hold **`.azl/engine.out` / `9099`**. Default **`PROOF_REQS=200`** (set **`PROOF_REQS=1000`** for a full run). Report includes an explicit **Scope** section (native C Ollama proxy vs `/v1/chat`).
   - **`bash scripts/build_enterprise_combined.sh <out.azl>`** — writes the enterprise combined file only (for inspection or custom bundles).
   - `AZL_API_TOKEN=… bash scripts/benchmark_enterprise_v1_chat.sh` — enterprise `POST /v1/chat` (daemon on `AZL_ENTERPRISE_PORT`, default 8080)
-- **Native GGUF + GPU (llama.cpp):** on the **`azl-native-engine` process**, set **`AZL_GGUF_PATH`** and either **`AZL_LLAMA_NGL`** or **`AZL_LLM_GPU_LAYERS`** (integer layer offload count). Same vars apply to the default **`llama-cli`** subprocess path (**`-ngl`**) and the optional in-process build (**`n_gpu_layers`**). Training/orchestration flags like **`AZL_HAS_GPU`** / **`device: cuda`** in `.azl` are a **separate** track (Torch / policy) until a syscall unifies them — see **`docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md` §2.1**.
+- **Native GGUF + GPU (llama.cpp):** on the **`azl-native-engine` process**, set **`AZL_GGUF_PATH`** and either **`AZL_LLAMA_NGL`** or **`AZL_LLM_GPU_LAYERS`** (integer layer offload count). Same vars apply to the default **`llama-cli`** subprocess path (**`-ngl`**) and the optional in-process build (**`n_gpu_layers`**). Training/orchestration flags like **`AZL_HAS_GPU`** / **`device: cuda`** in `.azl` are a **separate** track (Torch / policy) until a syscall unifies them — see **`docs/AZL_GPU_NEURAL_SURFACE_MAP.md` §2.1**.
 
 ## Docker image (`Dockerfile`)
 

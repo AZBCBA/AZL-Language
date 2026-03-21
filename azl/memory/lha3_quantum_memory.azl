@@ -2,6 +2,7 @@
 # CONSOLIDATED LHA3 QUANTUM MEMORY SYSTEM
 # This component consolidates all LHA3 memory functionality into one unified system
 # ============================================================================
+# LHA3_COMPRESSION_MODEL=heuristic_retention — NOT byte-level codec; see docs/LHA3_COMPRESSION_HONESTY.md
 
 component ::memory.lha3_quantum {
   init {
@@ -189,26 +190,26 @@ component ::memory.lha3_quantum {
       return ::state_id
     }
     
-    # Function: compress_fractal_memory (called by training system)
-    listen for "compress_fractal_memory" then {
+    # compaction_fractal_memory — heuristic retention on counters (NOT byte codec); see docs/LHA3_COMPRESSION_HONESTY.md
+    listen for "compaction_fractal_memory" then {
       set ::compression_level = ::event.data || 5
       
       set ::total_items = ::memory_type_counters.episodic + ::memory_type_counters.semantic + ::memory_type_counters.working + ::memory_type_counters.vector_index + ::memory_type_counters.graph_index
-      emit "quantum_engine.compress_memory" to ::quantum.memory.lha3_quantum_engine with {
+      emit "quantum_engine.apply_compaction" to ::quantum.memory.lha3_quantum_engine with {
         memory_items: ::total_items,
         level: ::compression_level
       }
-      set ::compression_result = {
+      set ::compaction_result = {
         level: ::compression_level,
         original_size: ::total_items,
-        compressed_size: (::total_items * (0.98 - (0.03 * ::compression_level))),
-        compression_ratio: (0.98 - (0.03 * ::compression_level)),
+        compacted_size: (::total_items * (0.98 - (0.03 * ::compression_level))),
+        retention_ratio: (0.98 - (0.03 * ::compression_level)),
         fractal_depth: ::fractal_depth,
         success: true
       }
       
-      emit "memory.lha3.compressed" with ::compression_result
-      return ::compression_result
+      emit "memory.lha3.compaction_applied" with ::compaction_result
+      return ::compaction_result
     }
     
     # Function: optimize_fractal_memory (called by training system)
@@ -345,7 +346,7 @@ component ::memory.lha3_quantum {
     memory_get_entry
     get_unified_memory_stats
     store_quantum_state
-    compress_fractal_memory
+    compaction_fractal_memory
     optimize_fractal_memory
     get_quantum_memory_stats
     lha3.store.processing_queue

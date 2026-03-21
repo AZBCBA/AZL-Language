@@ -1,0 +1,22 @@
+# Gate F71: ::line.split_chars() + for ::c in ::chars (tokenizer per-char loop shape).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit chars_go with { }
+  }
+  behavior {
+    listen for "chars_go" {
+      set ::line = "ab"
+      set ::chars = ::line.split_chars()
+      for ::c in ::chars {
+        say ::c
+      }
+      say "P0_SEMANTIC_SPLIT_CHARS_OK"
+    }
+  }
+}

@@ -5,13 +5,14 @@ Single source of behavioral truth: keep in sync with C when changing the minimal
 Nested ``listen`` may run inside ``init`` / listener bodies; ``emit`` inside ``exec_block``
 drains the event queue (``process_events``) so chained handlers match the interpret→tokenize shape.
 Each queued event may carry a ``with { … }`` payload bound as ``::event.data.<key>`` for that dispatch
-(F10–F76 parity fixtures under ``azl/tests/p0_semantic_*.azl``). ``return`` at listener depth exits the
+(F10–F80 parity fixtures under ``azl/tests/p0_semantic_*.azl``). ``return`` at listener depth exits the
 current listener body (including from inside ``if { … }``); ``return`` in top-level ``init`` skips the rest of ``init``.
 ``set ::dst = ::src.split("delim")`` stores split segments joined by newlines; ``for ::v in ::dst { … }`` (listener
 bodies only) iterates those segments — matches the ``::code.split("\\n")`` + line loop shape in ``azl_interpreter.azl``.
 ``::var.length`` in expressions yields the string length as a decimal string (unset base → ``0``).
 ``set ::dst = ::src.split_chars()`` stores Unicode code points of ``::src`` joined by newlines (``for ::c in ::dst`` matches ``for ::char in ::line_text`` in ``azl_interpreter.azl``).
-``set ::buf.push("literal")`` / ``::var`` / ``{ type: "…", value: "…", line: N, column: M }`` appends one newline-delimited segment (object rows serialize as ``tz|…|…|…|…`` with ``\\|`` / ``\\\\`` escapes). ``set ::acc = ::lhs.concat(::rhs)`` joins two buffers with newline (``[]`` / empty same as ``for ::row in``).
+``set ::buf.push("literal")`` / ``::var`` / ``{ type: "…", value: "…" | ::var, line: N | ::var, column: M | ::var }`` appends one newline-delimited segment (object rows serialize as ``tz|…|…|…|…`` with ``\\|`` / ``\\\\`` escapes). ``set ::acc = ::lhs.concat(::rhs)`` joins two buffers with newline (``[]`` / empty same as ``for ::row in``).
+Double-quoted ``say "…"`` expands ``::dotted.path`` and ``::dotted.path.length`` (same ``.length`` rule as expressions: byte length of stored value; unset → ``0``). Single-quoted ``say '…'`` stays literal.
 Binary ``-`` in expressions is supported only when both operands are canonical base-10 integers (``::column - ::name.length`` tokenize-line shape); otherwise use ``+`` string/int rules.
 """
 
@@ -195,12 +196,71 @@ class MinimalAZLRuntime:
             i += 1
         return self.ntok
 
+    def _say_expand_double_quoted(self, inner: str) -> None:
+        n = len(inner)
+        p = 0
+        while p < n:
+            if p + 1 < n and inner[p] == ":" and inner[p + 1] == ":":
+                path0 = p + 2
+                if path0 >= n or (not inner[path0].isalpha() and inner[path0] != "_"):
+                    sys.stdout.write(":")
+                    p += 1
+                    continue
+                j = path0 + 1
+                while j < n and (inner[j].isalnum() or inner[j] == "_"):
+                    j += 1
+                use_length = False
+                end_hole = j
+                parse_ok = True
+                while True:
+                    if j + 7 <= n and inner[j : j + 7] == ".length":
+                        after = j + 7
+                        if after == n or not (
+                            inner[after].isalnum() or inner[after] == "_" or inner[after] == "."
+                        ):
+                            use_length = True
+                            end_hole = after
+                            break
+                    if j < n and inner[j] == ".":
+                        j += 1
+                        if j >= n or (not inner[j].isalpha() and inner[j] != "_"):
+                            parse_ok = False
+                            break
+                        j += 1
+                        while j < n and (inner[j].isalnum() or inner[j] == "_"):
+                            j += 1
+                        continue
+                    end_hole = j
+                    break
+                if not parse_ok:
+                    sys.stdout.write(":")
+                    p += 1
+                    continue
+                key = "::" + inner[path0:j]
+                if len(key) >= 128:
+                    raise SemanticEngineError(5, "azl_semantic_engine: say interpolation key too long")
+                vv = self.var_get(key)
+                if use_length:
+                    sys.stdout.write(str(0 if vv is None else len(vv)))
+                elif vv:
+                    sys.stdout.write(vv)
+                p = end_hole
+            else:
+                sys.stdout.write(inner[p])
+                p += 1
+
     def exec_say(self, i: list[int]) -> None:
         i[0] += 1
         if i[0] >= self.ntok:
             return
         s = self.tok[i[0]]
-        if len(s) >= 2 and s[0] in "\"'":
+        if len(s) >= 2 and s[0] == '"':
+            inner = s[1:-1] if len(s) >= 2 else ""
+            self._say_expand_double_quoted(inner)
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            i[0] += 1
+        elif len(s) >= 2 and s[0] == "'":
             inner = s[1:-1] if len(s) >= 2 else ""
             sys.stdout.write(inner)
             sys.stdout.write("\n")
@@ -292,6 +352,8 @@ class MinimalAZLRuntime:
                 raw = inner
             elif vt and vt.isdigit():
                 raw = vt
+            elif vt.startswith("::"):
+                raw = self.var_get(vt) or ""
             else:
                 raise SemanticEngineError(5, "azl_semantic_engine: .push object bad value")
             i[0] += 1
@@ -735,6 +797,9 @@ class MinimalAZLRuntime:
             valtok = self.tok[i[0]]
             if len(valtok) >= 2 and valtok[0] in "\"'":
                 inner = valtok[1:-1] if len(valtok) >= 2 else ""
+            elif valtok.startswith("::"):
+                vv = self.var_get(valtok)
+                inner = vv if vv is not None else ""
             else:
                 inner = valtok
             i[0] += 1

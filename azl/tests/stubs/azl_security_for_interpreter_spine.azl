@@ -1,0 +1,9 @@
+# Harness-only: prepend this file before `azl/runtime/interpreter/azl_interpreter.azl` so
+# `link ::azl.security` resolves when running via `tools/azl_runtime_spine_host.py`.
+# Enterprise / combined bundles must supply the real `::azl.security` from `azl/security/`; do not
+# merge this file into production bundles that already define `::azl.security`.
+
+component ::azl.security {
+  init {
+  }
+}

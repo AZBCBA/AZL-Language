@@ -4,7 +4,13 @@ AZL is a **component–event** language: programs are built from named `componen
 
 **Native runtime (today):** the HTTP supervisor in `tools/azl_native_engine.c` forks a child that runs a **concatenated** `.azl` bundle. That child is either the **minimal C interpreter** or a **Python runtime** with the same subset (`AZL_RUNTIME_SPINE`); full semantics are specified in `azl/runtime/interpreter/azl_interpreter.azl`, and making that path the default enterprise semantic owner is **ongoing** ([RUNTIME_SPINE_DECISION.md](docs/RUNTIME_SPINE_DECISION.md), [PROJECT_COMPLETION_ROADMAP.md](docs/PROJECT_COMPLETION_ROADMAP.md)).
 
-**Broader library surface:** LHA3-style memory, quantum- and topology-flavored **software** modules, neural orchestration, optional Torch FFI (`AZL_ENABLE_TORCH_FFI`), and HTTP bridges for LLMs. Most of this is **not** exercised by the default native child; boundaries are documented in [AZL_GPU_NEURAL_QUANTUM_INVENTORY.md](docs/AZL_GPU_NEURAL_QUANTUM_INVENTORY.md) and [DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md](docs/DEEP_AUDIT_QUANTUM_MEMORY_PHYSICS.md). Native LLM access is designed around an **Ollama-compatible HTTP proxy**; in-process GGUF is **not** implemented and is reported via `GET /api/llm/capabilities`.
+**Broader library surface:** LHA3-style memory (formal name **TBD** — [AZL_BCBA_NAMING_FRAME.md](docs/AZL_BCBA_NAMING_FRAME.md)), **RepertoireField** modules (legacy path `azl/quantum/` — [AZL_GPU_NEURAL_SURFACE_MAP.md](docs/AZL_GPU_NEURAL_SURFACE_MAP.md) §0), topology-flavored **software**, neural orchestration, optional Torch FFI (`AZL_ENABLE_TORCH_FFI`), and HTTP bridges for LLMs. Most of this is **not** exercised by the default native child; the **surface map** links GPU / LLM / runtime context. Native LLM access is designed around an **Ollama-compatible HTTP proxy**; in-process GGUF is **not** implemented and is reported via `GET /api/llm/capabilities`.
+
+**Integration check (one command):** from repo root run **`make verify`** — full native + test stack without optional LLM benches; see [docs/INTEGRATION_VERIFY.md](docs/INTEGRATION_VERIFY.md). **Doc trust:** promoted checks from **`release/doc_verification_pieces.json`** run first (step 0); run all manifest entries with **`make verify-doc-pieces`**.
+
+**Sibling trees (Rust, weights, finetune workspaces)** are **not** in this repo; see [docs/RELATED_WORKSPACES.md](docs/RELATED_WORKSPACES.md) and [migration/INVENTORY.csv](migration/INVENTORY.csv).
+
+**AI / maintainers (new session — read first):** [AGENTS.md](AGENTS.md) · [docs/AI_MAINTAINER_CONTINUITY_HANDOFF.md](docs/AI_MAINTAINER_CONTINUITY_HANDOFF.md) · Strategic plan: [docs/AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md](docs/AZL_STRATEGIC_CONSENSUS_AND_EXECUTION_PLAN.md)
 
 **Documentation canon (shipped work + full doc map):** [docs/AZL_DOCUMENTATION_CANON.md](docs/AZL_DOCUMENTATION_CANON.md) · Index: [docs/README.md](docs/README.md) · **Where files belong (root vs `.azl/` vs trees):** [docs/REPOSITORY_LAYOUT.md](docs/REPOSITORY_LAYOUT.md) · **Local `.azl/` subfolders:** [docs/LOCAL_WORKSPACE_LAYOUT.md](docs/LOCAL_WORKSPACE_LAYOUT.md)
 
@@ -54,7 +60,7 @@ bash scripts/verify_enterprise_native_http_live.sh
 
 **Strength bar (gates + live capabilities in one command):** `bash scripts/verify_azl_strength_bar.sh` — see [docs/AZL_DOCUMENTATION_CANON.md](docs/AZL_DOCUMENTATION_CANON.md) §1.7.
 
-**Full verification (release order + all tests):** `bash scripts/run_full_repo_verification.sh` — set `RUN_OPTIONAL_BENCHES=0` to skip LLM benches.
+**Full verification (release order + all tests):** `bash scripts/run_full_repo_verification.sh` — seven steps (**0–6**), including **`scripts/verify_azl_interpreter_semantic_spine_smoke.sh`** (real **`azl_interpreter.azl`** on Python semantic spine for **`init`** — see [ERROR_SYSTEM.md](docs/ERROR_SYSTEM.md)); set `RUN_OPTIONAL_BENCHES=0` to skip LLM benches.
 
 Release profile details: `RELEASE_READY.md` and `release/native/manifest.json`.
 
@@ -80,6 +86,18 @@ See [OPERATIONS.md](OPERATIONS.md) for the full runbook.
 
 Run full native validation: `./scripts/run_all_tests.sh`.
 
+## Real-world language benchmark (optional)
+
+**Industry reference workload** (same class as the [Computer Language Benchmarks Game](https://benchmarksgame-team.pages.debian.net/benchmarksgame/)): **spectral-norm** in **C vs Python**, timed with **[hyperfine](https://github.com/sharkdp/hyperfine)**. Requires `hyperfine`, `gcc`, and `python3`.
+
+```bash
+make benchmark-real-world
+```
+
+Not part of `make verify`. Details: [docs/BENCHMARKS_REAL_WORLD.md](docs/BENCHMARKS_REAL_WORLD.md).
+
+**Full AZL stack + timings + optional C/Python ruler:** [docs/BENCHMARKS_AZL_VS_REAL_WORLD.md](docs/BENCHMARKS_AZL_VS_REAL_WORLD.md) — `make benchmark-azl-full-report` (writes a report under `.azl/benchmarks/`).
+
 ## LLM and chat benchmarks (optional)
 
 - **Suite (native + optional enterprise):** `bash scripts/run_product_benchmark_suite.sh` — same as below, plus `/v1/chat` when `AZL_API_TOKEN` is set.
@@ -98,7 +116,7 @@ See [docs/LLM_INFRASTRUCTURE_AUDIT.md](docs/LLM_INFRASTRUCTURE_AUDIT.md).
 - `azl-ci.yml`: all branches — same guards + **`run_all_tests.sh`** + **`run_examples.sh`**
 - `nightly.yml`: **`check_azl_native_gates.sh`** + sysproxy E2E + logs
 
-**Completion (precise wording):** [docs/PROJECT_COMPLETION_STATEMENT.md](docs/PROJECT_COMPLETION_STATEMENT.md) — Tier **A** = `make native-release-profile-complete` / `bash scripts/verify_native_release_profile_complete.sh`. Tier **B** = full roadmap ([docs/PROJECT_COMPLETION_ROADMAP.md](docs/PROJECT_COMPLETION_ROADMAP.md)).
+**Completion (precise wording):** [docs/PROJECT_COMPLETION_STATEMENT.md](docs/PROJECT_COMPLETION_STATEMENT.md) — Tier **A** = `make native-release-profile-complete`. Tier **B** = [docs/TIER_B_BACKLOG.md](docs/TIER_B_BACKLOG.md) + [docs/PROJECT_COMPLETION_ROADMAP.md](docs/PROJECT_COMPLETION_ROADMAP.md).
 
 Documentation index: [docs/README.md](docs/README.md).
 

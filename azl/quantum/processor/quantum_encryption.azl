@@ -1,11 +1,23 @@
+# =============================================================================
+# NON-PRODUCTION CRYPTO DEMO — DO NOT USE FOR SECRETS OR COMPLIANCE
+# Component ::quantum.encryption is a teaching stub: Caesar-style shift in a string.
+# There is no AEAD, no key agreement, no authentication, and decrypt is NOT invertible.
+# Production crypto requires audited primitives and a threat model — see docs/AZL_ENGINEERING_REALITY_AUDIT.md §5.
+# =============================================================================
+
 component ::quantum.encryption {
   init {
     set ::registered = false
     set ::active_key_id = "qkey_default"
     set ::keys = {
-      qkey_default: { shift: 7, strength: "quantum_enhanced" }
+      qkey_default: { shift: 7, strength: "demo_shift_only" }
     }
-    emit "quantum.encryption.ready" with { key_id: ::active_key_id }
+    say "SECURITY: ::quantum.encryption is DEMO_NON_CRYPTO only — not production cryptography (see AZL_ENGINEERING_REALITY_AUDIT.md §5)"
+    emit "quantum.encryption.ready" with {
+      key_id: ::active_key_id,
+      security_tier: "DEMO_NON_CRYPTO",
+      invertible_decrypt: false
+    }
   }
 
   behavior {
@@ -14,7 +26,7 @@ component ::quantum.encryption {
       emit "quantum.encryption.registered" with {
         registered: true,
         key_id: ::active_key_id,
-        quantum_enhanced: true
+        security_tier: "DEMO_NON_CRYPTO"
       }
     }
 
@@ -24,6 +36,11 @@ component ::quantum.encryption {
       set ::key_id = ::req.key_id || ::active_key_id
       set ::key = ::keys[::key_id]
       if ::key == null {
+        emit log_error with {
+          type: "security",
+          message: "quantum.encryption.execute unknown_key",
+          context: { key_id: ::key_id }
+        }
         emit "quantum.encryption.failed" with { error: "unknown_key", key_id: ::key_id }
         return
       }
@@ -32,17 +49,25 @@ component ::quantum.encryption {
       emit "quantum.encryption.completed" with {
         key_id: ::key_id,
         ciphertext: ::ciphertext,
-        algorithm: "azl_quantum_shift"
+        algorithm: "azl_demo_string_shift",
+        security_tier: "DEMO_NON_CRYPTO",
+        crypto_assurance: "none"
       }
     }
 
     listen for "quantum.encryption.decrypt" then {
       set ::req = ::event.data || {}
       set ::ciphertext = ::req.ciphertext || ""
-      set ::plaintext = ::ciphertext
-      emit "quantum.encryption.decrypted" with {
-        plaintext: ::plaintext,
-        algorithm: "azl_quantum_shift"
+      emit log_error with {
+        type: "security",
+        message: "quantum.encryption.decrypt rejected — demo cipher is not invertible; use audited crypto for real decrypt",
+        context: { ciphertext_len: ::ciphertext.length }
+      }
+      emit "quantum.encryption.failed" with {
+        error: "decrypt_not_supported_demo_cipher",
+        key_id: ::active_key_id,
+        security_tier: "DEMO_NON_CRYPTO",
+        detail: "No inverse mapping for QE+<shift>:<text> format; plaintext cannot be recovered by this component."
       }
     }
   }
