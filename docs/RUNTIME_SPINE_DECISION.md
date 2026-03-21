@@ -68,7 +68,13 @@ the trace today is: **`start_azl_native_mode.sh`** → **`run_enterprise_daemon.
 
 **P0tokemit (tokenize cache hit + `emit tokenize_complete`, 2026-03-22):** Same hit path as **P0tokhit**, then **`emit tokenize_complete with { tokens: ::tokens }`** so **`::event.data.tokens`** is visible in a **`listen for "tokenize_complete"`** body. Real file registers that listener in **`init`** before **`emit tokenize`** (~**46** vs ~**81**); fixture registers **`tokenize_complete`** before the starter event. Gate **F82**: **`azl/tests/p0_semantic_tokenize_cache_hit_emit_complete.azl`** (exits **347–349**).
 
-**Open next (spine queue):** **`listen for "parse"`** cache hit/miss + **`emit parse_complete`** (and dependencies) as **F83+** parity fixtures, then **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** phase **D — Vertical slice: parse**.
+**P0parsemiss (parse cache miss + `ast_misses`, 2026-03-22):** **`set ::tokens = ::event.data.tokens`** then **`if (::cached_ast != null)`** miss branch + **`::perf.stats.ast_misses + 1`** — aligns **`listen for "parse"`** ~**109–127** (fixture uses **`::cached_ast`** stand-in for **`cached_ast`** / **`::perf.ast_cache[::key]`**). Gate **F83**: **`azl/tests/p0_semantic_parse_cache_miss_branch.azl`** (exits **350–352**).
+
+**P0parsehit (parse cache hit + `ast_hits`, 2026-03-22):** Hit path **`::perf.stats.ast_hits + 1`**, **`set ::ast = ::cached_ast`**, **`return`** (~**113–119**). Gate **F84**: **`azl/tests/p0_semantic_parse_cache_hit_branch.azl`** (exits **353–355**).
+
+**P0parseemit (parse cache hit + `emit parse_complete`, 2026-03-22):** Hit path + **`emit parse_complete with { ast: ::ast }`**; inner **`listen for "parse_complete"`** reads **`::event.data.ast`**. Gate **F85**: **`azl/tests/p0_semantic_parse_cache_hit_emit_complete.azl`** (exits **356–358**).
+
+**Open next (spine queue):** **`listen for "execute"`** / **`execute_complete`**, **`AZL_USE_VM`** branch shapes, **`::execute_ast`** / VM stubs — **F86+** fixtures + **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** phase **E — Vertical slice: execute**.
 
 **P0.1 execution order (vertical slices):** Maintainership sequence for **`azl_interpreter.azl`** on the semantic spine — parity gates (**A**), real-file **`init`** smoke (**B**), then **tokenize → parse → execute** slices (**C–E**) before claiming full **behavior** (**F**). Single source: **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** § **P0.1 — Long-term execution order** and **[TIER_B_BACKLOG.md](TIER_B_BACKLOG.md)** § **P0.1 execution checklist**.
 

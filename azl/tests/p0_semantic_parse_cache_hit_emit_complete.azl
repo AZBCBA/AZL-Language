@@ -1,0 +1,34 @@
+# Gate F85: parse cache hit + `emit parse_complete with { ast: ::ast }` (mirrors `azl_interpreter.azl` ~113–118). `listen for "parse_complete"` registered before the starter `emit`.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    set ::cached_ast = "ast-body"
+    emit p85_parse_hit_emit with { tokens: "seed-toks" }
+  }
+  behavior {
+    listen for "parse_complete" {
+      say "PC_INNER"
+      say ::event.data.ast
+      say "P0_SEM_F85_OK"
+    }
+    listen for "p85_parse_hit_emit" {
+      set ::tokens = ::event.data.tokens
+      say ::tokens
+      if (::cached_ast != null) {
+        say "PARSE_HIT"
+        set ::perf.stats.ast_hits = 0
+        set ::perf.stats.ast_hits = ::perf.stats.ast_hits + 1
+        set ::ast = ::cached_ast
+        emit parse_complete with { ast: ::ast }
+        return
+      }
+      say "P85_BAD_MISS"
+      say "P0_SEM_F85_FAIL"
+    }
+  }
+}

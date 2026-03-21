@@ -1,0 +1,31 @@
+# Gate F84: parse cache HIT — `if (::cached_ast != null) { ast_hits + 1; set ::ast = ::cached_ast; … return }` (mirrors `azl_interpreter.azl` ~113–119). Init seeds `::cached_ast`.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    set ::cached_ast = "ast-node"
+    emit p84_parse_hit with { tokens: "seed-toks" }
+  }
+  behavior {
+    listen for "p84_parse_hit" {
+      set ::tokens = ::event.data.tokens
+      say ::tokens
+      if (::cached_ast != null) {
+        say "PARSE_HIT"
+        set ::perf.stats.ast_hits = 0
+        set ::perf.stats.ast_hits = ::perf.stats.ast_hits + 1
+        say ::perf.stats.ast_hits
+        set ::ast = ::cached_ast
+        say ::ast
+        say "P0_SEM_PARSE_CACHE_HIT_OK"
+        return
+      }
+      say "PARSE_MISS_BAD"
+      say "P0_SEM_PARSE_CACHE_HIT_FAIL"
+    }
+  }
+}

@@ -2967,6 +2967,109 @@ if [ "$THEC_C_OUT" != "$THEC_PY_OUT" ]; then
   exit 349
 fi
 
+echo "[gate] F83: C vs Python — parse cache-miss (::tokens from payload, ast_misses + 1)"
+PCM="${ROOT_DIR}/azl/tests/p0_semantic_parse_cache_miss_branch.azl"
+set +e
+PCM_C_OUT="$("$MINI_BIN" "$PCM" boot.entry 2>&1)"
+pcm_c_rc=$?
+set -e
+if [ "$pcm_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_cache_miss_branch exited $pcm_c_rc: $PCM_C_OUT"
+  exit 350
+fi
+if ! printf '%s\n' "$PCM_C_OUT" | rg -q '^seed-toks$'; then
+  echo "ERROR: expected seed-toks in C output, got: $PCM_C_OUT"
+  exit 350
+fi
+if ! printf '%s\n' "$PCM_C_OUT" | rg -q '^PARSE_MISS$'; then
+  echo "ERROR: expected PARSE_MISS in C output, got: $PCM_C_OUT"
+  exit 350
+fi
+if ! printf '%s\n' "$PCM_C_OUT" | rg -q '^1$'; then
+  echo "ERROR: expected 1 (ast_misses) in C output, got: $PCM_C_OUT"
+  exit 350
+fi
+if ! printf '%s\n' "$PCM_C_OUT" | rg -q '^P0_SEM_PARSE_CACHE_MISS_OK$'; then
+  echo "ERROR: expected P0_SEM_PARSE_CACHE_MISS_OK in C output, got: $PCM_C_OUT"
+  exit 350
+fi
+if ! printf '%s\n' "$PCM_C_OUT" | awk 'NR==1{if($0!="seed-toks")exit 1} NR==2{if($0!="PARSE_MISS")exit 1} NR==3{if($0!="1")exit 1} NR==4{if($0!="P0_SEM_PARSE_CACHE_MISS_OK")exit 1} END{if(NR!=4)exit 1}'; then
+  echo "ERROR: expected stdout order for parse cache miss, got: $PCM_C_OUT"
+  exit 350
+fi
+set +e
+PCM_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$PCM" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+pcm_py_rc=$?
+set -e
+if [ "$pcm_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_cache_miss_branch exited $pcm_py_rc: $PCM_PY_OUT"
+  exit 351
+fi
+if [ "$PCM_C_OUT" != "$PCM_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_cache_miss_branch" >&2
+  echo "C:  $PCM_C_OUT" >&2
+  echo "Py: $PCM_PY_OUT" >&2
+  exit 352
+fi
+
+echo "[gate] F84: C vs Python — parse cache-hit (ast_hits + 1, ::ast = ::cached_ast, return)"
+PCH="${ROOT_DIR}/azl/tests/p0_semantic_parse_cache_hit_branch.azl"
+set +e
+PCH_C_OUT="$("$MINI_BIN" "$PCH" boot.entry 2>&1)"
+pch_c_rc=$?
+set -e
+if [ "$pch_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_cache_hit_branch exited $pch_c_rc: $PCH_C_OUT"
+  exit 353
+fi
+if ! printf '%s\n' "$PCH_C_OUT" | awk 'NR==1{if($0!="seed-toks")exit 1} NR==2{if($0!="PARSE_HIT")exit 1} NR==3{if($0!="1")exit 1} NR==4{if($0!="ast-node")exit 1} NR==5{if($0!="P0_SEM_PARSE_CACHE_HIT_OK")exit 1} END{if(NR!=5)exit 1}'; then
+  echo "ERROR: expected stdout order for parse cache hit branch, got: $PCH_C_OUT"
+  exit 353
+fi
+set +e
+PCH_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$PCH" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+pch_py_rc=$?
+set -e
+if [ "$pch_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_cache_hit_branch exited $pch_py_rc: $PCH_PY_OUT"
+  exit 354
+fi
+if [ "$PCH_C_OUT" != "$PCH_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_cache_hit_branch" >&2
+  echo "C:  $PCH_C_OUT" >&2
+  echo "Py: $PCH_PY_OUT" >&2
+  exit 355
+fi
+
+echo "[gate] F85: C vs Python — parse cache hit + emit parse_complete { ast: ::ast }"
+PCE="${ROOT_DIR}/azl/tests/p0_semantic_parse_cache_hit_emit_complete.azl"
+set +e
+PCE_C_OUT="$("$MINI_BIN" "$PCE" boot.entry 2>&1)"
+pce_c_rc=$?
+set -e
+if [ "$pce_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_cache_hit_emit_complete exited $pce_c_rc: $PCE_C_OUT"
+  exit 356
+fi
+if ! printf '%s\n' "$PCE_C_OUT" | awk 'NR==1{if($0!="seed-toks")exit 1} NR==2{if($0!="PARSE_HIT")exit 1} NR==3{if($0!="PC_INNER")exit 1} NR==4{if($0!="ast-body")exit 1} NR==5{if($0!="P0_SEM_F85_OK")exit 1} END{if(NR!=5)exit 1}'; then
+  echo "ERROR: expected stdout order for parse cache hit emit complete, got: $PCE_C_OUT"
+  exit 356
+fi
+set +e
+PCE_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; AZL_COMBINED_PATH="$PCE" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+pce_py_rc=$?
+set -e
+if [ "$pce_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_cache_hit_emit_complete exited $pce_py_rc: $PCE_PY_OUT"
+  exit 357
+fi
+if [ "$PCE_C_OUT" != "$PCE_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_cache_hit_emit_complete" >&2
+  echo "C:  $PCE_C_OUT" >&2
+  echo "Py: $PCE_PY_OUT" >&2
+  exit 358
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

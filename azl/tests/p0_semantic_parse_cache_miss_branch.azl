@@ -1,0 +1,28 @@
+# Gate F83: `listen for "parse"` miss path — `set ::tokens = ::event.data.tokens`, cache slot unset, `::perf.stats.ast_misses + 1` (mirrors `azl_interpreter.azl` ~109–127). `::cached_ast` stand-in for `cached_ast` / `::perf.ast_cache[::key]`.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p83_parse_miss with { tokens: "seed-toks" }
+  }
+  behavior {
+    listen for "p83_parse_miss" {
+      set ::tokens = ::event.data.tokens
+      say ::tokens
+      if (::cached_ast != null) {
+        say "PARSE_HIT_BAD"
+        say "P0_SEM_PARSE_MISS_FAIL"
+        return
+      }
+      say "PARSE_MISS"
+      set ::perf.stats.ast_misses = 0
+      set ::perf.stats.ast_misses = ::perf.stats.ast_misses + 1
+      say ::perf.stats.ast_misses
+      say "P0_SEM_PARSE_CACHE_MISS_OK"
+    }
+  }
+}
