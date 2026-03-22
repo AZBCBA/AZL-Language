@@ -1657,7 +1657,7 @@ static int parse_with_brace_payload(ParseTokPair *pairs, int np, int j, int *j_o
   return -1;
 }
 
-/* One of say|… / emit|… / set|… inside `listen for ev [then] { … }`; chunk_out ≤254 chars; *j_out past outer `}`. */
+/* One of say|… / emit|… / set|… inside `listen for ev [then] { … }`; chunk_out ≤254 chars; *j_out after stmt (eol or past `}`). */
 static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const char *evn, char *chunk_out,
                                    size_t chunk_sz, int *j_out) {
   chunk_out[0] = '\0';
@@ -1669,8 +1669,15 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
     size_t ml = 0;
     while (j < np) {
       if (strcmp(pairs[j].typ, "eol") == 0) {
+        if (msg[0] == '\0') {
+          j++;
+          continue;
+        }
         j++;
-        continue;
+        (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|say|%.199s", evn, msg);
+        if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+        *j_out = j;
+        return 0;
       }
       if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) {
         if (msg[0] == '\0') return -1;
@@ -1778,8 +1785,15 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
     size_t rl = 0;
     while (j < np) {
       if (strcmp(pairs[j].typ, "eol") == 0) {
+        if (rhs[0] == '\0') {
+          j++;
+          continue;
+        }
         j++;
-        continue;
+        (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|set|%s|%.199s", evn, varn, rhs);
+        if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+        *j_out = j;
+        return 0;
       }
       if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) {
         if (rhs[0] == '\0') return -1;
@@ -2204,10 +2218,37 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
       }
       j = parse_skip_eol(pairs, np, j + 1);
       char lchunk[320];
-      int j2 = j;
-      if (parse_listen_inner_body(pairs, np, j, evn, lchunk, sizeof(lchunk), &j2) == 0) {
+      size_t acc_save_len = strlen(acc);
+      int jpos = j;
+      int stmts = 0;
+      for (;;) {
+        if (jpos >= np) {
+          /* Successful parse can end with j2 == np; do not wipe acc in that case. */
+          if (stmts <= 0) {
+            acc[acc_save_len] = '\0';
+          }
+          break;
+        }
+        if (strcmp(pairs[jpos].typ, "eol") == 0) {
+          jpos = parse_skip_eol(pairs, np, jpos + 1);
+          continue;
+        }
+        if (strcmp(pairs[jpos].typ, "brace") == 0 && strcmp(pairs[jpos].val, "}") == 0) {
+          jpos++;
+          break;
+        }
+        int j2 = jpos;
+        if (parse_listen_inner_body(pairs, np, jpos, evn, lchunk, sizeof(lchunk), &j2) != 0) {
+          acc[acc_save_len] = '\0';
+          stmts = -1;
+          break;
+        }
         parse_acc_append(acc, sizeof(acc), lchunk);
-        i = j2;
+        stmts++;
+        jpos = j2;
+      }
+      if (stmts > 0) {
+        i = jpos;
         continue;
       }
       i++;

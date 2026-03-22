@@ -343,8 +343,13 @@ class MinimalAZLRuntime:
             while j < n:
                 t2, v2 = pairs[j]
                 if t2 == "eol":
+                    if not parts:
+                        j += 1
+                        continue
                     j += 1
-                    continue
+                    msg = " ".join(parts)[:199]
+                    seg = ("listen|" + evn + "|say|" + msg)[:255]
+                    return (seg, j)
                 if t2 == "brace" and v2 == "}":
                     if not parts:
                         return None
@@ -423,8 +428,13 @@ class MinimalAZLRuntime:
             while j < n:
                 t2, v2 = pairs[j]
                 if t2 == "eol":
+                    if not rhs_parts:
+                        j += 1
+                        continue
                     j += 1
-                    continue
+                    rhs = " ".join(rhs_parts)[:200]
+                    seg = ("listen|" + evn + "|set|" + var_name + "|" + rhs)[:255]
+                    return (seg, j)
                 if t2 == "brace" and v2 == "}":
                     if not rhs_parts:
                         return None
@@ -690,13 +700,29 @@ class MinimalAZLRuntime:
                     i += 1
                     continue
                 j = self._skip_eol_pairs(pairs, j + 1)
-                parsed_ln = self._parse_listen_inner_to_row(pairs, j, n, evn)
-                if parsed_ln is None:
+                inner_lines: list[str] = []
+                inner_failed = False
+                while j < n:
+                    t_skip, v_skip = pairs[j]
+                    if t_skip == "eol":
+                        j += 1
+                        continue
+                    if t_skip == "brace" and v_skip == "}":
+                        j += 1
+                        break
+                    parsed_ln = self._parse_listen_inner_to_row(pairs, j, n, evn)
+                    if parsed_ln is None:
+                        inner_failed = True
+                        break
+                    line, j2 = parsed_ln
+                    inner_lines.append(line)
+                    j = j2
+                if inner_failed or not inner_lines:
                     i += 1
                     continue
-                line, j2 = parsed_ln
-                out_lines.append(line)
-                i = j2
+                for line in inner_lines:
+                    out_lines.append(line)
+                i = j
                 continue
             i += 1
         if not out_lines:

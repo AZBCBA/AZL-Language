@@ -1,0 +1,27 @@
+# Gate F166: ::parse_tokens — listen { say … ; say … } → two listen|…|say|… rows (multi-statement body)
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f166_parse with { }
+  }
+  behavior {
+    listen for "f166_parse" {
+      set ::tokens = []
+      set ::l1 = "listen for f166 { say F166_A"
+      set ::l2 = "say F166_B }"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::l1, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l2, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 2, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F166_OK"
+    }
+  }
+}
