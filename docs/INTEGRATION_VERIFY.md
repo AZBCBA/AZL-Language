@@ -18,7 +18,7 @@
 | **Maintainer / Tier A ceremony** (adds GitHub check JSON + strength bar) | **`make native-release-profile-complete`** |
 | **Faster loop** (native stack only; skips azlpack/LSP/VM tail) | **`bash scripts/run_tests.sh`** |
 
-**Rule:** After a meaningful change, from the **repo root** run **`make verify`**. Exit code **0** means the integration check passed. Promoted **doc pieces** (step **0**) include **`bash -n`** on release-step scripts, including **`verify_azl_interpreter_semantic_spine_smoke.sh`** (anchor **`docs/ERROR_SYSTEM.md`** § *Real interpreter source on semantic spine*).
+**Rule:** After a meaningful change, from the **repo root** run **`make verify`**. Exit code **0** means the integration check passed. Promoted **doc pieces** (step **0**) include **`bash -n`** on **`verify_azl_interpreter_semantic_spine_smoke.sh`** and **`verify_azl_interpreter_semantic_spine_behavior_smoke.sh`** (anchors in **`docs/ERROR_SYSTEM.md`**).
 
 **Semantic spine roadmap (long-term order, not just “gates green”):** [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md) § **P0.1 — Long-term execution order** and [TIER_B_BACKLOG.md](TIER_B_BACKLOG.md) § **P0.1 execution checklist** — vertical slices along **`azl_interpreter.azl`** (tokenize → parse → execute) after parity (**A**) and real-file **`init`** smoke (**B**).
 
@@ -27,10 +27,12 @@
 0. **`verify_documentation_pieces.sh --promoted-only`** — proves promoted doc-linked commands / files (see **`release/doc_verification_pieces.json`**)  
 1. **`enforce_canonical_stack.sh`**  
 2. **`check_azl_native_gates.sh`**  
-3. **`verify_azl_interpreter_semantic_spine_smoke.sh`** — real **`azl/runtime/interpreter/azl_interpreter.azl`** on Python semantic spine (stub **`::azl.security`**)  
-4. **`enforce_legacy_entrypoint_blocklist.sh`**  
-5. **`verify_native_runtime_live.sh`**  
-6. **`run_all_tests.sh`** (includes enterprise HTTP, LHA3/quantum verify, grammar, VM, azlpack, LSP, …)
+3. **`verify_azl_interpreter_semantic_spine_smoke.sh`** — real **`azl/runtime/interpreter/azl_interpreter.azl`** on Python semantic spine (stub **`::azl.security`**; **`init`** only)
+
+4. **`verify_azl_interpreter_semantic_spine_behavior_smoke.sh`** — stub + harness + interpreter; **`emit interpret`** through tokenize/parse/execute (**ERROR_SYSTEM** **548–554**)  
+5. **`enforce_legacy_entrypoint_blocklist.sh`**  
+6. **`verify_native_runtime_live.sh`**  
+7. **`run_all_tests.sh`** (includes enterprise HTTP, LHA3/quantum verify, grammar, VM, azlpack, LSP, …)
 
 Optional Ollama / enterprise chat benches are **off** so local LLM setup is not required.
 

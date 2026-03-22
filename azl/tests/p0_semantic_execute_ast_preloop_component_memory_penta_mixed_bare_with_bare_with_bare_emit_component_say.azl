@@ -1,0 +1,78 @@
+# Gate F140: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **bare** + **`memory|emit|…|with|…`** + **bare** + **`memory|emit|…|with|…`** + **bare** (five rows, FIFO queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p140.linked {
+  init {
+    say "P140_LINK_SID"
+  }
+}
+
+component ::p140.a {
+  init {
+    say "P140_A"
+  }
+}
+
+component ::p140.b {
+  init {
+    say "P140_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p140_comp_penta_bare_with_bare_with_bare_emit_comp with { ast: "f140-root", scope: "f140-sc", nodes: "import|f140_mod_tag
+link|::p140.linked
+component|p140.a
+memory|emit|f140_e1
+memory|emit|f140_e2|with|fk140a|F140_PAY_A
+memory|emit|f140_e3
+memory|emit|f140_e4|with|fk140b|F140_PAY_B
+memory|emit|f140_e5
+component|p140.b
+memory|say|F140_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC140_INNER"
+      say ::event.data.result
+      say "P0_SEM_F140_OK"
+    }
+    listen for "f140_e1" {
+      say "F140_BARE_1"
+    }
+    listen for "f140_e2" {
+      say ::event.data.fk140a
+    }
+    listen for "f140_e3" {
+      say "F140_BARE_3"
+    }
+    listen for "f140_e4" {
+      say ::event.data.fk140b
+    }
+    listen for "f140_e5" {
+      say "F140_BARE_5"
+    }
+    listen for "p140_comp_penta_bare_with_bare_with_bare_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F140_VM_ON_BAD"
+        return
+      }
+      say "F140_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX140_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

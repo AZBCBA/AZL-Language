@@ -1,0 +1,74 @@
+# Gate F139: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **`memory|emit|…|with|…`** ×2 + **bare** ×2 (four rows, FIFO queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p139.linked {
+  init {
+    say "P139_LINK_SID"
+  }
+}
+
+component ::p139.a {
+  init {
+    say "P139_A"
+  }
+}
+
+component ::p139.b {
+  init {
+    say "P139_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p139_comp_quad_with_with_bare_bare_emit_comp with { ast: "f139-root", scope: "f139-sc", nodes: "import|f139_mod_tag
+link|::p139.linked
+component|p139.a
+memory|emit|f139_e1|with|fk139a|F139_PAY_A
+memory|emit|f139_e2|with|fk139b|F139_PAY_B
+memory|emit|f139_e3
+memory|emit|f139_e4
+component|p139.b
+memory|say|F139_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC139_INNER"
+      say ::event.data.result
+      say "P0_SEM_F139_OK"
+    }
+    listen for "f139_e1" {
+      say ::event.data.fk139a
+    }
+    listen for "f139_e2" {
+      say ::event.data.fk139b
+    }
+    listen for "f139_e3" {
+      say "F139_BARE_3"
+    }
+    listen for "f139_e4" {
+      say "F139_BARE_4"
+    }
+    listen for "p139_comp_quad_with_with_bare_bare_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F139_VM_ON_BAD"
+        return
+      }
+      say "F139_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX139_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

@@ -64,3 +64,7 @@ output.txt
 
 # Built .azlpack tarballs (scripts/build_azlpack.sh)
 packages/registry/**/pkg.tar.gz
+
+# Local native binaries (produced by build scripts; do not commit)
+/azl-native-engine
+tools/azl_interpreter_minimal

@@ -918,12 +918,27 @@ static void exec_if(int *i) {
     mini_expr_error("if missing {");
     exit(5);
   }
-  if (cond_is_true(cond)) {
+  int took_then = cond_is_true(cond) ? 1 : 0;
+  if (took_then) {
     (*i)++;
     exec_init_block(i);
     if (*i < g_ntok && strcmp(g_tok[*i], "}") == 0) (*i)++;
   } else {
     skip_braced_block(i);
+  }
+  if (*i < g_ntok && strcmp(g_tok[*i], "else") == 0) {
+    (*i)++;
+    if (*i >= g_ntok || strcmp(g_tok[*i], "{") != 0) {
+      mini_expr_error("else missing {");
+      exit(5);
+    }
+    if (took_then) {
+      skip_braced_block(i);
+    } else {
+      (*i)++;
+      exec_init_block(i);
+      if (*i < g_ntok && strcmp(g_tok[*i], "}") == 0) (*i)++;
+    }
   }
 }
 
@@ -1241,7 +1256,7 @@ static void execute_ast_set_line(const char *after_set, char *result, size_t rsz
 
 static void execute_ast_listen_line(const char *after_listen, char *result, size_t rsz);
 
-/* memory|set|::k|v, memory|say|text, memory|emit|…, memory|listen|… — stub memory rows (F104–F142; F115+ = memory|listen|… same stub table as listen|). */
+/* memory|set|::k|v, memory|say|text, memory|emit|…, memory|listen|… — stub memory rows (F104–F148; F115+ = memory|listen|… same stub table as listen|). */
 static void execute_ast_memory_line(const char *after_mem, char *result, size_t rsz) {
   const char *p = after_mem ? after_mem : "";
   if (strncmp(p, "listen|", 7U) == 0) {

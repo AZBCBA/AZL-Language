@@ -1,0 +1,74 @@
+# Gate F136: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **bare** + **`memory|emit|…|with|…`** + **`memory|emit|…|with|…`** + **bare** (four rows, FIFO queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p136.linked {
+  init {
+    say "P136_LINK_SID"
+  }
+}
+
+component ::p136.a {
+  init {
+    say "P136_A"
+  }
+}
+
+component ::p136.b {
+  init {
+    say "P136_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p136_comp_quad_mixed_emit_comp with { ast: "f136-root", scope: "f136-sc", nodes: "import|f136_mod_tag
+link|::p136.linked
+component|p136.a
+memory|emit|f136_e1
+memory|emit|f136_e2|with|fk136a|F136_PAY_A
+memory|emit|f136_e3|with|fk136b|F136_PAY_B
+memory|emit|f136_e4
+component|p136.b
+memory|say|F136_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC136_INNER"
+      say ::event.data.result
+      say "P0_SEM_F136_OK"
+    }
+    listen for "f136_e1" {
+      say "F136_BARE_1"
+    }
+    listen for "f136_e2" {
+      say ::event.data.fk136a
+    }
+    listen for "f136_e3" {
+      say ::event.data.fk136b
+    }
+    listen for "f136_e4" {
+      say "F136_BARE_4"
+    }
+    listen for "p136_comp_quad_mixed_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F136_VM_ON_BAD"
+        return
+      }
+      say "F136_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX136_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

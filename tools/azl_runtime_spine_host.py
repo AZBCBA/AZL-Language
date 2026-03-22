@@ -14,6 +14,10 @@ P0.1b (release): `scripts/verify_azl_interpreter_semantic_spine_smoke.sh` concat
 `azl/tests/stubs/azl_security_for_interpreter_spine.azl` + `azl/runtime/interpreter/azl_interpreter.azl`,
 sets AZL_COMBINED_PATH and AZL_ENTRY=azl.interpreter, and asserts clean `init` (see docs/ERROR_SYSTEM.md).
 
+P0.1c (release): `scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh` adds
+`azl/tests/harness/azl_interpreter_semantic_spine_behavior_entry.azl`, uses AZL_ENTRY=azl.spine.behavior.entry,
+and asserts the interpret pipeline through execute (ERROR_SYSTEM.md exits 548–554).
+
 Exit codes:
   71 — ERR_AZL_COMBINED_PATH_INVALID
   72 — ERR_AZL_ENTRY_MISSING

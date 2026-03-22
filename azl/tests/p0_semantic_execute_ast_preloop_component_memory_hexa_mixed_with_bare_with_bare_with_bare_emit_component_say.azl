@@ -1,0 +1,82 @@
+# Gate F143: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **six** **`memory|emit|…`** rows (**`with`** / **bare** / **`with`** / **bare** / **`with`** / **bare**, FIFO), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset. **`import|i`** + **`e1`…`e6`** keep **`::ast.nodes`** within minimal **255-byte** bound.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p143.linked {
+  init {
+    say "P143_LINK_SID"
+  }
+}
+
+component ::p143.a {
+  init {
+    say "P143_A"
+  }
+}
+
+component ::p143.b {
+  init {
+    say "P143_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p143_comp_hexa_with_bare_with_bare_with_bare_emit_comp with { ast: "f143-root", scope: "f143-sc", nodes: "import|i
+link|::p143.linked
+component|p143.a
+memory|emit|e1|with|a|F143_PA
+memory|emit|e2
+memory|emit|e3|with|b|F143_PB
+memory|emit|e4
+memory|emit|e5|with|c|F143_PC
+memory|emit|e6
+component|p143.b
+memory|say|F143_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC143_INNER"
+      say ::event.data.result
+      say "P0_SEM_F143_OK"
+    }
+    listen for "e1" {
+      say ::event.data.a
+    }
+    listen for "e2" {
+      say "F143_BARE_2"
+    }
+    listen for "e3" {
+      say ::event.data.b
+    }
+    listen for "e4" {
+      say "F143_BARE_4"
+    }
+    listen for "e5" {
+      say ::event.data.c
+    }
+    listen for "e6" {
+      say "F143_BARE_6"
+    }
+    listen for "p143_comp_hexa_with_bare_with_bare_with_bare_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F143_VM_ON_BAD"
+        return
+      }
+      say "F143_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX143_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

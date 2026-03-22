@@ -9,6 +9,7 @@
 #
 # Env: LLM_BENCH_* passed through; AZL_LLAMA_SKIP_NO_CNV=1 if your binary has no -no-cnv
 #      AZL_LLAMA_SIMPLE_IO=1 recommended for llama.cpp `llama-completion` (subprocess-friendly)
+#      Engine + benchmark pass --single-turn to llama-cli (chat templates otherwise hang on stdin).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"

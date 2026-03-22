@@ -559,6 +559,45 @@ static void policy_audit_append(const char *decision, const char *reason, size_t
   fclose(af);
 }
 
+/* Drop llama-cli interactive header up through the "> ..." prompt line (stdout is a TTY-shaped transcript). */
+static void trim_llama_cli_stdout_prefix(char *s) {
+  if (!s || !s[0]) return;
+  char *pa = strstr(s, "\n> ");
+  if (!pa) return;
+  char *body = strchr(pa + 2, '\n');
+  if (!body) return;
+  body++;
+  while (*body == '\n') body++;
+  if (*body && body != s) memmove(s, body, strlen(body) + 1);
+}
+
+/* Strip llama-cli footer lines that leak to stdout (timings, "Exiting..."). Use the *last* "[ Prompt:"
+ * match so we do not truncate model text that happens to contain that substring earlier. */
+static void trim_llama_cli_stdout_noise(char *s) {
+  if (!s || !s[0]) return;
+  char *last = NULL;
+  for (char *scan = s; (scan = strstr(scan, "[ Prompt:")) != NULL;) {
+    last = scan;
+    scan += 1;
+  }
+  if (last) {
+    char *line = last;
+    while (line > s && line[-1] != '\n') line--;
+    *line = '\0';
+  }
+  char *ex = strstr(s, "Exiting...");
+  if (ex) {
+    char *line = ex;
+    while (line > s && line[-1] != '\n') line--;
+    *line = '\0';
+  }
+  size_t n = strlen(s);
+  while (n > 0 && isspace((unsigned char)s[n - 1])) {
+    s[n - 1] = '\0';
+    n--;
+  }
+}
+
 static int gguf_infer_text(const char *prompt, int n_predict, char *out, size_t outsz, char *backend,
                            size_t backend_sz, char *err, size_t err_sz) {
   if (!prompt || !out || outsz == 0) return -1;
@@ -652,6 +691,11 @@ static int gguf_infer_text(const char *prompt, int n_predict, char *out, size_t 
     argv[ai++] = nbuf;
     if (!(use_no_cnv && use_no_cnv[0] == '1')) argv[ai++] = "-no-cnv";
     if (simple_io && simple_io[0] == '1') argv[ai++] = "--simple-io";
+    /* Newer llama-cli enables conversation/interactive mode when a chat template exists; without this,
+     * -f prompt can wait for stdin forever (breaks gguf_infer + benchmarks). */
+    argv[ai++] = "--single-turn";
+    argv[ai++] = "--no-display-prompt";
+    argv[ai++] = "--no-warmup";
     argv[ai++] = NULL;
     (void)execvp(cli, argv);
     _exit(127);
@@ -674,6 +718,8 @@ static int gguf_infer_text(const char *prompt, int n_predict, char *out, size_t 
     (void)snprintf(err, err_sz, "%s", "llama_cli_failed");
     return -9;
   }
+  trim_llama_cli_stdout_prefix(raw);
+  trim_llama_cli_stdout_noise(raw);
   (void)snprintf(out, outsz, "%s", raw);
   (void)snprintf(backend, backend_sz, "%s", "llama_cli");
   return 0;
@@ -737,14 +783,25 @@ static void sanitize_chat_answer(const char *prompt, char *answer, size_t answer
     }
   }
 
-  if (strstr(answer, "System:") && strstr(answer, "Conversation:")) {
+  /* llama-cli may echo a transcript: "Conversation:" / "User:" lines and one or more "Assistant:"
+   * markers. Use the last "\nAssistant:" so we keep the real completion (not an empty slot). */
+  if (strstr(answer, "Conversation:") != NULL &&
+      (strstr(answer, "System:") != NULL || strstr(answer, "User:") != NULL)) {
     char *scan = answer;
     char *last = NULL;
     while ((scan = strstr(scan, "\nAssistant:")) != NULL) {
       last = scan;
       scan += 11;
     }
-    if (last) memmove(answer, last + 11, strlen(last + 11) + 1);
+    if (last) {
+      char *body = last + 11;
+      while (*body == '\n' || *body == '\r') body++;
+      if (strncmp(body, "Assistant:", 10) == 0) {
+        body += 10;
+        while (*body == '\n' || *body == '\r' || isspace((unsigned char)*body)) body++;
+      }
+      memmove(answer, body, strlen(body) + 1);
+    }
   }
 
   trim_ascii_whitespace(answer);
@@ -934,10 +991,10 @@ static void handle_chat_session(int cfd, const char *req, ssize_t n, EngineState
     write_response(cfd, 400, "Bad Request", "{\"ok\":false,\"error\":\"missing_message\"}");
     return;
   }
-  int n_predict = 96;
-  (void)json_extract_int_field(body_copy, "n_predict", &n_predict, 96);
+  int n_predict = 512;
+  (void)json_extract_int_field(body_copy, "n_predict", &n_predict, 512);
   if (n_predict < 1) n_predict = 1;
-  if (n_predict > 1024) n_predict = 1024;
+  if (n_predict > 2048) n_predict = 2048;
   int reset = request_json_has_true_flag(body_copy, "reset");
   free(body_copy);
 
@@ -965,7 +1022,9 @@ static void handle_chat_session(int cfd, const char *req, ssize_t n, EngineState
 
   /* History can be up to CHAT_SESS_HIST_MAX; stack snprintf into 12KiB tripped -Werror=format-truncation on -Os CI. */
   static const char kChatWrapPrefix[] =
-      "System: You are AZL chat assistant. Follow policy, be accurate, concise, and production-grade.\n"
+      "System: You are a helpful assistant in AZL terminal chat. Respond naturally to what the user wrote "
+      "(including greetings and typos). Follow safety/policy; do not leak secrets. Prefer clear, complete "
+      "sentences—do not stop mid-phrase.\n"
       "Conversation:\n";
   static const char kChatWrapSuffix[] = "\nAssistant:";
   const size_t wp = sizeof(kChatWrapPrefix) - 1u;

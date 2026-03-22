@@ -1,0 +1,94 @@
+# Gate F146: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **nine** bare **`memory|emit|ev`** rows (no `|with|`, FIFO queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset. **`import|i`** + **`e1`…`e9`** keep **`::ast.nodes`** within minimal **255-byte** bound.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p146.linked {
+  init {
+    say "P146_LINK_SID"
+  }
+}
+
+component ::p146.a {
+  init {
+    say "P146_A"
+  }
+}
+
+component ::p146.b {
+  init {
+    say "P146_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p146_comp_nona_bare_emit_comp with { ast: "f146-root", scope: "f146-sc", nodes: "import|i
+link|::p146.linked
+component|p146.a
+memory|emit|e1
+memory|emit|e2
+memory|emit|e3
+memory|emit|e4
+memory|emit|e5
+memory|emit|e6
+memory|emit|e7
+memory|emit|e8
+memory|emit|e9
+component|p146.b
+memory|say|F146_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC146_INNER"
+      say ::event.data.result
+      say "P0_SEM_F146_OK"
+    }
+    listen for "e1" {
+      say "F146_BARE_1"
+    }
+    listen for "e2" {
+      say "F146_BARE_2"
+    }
+    listen for "e3" {
+      say "F146_BARE_3"
+    }
+    listen for "e4" {
+      say "F146_BARE_4"
+    }
+    listen for "e5" {
+      say "F146_BARE_5"
+    }
+    listen for "e6" {
+      say "F146_BARE_6"
+    }
+    listen for "e7" {
+      say "F146_BARE_7"
+    }
+    listen for "e8" {
+      say "F146_BARE_8"
+    }
+    listen for "e9" {
+      say "F146_BARE_9"
+    }
+    listen for "p146_comp_nona_bare_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F146_VM_ON_BAD"
+        return
+      }
+      say "F146_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX146_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

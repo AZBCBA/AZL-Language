@@ -109,5 +109,5 @@
 ## 7. Verification
 
 - `scripts/verify_native_runtime_live.sh` — starts **`azl-native-engine`** with the **minimal** bootstrap bundle (`c_minimal_link_ping`, same family as `run_native_engine_llm_bench.sh`), waits for **`/healthz`** + **`/readyz`** HTTP 200, then asserts `/api/llm/capabilities` returns `ok`, `ollama_http_proxy: true`, and either **`gguf_in_process: false` + `ERR_NATIVE_GGUF_NOT_IN_PROCESS`** (default build) or **`gguf_in_process: true` + `gguf_embedded_llamacpp: true` + `error: null`** (llama.cpp-linked build).
-- `scripts/verify_enterprise_native_http_live.sh` — same capability assertions on **`azl-native-engine`** with the **fat** combined file from **`build_enterprise_combined.sh`** and entry **`::build.daemon.enterprise`** (run via **`scripts/run_tests.sh`** inside **`run_all_tests.sh`** and **`run_full_repo_verification.sh`** step **6**; also CI runtime smoke).
+- `scripts/verify_enterprise_native_http_live.sh` — same capability assertions on **`azl-native-engine`** with the **fat** combined file from **`build_enterprise_combined.sh`** and entry **`::build.daemon.enterprise`** (run via **`scripts/run_tests.sh`** inside **`run_all_tests.sh`** and **`run_full_repo_verification.sh`** step **7**; also CI runtime smoke).
 - `scripts/check_azl_native_gates.sh` — requires the capabilities route to exist in the C source.

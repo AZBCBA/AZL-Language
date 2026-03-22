@@ -21,6 +21,7 @@ Binary ``-`` in expressions is supported only when both operands are canonical b
 
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 from dataclasses import dataclass, field
@@ -31,6 +32,35 @@ MAX_VARS = 256
 MAX_LISTENERS = 64
 MAX_EVENTS = 32
 MAX_PAYLOAD_KEYS = 8
+
+# Bare identifiers in set/if (interpreter-shaped; see azl_interpreter.azl tokenize/parse).
+_BARE_ID_FORBIDDEN = frozenset(
+    {
+        "if",
+        "for",
+        "in",
+        "return",
+        "listen",
+        "emit",
+        "with",
+        "link",
+        "init",
+        "behavior",
+        "memory",
+        "component",
+        "true",
+        "false",
+        "null",
+        "then",
+        "say",
+        "set",
+        "and",
+        "or",
+        "on",
+        "import",
+        "let",
+    }
+)
 
 
 class SemanticEngineError(Exception):
@@ -142,6 +172,9 @@ class MinimalAZLRuntime:
     _execute_ast_listen_stubs: list[tuple[str, str, str, str]] = field(
         default_factory=list, repr=False
     )  # (event, "say"|"emit"|"set", arg1, arg2)
+    # Interpreter spine (azl_interpreter.azl): flat cache maps; aggregate literals are "{}" in minimal.
+    _perf_tok_cache: dict[str, str] = field(default_factory=dict, repr=False)
+    _perf_ast_cache: dict[str, str] = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
         self.ntok = len(self.tok)
@@ -193,6 +226,122 @@ class MinimalAZLRuntime:
             self.listeners.append(
                 Listener(event=ev[:63], block_start=block_start, block_end=block_end)
             )
+
+    @staticmethod
+    def _normalize_bare_identifier_lhs(tok0: str) -> str | None:
+        if tok0.startswith("::"):
+            return tok0
+        if not tok0 or not (tok0[0].isalpha() or tok0[0] == "_"):
+            return None
+        if not all(ch.isalnum() or ch == "_" for ch in tok0):
+            return None
+        if tok0 in _BARE_ID_FORBIDDEN:
+            return None
+        return "::" + tok0
+
+    def _format_tz_row(self, typ: str, val: str, line: str, col: str) -> str:
+        parts = [
+            self._tz_esc_field(typ[:32]),
+            self._tz_esc_field(val[:200]),
+            self._tz_esc_field(line[:20]),
+            self._tz_esc_field(col[:20]),
+        ]
+        return "tz|" + "|".join(parts)
+
+    def _builtin_tokenize_line_stub(self, line_text: str, line_no_s: str) -> str:
+        s = (line_text or "").strip()
+        if not s:
+            return ""
+        ln = (line_no_s or "1").strip()
+        if not ln.isdigit():
+            ln = "1"
+        return self._format_tz_row("identifier", s[:80], ln, "1")
+
+    def _try_spine_interpreter_builtin_statement(self, i: list[int]) -> bool:
+        """Standalone ``::insert_cache(...)`` / ``::touch_cache_key(...)`` in listener bodies."""
+        t = self.tok[i[0]]
+        if t == "::insert_cache":
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != "(":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: insert_cache missing ("
+                )
+            i[0] += 1
+            if i[0] >= self.ntok or not self.tok[i[0]].startswith("::"):
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: insert_cache bad key arg"
+                )
+            key_raw = self.var_get(self.tok[i[0]]) or ""
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != ",":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: insert_cache missing ,"
+                )
+            i[0] += 1
+            if i[0] >= self.ntok:
+                raise SemanticEngineError(5, "azl_semantic_engine: insert_cache eof")
+            if self.tok[i[0]] == "null":
+                i[0] += 1
+                if i[0] >= self.ntok or self.tok[i[0]] != ",":
+                    raise SemanticEngineError(
+                        5, "azl_semantic_engine: insert_cache missing , after null"
+                    )
+                i[0] += 1
+                if i[0] >= self.ntok or not self.tok[i[0]].startswith("::"):
+                    raise SemanticEngineError(
+                        5, "azl_semantic_engine: insert_cache bad ast arg"
+                    )
+                ast_v = self.var_get(self.tok[i[0]]) or ""
+                i[0] += 1
+                if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                    raise SemanticEngineError(
+                        5, "azl_semantic_engine: insert_cache missing )"
+                    )
+                i[0] += 1
+                self._perf_ast_cache[key_raw[:200]] = ast_v[:4096]
+                return True
+            if not self.tok[i[0]].startswith("::"):
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: insert_cache bad tokens arg"
+                )
+            toks_v = self.var_get(self.tok[i[0]]) or ""
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != ",":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: insert_cache missing , (tokens)"
+                )
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != "null":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: insert_cache expected null after tokens"
+                )
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: insert_cache missing )"
+                )
+            i[0] += 1
+            self._perf_tok_cache[key_raw[:200]] = toks_v[:4096]
+            return True
+        if t == "::touch_cache_key":
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != "(":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: touch_cache_key missing ("
+                )
+            i[0] += 1
+            if i[0] >= self.ntok or not self.tok[i[0]].startswith("::"):
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: touch_cache_key bad arg"
+                )
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: touch_cache_key missing )"
+                )
+            i[0] += 1
+            return True
+        return False
 
     def find_block_end(self, i: int) -> int:
         depth = 1
@@ -443,6 +592,19 @@ class MinimalAZLRuntime:
         if t in ("false", "true"):
             i[0] += 1
             return t, 0
+        if t and (t[0].isalpha() or t[0] == "_") and all(
+            ch.isalnum() or ch == "_" for ch in t
+        ):
+            if t not in _BARE_ID_FORBIDDEN:
+                i[0] += 1
+                gk = "::" + t
+                vv = self.var_get(gk)
+                if vv is None:
+                    return "", 1
+                # Interpreter-shaped cache slots (e.g. cached_tok): empty string means "unset".
+                if vv == "":
+                    return "", 1
+                return vv, 0
         if t.startswith("::"):
             if t == "::internal.env":
                 i[0] += 1
@@ -466,6 +628,36 @@ class MinimalAZLRuntime:
                     i[0] += 1
                     vv = self.var_get(base)
                     return (str(0 if vv is None else len(vv)), 0)
+            if t == "::perf.tok_cache":
+                i[0] += 1
+                if i[0] >= self.ntok or self.tok[i[0]] != "[":
+                    raise SemanticEngineError(
+                        5, "azl_semantic_engine: perf.tok_cache[ expected"
+                    )
+                i[0] += 1
+                key_s, _ = self._eval_primary(i)
+                if i[0] >= self.ntok or self.tok[i[0]] != "]":
+                    raise SemanticEngineError(5, "azl_semantic_engine: perf.tok_cache ] expected")
+                i[0] += 1
+                raw = self._perf_tok_cache.get(key_s)
+                if raw is None:
+                    return "", 1
+                return raw[:255], 0
+            if t == "::perf.ast_cache":
+                i[0] += 1
+                if i[0] >= self.ntok or self.tok[i[0]] != "[":
+                    raise SemanticEngineError(
+                        5, "azl_semantic_engine: perf.ast_cache[ expected"
+                    )
+                i[0] += 1
+                key_s, _ = self._eval_primary(i)
+                if i[0] >= self.ntok or self.tok[i[0]] != "]":
+                    raise SemanticEngineError(5, "azl_semantic_engine: perf.ast_cache ] expected")
+                i[0] += 1
+                raw = self._perf_ast_cache.get(key_s)
+                if raw is None:
+                    return "", 1
+                return raw[:255], 0
             vv = self.var_get(t)
             i[0] += 1
             if vv is None:
@@ -598,13 +790,25 @@ class MinimalAZLRuntime:
         cond = self.eval_expr(i)
         if i[0] >= self.ntok or self.tok[i[0]] != "{":
             raise SemanticEngineError(5, "azl_semantic_engine: if missing {")
-        if self._cond_is_true(cond):
+        took_then = self._cond_is_true(cond)
+        if took_then:
             i[0] += 1
             self.exec_init_block(i)
             if i[0] < self.ntok and self.tok[i[0]] == "}":
                 i[0] += 1
         else:
             self._skip_braced_block(i)
+        if i[0] < self.ntok and self.tok[i[0]] == "else":
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != "{":
+                raise SemanticEngineError(5, "azl_semantic_engine: else missing {")
+            if took_then:
+                self._skip_braced_block(i)
+            else:
+                i[0] += 1
+                self.exec_init_block(i)
+                if i[0] < self.ntok and self.tok[i[0]] == "}":
+                    i[0] += 1
 
     def exec_for_in(self, i: list[int]) -> None:
         """for ::var in ::seq { body } — listener bodies only (invoked from exec_block)."""
@@ -736,7 +940,7 @@ class MinimalAZLRuntime:
         return "Listen: " + levn[:120]
 
     def _builtin_execute_ast_result(self, ast_base: str) -> str:
-        """Walk ``<ast_base>.nodes``: preloop ``import|`` / ``link|`` (F98, F112–F114, F118, F120, F121, F122); main ``component|`` / ``memory|set|…`` / ``memory|say|…`` / ``memory|emit|…`` / ``memory|listen|…`` (F104–F142) / ``listen|…|…`` (F99–F103); ``say|`` (F93); ``emit|`` / ``emit|ev|with|…`` (F94–F97); ``set|::k|v`` (F95)."""
+        """Walk ``<ast_base>.nodes``: preloop ``import|`` / ``link|`` (F98, F112–F114, F118, F120, F121, F122); main ``component|`` / ``memory|set|…`` / ``memory|say|…`` / ``memory|emit|…`` / ``memory|listen|…`` (F104–F148) / ``listen|…|…`` (F99–F103); ``say|`` (F93); ``emit|`` / ``emit|ev|with|…`` (F94–F97); ``set|::k|v`` (F95)."""
         nk = ast_base + ".nodes"
         raw = self.var_get(nk) or ""
         result = "Execution completed"
@@ -850,8 +1054,7 @@ class MinimalAZLRuntime:
         if i[0] >= self.ntok:
             return
         t0 = self.tok[i[0]]
-        if not t0 or not t0.startswith("::"):
-            i[0] += 1
+        if not t0:
             return
         if t0.endswith(".push") and len(t0) > len(".push") + 2:
             base = t0[: -len(".push")]
@@ -885,7 +1088,14 @@ class MinimalAZLRuntime:
                 joined = cur + "\n" + seg
             self.var_set(base, joined[:255])
             return
-        k = t0
+        if t0.startswith("::"):
+            k = t0
+        else:
+            nb = self._normalize_bare_identifier_lhs(t0)
+            if nb is None:
+                i[0] += 1
+                return
+            k = nb
         i[0] += 1
         if i[0] >= self.ntok or self.tok[i[0]] != "=":
             return
@@ -902,14 +1112,48 @@ class MinimalAZLRuntime:
             if i[0] >= self.ntok:
                 raise SemanticEngineError(5, "azl_semantic_engine: .concat missing arg")
             carg = self.tok[i[0]]
-            if not carg.startswith("::"):
+            rgt: str
+            if carg == "::tokenize_line":
+                i[0] += 1
+                if i[0] >= self.ntok or self.tok[i[0]] != "(":
+                    raise SemanticEngineError(
+                        5, "azl_semantic_engine: tokenize_line missing ("
+                    )
+                i[0] += 1
+                if i[0] >= self.ntok or not self.tok[i[0]].startswith("::"):
+                    raise SemanticEngineError(
+                        5, "azl_semantic_engine: tokenize_line bad line_text"
+                    )
+                a1 = self.tok[i[0]]
+                i[0] += 1
+                if i[0] >= self.ntok or self.tok[i[0]] != ",":
+                    raise SemanticEngineError(
+                        5, "azl_semantic_engine: tokenize_line missing ,"
+                    )
+                i[0] += 1
+                if i[0] >= self.ntok or not self.tok[i[0]].startswith("::"):
+                    raise SemanticEngineError(
+                        5, "azl_semantic_engine: tokenize_line bad line_no"
+                    )
+                a2 = self.tok[i[0]]
+                i[0] += 1
+                if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                    raise SemanticEngineError(
+                        5, "azl_semantic_engine: tokenize_line missing )"
+                    )
+                i[0] += 1
+                rgt = self._builtin_tokenize_line_stub(
+                    self.var_get(a1) or "", self.var_get(a2) or "1"
+                )
+            elif not carg.startswith("::"):
                 raise SemanticEngineError(5, "azl_semantic_engine: .concat bad arg")
-            i[0] += 1
+            else:
+                i[0] += 1
+                rgt = self.var_get(carg) or ""
             if i[0] >= self.ntok or self.tok[i[0]] != ")":
                 raise SemanticEngineError(5, "azl_semantic_engine: .concat missing )")
             i[0] += 1
             lft = self.var_get(concat_lhs)
-            rgt = self.var_get(carg) or ""
             lp = (
                 ""
                 if (lft is None or lft == "" or lft == "[]")
@@ -976,6 +1220,66 @@ class MinimalAZLRuntime:
             src = self.var_get(base) or ""
             joined = "\n".join(src.split(delim))
             self.var_set(k, joined[:255])
+            return
+
+        def _hash_blob(var_tok: str) -> str:
+            if not var_tok.startswith("::"):
+                raise SemanticEngineError(5, "azl_semantic_engine: hash_* bad arg")
+            raw = (self.var_get(var_tok) or "").encode("utf-8", errors="replace")
+            h = hashlib.sha256(raw).hexdigest()[:16]
+            return h
+
+        if v == "::hash_source":
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != "(":
+                raise SemanticEngineError(5, "azl_semantic_engine: hash_source missing (")
+            i[0] += 1
+            if i[0] >= self.ntok:
+                raise SemanticEngineError(5, "azl_semantic_engine: hash_source missing arg")
+            arg = self.tok[i[0]]
+            hx = _hash_blob(arg)
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                raise SemanticEngineError(5, "azl_semantic_engine: hash_source missing )")
+            i[0] += 1
+            self.var_set(k, ("tok_" + hx)[:255])
+            return
+        if v == "::hash_tokens":
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != "(":
+                raise SemanticEngineError(5, "azl_semantic_engine: hash_tokens missing (")
+            i[0] += 1
+            if i[0] >= self.ntok:
+                raise SemanticEngineError(5, "azl_semantic_engine: hash_tokens missing arg")
+            arg = self.tok[i[0]]
+            hx = _hash_blob(arg)
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                raise SemanticEngineError(5, "azl_semantic_engine: hash_tokens missing )")
+            i[0] += 1
+            self.var_set(k, ("ast_" + hx)[:255])
+            return
+        if v == "::parse_tokens":
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != "(":
+                raise SemanticEngineError(5, "azl_semantic_engine: parse_tokens missing (")
+            i[0] += 1
+            if i[0] >= self.ntok:
+                raise SemanticEngineError(5, "azl_semantic_engine: parse_tokens missing arg")
+            arg = self.tok[i[0]]
+            if not arg.startswith("::"):
+                raise SemanticEngineError(5, "azl_semantic_engine: parse_tokens bad arg")
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                raise SemanticEngineError(5, "azl_semantic_engine: parse_tokens missing )")
+            i[0] += 1
+            _ = self.var_get(arg)
+            self.var_set("::ast", "{}")
+            self.var_set(
+                "::ast.nodes",
+                "say|AZL_SPINE_SEMANTIC_PARSE_EXECUTE_BRIDGE",
+            )
+            self.var_set(k, "{}")
             return
         if v == "::vm_compile_ast":
             i[0] += 1
@@ -1199,6 +1503,12 @@ class MinimalAZLRuntime:
                     k += 1
                     ki = [k]
                     self.exec_init_block(ki)
+            if lt == "azl.interpreter":
+                # Init stores aggregate `{ … }` as "{}"; keep perf counters addressable like dotted globals.
+                for sub in ("tok_hits", "tok_misses", "ast_hits", "ast_misses"):
+                    pk = f"::perf.stats.{sub}"
+                    if self.var_get(pk) is None:
+                        self.var_set(pk, "0")
             return
 
         sys.stderr.write(f"azl_semantic_engine: link: component not found: {link_target}\n")
@@ -1323,6 +1633,20 @@ class MinimalAZLRuntime:
                     ii = [i]
                     self.exec_listen(ii)
                     i = ii[0]
+                elif (
+                    depth == 1
+                    and t.startswith("::")
+                    and i + 1 < self.ntok
+                    and self.tok[i + 1] == "("
+                ):
+                    ii = [i]
+                    if self._try_spine_interpreter_builtin_statement(ii):
+                        i = ii[0]
+                    else:
+                        raise SemanticEngineError(
+                            5,
+                            f"azl_semantic_engine: unsupported spine call {t!r}",
+                        )
                 else:
                     i += 1
         finally:

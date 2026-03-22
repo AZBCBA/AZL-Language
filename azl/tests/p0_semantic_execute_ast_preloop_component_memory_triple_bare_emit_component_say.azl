@@ -1,0 +1,70 @@
+# Gate F131: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **three** bare **`memory|emit|ev`** rows (no `|with|`, FIFO queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p131.linked {
+  init {
+    say "P131_LINK_SID"
+  }
+}
+
+component ::p131.a {
+  init {
+    say "P131_A"
+  }
+}
+
+component ::p131.b {
+  init {
+    say "P131_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p131_comp_triple_bare_emit_comp with { ast: "f131-root", scope: "f131-sc", nodes: "import|f131_mod_tag
+link|::p131.linked
+component|p131.a
+memory|emit|f131_e1
+memory|emit|f131_e2
+memory|emit|f131_e3
+component|p131.b
+memory|say|F131_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC131_INNER"
+      say ::event.data.result
+      say "P0_SEM_F131_OK"
+    }
+    listen for "f131_e1" {
+      say "F131_BARE_1"
+    }
+    listen for "f131_e2" {
+      say "F131_BARE_2"
+    }
+    listen for "f131_e3" {
+      say "F131_BARE_3"
+    }
+    listen for "p131_comp_triple_bare_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F131_VM_ON_BAD"
+        return
+      }
+      say "F131_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX131_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

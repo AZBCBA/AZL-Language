@@ -52,6 +52,10 @@ def run_llama_cli(prompt: str, n_predict: int) -> tuple[bool, float, str]:
             cmd.append("-no-cnv")
         if (os.environ.get("AZL_LLAMA_SIMPLE_IO") or "").strip() == "1":
             cmd.append("--simple-io")
+        # Match tools/azl_native_engine.c: chat-templated models otherwise stay interactive after -f.
+        cmd.append("--single-turn")
+        cmd.append("--no-display-prompt")
+        cmd.append("--no-warmup")
         t0 = time.perf_counter()
         r = subprocess.run(
             cmd,

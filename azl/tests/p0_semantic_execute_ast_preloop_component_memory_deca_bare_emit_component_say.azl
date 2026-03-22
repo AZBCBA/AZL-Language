@@ -1,0 +1,98 @@
+# Gate F147: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **ten** bare **`memory|emit|ev`** rows (no `|with|`, FIFO queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset. **`import|i`** + **`e1`…`e10`** keep **`::ast.nodes`** within minimal **255-byte** bound.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p147.linked {
+  init {
+    say "P147_LINK_SID"
+  }
+}
+
+component ::p147.a {
+  init {
+    say "P147_A"
+  }
+}
+
+component ::p147.b {
+  init {
+    say "P147_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p147_comp_deca_bare_emit_comp with { ast: "f147-root", scope: "f147-sc", nodes: "import|i
+link|::p147.linked
+component|p147.a
+memory|emit|e1
+memory|emit|e2
+memory|emit|e3
+memory|emit|e4
+memory|emit|e5
+memory|emit|e6
+memory|emit|e7
+memory|emit|e8
+memory|emit|e9
+memory|emit|e10
+component|p147.b
+memory|say|F147_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC147_INNER"
+      say ::event.data.result
+      say "P0_SEM_F147_OK"
+    }
+    listen for "e1" {
+      say "F147_BARE_1"
+    }
+    listen for "e2" {
+      say "F147_BARE_2"
+    }
+    listen for "e3" {
+      say "F147_BARE_3"
+    }
+    listen for "e4" {
+      say "F147_BARE_4"
+    }
+    listen for "e5" {
+      say "F147_BARE_5"
+    }
+    listen for "e6" {
+      say "F147_BARE_6"
+    }
+    listen for "e7" {
+      say "F147_BARE_7"
+    }
+    listen for "e8" {
+      say "F147_BARE_8"
+    }
+    listen for "e9" {
+      say "F147_BARE_9"
+    }
+    listen for "e10" {
+      say "F147_BARE_10"
+    }
+    listen for "p147_comp_deca_bare_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F147_VM_ON_BAD"
+        return
+      }
+      say "F147_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX147_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

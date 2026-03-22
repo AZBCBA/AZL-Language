@@ -11,7 +11,7 @@ PORT="${AZL_CHAT_PORT:-${AZL_BUILD_API_PORT:-8080}}"
 BASE_URL="${AZL_CHAT_BASE_URL:-http://127.0.0.1:${PORT}}"
 TOKEN="${AZL_CHAT_TOKEN:-${AZL_API_TOKEN:-azl_live_chat_token_2026}}"
 SESSION_ID="${AZL_CHAT_SESSION_ID:-user-$(date +%s)}"
-N_PREDICT="${AZL_CHAT_N_PREDICT:-220}"
+N_PREDICT="${AZL_CHAT_N_PREDICT:-512}"
 
 if ! command -v curl >/dev/null 2>&1; then
   echo "ERROR: curl is required but not found in PATH." >&2

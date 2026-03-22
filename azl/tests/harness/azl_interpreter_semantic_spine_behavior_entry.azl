@@ -1,0 +1,14 @@
+# Tier B P0.1 — semantic spine behavior-entry harness (test-only).
+# Concatenated after azl_security_for_interpreter_spine.azl and before
+# azl/runtime/interpreter/azl_interpreter.azl. Entry component: ::azl.spine.behavior.entry
+# links the real interpreter, then emit interpret to exercise behavior listeners on minimal_runtime.
+
+component ::azl.spine.behavior.entry {
+  init {
+    say "AZL_SPINE_BEHAVIOR_ENTRY_PRE"
+    link ::azl.interpreter
+    say "AZL_SPINE_BEHAVIOR_ENTRY_LINKED"
+    emit interpret with { code: "say x", component_name: "smoke" }
+    say "AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT"
+  }
+}

@@ -38,6 +38,13 @@
       "shell": "bash -n scripts/verify_azl_interpreter_semantic_spine_smoke.sh"
     },
     {
+      "id": "verify_step_interpreter_semantic_spine_behavior_smoke_syntax",
+      "doc": "docs/ERROR_SYSTEM.md",
+      "description": "verify_azl_interpreter_semantic_spine_behavior_smoke.sh parses under bash -n (P0.1c release step)",
+      "promoted": true,
+      "shell": "bash -n scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh"
+    },
+    {
       "id": "verify_step_legacy_blocklist_syntax",
       "doc": "docs/INTEGRATION_VERIFY.md",
       "description": "enforce_legacy_entrypoint_blocklist.sh parses under bash -n",

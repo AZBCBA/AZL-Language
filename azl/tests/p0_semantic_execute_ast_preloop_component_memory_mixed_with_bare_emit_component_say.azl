@@ -1,0 +1,66 @@
+# Gate F133: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **`memory|emit|ev1|with|k|v`** then **bare** **`memory|emit|ev2`** (mixed FIFO queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p133.linked {
+  init {
+    say "P133_LINK_SID"
+  }
+}
+
+component ::p133.a {
+  init {
+    say "P133_A"
+  }
+}
+
+component ::p133.b {
+  init {
+    say "P133_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p133_comp_mixed_with_bare_emit_comp with { ast: "f133-root", scope: "f133-sc", nodes: "import|f133_mod_tag
+link|::p133.linked
+component|p133.a
+memory|emit|f133_e1|with|fk133|F133_PAYLOAD
+memory|emit|f133_e2
+component|p133.b
+memory|say|F133_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC133_INNER"
+      say ::event.data.result
+      say "P0_SEM_F133_OK"
+    }
+    listen for "f133_e1" {
+      say ::event.data.fk133
+    }
+    listen for "f133_e2" {
+      say "F133_BARE_2"
+    }
+    listen for "p133_comp_mixed_with_bare_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F133_VM_ON_BAD"
+        return
+      }
+      say "F133_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX133_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

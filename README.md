@@ -60,7 +60,7 @@ bash scripts/verify_enterprise_native_http_live.sh
 
 **Strength bar (gates + live capabilities in one command):** `bash scripts/verify_azl_strength_bar.sh` — see [docs/AZL_DOCUMENTATION_CANON.md](docs/AZL_DOCUMENTATION_CANON.md) §1.7.
 
-**Full verification (release order + all tests):** `bash scripts/run_full_repo_verification.sh` — seven steps (**0–6**), including **`scripts/verify_azl_interpreter_semantic_spine_smoke.sh`** (real **`azl_interpreter.azl`** on Python semantic spine for **`init`** — see [ERROR_SYSTEM.md](docs/ERROR_SYSTEM.md)); set `RUN_OPTIONAL_BENCHES=0` to skip LLM benches.
+**Full verification (release order + all tests):** `bash scripts/run_full_repo_verification.sh` — eight steps (**0–7**), including **`scripts/verify_azl_interpreter_semantic_spine_smoke.sh`** (**`init`**) and **`scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh`** (interpret pipeline bridge — see [ERROR_SYSTEM.md](docs/ERROR_SYSTEM.md)); set `RUN_OPTIONAL_BENCHES=0` to skip LLM benches.
 
 Release profile details: `RELEASE_READY.md` and `release/native/manifest.json`.
 

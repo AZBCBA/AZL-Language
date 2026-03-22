@@ -1,0 +1,90 @@
+# Gate F145: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **eight** bare **`memory|emit|ev`** rows (no `|with|`, FIFO queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset. **`import|i`** + **`e1`…`e8`** keep **`::ast.nodes`** within minimal **255-byte** bound.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p145.linked {
+  init {
+    say "P145_LINK_SID"
+  }
+}
+
+component ::p145.a {
+  init {
+    say "P145_A"
+  }
+}
+
+component ::p145.b {
+  init {
+    say "P145_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p145_comp_octa_bare_emit_comp with { ast: "f145-root", scope: "f145-sc", nodes: "import|i
+link|::p145.linked
+component|p145.a
+memory|emit|e1
+memory|emit|e2
+memory|emit|e3
+memory|emit|e4
+memory|emit|e5
+memory|emit|e6
+memory|emit|e7
+memory|emit|e8
+component|p145.b
+memory|say|F145_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC145_INNER"
+      say ::event.data.result
+      say "P0_SEM_F145_OK"
+    }
+    listen for "e1" {
+      say "F145_BARE_1"
+    }
+    listen for "e2" {
+      say "F145_BARE_2"
+    }
+    listen for "e3" {
+      say "F145_BARE_3"
+    }
+    listen for "e4" {
+      say "F145_BARE_4"
+    }
+    listen for "e5" {
+      say "F145_BARE_5"
+    }
+    listen for "e6" {
+      say "F145_BARE_6"
+    }
+    listen for "e7" {
+      say "F145_BARE_7"
+    }
+    listen for "e8" {
+      say "F145_BARE_8"
+    }
+    listen for "p145_comp_octa_bare_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F145_VM_ON_BAD"
+        return
+      }
+      say "F145_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX145_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

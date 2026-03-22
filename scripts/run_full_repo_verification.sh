@@ -5,10 +5,11 @@
 #   0) verify_documentation_pieces.sh --promoted-only  (manifest: release/doc_verification_pieces.json)
 #   1) enforce_canonical_stack
 #   2) check_azl_native_gates  (gate 0: self_check_release_helpers + jq/manifest; includes gate H — P0 tokenizer + brace balance)
-#   3) verify_azl_interpreter_semantic_spine_smoke  (Tier B P0.1: real azl_interpreter.azl + stub ::azl.security on Python spine)
-#   4) enforce_legacy_entrypoint_blocklist
-#   5) verify_native_runtime_live  (minimal bundle — fast C-engine HTTP contract before long suite)
-#   6) run_all_tests  (scripts/run_tests.sh includes enterprise HTTP + qlha3 + grammar; see run_tests.sh)
+#   3) verify_azl_interpreter_semantic_spine_smoke  (Tier B P0.1: real azl_interpreter.azl + stub ::azl.security on Python spine; init only)
+#   4) verify_azl_interpreter_semantic_spine_behavior_smoke  (Tier B P0.1: stub + behavior-entry harness + interpreter; interpret→tokenize→parse→execute bridge)
+#   5) enforce_legacy_entrypoint_blocklist
+#   6) verify_native_runtime_live  (minimal bundle — fast C-engine HTTP contract before long suite)
+#   7) run_all_tests  (scripts/run_tests.sh includes enterprise HTTP + qlha3 + grammar; see run_tests.sh)
 #
 # Optional tail (does not fail the script if skipped):
 #   If Ollama is up: LLM_BENCH_REQS=3 run_native_engine_llm_bench.sh
@@ -25,25 +26,28 @@ echo "=============================================="
 echo "  Full repo verification (RELEASE_READY + tests)"
 echo "=============================================="
 
-echo "[0/7] verify_documentation_pieces.sh --promoted-only"
+echo "[0/8] verify_documentation_pieces.sh --promoted-only"
 bash scripts/verify_documentation_pieces.sh --promoted-only
 
-echo "[1/7] enforce_canonical_stack.sh"
+echo "[1/8] enforce_canonical_stack.sh"
 bash scripts/enforce_canonical_stack.sh
 
-echo "[2/7] check_azl_native_gates.sh"
+echo "[2/8] check_azl_native_gates.sh"
 bash scripts/check_azl_native_gates.sh
 
-echo "[3/7] verify_azl_interpreter_semantic_spine_smoke.sh"
+echo "[3/8] verify_azl_interpreter_semantic_spine_smoke.sh"
 bash scripts/verify_azl_interpreter_semantic_spine_smoke.sh
 
-echo "[4/7] enforce_legacy_entrypoint_blocklist.sh"
+echo "[4/8] verify_azl_interpreter_semantic_spine_behavior_smoke.sh"
+bash scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh
+
+echo "[5/8] enforce_legacy_entrypoint_blocklist.sh"
 bash scripts/enforce_legacy_entrypoint_blocklist.sh
 
-echo "[5/7] verify_native_runtime_live.sh"
+echo "[6/8] verify_native_runtime_live.sh"
 bash scripts/verify_native_runtime_live.sh
 
-echo "[6/7] run_all_tests.sh"
+echo "[7/8] run_all_tests.sh"
 bash scripts/run_all_tests.sh
 
 echo ""

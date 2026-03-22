@@ -4527,6 +4527,156 @@ if [ "$F142_C_OUT" != "$F142_PY_OUT" ]; then
   exit 529
 fi
 
+echo "[gate] F143: C vs Python — preloop import|+link| then component| + six memory|emit|… (with/bare ×3) + component| + memory|say|"
+F143EX="${ROOT_DIR}/azl/tests/p0_semantic_execute_ast_preloop_component_memory_hexa_mixed_with_bare_with_bare_with_bare_emit_component_say.azl"
+F143_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F143EX" boot.entry 2>&1)"
+f143_c_rc=$?
+if [ "$f143_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_ast_preloop_component_memory_hexa_mixed_with_bare_with_bare_with_bare_emit_component_say exited $f143_c_rc: $F143_C_OUT"
+  exit 530
+fi
+if ! printf '%s\n' "$F143_C_OUT" | awk 'NR==1{if($0!="F143_TREE")exit 1} NR==2{if($0!="P143_LINK_SID")exit 1} NR==3{if($0!="P143_A")exit 1} NR==4{if($0!="F143_PA")exit 1} NR==5{if($0!="F143_BARE_2")exit 1} NR==6{if($0!="F143_PB")exit 1} NR==7{if($0!="F143_BARE_4")exit 1} NR==8{if($0!="F143_PC")exit 1} NR==9{if($0!="F143_BARE_6")exit 1} NR==10{if($0!="P143_B")exit 1} NR==11{if($0!="F143_MEM")exit 1} NR==12{if($0!="i")exit 1} NR==13{if($0!="EX143_POST")exit 1} NR==14{if($0!="Said: F143_MEM")exit 1} NR==15{if($0!="EC143_INNER")exit 1} NR==16{if($0!="Said: F143_MEM")exit 1} NR==17{if($0!="P0_SEM_F143_OK")exit 1} END{if(NR!=17)exit 1}'; then
+  echo "ERROR: expected F143 preloop + component| + hexa with/bare memory|emit + component| + memory|say stdout (17 lines), got: $F143_C_OUT"
+  exit 530
+fi
+F143_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F143EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f143_py_rc=$?
+if [ "$f143_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_ast_preloop_component_memory_hexa_mixed_with_bare_with_bare_with_bare_emit_component_say exited $f143_py_rc: $F143_PY_OUT"
+  exit 531
+fi
+if [ "$F143_C_OUT" != "$F143_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_ast_preloop_component_memory_hexa_mixed_with_bare_with_bare_with_bare_emit_component_say" >&2
+  echo "C:  $F143_C_OUT" >&2
+  echo "Py: $F143_PY_OUT" >&2
+  exit 532
+fi
+
+echo "[gate] F144: C vs Python — preloop import|+link| then component| + seven bare memory|emit|… + component| + memory|say|"
+F144EX="${ROOT_DIR}/azl/tests/p0_semantic_execute_ast_preloop_component_memory_hepta_bare_emit_component_say.azl"
+F144_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F144EX" boot.entry 2>&1)"
+f144_c_rc=$?
+if [ "$f144_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_ast_preloop_component_memory_hepta_bare_emit_component_say exited $f144_c_rc: $F144_C_OUT"
+  exit 533
+fi
+if ! printf '%s\n' "$F144_C_OUT" | awk 'NR==1{if($0!="F144_TREE")exit 1} NR==2{if($0!="P144_LINK_SID")exit 1} NR==3{if($0!="P144_A")exit 1} NR==4{if($0!="F144_BARE_1")exit 1} NR==5{if($0!="F144_BARE_2")exit 1} NR==6{if($0!="F144_BARE_3")exit 1} NR==7{if($0!="F144_BARE_4")exit 1} NR==8{if($0!="F144_BARE_5")exit 1} NR==9{if($0!="F144_BARE_6")exit 1} NR==10{if($0!="F144_BARE_7")exit 1} NR==11{if($0!="P144_B")exit 1} NR==12{if($0!="F144_MEM")exit 1} NR==13{if($0!="i")exit 1} NR==14{if($0!="EX144_POST")exit 1} NR==15{if($0!="Said: F144_MEM")exit 1} NR==16{if($0!="EC144_INNER")exit 1} NR==17{if($0!="Said: F144_MEM")exit 1} NR==18{if($0!="P0_SEM_F144_OK")exit 1} END{if(NR!=18)exit 1}'; then
+  echo "ERROR: expected F144 preloop + component| + hepta bare memory|emit + component| + memory|say stdout (18 lines), got: $F144_C_OUT"
+  exit 533
+fi
+F144_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F144EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f144_py_rc=$?
+if [ "$f144_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_ast_preloop_component_memory_hepta_bare_emit_component_say exited $f144_py_rc: $F144_PY_OUT"
+  exit 534
+fi
+if [ "$F144_C_OUT" != "$F144_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_ast_preloop_component_memory_hepta_bare_emit_component_say" >&2
+  echo "C:  $F144_C_OUT" >&2
+  echo "Py: $F144_PY_OUT" >&2
+  exit 535
+fi
+
+echo "[gate] F145: C vs Python — preloop import|+link| then component| + eight bare memory|emit|… + component| + memory|say|"
+F145EX="${ROOT_DIR}/azl/tests/p0_semantic_execute_ast_preloop_component_memory_octa_bare_emit_component_say.azl"
+F145_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F145EX" boot.entry 2>&1)"
+f145_c_rc=$?
+if [ "$f145_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_ast_preloop_component_memory_octa_bare_emit_component_say exited $f145_c_rc: $F145_C_OUT"
+  exit 536
+fi
+if ! printf '%s\n' "$F145_C_OUT" | awk 'NR==1{if($0!="F145_TREE")exit 1} NR==2{if($0!="P145_LINK_SID")exit 1} NR==3{if($0!="P145_A")exit 1} NR==4{if($0!="F145_BARE_1")exit 1} NR==5{if($0!="F145_BARE_2")exit 1} NR==6{if($0!="F145_BARE_3")exit 1} NR==7{if($0!="F145_BARE_4")exit 1} NR==8{if($0!="F145_BARE_5")exit 1} NR==9{if($0!="F145_BARE_6")exit 1} NR==10{if($0!="F145_BARE_7")exit 1} NR==11{if($0!="F145_BARE_8")exit 1} NR==12{if($0!="P145_B")exit 1} NR==13{if($0!="F145_MEM")exit 1} NR==14{if($0!="i")exit 1} NR==15{if($0!="EX145_POST")exit 1} NR==16{if($0!="Said: F145_MEM")exit 1} NR==17{if($0!="EC145_INNER")exit 1} NR==18{if($0!="Said: F145_MEM")exit 1} NR==19{if($0!="P0_SEM_F145_OK")exit 1} END{if(NR!=19)exit 1}'; then
+  echo "ERROR: expected F145 preloop + component| + octa bare memory|emit + component| + memory|say stdout (19 lines), got: $F145_C_OUT"
+  exit 536
+fi
+F145_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F145EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f145_py_rc=$?
+if [ "$f145_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_ast_preloop_component_memory_octa_bare_emit_component_say exited $f145_py_rc: $F145_PY_OUT"
+  exit 537
+fi
+if [ "$F145_C_OUT" != "$F145_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_ast_preloop_component_memory_octa_bare_emit_component_say" >&2
+  echo "C:  $F145_C_OUT" >&2
+  echo "Py: $F145_PY_OUT" >&2
+  exit 538
+fi
+
+echo "[gate] F146: C vs Python — preloop import|+link| then component| + nine bare memory|emit|… + component| + memory|say|"
+F146EX="${ROOT_DIR}/azl/tests/p0_semantic_execute_ast_preloop_component_memory_nona_bare_emit_component_say.azl"
+F146_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F146EX" boot.entry 2>&1)"
+f146_c_rc=$?
+if [ "$f146_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_ast_preloop_component_memory_nona_bare_emit_component_say exited $f146_c_rc: $F146_C_OUT"
+  exit 539
+fi
+if ! printf '%s\n' "$F146_C_OUT" | awk 'NR==1{if($0!="F146_TREE")exit 1} NR==2{if($0!="P146_LINK_SID")exit 1} NR==3{if($0!="P146_A")exit 1} NR==4{if($0!="F146_BARE_1")exit 1} NR==5{if($0!="F146_BARE_2")exit 1} NR==6{if($0!="F146_BARE_3")exit 1} NR==7{if($0!="F146_BARE_4")exit 1} NR==8{if($0!="F146_BARE_5")exit 1} NR==9{if($0!="F146_BARE_6")exit 1} NR==10{if($0!="F146_BARE_7")exit 1} NR==11{if($0!="F146_BARE_8")exit 1} NR==12{if($0!="F146_BARE_9")exit 1} NR==13{if($0!="P146_B")exit 1} NR==14{if($0!="F146_MEM")exit 1} NR==15{if($0!="i")exit 1} NR==16{if($0!="EX146_POST")exit 1} NR==17{if($0!="Said: F146_MEM")exit 1} NR==18{if($0!="EC146_INNER")exit 1} NR==19{if($0!="Said: F146_MEM")exit 1} NR==20{if($0!="P0_SEM_F146_OK")exit 1} END{if(NR!=20)exit 1}'; then
+  echo "ERROR: expected F146 preloop + component| + nona bare memory|emit + component| + memory|say stdout (20 lines), got: $F146_C_OUT"
+  exit 539
+fi
+F146_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F146EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f146_py_rc=$?
+if [ "$f146_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_ast_preloop_component_memory_nona_bare_emit_component_say exited $f146_py_rc: $F146_PY_OUT"
+  exit 540
+fi
+if [ "$F146_C_OUT" != "$F146_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_ast_preloop_component_memory_nona_bare_emit_component_say" >&2
+  echo "C:  $F146_C_OUT" >&2
+  echo "Py: $F146_PY_OUT" >&2
+  exit 541
+fi
+
+echo "[gate] F147: C vs Python — preloop import|+link| then component| + ten bare memory|emit|… + component| + memory|say|"
+F147EX="${ROOT_DIR}/azl/tests/p0_semantic_execute_ast_preloop_component_memory_deca_bare_emit_component_say.azl"
+F147_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F147EX" boot.entry 2>&1)"
+f147_c_rc=$?
+if [ "$f147_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_ast_preloop_component_memory_deca_bare_emit_component_say exited $f147_c_rc: $F147_C_OUT"
+  exit 542
+fi
+if ! printf '%s\n' "$F147_C_OUT" | awk 'NR==1{if($0!="F147_TREE")exit 1} NR==2{if($0!="P147_LINK_SID")exit 1} NR==3{if($0!="P147_A")exit 1} NR==4{if($0!="F147_BARE_1")exit 1} NR==5{if($0!="F147_BARE_2")exit 1} NR==6{if($0!="F147_BARE_3")exit 1} NR==7{if($0!="F147_BARE_4")exit 1} NR==8{if($0!="F147_BARE_5")exit 1} NR==9{if($0!="F147_BARE_6")exit 1} NR==10{if($0!="F147_BARE_7")exit 1} NR==11{if($0!="F147_BARE_8")exit 1} NR==12{if($0!="F147_BARE_9")exit 1} NR==13{if($0!="F147_BARE_10")exit 1} NR==14{if($0!="P147_B")exit 1} NR==15{if($0!="F147_MEM")exit 1} NR==16{if($0!="i")exit 1} NR==17{if($0!="EX147_POST")exit 1} NR==18{if($0!="Said: F147_MEM")exit 1} NR==19{if($0!="EC147_INNER")exit 1} NR==20{if($0!="Said: F147_MEM")exit 1} NR==21{if($0!="P0_SEM_F147_OK")exit 1} END{if(NR!=21)exit 1}'; then
+  echo "ERROR: expected F147 preloop + component| + deca bare memory|emit + component| + memory|say stdout (21 lines), got: $F147_C_OUT"
+  exit 542
+fi
+F147_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F147EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f147_py_rc=$?
+if [ "$f147_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_ast_preloop_component_memory_deca_bare_emit_component_say exited $f147_py_rc: $F147_PY_OUT"
+  exit 543
+fi
+if [ "$F147_C_OUT" != "$F147_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_ast_preloop_component_memory_deca_bare_emit_component_say" >&2
+  echo "C:  $F147_C_OUT" >&2
+  echo "Py: $F147_PY_OUT" >&2
+  exit 544
+fi
+
+echo "[gate] F148: C vs Python — preloop import|+link| then component| + eleven bare memory|emit|… + component| + memory|say|"
+F148EX="${ROOT_DIR}/azl/tests/p0_semantic_execute_ast_preloop_component_memory_undeca_bare_emit_component_say.azl"
+F148_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F148EX" boot.entry 2>&1)"
+f148_c_rc=$?
+if [ "$f148_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_ast_preloop_component_memory_undeca_bare_emit_component_say exited $f148_c_rc: $F148_C_OUT"
+  exit 545
+fi
+if ! printf '%s\n' "$F148_C_OUT" | awk 'NR==1{if($0!="F148_TREE")exit 1} NR==2{if($0!="P148_LINK_SID")exit 1} NR==3{if($0!="P148_A")exit 1} NR==4{if($0!="F148_BARE_1")exit 1} NR==5{if($0!="F148_BARE_2")exit 1} NR==6{if($0!="F148_BARE_3")exit 1} NR==7{if($0!="F148_BARE_4")exit 1} NR==8{if($0!="F148_BARE_5")exit 1} NR==9{if($0!="F148_BARE_6")exit 1} NR==10{if($0!="F148_BARE_7")exit 1} NR==11{if($0!="F148_BARE_8")exit 1} NR==12{if($0!="F148_BARE_9")exit 1} NR==13{if($0!="F148_BARE_10")exit 1} NR==14{if($0!="F148_BARE_11")exit 1} NR==15{if($0!="P148_B")exit 1} NR==16{if($0!="F148_MEM")exit 1} NR==17{if($0!="i")exit 1} NR==18{if($0!="EX148_POST")exit 1} NR==19{if($0!="Said: F148_MEM")exit 1} NR==20{if($0!="EC148_INNER")exit 1} NR==21{if($0!="Said: F148_MEM")exit 1} NR==22{if($0!="P0_SEM_F148_OK")exit 1} END{if(NR!=22)exit 1}'; then
+  echo "ERROR: expected F148 preloop + component| + undeca bare memory|emit + component| + memory|say stdout (22 lines), got: $F148_C_OUT"
+  exit 545
+fi
+F148_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F148EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f148_py_rc=$?
+if [ "$f148_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_ast_preloop_component_memory_undeca_bare_emit_component_say exited $f148_py_rc: $F148_PY_OUT"
+  exit 546
+fi
+if [ "$F148_C_OUT" != "$F148_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_ast_preloop_component_memory_undeca_bare_emit_component_say" >&2
+  echo "C:  $F148_C_OUT" >&2
+  echo "Py: $F148_PY_OUT" >&2
+  exit 547
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

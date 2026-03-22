@@ -1,0 +1,70 @@
+# Gate F134: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **`memory|emit|ev1|with|k|v`** + **bare** **`memory|emit|ev2`** + **`memory|emit|ev3|with|k|v`** (FIFO queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p134.linked {
+  init {
+    say "P134_LINK_SID"
+  }
+}
+
+component ::p134.a {
+  init {
+    say "P134_A"
+  }
+}
+
+component ::p134.b {
+  init {
+    say "P134_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p134_comp_triple_mixed_emit_comp with { ast: "f134-root", scope: "f134-sc", nodes: "import|f134_mod_tag
+link|::p134.linked
+component|p134.a
+memory|emit|f134_e1|with|fk134a|F134_PAY_A
+memory|emit|f134_e2
+memory|emit|f134_e3|with|fk134b|F134_PAY_B
+component|p134.b
+memory|say|F134_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC134_INNER"
+      say ::event.data.result
+      say "P0_SEM_F134_OK"
+    }
+    listen for "f134_e1" {
+      say ::event.data.fk134a
+    }
+    listen for "f134_e2" {
+      say "F134_BARE_MID"
+    }
+    listen for "f134_e3" {
+      say ::event.data.fk134b
+    }
+    listen for "p134_comp_triple_mixed_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F134_VM_ON_BAD"
+        return
+      }
+      say "F134_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX134_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}
