@@ -15,7 +15,10 @@
 #include <time.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <strings.h>
+
+#include "azl_native_engine_core_host.h"
 
 #ifdef AZL_WITH_LLAMACPP
 #include "azl_gguf_infer_llamacpp.h"
@@ -41,6 +44,9 @@ typedef struct {
   long last_runtime_poll_ms;
   char runtime_error[512];
   char runtime_command[1024];
+  int use_native_core;
+  int native_core_demo;
+  AzlNativeCoreHost native_core;
 } EngineState;
 
 static void on_signal(int sig) {
@@ -252,6 +258,11 @@ static void update_runtime_state(EngineState *st) {
     if ((now_ms - st->last_runtime_poll_ms) < 500) return;
   }
   st->last_runtime_poll_ms = now_ms;
+
+  if (st->use_native_core) {
+    st->runtime_running = 1;
+    return;
+  }
 
   if (st->runtime_pid <= 0) {
     st->runtime_running = 0;
@@ -1287,9 +1298,9 @@ static void handle_conn(int cfd, EngineState *st) {
     long uptime = (long)(time(NULL) - st->started_at);
     snprintf(body, sizeof(body),
              "{\"status\":\"ok\",\"engine\":\"native\",\"uptime_sec\":%ld,\"requests_total\":%lu,"
-             "\"combined\":\"%s\","
+             "\"combined\":\"%s\",\"native_core\":%s,"
              "\"runtime\":{\"running\":%s,\"pid\":%d,\"exit_code\":%d}}",
-             uptime, st->requests_total, st->combined_path,
+             uptime, st->requests_total, st->combined_path, st->use_native_core ? "true" : "false",
              st->runtime_running ? "true" : "false", (int)st->runtime_pid, st->runtime_exit_code);
     write_response(cfd, 200, "OK", body);
     return;
@@ -1487,20 +1498,59 @@ static int run_server(EngineState *st) {
     return 13;
   }
 
-  printf("native-engine: listening on http://%s:%d entry=%s\n", st->host, st->port, st->entry);
+  printf("native-engine: listening on http://%s:%d entry=%s%s%s\n", st->host, st->port, st->entry,
+         st->use_native_core ? " native_core=1" : "", st->native_core_demo ? " native_core_demo=1" : "");
   fflush(stdout);
 
+  struct sockaddr_in ca;
+  socklen_t calen = sizeof(ca);
+
+  if (st->use_native_core) {
+    int fl = fcntl(sfd, F_GETFL, 0);
+    if (fl >= 0)
+      (void)fcntl(sfd, F_SETFL, fl | O_NONBLOCK);
+  }
+
   while (g_running) {
-    struct sockaddr_in ca;
-    socklen_t calen = sizeof(ca);
-    int cfd = accept(sfd, (struct sockaddr *)&ca, &calen);
-    if (cfd < 0) {
-      if (errno == EINTR) continue;
-      usleep(20000);
-      continue;
+    if (st->use_native_core) {
+      struct pollfd pfd;
+      pfd.fd = sfd;
+      pfd.events = POLLIN;
+      int pr = poll(&pfd, 1, 50);
+      if (pr < 0) {
+        if (errno == EINTR)
+          continue;
+        usleep(20000);
+        continue;
+      }
+      if (pr > 0 && (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)))
+        break;
+      if (pr > 0 && (pfd.revents & POLLIN)) {
+        for (;;) {
+          int cfd = accept(sfd, (struct sockaddr *)&ca, &calen);
+          if (cfd < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+              break;
+            usleep(1000);
+            break;
+          }
+          handle_conn(cfd, st);
+          close(cfd);
+        }
+      }
+      azl_native_core_host_poll(&st->native_core);
+    } else {
+      calen = sizeof(ca);
+      int cfd = accept(sfd, (struct sockaddr *)&ca, &calen);
+      if (cfd < 0) {
+        if (errno == EINTR)
+          continue;
+        usleep(20000);
+        continue;
+      }
+      handle_conn(cfd, st);
+      close(cfd);
     }
-    handle_conn(cfd, st);
-    close(cfd);
   }
 
   close(sfd);
@@ -1509,12 +1559,46 @@ static int run_server(EngineState *st) {
 
 int main(int argc, char **argv) {
   if (argc < 2) {
-    fprintf(stderr, "usage: %s <bootstrap.bundle.azl> [::<entry.point>]\n", argv[0]);
+    fprintf(stderr,
+            "usage: %s [--use-native-core] [--native-core-demo] <bootstrap.bundle.azl> [::<entry.point>]\n",
+            argv[0]);
+    fprintf(stderr,
+            "  --use-native-core   Embed azl_core_engine; skip AZL_NATIVE_RUNTIME_CMD child (benchmark).\n");
+    fprintf(stderr,
+            "  --native-core-demo  After start, emit async Ollama /api/generate (needs curl; OLLAMA_HOST).\n");
     return 2;
   }
   EngineState st;
   memset(&st, 0, sizeof(st));
-  snprintf(st.bundle_path, sizeof(st.bundle_path), "%s", argv[1]);
+  const char *bundle_arg = NULL;
+  const char *entry_arg = NULL;
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--use-native-core") == 0) {
+      st.use_native_core = 1;
+      continue;
+    }
+    if (strcmp(argv[i], "--native-core-demo") == 0) {
+      st.native_core_demo = 1;
+      continue;
+    }
+    if (!bundle_arg)
+      bundle_arg = argv[i];
+    else if (!entry_arg)
+      entry_arg = argv[i];
+    else {
+      fprintf(stderr, "native-engine: unexpected argument: %s\n", argv[i]);
+      return 2;
+    }
+  }
+  if (!bundle_arg) {
+    fprintf(stderr, "native-engine: missing bootstrap bundle path\n");
+    return 2;
+  }
+  if (st.native_core_demo && !st.use_native_core) {
+    fprintf(stderr, "native-engine: --native-core-demo requires --use-native-core\n");
+    return 2;
+  }
+  snprintf(st.bundle_path, sizeof(st.bundle_path), "%s", bundle_arg);
   st.started_at = time(NULL);
   st.port = atoi(getenv_or("AZL_BUILD_API_PORT", "8080"));
   if (st.port <= 0 || st.port > 65535) st.port = 8080;
@@ -1529,8 +1613,8 @@ int main(int argc, char **argv) {
 
   int rc = read_bootstrap_metadata(st.bundle_path, st.combined_path, sizeof(st.combined_path), st.entry, sizeof(st.entry));
   if (rc != 0) return rc;
-  if (argc >= 3 && argv[2][0] != '\0') {
-    snprintf(st.entry, sizeof(st.entry), "%s", argv[2]);
+  if (entry_arg && entry_arg[0] != '\0') {
+    snprintf(st.entry, sizeof(st.entry), "%s", entry_arg);
   }
   struct stat cst;
   if (stat(st.combined_path, &cst) != 0) {
@@ -1540,14 +1624,39 @@ int main(int argc, char **argv) {
 
   signal(SIGINT, on_signal);
   signal(SIGTERM, on_signal);
-  int start_rc = start_runtime_pipeline(&st);
-  if (start_rc != 0) {
-    fprintf(stderr, "native-engine: failed to launch runtime pipeline: %s\n", st.runtime_error);
-    return start_rc;
+
+  if (st.use_native_core) {
+    char cwdbuf[512];
+    if (getenv("AZL_REPO_ROOT") == NULL && getcwd(cwdbuf, sizeof(cwdbuf)) != NULL)
+      setenv("AZL_REPO_ROOT", cwdbuf, 0);
+    memset(&st.native_core, 0, sizeof(st.native_core));
+    if (azl_native_core_host_init(&st.native_core) != 0) {
+      fprintf(stderr, "native-engine: azl_native_core_host_init failed\n");
+      return 16;
+    }
+    if (azl_native_core_register_stdlib_net_http(&st.native_core) != 0) {
+      fprintf(stderr, "native-engine: azl_native_core_register_stdlib_net_http failed\n");
+      azl_native_core_host_shutdown(&st.native_core);
+      return 17;
+    }
+    if (st.native_core_demo)
+      azl_native_core_emit_demo_ollama(&st.native_core);
+    st.runtime_running = 1;
+    st.runtime_pid = -1;
+    snprintf(st.runtime_command, sizeof(st.runtime_command), "embedded:azl_core_engine");
+    st.runtime_error[0] = '\0';
+  } else {
+    int start_rc = start_runtime_pipeline(&st);
+    if (start_rc != 0) {
+      fprintf(stderr, "native-engine: failed to launch runtime pipeline: %s\n", st.runtime_error);
+      return start_rc;
+    }
   }
   append_run_record(&st);
   int rc_srv = run_server(&st);
-  if (st.runtime_pid > 0) {
+  if (st.use_native_core) {
+    azl_native_core_host_shutdown(&st.native_core);
+  } else if (st.runtime_pid > 0) {
     kill(st.runtime_pid, SIGTERM);
     (void)waitpid(st.runtime_pid, NULL, 0);
   }

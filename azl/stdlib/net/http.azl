@@ -1,0 +1,89 @@
+# stdlib.net.http — contract for native azl_core_engine async HTTP bridge
+#
+# Native host (C) responsibilities:
+#   - azl_bridge_submit_http() on net.http.request_async (non-blocking worker).
+#   - azl_bridge_poll() between interpreter steps; azl_engine_process() drains.
+#   - Events: net.http.stream_chunk, net.http.complete, net.http.error
+#
+# ERROR_SYSTEM.md: IO/Network + Timeout — timeouts MUST emit net.http.error with
+#   code AZL_ERR_NET_TIMEOUT (4) or structured log_error (kind: Timeout / IO/Network).
+#
+# Real transport: tools/sysproxy.c http_client over TCP (AZL_SYSPROXY_TCP) or curl
+# when bridge port is 0 — see docs/LLM_INFRASTRUCTURE_AUDIT.md.
+
+component ::stdlib.net.http {
+  init {
+    set ::net.http.default_timeout_sec = 30
+  }
+
+  behavior {
+    # Application emits this to start a request; host maps to azl_bridge_submit_http.
+    listen for "net.http.request_async" then {
+      set ::req = ::event.data
+      if (::req == null) {
+        emit log_error with {
+          kind: "Type",
+          category: "IO/Network",
+          message: "net.http.request_async: missing event.data"
+        }
+        return
+      }
+      if (::req.url == null || ("" + ::req.url).length == 0) {
+        emit log_error with {
+          kind: "Type",
+          category: "IO/Network",
+          message: "net.http.request_async: url required"
+        }
+        return
+      }
+      set ::tmo = ::req.timeout_sec
+      if (::tmo == null) {
+        set ::tmo = ::net.http.default_timeout_sec
+      }
+      # Host hook: enqueue HTTP job (sysproxy or curl); do not block listener.
+      emit net.http._native_submit with {
+        url: ::req.url,
+        method: (::req.method or "GET"),
+        body: (::req.body or ""),
+        request_tag: (::req.request_tag or "default"),
+        timeout_sec: ::tmo,
+        stream_lines: (::req.stream_lines or false)
+      }
+    }
+
+    # Optional: aggregate stream_chunk into buffer (pure AZL; subset only on spine).
+    listen for "net.http.stream_chunk" then {
+      set ::tag = ::event.data.request_tag
+      set ::line = ::event.data.line
+      if (::tag == null) {
+        set ::tag = ""
+      }
+      if (::line == null) {
+        set ::line = ""
+      }
+      emit net.http.chunk_received with { request_tag: ::tag, line: ::line }
+    }
+
+    listen for "net.http.complete" then {
+      emit net.http.request_complete with { request_tag: (::event.data.request_tag or "") }
+    }
+
+    listen for "net.http.error" then {
+      set ::code = ::event.data.code
+      set ::msg = (::event.data.message or "net.http.error")
+      emit log_error with {
+        kind: "IO/Network",
+        message: ::msg,
+        context: {
+          code: ::code,
+          request_tag: (::event.data.request_tag or "")
+        }
+      }
+      emit net.http.request_failed with {
+        request_tag: (::event.data.request_tag or ""),
+        code: ::code,
+        message: ::msg
+      }
+    }
+  }
+}

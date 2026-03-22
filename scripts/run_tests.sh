@@ -18,11 +18,14 @@ chmod +x \
   scripts/verify_rust_offtree_doc_contract.sh \
   scripts/verify_azl_literal_codec_container_doc_contract.sh \
   scripts/verify_azl_literal_codec_roundtrip.sh \
+  scripts/verify_azl_core_engine.sh \
+  scripts/build_azl_core_engine.sh \
   2>/dev/null || true
 bash scripts/verify_repertoire_field_surface_contract.sh
 bash scripts/verify_rust_offtree_doc_contract.sh
 bash scripts/verify_azl_literal_codec_container_doc_contract.sh
 bash scripts/verify_azl_literal_codec_roundtrip.sh
+bash scripts/verify_azl_core_engine.sh
 bash scripts/enforce_canonical_stack.sh
 bash scripts/check_azl_native_gates.sh
 bash scripts/enforce_legacy_entrypoint_blocklist.sh

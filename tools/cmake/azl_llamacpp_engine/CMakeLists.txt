@@ -26,14 +26,18 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 add_subdirectory("${LLAMA_CPP_ROOT}" "${CMAKE_BINARY_DIR}/_llama_cpp_build")
 
+find_package(Threads REQUIRED)
+
 add_executable(azl-native-engine
   "${AZL_REPO_ROOT}/tools/azl_native_engine.c"
+  "${AZL_REPO_ROOT}/tools/azl_core_engine.c"
+  "${AZL_REPO_ROOT}/tools/azl_native_engine_core_host.c"
   "${AZL_REPO_ROOT}/tools/azl_gguf_infer_llamacpp.cpp"
 )
 
 target_compile_definitions(azl-native-engine PRIVATE AZL_WITH_LLAMACPP=1)
 target_include_directories(azl-native-engine PRIVATE "${AZL_REPO_ROOT}/tools")
-target_link_libraries(azl-native-engine PRIVATE llama)
+target_link_libraries(azl-native-engine PRIVATE llama Threads::Threads)
 
 set_target_properties(azl-native-engine PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${AZL_REPO_ROOT}/.azl/bin"

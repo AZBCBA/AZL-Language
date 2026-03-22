@@ -1,0 +1,39 @@
+# Demo: async Ollama streaming via net.http.request_async (stdlib.net.http contract).
+#
+# Run on full AZL semantic spine: link ::stdlib.net.http (or equivalent) and emit from init.
+#
+# Native-engine fast path (Phase E): same event names are registered in C when using
+#   azl-native-engine --use-native-core --native-core-demo
+# with stream_chunk printed to stdout by the embedded core host.
+#
+# Environment: OLLAMA_HOST (default http://127.0.0.1:11434), AZL_NATIVE_CORE_DEMO_MODEL
+
+component ::examples.native_core_ollama_stream_demo {
+  init {
+    set ::ollama = (::internal.env("OLLAMA_HOST") or "http://127.0.0.1:11434")
+    set ::model = (::internal.env("AZL_NATIVE_CORE_DEMO_MODEL") or "llama3.2:1b")
+    set ::url = (::ollama + "/api/generate")
+    set ::body = ("{\"model\":\"" + ::model +
+      "\",\"prompt\":\"Say OK in one word.\",\"stream\":true,\"options\":{\"num_predict\":16}}")
+    emit net.http.request_async with {
+      url: ::url,
+      method: "POST",
+      body: ::body,
+      request_tag: "ollama_demo",
+      timeout_sec: 120,
+      stream_lines: true
+    }
+  }
+
+  behavior {
+    listen for "net.http.stream_chunk" then {
+      say ("[chunk] " + ::event.data.request_tag + " | " + ::event.data.line)
+    }
+    listen for "net.http.complete" then {
+      say ("[complete] " + ::event.data.request_tag)
+    }
+    listen for "net.http.error" then {
+      say ("[error] " + ::event.data.code + " " + ::event.data.message)
+    }
+  }
+}

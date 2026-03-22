@@ -18,6 +18,8 @@ chmod +x \
   scripts/verify_rust_offtree_doc_contract.sh \
   scripts/verify_azl_literal_codec_container_doc_contract.sh \
   scripts/verify_azl_literal_codec_roundtrip.sh \
+  scripts/verify_azl_core_engine.sh \
+  scripts/build_azl_core_engine.sh \
   2>/dev/null || true
 ./scripts/run_tests.sh
 
