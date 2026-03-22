@@ -3,7 +3,7 @@ Spine bootstrap engine (Python), kept in lockstep with ``tools/azl_interpreter_m
 
 Interpreter-shaped semantics live in ``azl/runtime/interpreter/azl_interpreter.azl``. This module hosts builtins and
 pipe encodings so combined AZL runs under ``tools/azl_runtime_spine_host.py`` — it must **implement** that contract
-and stay C-parity, not define divergent meaning. Rules for listeners, ``emit``/queue drain, ``if``/``&&``/``for-in``,
+and stay C-parity, not define divergent meaning. Rules for listeners, ``emit``/queue drain, ``&&``/``for-in``,
 tokenize/parse builtins, and ``execute_ast`` row shapes: align with the AZL file and C; regressions live under
 ``azl/tests/p0_semantic_*.azl``.
 """
@@ -11,6 +11,7 @@ tokenize/parse builtins, and ``execute_ast`` row shapes: align with the AZL file
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import sys
 from dataclasses import dataclass, field
@@ -823,7 +824,8 @@ class MinimalAZLRuntime:
         return None
 
     @staticmethod
-    def _normalize_if_cond_const(cond_raw: str) -> str | None:
+    def _spine_if_condition_const(cond_raw: str) -> str | None:
+        """Constant-foldable user condition only; aligns with ``::execute_if_statement`` true/false vs other."""
         eq_split = cond_raw.split(" = = ")
         if len(eq_split) == 2:
             cond_raw = eq_split[0].strip() + "==" + eq_split[1].strip()
@@ -839,9 +841,10 @@ class MinimalAZLRuntime:
             return "false"
         return None
 
-    def _try_parse_if_const_fold(
+    def _try_parse_if_spine_row(
         self, pairs: list[tuple[str, str]], i: int, n: int
-    ) -> tuple[list[str], int] | None:
+    ) -> tuple[str, int] | None:
+        """Serialize ``if`` / ``otherwise`` as one ``if|`` + JSON row (no branch choice here — see ``_builtin_execute_ast_run_lines``)."""
         if i >= n or pairs[i] != ("identifier", "if"):
             return None
         j = self._skip_eol_pairs(pairs, i + 1)
@@ -881,20 +884,17 @@ class MinimalAZLRuntime:
                 else_hi = e_close
                 j = e_close + 1
 
-        const = self._normalize_if_cond_const(cond_raw)
         then_lines = self._parse_tokens_nodes_range(pairs, then_lo, then_hi)
         else_lines: list[str] = (
             self._parse_tokens_nodes_range(pairs, else_lo, else_hi)
             if else_lo is not None and else_hi is not None
             else []
         )
-        if const == "true":
-            merged = then_lines
-        elif const == "false":
-            merged = else_lines
-        else:
-            merged = then_lines + else_lines
-        return (merged, j)
+        payload = {"c": cond_raw, "t": then_lines, "f": else_lines}
+        line = "if|" + json.dumps(payload, separators=(",", ":"))
+        if len(line) > INTERP_BLOB_VAR_MAX:
+            return None
+        return (line, j)
 
     def _parse_tokens_nodes_range(
         self, pairs: list[tuple[str, str]], lo: int, hi: int
@@ -909,11 +909,10 @@ class MinimalAZLRuntime:
                 i += 1
                 continue
             if typ == "identifier" and val == "if":
-                folded = self._try_parse_if_const_fold(pairs, i, n)
-                if folded is not None:
-                    inner_lines, new_i = folded
-                    out_lines.extend(inner_lines)
-                    i = new_i
+                if_row = self._try_parse_if_spine_row(pairs, i, n)
+                if if_row is not None:
+                    out_lines.append(if_row[0])
+                    i = if_row[1]
                     continue
             if typ == "identifier" and val == "say":
                 j = self._skip_eol_pairs(pairs, i + 1)
@@ -2133,33 +2132,10 @@ class MinimalAZLRuntime:
                 return "execute_spine_bad_memory"
         return out
 
-    def _builtin_execute_ast_result(self, ast_base: str) -> str:
-        """Bootstrap walk of serialized ``::ast.nodes`` (same pipe contract as azl_interpreter.azl ``execute_ast``). F-gate indices: preloop import|/link| (F98, F112–F122); memory/listen/say/emit/set rows (F93–F148)."""
-        em = (self.var_get(ast_base + ".exec_model") or "").strip()
-        if em == "spine_component_v1":
-            return self._execute_spine_component_v1(ast_base)[:255]
-        nk = ast_base + ".nodes"
-        raw = self.var_get(nk) or ""
-        result = "Execution completed"
-        if not raw.strip():
-            return result
-        self._execute_ast_listen_stubs.clear()
-        fn_reg: dict[str, str] = {}
-        lines = raw.split("\n")
-        for line in lines:
-            if (self.var_get("::halted") or "") == "true":
-                return "Execution halted due to error"
-            seg = line.lstrip(" \t")
-            if not seg:
-                continue
-            if seg.startswith("import|"):
-                tail = seg[7:]
-                if tail:
-                    self.var_set("::p0_exec_import_last", tail[:MAX_VAR_VALUE_LEN])
-            elif seg.startswith("link|"):
-                tail = seg[5:]
-                if tail:
-                    self.run_linked_component(tail)
+    def _builtin_execute_ast_run_lines(
+        self, lines: list[str], fn_reg: dict[str, str], result: str
+    ) -> str:
+        """Walk pipe rows (nested under ``if|`` branches share ``fn_reg``). Branch choice for ``if|`` matches ``azl_interpreter.azl`` ``::execute_if_statement``."""
         for line in lines:
             if (self.var_get("::halted") or "") == "true":
                 return "Execution halted due to error"
@@ -2167,6 +2143,29 @@ class MinimalAZLRuntime:
             if not seg:
                 continue
             if seg.startswith("import|") or seg.startswith("link|"):
+                continue
+            if seg.startswith("if|"):
+                rest = seg[3:]
+                try:
+                    d = json.loads(rest)
+                except json.JSONDecodeError:
+                    continue
+                c = d.get("c", "")
+                raw_then = d.get("t")
+                raw_else = d.get("f")
+                then_lines = (
+                    [str(x) for x in raw_then]
+                    if isinstance(raw_then, list)
+                    else []
+                )
+                else_lines = (
+                    [str(x) for x in raw_else]
+                    if isinstance(raw_else, list)
+                    else []
+                )
+                const = self._spine_if_condition_const(str(c))
+                chosen = then_lines if const == "true" else else_lines
+                result = self._builtin_execute_ast_run_lines(chosen, fn_reg, result)
                 continue
             if seg.startswith("say|"):
                 pay = seg[4:]
@@ -2274,6 +2273,36 @@ class MinimalAZLRuntime:
                 else:
                     print(cpay, flush=True)
                     result = "called:" + cname[:120]
+        return result
+
+    def _builtin_execute_ast_result(self, ast_base: str) -> str:
+        """Bootstrap walk of serialized ``::ast.nodes`` (same pipe contract as azl_interpreter.azl ``execute_ast``). F-gate indices: preloop import|/link| (F98, F112–F122); memory/listen/say/emit/set rows (F93–F148)."""
+        em = (self.var_get(ast_base + ".exec_model") or "").strip()
+        if em == "spine_component_v1":
+            return self._execute_spine_component_v1(ast_base)[:255]
+        nk = ast_base + ".nodes"
+        raw = self.var_get(nk) or ""
+        result = "Execution completed"
+        if not raw.strip():
+            return result
+        self._execute_ast_listen_stubs.clear()
+        fn_reg: dict[str, str] = {}
+        lines = raw.split("\n")
+        for line in lines:
+            if (self.var_get("::halted") or "") == "true":
+                return "Execution halted due to error"
+            seg = line.lstrip(" \t")
+            if not seg:
+                continue
+            if seg.startswith("import|"):
+                tail = seg[7:]
+                if tail:
+                    self.var_set("::p0_exec_import_last", tail[:MAX_VAR_VALUE_LEN])
+            elif seg.startswith("link|"):
+                tail = seg[5:]
+                if tail:
+                    self.run_linked_component(tail)
+        result = self._builtin_execute_ast_run_lines(lines, fn_reg, result)
         return result[:255]
 
     def exec_set(self, i: list[int]) -> None:

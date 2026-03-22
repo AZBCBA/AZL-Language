@@ -14,8 +14,8 @@
 #   - tenth emit interpret (bare emit user statement) — exercises ::execute_emit → ::emit_event_resolved on the real file path (📡 line + Emitted: in ::result).
 #   - eleventh emit interpret (emit … with { k: v }) — exercises payload path in ::emit_event_resolved (AZL_EMIT_WITH_PAYLOAD) on the real file path.
 #   - twelfth emit interpret (on name { say … } then name()) — exercises top-level ::parse_tokens + ::execute_ast function registration + ::execute_call on the real file path.
-#   - fourteenth emit interpret (if ( true ) { say … }) — exercises ::parse_if_statement + ::execute_if_statement on the real interpret→execute_ast chain.
-#   - fifteenth emit interpret (if ( false ) { … } otherwise { say … }) — alternate branch + skipped then-body (keyword otherwise — see ::parse_if_statement).
+#   - fourteenth emit interpret (if ( true ) { say … }) — in-file ::parse_if_statement / ::execute_if_statement define meaning; spine ::parse_tokens emits if|… pipe, host ::execute_ast walks it (same branch rule).
+#   - fifteenth emit interpret (if ( false ) { … } otherwise { say … }) — alternate branch + skipped then-body (keyword otherwise — see ::parse_if_statement); spine if| payload + execute-time branch choice.
 
 component ::azl.spine.behavior.entry {
   init {

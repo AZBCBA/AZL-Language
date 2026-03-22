@@ -809,7 +809,7 @@ Tier B **P0.1c** release crumb: concatenates **`azl/tests/stubs/azl_security_for
 | **611** | Stdout missing **`AZL_SPINE_P9_SET_LINE`** (ninth interpret **`set ::…`** + **`say`** — **`::execute_ast`** **`set|…`** row on real file path) |
 | **633** | Stdout missing **`AZL_SPINE_P14_IF`** (fourteenth interpret **`if ( true ) { say … }`** — **`::parse_if_statement`** / **`::execute_if_statement`** on real file path) |
 | **634** | Stdout contains **`AZL_SPINE_P15_BAD`** (fifteenth interpret skipped then-branch must not run) |
-| **635** | Stdout missing **`AZL_SPINE_P15_ELSE`** (fifteenth interpret **`if ( false ) { … } otherwise { say … }`** — alternate branch; **`::parse_if_statement`** / **`::parse_tokens`** bridge constant-fold) |
+| **635** | Stdout missing **`AZL_SPINE_P15_ELSE`** (fifteenth interpret **`if ( false ) { … } otherwise { say … }`** — alternate branch; spine **`if|`** pipe + host **`::execute_ast`** branch choice aligned with **`::execute_if_statement`**) |
 
 ### Enterprise POST /v1/chat benchmark (`scripts/benchmark_enterprise_v1_chat.sh`)
 
