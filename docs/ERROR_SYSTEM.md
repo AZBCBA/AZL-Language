@@ -151,7 +151,7 @@ Runs in **`scripts/run_tests.sh`**. **`PYTHONPATH=tools`** **`python3 -m azl_lit
 
 ### Native core engine selftest (`scripts/verify_azl_core_engine.sh`)
 
-Runs in **`scripts/run_tests.sh`**. Compiles **`tools/azl_core_engine.c`**, **`tools/azl_bytecode.c`**, and **`tools/azl_compiler.c`** with **`AZL_CORE_ENGINE_SELFTEST`** (multi-listener dispatch, fixed-depth recursion guard, JSON bytecode hello-world **`tools/testdata/vm_hello_world.json`**, AZL-source compile + VM hello **`tools/testdata/vm_hello.azl`**). Prefix **`ERROR[AZL_CORE_ENGINE_VERIFY]:`** on stderr.
+Runs in **`scripts/run_tests.sh`**. Compiles **`tools/azl_core_engine.c`**, **`tools/azl_bytecode.c`**, and **`tools/azl_compiler.c`** with **`AZL_CORE_ENGINE_SELFTEST`** (multi-listener dispatch, fixed-depth recursion guard, JSON bytecode hello-world **`tools/testdata/vm_hello_world.json`**, AZL-source compile + VM hello **`tools/testdata/vm_hello.azl`**). Then links **`azl-native-engine`** and asserts a raw compile-subset **`tools/testdata/vm_hello.azl`** (non-bootstrap) defaults to **`execution_lane=native_compile_vm`** on stderr (no **`--use-native-core`**). Prefix **`ERROR[AZL_CORE_ENGINE_VERIFY]:`** on stderr.
 
 | Exit | Meaning |
 |------|---------|
@@ -159,6 +159,9 @@ Runs in **`scripts/run_tests.sh`**. Compiles **`tools/azl_core_engine.c`**, **`t
 | **628** | **`gcc`** not found |
 | **629** | Compile failed (**`-Wall -Wextra -Werror`**) |
 | **630** | Selftest process failed (**`azl_core_engine_selftest`** exit **4** = JSON bytecode VM, **5** = AZL compiler / **`vm_hello.azl`**) |
+| **631** | **`azl-native-engine`** link failed (lane probe build) |
+| **632** | **`tools/testdata/vm_hello.azl`** missing (lane probe) |
+| **903** | Lane probe: stderr missing **`execution_lane=native_compile_vm`** for raw compile-subset **`.azl`** |
 
 ### RepertoireField surface contract (`scripts/verify_repertoire_field_surface_contract.sh`)
 

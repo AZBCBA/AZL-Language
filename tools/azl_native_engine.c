@@ -31,6 +31,12 @@
 
 static volatile sig_atomic_t g_running = 1;
 
+enum {
+  AZL_EXEC_LANE_CHILD_RUNTIME = 0,
+  AZL_EXEC_LANE_NATIVE_CORE_EMBEDDED = 1,
+  AZL_EXEC_LANE_NATIVE_COMPILE_VM = 2,
+};
+
 typedef struct {
   char bundle_path[1024];
   char combined_path[1024];
@@ -49,8 +55,21 @@ typedef struct {
   int use_native_core;
   int native_core_demo;
   char compile_azl_path[1024];
+  int compile_vm_auto; /* 1 if compile/vm lane was chosen by .azl probe (not --compile-azl alone) */
+  int exec_lane;       /* AZL_EXEC_LANE_* */
   AzlNativeCoreHost native_core;
 } EngineState;
+
+static const char *azl_exec_lane_cstr(int lane) {
+  switch (lane) {
+  case AZL_EXEC_LANE_NATIVE_COMPILE_VM:
+    return "native_compile_vm";
+  case AZL_EXEC_LANE_NATIVE_CORE_EMBEDDED:
+    return "native_core_embedded";
+  default:
+    return "child_runtime";
+  }
+}
 
 static void on_signal(int sig) {
   (void)sig;
@@ -263,7 +282,7 @@ static int read_bootstrap_metadata(const char *bundle, char *combined, size_t co
   }
   if (strncmp(line, "# AZL-BOOTSTRAP v1", 18) != 0) {
     fclose(fp);
-    fprintf(stderr, "native-engine: invalid bootstrap header\n");
+    /* Caller may try native compile/vm subset on the same path; message printed there. */
     return 4;
   }
   combined[0] = '\0';
@@ -1316,13 +1335,17 @@ static void handle_conn(int cfd, EngineState *st) {
   }
   if (strcmp(path, "/readyz") == 0) {
     if (st->runtime_running) {
-      snprintf(body, sizeof(body), "{\"status\":\"ready\",\"engine\":\"native\",\"runtime\":\"running\"}");
+      snprintf(body, sizeof(body),
+               "{\"status\":\"ready\",\"engine\":\"native\",\"runtime\":\"running\","
+               "\"execution_lane\":\"%s\"}",
+               azl_exec_lane_cstr(st->exec_lane));
       write_response(cfd, 200, "OK", body);
     } else {
       snprintf(body, sizeof(body),
                "{\"status\":\"not_ready\",\"engine\":\"native\",\"runtime\":\"stopped\","
+               "\"execution_lane\":\"%s\","
                "\"runtime_exit_code\":%d}",
-               st->runtime_exit_code);
+               azl_exec_lane_cstr(st->exec_lane), st->runtime_exit_code);
       write_response(cfd, 503, "Service Unavailable", body);
     }
     return;
@@ -1331,17 +1354,21 @@ static void handle_conn(int cfd, EngineState *st) {
     long uptime = (long)(time(NULL) - st->started_at);
     snprintf(body, sizeof(body),
              "{\"status\":\"ok\",\"engine\":\"native\",\"uptime_sec\":%ld,\"requests_total\":%lu,"
-             "\"combined\":\"%s\",\"native_core\":%s,"
+             "\"combined\":\"%s\",\"execution_lane\":\"%s\",\"compile_vm_auto_detect\":%s,"
+             "\"native_core\":%s,"
              "\"runtime\":{\"running\":%s,\"pid\":%d,\"exit_code\":%d}}",
-             uptime, st->requests_total, st->combined_path, st->use_native_core ? "true" : "false",
+             uptime, st->requests_total, st->combined_path, azl_exec_lane_cstr(st->exec_lane),
+             st->compile_vm_auto ? "true" : "false", st->use_native_core ? "true" : "false",
              st->runtime_running ? "true" : "false", (int)st->runtime_pid, st->runtime_exit_code);
     write_response(cfd, 200, "OK", body);
     return;
   }
   if (strcmp(path, "/api/exec_state") == 0) {
     snprintf(body, sizeof(body),
-             "{\"ok\":true,\"running\":%s,\"pid\":%d,\"exit_code\":%d,\"combined\":\"%s\"}",
-             st->runtime_running ? "true" : "false", (int)st->runtime_pid, st->runtime_exit_code, st->combined_path);
+             "{\"ok\":true,\"running\":%s,\"pid\":%d,\"exit_code\":%d,\"combined\":\"%s\","
+             "\"execution_lane\":\"%s\"}",
+             st->runtime_running ? "true" : "false", (int)st->runtime_pid, st->runtime_exit_code, st->combined_path,
+             azl_exec_lane_cstr(st->exec_lane));
     write_response(cfd, 200, "OK", body);
     return;
   }
@@ -1355,10 +1382,11 @@ static void handle_conn(int cfd, EngineState *st) {
   if (strcmp(path, "/api/state") == 0) {
     snprintf(body, sizeof(body),
              "{\"ok\":true,\"mode\":\"native\",\"entry\":\"%s\","
+             "\"execution_lane\":\"%s\",\"compile_vm_auto_detect\":%s,"
              "\"runtime\":{\"running\":%s,\"pid\":%d,\"exit_code\":%d},"
              "\"error\":\"%s\"}",
-             st->entry, st->runtime_running ? "true" : "false", (int)st->runtime_pid,
-             st->runtime_exit_code, st->runtime_error);
+             st->entry, azl_exec_lane_cstr(st->exec_lane), st->compile_vm_auto ? "true" : "false",
+             st->runtime_running ? "true" : "false", (int)st->runtime_pid, st->runtime_exit_code, st->runtime_error);
     write_response(cfd, 200, "OK", body);
     return;
   }
@@ -1593,14 +1621,18 @@ static int run_server(EngineState *st) {
 int main(int argc, char **argv) {
   if (argc < 2) {
     fprintf(stderr,
-            "usage: %s [--use-native-core] [--native-core-demo] <bootstrap.bundle.azl> [::<entry.point>]\n",
+            "usage: %s [--use-native-core] [--native-core-demo] <bundle|compile-subset.azl> [::<entry.point>]\n",
             argv[0]);
     fprintf(stderr,
-            "  --use-native-core   Embed azl_core_engine; skip AZL_NATIVE_RUNTIME_CMD child (benchmark).\n");
+            "  --use-native-core   Embed azl_core_engine; skip AZL_NATIVE_RUNTIME_CMD child (HTTP + core in-process).\n");
     fprintf(stderr,
             "  --native-core-demo  After start, emit async Ollama /api/generate (needs curl; OLLAMA_HOST).\n");
     fprintf(stderr,
-            "  --compile-azl PATH  With --use-native-core: compile .azl subset to bytecode and vm_exec.\n");
+            "  --compile-azl PATH  Native compile/vm subset → bytecode + vm_exec (implies --use-native-core).\n");
+    fprintf(stderr,
+            "  If PATH is not # AZL-BOOTSTRAP v1 but is compile-subset .azl, native compile/vm is used by default.\n");
+    fprintf(stderr,
+            "  Full AZL semantics otherwise: bootstrap bundle + AZL_NATIVE_RUNTIME_CMD child (see /status execution_lane).\n");
     return 2;
   }
   EngineState st;
@@ -1622,6 +1654,7 @@ int main(int argc, char **argv) {
         return 2;
       }
       snprintf(st.compile_azl_path, sizeof(st.compile_azl_path), "%s", argv[++i]);
+      st.use_native_core = 1;
       continue;
     }
     if (!bundle_arg)
@@ -1641,10 +1674,6 @@ int main(int argc, char **argv) {
     fprintf(stderr, "native-engine: --native-core-demo requires --use-native-core\n");
     return 2;
   }
-  if (st.compile_azl_path[0] != '\0' && !st.use_native_core) {
-    fprintf(stderr, "native-engine: --compile-azl requires --use-native-core\n");
-    return 2;
-  }
   snprintf(st.bundle_path, sizeof(st.bundle_path), "%s", bundle_arg);
   st.started_at = time(NULL);
   st.port = atoi(getenv_or("AZL_BUILD_API_PORT", "8080"));
@@ -1657,16 +1686,48 @@ int main(int argc, char **argv) {
   st.last_runtime_poll_ms = 0;
   st.runtime_error[0] = '\0';
   st.runtime_command[0] = '\0';
+  st.compile_vm_auto = 0;
+  st.exec_lane = AZL_EXEC_LANE_CHILD_RUNTIME;
 
   int rc = read_bootstrap_metadata(st.bundle_path, st.combined_path, sizeof(st.combined_path), st.entry, sizeof(st.entry));
-  if (rc != 0) return rc;
-  if (entry_arg && entry_arg[0] != '\0') {
-    snprintf(st.entry, sizeof(st.entry), "%s", entry_arg);
+  if (rc == 4) {
+    char cerr[512];
+    if (azl_compile_file_check(st.bundle_path, cerr, sizeof(cerr)) == 0) {
+      st.compile_vm_auto = 1;
+      st.use_native_core = 1;
+      snprintf(st.compile_azl_path, sizeof(st.compile_azl_path), "%s", st.bundle_path);
+      snprintf(st.combined_path, sizeof(st.combined_path), "%s", st.bundle_path);
+      if (entry_arg && entry_arg[0] != '\0') {
+        snprintf(st.entry, sizeof(st.entry), "%s", entry_arg);
+      } else {
+        snprintf(st.entry, sizeof(st.entry), "::compile_vm");
+      }
+    } else {
+      fprintf(stderr,
+              "native-engine: not an AZL bootstrap bundle (expected # AZL-BOOTSTRAP v1 on line 1) "
+              "and not in the native compile/vm subset: %s\n",
+              cerr);
+      return 4;
+    }
+  } else if (rc != 0) {
+    return rc;
+  } else {
+    if (entry_arg && entry_arg[0] != '\0') {
+      snprintf(st.entry, sizeof(st.entry), "%s", entry_arg);
+    }
+    struct stat cst;
+    if (stat(st.combined_path, &cst) != 0) {
+      fprintf(stderr, "native-engine: combined file missing: %s\n", st.combined_path);
+      return 6;
+    }
   }
-  struct stat cst;
-  if (stat(st.combined_path, &cst) != 0) {
-    fprintf(stderr, "native-engine: combined file missing: %s\n", st.combined_path);
-    return 6;
+
+  if (st.compile_vm_auto) {
+    struct stat cst;
+    if (stat(st.bundle_path, &cst) != 0) {
+      fprintf(stderr, "native-engine: cannot stat compile-subset source: %s\n", st.bundle_path);
+      return 6;
+    }
   }
 
   signal(SIGINT, on_signal);
@@ -1675,6 +1736,8 @@ int main(int argc, char **argv) {
   /* Native core: event + HTTP bridge + bytecode VM live in-process; no AZL_NATIVE_RUNTIME_CMD
    * child (no Python minimal_runtime / C minimal interpreter subprocess for event logic). */
   if (st.use_native_core) {
+    st.exec_lane =
+        (st.compile_azl_path[0] != '\0') ? AZL_EXEC_LANE_NATIVE_COMPILE_VM : AZL_EXEC_LANE_NATIVE_CORE_EMBEDDED;
     char cwdbuf[512];
     if (getenv("AZL_REPO_ROOT") == NULL && getcwd(cwdbuf, sizeof(cwdbuf)) != NULL)
       setenv("AZL_REPO_ROOT", cwdbuf, 0);
@@ -1695,12 +1758,12 @@ int main(int argc, char **argv) {
       azl_bytecode_program_init_empty(&bcprog);
       char cerr[512];
       if (azl_compile_file(st.compile_azl_path, &bcprog, cerr, sizeof(cerr)) != 0) {
-        fprintf(stderr, "native-engine: --compile-azl %s: %s\n", st.compile_azl_path, cerr);
+        fprintf(stderr, "native-engine: native compile/vm subset rejected for %s: %s\n", st.compile_azl_path, cerr);
         azl_native_core_host_shutdown(&st.native_core);
         return 18;
       }
       if (azl_vm_exec_block(st.native_core.eng, &bcprog) != AZL_OK) {
-        fprintf(stderr, "native-engine: vm_exec after --compile-azl failed\n");
+        fprintf(stderr, "native-engine: vm_exec after native compile failed\n");
         azl_bytecode_program_destroy(&bcprog);
         azl_native_core_host_shutdown(&st.native_core);
         return 19;
@@ -1713,12 +1776,22 @@ int main(int argc, char **argv) {
     st.runtime_pid = -1;
     snprintf(st.runtime_command, sizeof(st.runtime_command), "embedded:azl_core_engine");
     st.runtime_error[0] = '\0';
+    fprintf(stderr, "native-engine: execution_lane=%s compile_azl_source=%s compile_vm_auto_detect=%s\n",
+            azl_exec_lane_cstr(st.exec_lane), st.compile_azl_path[0] != '\0' ? st.compile_azl_path : "",
+            st.compile_vm_auto ? "true" : "false");
+    fflush(stderr);
   } else {
     int start_rc = start_runtime_pipeline(&st);
     if (start_rc != 0) {
       fprintf(stderr, "native-engine: failed to launch runtime pipeline: %s\n", st.runtime_error);
       return start_rc;
     }
+    st.exec_lane = AZL_EXEC_LANE_CHILD_RUNTIME;
+    const char *rcmd = getenv("AZL_NATIVE_RUNTIME_CMD");
+    fprintf(stderr,
+            "native-engine: execution_lane=child_runtime AZL_NATIVE_RUNTIME_CMD=%s combined=%s entry=%s\n",
+            rcmd && rcmd[0] ? rcmd : "(unset)", st.combined_path, st.entry);
+    fflush(stderr);
   }
   append_run_record(&st);
   int rc_srv = run_server(&st);

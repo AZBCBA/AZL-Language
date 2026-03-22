@@ -522,6 +522,14 @@ int azl_compile_file(const char *path, AzlBytecodeProgram *out, char *errbuf, si
   return azl_compile_source(buf, n, out, errbuf, errbuf_sz);
 }
 
+int azl_compile_file_check(const char *path, char *errbuf, size_t errbuf_sz) {
+  AzlBytecodeProgram prog;
+  azl_bytecode_program_init_empty(&prog);
+  int r = azl_compile_file(path, &prog, errbuf, errbuf_sz);
+  azl_bytecode_program_destroy(&prog);
+  return r;
+}
+
 static const char *cmp_payload(const AzlEvent *ev, const char *key) {
   if (!ev || !key)
     return NULL;

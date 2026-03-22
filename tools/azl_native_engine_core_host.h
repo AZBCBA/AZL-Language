@@ -1,4 +1,4 @@
-/* Embedded azl_core_engine (Phase E) — toggled by --use-native-core */
+/* Embedded azl_core_engine — used for --use-native-core, --compile-azl, or auto compile/vm .azl input */
 #ifndef AZL_NATIVE_ENGINE_CORE_HOST_H
 #define AZL_NATIVE_ENGINE_CORE_HOST_H
 
