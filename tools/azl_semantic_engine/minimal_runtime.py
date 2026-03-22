@@ -439,6 +439,67 @@ class MinimalAZLRuntime:
                     out_lines.append("link|" + pairs[j][1][:200])
                     i = j + 1
                     continue
+            if typ == "identifier" and val == "component":
+                j = self._skip_eol_pairs(pairs, i + 1)
+                if j < n:
+                    ct, cv = pairs[j]
+                    if ct == "identifier" and cv.startswith("::"):
+                        out_lines.append("component|" + cv[:200])
+                        i = j + 1
+                        continue
+            if typ == "identifier" and val == "listen":
+                j = self._skip_eol_pairs(pairs, i + 1)
+                if j >= n or pairs[j] != ("identifier", "for"):
+                    i += 1
+                    continue
+                j = self._skip_eol_pairs(pairs, j + 1)
+                if j >= n:
+                    i += 1
+                    continue
+                et, ev = pairs[j]
+                if et == "string":
+                    evn = ev[:63]
+                elif et == "identifier":
+                    evn = ev[:63]
+                else:
+                    i += 1
+                    continue
+                if not evn or "|" in evn:
+                    i += 1
+                    continue
+                j = self._skip_eol_pairs(pairs, j + 1)
+                if j >= n or pairs[j] != ("brace", "{"):
+                    i += 1
+                    continue
+                j = self._skip_eol_pairs(pairs, j + 1)
+                if j >= n or pairs[j] != ("identifier", "say"):
+                    i += 1
+                    continue
+                j = self._skip_eol_pairs(pairs, j + 1)
+                parts: list[str] = []
+                ok_listen = False
+                while j < n:
+                    t2, v2 = pairs[j]
+                    if t2 == "eol":
+                        j += 1
+                        continue
+                    if t2 == "brace" and v2 == "}":
+                        ok_listen = bool(parts)
+                        j += 1
+                        break
+                    if t2 in ("identifier", "string"):
+                        parts.append(v2)
+                        j += 1
+                        continue
+                    break
+                if ok_listen:
+                    msg = " ".join(parts)[:199]
+                    seg = ("listen|" + evn + "|say|" + msg)[:255]
+                    out_lines.append(seg)
+                    i = j
+                else:
+                    i += 1
+                continue
             i += 1
         if not out_lines:
             return "say|AZL_SPINE_SEMANTIC_PARSE_EXECUTE_BRIDGE"

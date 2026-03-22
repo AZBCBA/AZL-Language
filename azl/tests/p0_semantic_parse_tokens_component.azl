@@ -1,0 +1,24 @@
+# Gate F154: ::parse_tokens — `component ::c154` → `component|::c154` (execute_ast row shape).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f154_parse with { }
+  }
+  behavior {
+    listen for "f154_parse" {
+      set ::tokens = []
+      set ::tx = "component ::c154"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::tx, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F154_OK"
+    }
+  }
+}

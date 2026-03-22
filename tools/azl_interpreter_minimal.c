@@ -1854,6 +1854,89 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
         continue;
       }
     }
+    if (strcmp(pairs[i].typ, "identifier") == 0 && strcmp(pairs[i].val, "component") == 0) {
+      int j = parse_skip_eol(pairs, np, i + 1);
+      if (j < np && strcmp(pairs[j].typ, "identifier") == 0 && pairs[j].val[0] == ':' &&
+          pairs[j].val[1] == ':') {
+        char chunk[280];
+        (void)snprintf(chunk, sizeof(chunk), "component|%.199s", pairs[j].val);
+        parse_acc_append(acc, sizeof(acc), chunk);
+        i = j + 1;
+        continue;
+      }
+    }
+    if (strcmp(pairs[i].typ, "identifier") == 0 && strcmp(pairs[i].val, "listen") == 0) {
+      int j = parse_skip_eol(pairs, np, i + 1);
+      if (j >= np || strcmp(pairs[j].typ, "identifier") != 0 || strcmp(pairs[j].val, "for") != 0) {
+        i++;
+        continue;
+      }
+      j = parse_skip_eol(pairs, np, j + 1);
+      if (j >= np) {
+        i++;
+        continue;
+      }
+      char evn[72];
+      evn[0] = '\0';
+      if (strcmp(pairs[j].typ, "string") == 0 || strcmp(pairs[j].typ, "identifier") == 0) {
+        (void)snprintf(evn, sizeof(evn), "%.63s", pairs[j].val);
+      }
+      if (!evn[0] || strchr(evn, '|') != NULL) {
+        i++;
+        continue;
+      }
+      j = parse_skip_eol(pairs, np, j + 1);
+      if (j >= np || strcmp(pairs[j].typ, "brace") != 0 || strcmp(pairs[j].val, "{") != 0) {
+        i++;
+        continue;
+      }
+      j = parse_skip_eol(pairs, np, j + 1);
+      if (j >= np || strcmp(pairs[j].typ, "identifier") != 0 || strcmp(pairs[j].val, "say") != 0) {
+        i++;
+        continue;
+      }
+      j = parse_skip_eol(pairs, np, j + 1);
+      char msg[224];
+      msg[0] = '\0';
+      size_t ml = 0;
+      int ok_listen = 0;
+      while (j < np) {
+        if (strcmp(pairs[j].typ, "eol") == 0) {
+          j++;
+          continue;
+        }
+        if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) {
+          ok_listen = (msg[0] != '\0');
+          j++;
+          break;
+        }
+        if (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0) {
+          if (ml > 0U && ml + 1U < sizeof(msg)) msg[ml++] = ' ';
+          size_t rem = sizeof(msg) - ml - 1U;
+          if (rem > 0U) {
+            (void)snprintf(msg + ml, rem, "%.199s", pairs[j].val);
+            ml = strlen(msg);
+            if (ml > 199U) {
+              msg[199] = '\0';
+              ml = 199U;
+            }
+          }
+          j++;
+          continue;
+        }
+        break;
+      }
+      if (ok_listen) {
+        char chunk[320];
+        (void)snprintf(chunk, sizeof(chunk), "listen|%.63s|say|%.199s", evn, msg);
+        if (strlen(chunk) > 254U) chunk[254] = '\0';
+        parse_acc_append(acc, sizeof(acc), chunk);
+        i = j;
+        continue;
+      }
+      i++;
+      continue;
+    }
     i++;
   }
   if (!acc[0])
