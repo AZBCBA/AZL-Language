@@ -23,6 +23,9 @@
 #   - twentieth emit interpret — evaluated falsey global; multi-statement otherwise-branch (two say lines); AZL_SPINE_P20_A before AZL_SPINE_P20_B; AZL_SPINE_P20_BAD must not run.
 #   - twenty-first emit interpret — `if ( ::azl_spine_p21 == 1 )` expression condition (not lone `::var`); AZL_SPINE_P21_IF; AZL_SPINE_P21_BAD must not run.
 #   - twenty-second emit interpret — `if ( ::azl_spine_p22 == 2 )` false expression path; AZL_SPINE_P22_ELSE; AZL_SPINE_P22_BAD must not run.
+#   - twenty-third emit interpret — `if ( ::azl_spine_p23 == 2 )` true expression path, multi-statement then (P23_A then P23_B); P23_BAD must not run.
+#   - twenty-fourth emit interpret — `if ( ::azl_spine_p24 == 3 )` false expression path, multi-statement otherwise (P24_A then P24_B); P24_BAD must not run.
+#   - twenty-fifth emit interpret — two sequential ifs on ::azl_spine_p25 (true then false); P25_T before P25_F; P25_BAD1 and P25_BAD2 must not run.
 
 component ::azl.spine.behavior.entry {
   init {
@@ -68,6 +71,16 @@ say 'AZL_SPINE_P20_B' }", component_name: "smoke20" }
 if ( ::azl_spine_p21 == 1 ) { say 'AZL_SPINE_P21_IF' } otherwise { say 'AZL_SPINE_P21_BAD' }", component_name: "smoke21" }
     emit interpret with { code: "set ::azl_spine_p22 = 1
 if ( ::azl_spine_p22 == 2 ) { say 'AZL_SPINE_P22_BAD' } otherwise { say 'AZL_SPINE_P22_ELSE' }", component_name: "smoke22" }
+    emit interpret with { code: "set ::azl_spine_p23 = 2
+if ( ::azl_spine_p23 == 2 ) { say 'AZL_SPINE_P23_A'
+say 'AZL_SPINE_P23_B' } otherwise { say 'AZL_SPINE_P23_BAD' }", component_name: "smoke23" }
+    emit interpret with { code: "set ::azl_spine_p24 = 2
+if ( ::azl_spine_p24 == 3 ) { say 'AZL_SPINE_P24_BAD' } otherwise { say 'AZL_SPINE_P24_A'
+say 'AZL_SPINE_P24_B' }", component_name: "smoke24" }
+    emit interpret with { code: "set ::azl_spine_p25 = true
+if ( ::azl_spine_p25 ) { say 'AZL_SPINE_P25_T' } otherwise { say 'AZL_SPINE_P25_BAD1' }
+set ::azl_spine_p25 = false
+if ( ::azl_spine_p25 ) { say 'AZL_SPINE_P25_BAD2' } otherwise { say 'AZL_SPINE_P25_F' }", component_name: "smoke25" }
     say "AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT"
   }
 }

@@ -18,10 +18,13 @@
 # smoke20 evaluated falsey otherwise-branch: two say lines in otherwise-block; P20_A before P20_B; P20_BAD must not appear.
 # smoke21 if ( ::azl_spine_p21 == 1 ) expression condition; P21_IF only; P21_BAD must not appear.
 # smoke22 if ( ::azl_spine_p22 == 2 ) false expression path; P22_ELSE only; P22_BAD must not appear.
+# smoke23 if ( ::azl_spine_p23 == 2 ) true expression path, multi-statement then; P23_A before P23_B; P23_BAD must not appear.
+# smoke24 if ( ::azl_spine_p24 == 3 ) false expression path, multi-statement otherwise; P24_A before P24_B; P24_BAD must not appear.
+# smoke25 two sequential ifs on ::azl_spine_p25; P25_T before P25_F; P25_BAD1 and P25_BAD2 must not appear.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–652).
+# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–662).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -108,8 +111,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=22)}' "$out"; then
-  err "stdout expected >=22 \"Interpretation complete:\" lines (harness twenty-two emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=25)}' "$out"; then
+  err "stdout expected >=25 \"Interpretation complete:\" lines (harness twenty-five emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -289,6 +292,68 @@ if ! rg -q 'AZL_SPINE_P22_ELSE' "$out"; then
   err "stdout missing twenty-second-interpret otherwise marker AZL_SPINE_P22_ELSE (expression false path on real file path)"
   cat "$out" >&2 || true
   exit 652
+fi
+if rg -q 'AZL_SPINE_P23_BAD' "$out"; then
+  err "stdout must not contain twenty-third-interpret otherwise marker AZL_SPINE_P23_BAD (expression true multi-statement then)"
+  cat "$out" >&2 || true
+  exit 653
+fi
+if ! rg -q 'AZL_SPINE_P23_A' "$out" || ! rg -q 'AZL_SPINE_P23_B' "$out"; then
+  err "stdout missing twenty-third-interpret then markers AZL_SPINE_P23_A and/or AZL_SPINE_P23_B"
+  cat "$out" >&2 || true
+  exit 654
+fi
+if ! awk '
+  /AZL_SPINE_P23_A/ && !a { a = NR }
+  /AZL_SPINE_P23_B/ && !b { b = NR }
+  END { exit !(a && b && a < b) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P23_A line before AZL_SPINE_P23_B (expression true multi-statement then)"
+  cat "$out" >&2 || true
+  exit 655
+fi
+if rg -q 'AZL_SPINE_P24_BAD' "$out"; then
+  err "stdout must not contain twenty-fourth-interpret then marker AZL_SPINE_P24_BAD (expression false multi-statement otherwise)"
+  cat "$out" >&2 || true
+  exit 656
+fi
+if ! rg -q 'AZL_SPINE_P24_A' "$out" || ! rg -q 'AZL_SPINE_P24_B' "$out"; then
+  err "stdout missing twenty-fourth-interpret otherwise markers AZL_SPINE_P24_A and/or AZL_SPINE_P24_B"
+  cat "$out" >&2 || true
+  exit 657
+fi
+if ! awk '
+  /AZL_SPINE_P24_A/ && !a { a = NR }
+  /AZL_SPINE_P24_B/ && !b { b = NR }
+  END { exit !(a && b && a < b) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P24_A line before AZL_SPINE_P24_B (expression false multi-statement otherwise)"
+  cat "$out" >&2 || true
+  exit 658
+fi
+if rg -q 'AZL_SPINE_P25_BAD1' "$out"; then
+  err "stdout must not contain twenty-fifth-interpret skipped otherwise marker AZL_SPINE_P25_BAD1"
+  cat "$out" >&2 || true
+  exit 659
+fi
+if rg -q 'AZL_SPINE_P25_BAD2' "$out"; then
+  err "stdout must not contain twenty-fifth-interpret skipped then marker AZL_SPINE_P25_BAD2"
+  cat "$out" >&2 || true
+  exit 660
+fi
+if ! rg -q 'AZL_SPINE_P25_T' "$out" || ! rg -q 'AZL_SPINE_P25_F' "$out"; then
+  err "stdout missing twenty-fifth-interpret markers AZL_SPINE_P25_T and/or AZL_SPINE_P25_F (two sequential ifs)"
+  cat "$out" >&2 || true
+  exit 661
+fi
+if ! awk '
+  /AZL_SPINE_P25_T/ && !t { t = NR }
+  /AZL_SPINE_P25_F/ && !f { f = NR }
+  END { exit !(t && f && t < f) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P25_T line before AZL_SPINE_P25_F (ordered sequential ifs in one emitted program)"
+  cat "$out" >&2 || true
+  exit 662
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"
