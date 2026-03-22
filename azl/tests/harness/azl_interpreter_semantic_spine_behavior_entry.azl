@@ -18,7 +18,7 @@
 #   - fifteenth emit interpret (if ( false ) { … } otherwise { say … }) — single-statement alternate branch; skipped then-body.
 #   - sixteenth emit interpret (if ( false ) { … } otherwise { two says }) — ordered multi-statement otherwise body (AZL_SPINE_P16_A then AZL_SPINE_P16_B); skipped then-body AZL_SPINE_P16_BAD.
 #   - seventeenth emit interpret — set ::azl_spine_p17 = true then if ( ::azl_spine_p17 ) { … } otherwise { … }: condition is evaluated (not a literal in the if parens); then-branch only; AZL_SPINE_P17_BAD must not run.
-#   - eighteenth emit interpret — set ::azl_spine_p18_flag = false then if ( ::azl_spine_p18_flag ) { … } otherwise { … }: evaluated falsey global; otherwise only; AZL_SPINE_P18_BAD must not run.
+#   - eighteenth emit interpret — set ::azl_spine_p18 = false then if ( ::azl_spine_p18 ) { … } otherwise { … }: evaluated falsey global; otherwise only; AZL_SPINE_P18_BAD must not run.
 
 component ::azl.spine.behavior.entry {
   init {
@@ -52,8 +52,8 @@ a()", component_name: "smoke12" }
 say 'AZL_SPINE_P16_B' }", component_name: "smoke16" }
     emit interpret with { code: "set ::azl_spine_p17 = true
 if ( ::azl_spine_p17 ) { say 'AZL_SPINE_P17_IF' } otherwise { say 'AZL_SPINE_P17_BAD' }", component_name: "smoke17" }
-    emit interpret with { code: "set ::azl_spine_p18_flag = false
-if ( ::azl_spine_p18_flag ) { say 'AZL_SPINE_P18_BAD' } otherwise { say 'AZL_SPINE_P18_ELSE' }", component_name: "smoke18" }
+    emit interpret with { code: "set ::azl_spine_p18 = false
+if ( ::azl_spine_p18 ) { say 'AZL_SPINE_P18_BAD' } otherwise { say 'AZL_SPINE_P18_ELSE' }", component_name: "smoke18" }
     say "AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT"
   }
 }
