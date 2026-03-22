@@ -314,76 +314,19 @@ static int payload_key_ok(const char *key) {
 /*
  * Parse `with { key: "value" | ::var, ... }` for emit payload; *i must point at `with`.
  * Advances *i past the closing `}` of the object (or leaves *i after `with` if no `{`).
+ * `toks` is either `g_tok` (use lim = g_ntok) or `g_synth_tok` (use lim = synthetic end).
+ * Single implementation: parity contract stays in one place; not a second AZL payload dialect in C.
  */
-static int parse_emit_with_payload(int *i, PayloadKV *out, int max_out) {
+static int parse_emit_with_payload_from(int *i, int lim_excl, const char **toks,
+                                        PayloadKV *out, int max_out) {
   int n = 0;
-  if (*i >= g_ntok || strcmp(g_tok[*i], "with") != 0) return 0;
+  if (*i >= lim_excl || strcmp(toks[*i], "with") != 0) return 0;
   (*i)++;
-  if (*i >= g_ntok || strcmp(g_tok[*i], "{") != 0) return 0;
-  (*i)++;
-  int depth = 1;
-  while (*i < g_ntok && depth > 0) {
-    const char *t = g_tok[*i];
-    if (strcmp(t, "{") == 0) { depth++; (*i)++; continue; }
-    if (strcmp(t, "}") == 0) { depth--; (*i)++; continue; }
-    if (depth != 1) { (*i)++; continue; }
-    char keybuf[48];
-    const char *key = NULL;
-    size_t tl = strlen(t);
-    if (tl >= 2 && t[tl - 1U] == ':') {
-      if (tl - 1U >= sizeof(keybuf)) { (*i)++; continue; }
-      memcpy(keybuf, t, tl - 1U);
-      keybuf[tl - 1U] = '\0';
-      if (!payload_key_ok(keybuf)) { (*i)++; continue; }
-      key = keybuf;
-      (*i)++;
-    } else {
-      if (!payload_key_ok(t)) { (*i)++; continue; }
-      if (tl >= sizeof(keybuf)) { (*i)++; continue; }
-      memcpy(keybuf, t, tl);
-      keybuf[tl] = '\0';
-      key = keybuf;
-      (*i)++;
-      if (*i >= g_ntok || strcmp(g_tok[*i], ":") != 0) continue;
-      (*i)++;
-    }
-    if (*i >= g_ntok) break;
-    const char *valtok = g_tok[*i];
-    char valbuf[256] = {0};
-    if (valtok && strlen(valtok) >= 2 && (valtok[0] == '"' || valtok[0] == '\'')) {
-      size_t L = strlen(valtok);
-      size_t nc = L >= 2 ? L - 2 : 0;
-      if (nc >= sizeof(valbuf)) nc = sizeof(valbuf) - 1U;
-      memcpy(valbuf, valtok + 1, nc);
-      valbuf[nc] = '\0';
-    } else if (valtok && valtok[0] == ':' && valtok[1] == ':') {
-      const char *vv = var_get(valtok);
-      if (vv) (void)snprintf(valbuf, sizeof(valbuf), "%s", vv);
-      else valbuf[0] = '\0';
-    } else {
-      (void)snprintf(valbuf, sizeof(valbuf), "%s", valtok ? valtok : "");
-    }
-    (*i)++;
-    if (n < max_out && key) {
-      (void)snprintf(out[n].key, sizeof(out[n].key), "%s", key);
-      (void)snprintf(out[n].v, sizeof(out[n].v), "%s", valbuf);
-      n++;
-    }
-    if (*i < g_ntok && strcmp(g_tok[*i], ",") == 0) (*i)++;
-  }
-  return n;
-}
-
-/* Same as parse_emit_with_payload but reads g_synth_tok[0..lim_excl) (synthetic listener bodies). */
-static int parse_emit_with_payload_synth(int *i, int lim_excl, PayloadKV *out, int max_out) {
-  int n = 0;
-  if (*i >= lim_excl || strcmp(g_synth_tok[*i], "with") != 0) return 0;
-  (*i)++;
-  if (*i >= lim_excl || strcmp(g_synth_tok[*i], "{") != 0) return 0;
+  if (*i >= lim_excl || strcmp(toks[*i], "{") != 0) return 0;
   (*i)++;
   int depth = 1;
   while (*i < lim_excl && depth > 0) {
-    const char *t = g_synth_tok[*i];
+    const char *t = toks[*i];
     if (strcmp(t, "{") == 0) {
       depth++;
       (*i)++;
@@ -427,11 +370,11 @@ static int parse_emit_with_payload_synth(int *i, int lim_excl, PayloadKV *out, i
       keybuf[tl] = '\0';
       key = keybuf;
       (*i)++;
-      if (*i >= lim_excl || strcmp(g_synth_tok[*i], ":") != 0) continue;
+      if (*i >= lim_excl || strcmp(toks[*i], ":") != 0) continue;
       (*i)++;
     }
     if (*i >= lim_excl) break;
-    const char *valtok = g_synth_tok[*i];
+    const char *valtok = toks[*i];
     char valbuf[256] = {0};
     if (valtok && strlen(valtok) >= 2 && (valtok[0] == '"' || valtok[0] == '\'')) {
       size_t L = strlen(valtok);
@@ -453,9 +396,17 @@ static int parse_emit_with_payload_synth(int *i, int lim_excl, PayloadKV *out, i
       (void)snprintf(out[n].v, sizeof(out[n].v), "%s", valbuf);
       n++;
     }
-    if (*i < lim_excl && strcmp(g_synth_tok[*i], ",") == 0) (*i)++;
+    if (*i < lim_excl && strcmp(toks[*i], ",") == 0) (*i)++;
   }
   return n;
+}
+
+static int parse_emit_with_payload(int *i, PayloadKV *out, int max_out) {
+  return parse_emit_with_payload_from(i, g_ntok, g_tok, out, max_out);
+}
+
+static int parse_emit_with_payload_synth(int *i, int lim_excl, PayloadKV *out, int max_out) {
+  return parse_emit_with_payload_from(i, lim_excl, g_synth_tok, out, max_out);
 }
 
 static void queue_push_event(const char *ev, const PayloadKV *kv, int nkv) {
