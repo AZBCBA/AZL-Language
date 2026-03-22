@@ -824,8 +824,8 @@ class MinimalAZLRuntime:
         return None
 
     @staticmethod
-    def _spine_if_condition_const(cond_raw: str) -> str | None:
-        """Constant-foldable user condition only; aligns with ``::execute_if_statement`` true/false vs other."""
+    def _pipe_if_condition_const_fold(cond_raw: str) -> str | None:
+        """Spine tz→pipe only: detect literal true/false (no expression engine)."""
         eq_split = cond_raw.split(" = = ")
         if len(eq_split) == 2:
             cond_raw = eq_split[0].strip() + "==" + eq_split[1].strip()
@@ -841,10 +841,10 @@ class MinimalAZLRuntime:
             return "false"
         return None
 
-    def _try_parse_if_spine_row(
+    def _expand_if_spine_pipe_rows(
         self, pairs: list[tuple[str, str]], i: int, n: int
-    ) -> tuple[str, int] | None:
-        """Serialize ``if`` / ``otherwise`` as one ``if|`` + JSON row (no branch choice here — see ``_builtin_execute_ast_run_lines``)."""
+    ) -> tuple[list[str], int] | None:
+        """If spine shape: const conditions flatten to inner pipe rows here; else one ``if|`` row for execute_ast."""
         if i >= n or pairs[i] != ("identifier", "if"):
             return None
         j = self._skip_eol_pairs(pairs, i + 1)
@@ -890,11 +890,16 @@ class MinimalAZLRuntime:
             if else_lo is not None and else_hi is not None
             else []
         )
+        cc = self._pipe_if_condition_const_fold(cond_raw)
+        if cc == "true":
+            return (then_lines, j)
+        if cc == "false":
+            return (else_lines, j)
         payload = {"c": cond_raw, "t": then_lines, "f": else_lines}
         line = "if|" + json.dumps(payload, separators=(",", ":"))
         if len(line) > INTERP_BLOB_VAR_MAX:
             return None
-        return (line, j)
+        return ([line], j)
 
     def _parse_tokens_nodes_range(
         self, pairs: list[tuple[str, str]], lo: int, hi: int
@@ -909,10 +914,10 @@ class MinimalAZLRuntime:
                 i += 1
                 continue
             if typ == "identifier" and val == "if":
-                if_row = self._try_parse_if_spine_row(pairs, i, n)
-                if if_row is not None:
-                    out_lines.append(if_row[0])
-                    i = if_row[1]
+                if_rows = self._expand_if_spine_pipe_rows(pairs, i, n)
+                if if_rows is not None:
+                    out_lines.extend(if_rows[0])
+                    i = if_rows[1]
                     continue
             if typ == "identifier" and val == "say":
                 j = self._skip_eol_pairs(pairs, i + 1)
@@ -2135,7 +2140,7 @@ class MinimalAZLRuntime:
     def _builtin_execute_ast_run_lines(
         self, lines: list[str], fn_reg: dict[str, str], result: str
     ) -> str:
-        """Walk pipe rows (nested under ``if|`` branches share ``fn_reg``). Branch choice for ``if|`` matches ``azl_interpreter.azl`` ``::execute_if_statement``."""
+        """Walk pipe rows (nested under ``if|`` branches share ``fn_reg``). ``if|`` rows only for non-const conditions (literals folded in ``_expand_if_spine_pipe_rows``)."""
         for line in lines:
             if (self.var_get("::halted") or "") == "true":
                 return "Execution halted due to error"
@@ -2163,7 +2168,7 @@ class MinimalAZLRuntime:
                     if isinstance(raw_else, list)
                     else []
                 )
-                const = self._spine_if_condition_const(str(c))
+                const = self._pipe_if_condition_const_fold(str(c))
                 chosen = then_lines if const == "true" else else_lines
                 result = self._builtin_execute_ast_run_lines(chosen, fn_reg, result)
                 continue

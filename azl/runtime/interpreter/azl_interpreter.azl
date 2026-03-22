@@ -1017,7 +1017,7 @@ component ::azl.interpreter {
       }
     }
 
-    # Execute if (condition) { ... } for parsed user code (interpret path). Spine host mirrors this for ``if|`` pipe rows from ``::parse_tokens`` (branch when not const-true: ``when_false`` — same as here for false / unknown).
+    # Execute if (condition) { ... } for parsed user code (interpret path). Spine ``::parse_tokens`` may flatten literal true/false to pipe rows only; non-literal conditions may still use an ``if|`` bootstrap row (host walk — not the semantic definition).
     ::execute_if_statement = (statement) => {
       set ::cond_v = ::evaluate_expression(::statement.condition)
       set ::is_false = (::cond_v == false || (::cond_v != null && ::cond_v.toString() == "false"))
