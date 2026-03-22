@@ -1,5 +1,7 @@
-# Agent Channels Subsystem
-# Handles secure communication channels for AI agents
+# AZL_CRYPTO_DEMO_SURFACE=DEMO_NON_CRYPTO_STUB
+# =============================================================================
+# Simulation-only agent “channel” events: TLS / quantum_identity strings are narrative props, not real handshakes or AEAD.
+# =============================================================================
 
 component ::quantum.agent_channels {
   init {
@@ -34,6 +36,12 @@ component ::quantum.agent_channels {
     set ::protocol_state = "initialized"
     set ::channel_success = false
     set ::agent_authenticated = false
+
+    say "SECURITY: ::quantum.agent_channels is DEMO_NON_CRYPTO_STUB — channel encryption labels are simulation only"
+    emit "quantum.agent_channels.ready" with {
+      security_tier: "DEMO_NON_CRYPTO_STUB",
+      simulation_only: true
+    }
   }
 
   behavior {

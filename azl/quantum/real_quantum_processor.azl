@@ -1,5 +1,6 @@
 # Real Quantum Processor — state-vector simulation in software (normal CPU RAM).
 # Not a physical QPU binding; gates and amplitudes are plain numeric structures in AZL.
+# REPERTOIREFIELD_IMPL_SCOPE=canonical_qc_numeric_processor — one bounded simulator surface; not the full RepertoireField API (see docs/AZL_GPU_NEURAL_SURFACE_MAP.md).
 
 component ::quantum.real_processor {
   init {

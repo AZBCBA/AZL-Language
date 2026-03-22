@@ -9,6 +9,7 @@ cd "$ROOT_DIR"
 DOC="docs/AZL_GPU_NEURAL_SURFACE_MAP.md"
 ANCHOR="REPERTOIREFIELD_SURFACE_CONTRACT_V1"
 CANON="azl/quantum/real_quantum_processor.azl"
+IMPL_SCOPE_MARK="REPERTOIREFIELD_IMPL_SCOPE=canonical_qc_numeric_processor"
 
 if [ ! -f "Makefile" ] || [ ! -d "azl/quantum" ]; then
   echo "ERROR[REPERTOIREFIELD_SURFACE]: must run from repository root" >&2
@@ -38,6 +39,11 @@ fi
 if [ ! -f "$CANON" ]; then
   echo "ERROR[REPERTOIREFIELD_SURFACE]: canonical processor missing: $CANON" >&2
   exit 235
+fi
+
+if ! rg -qF "$IMPL_SCOPE_MARK" "$CANON"; then
+  echo "ERROR[REPERTOIREFIELD_SURFACE]: impl scope marker missing in $CANON (expected $IMPL_SCOPE_MARK)" >&2
+  exit 236
 fi
 
 echo "repertoire-field-surface-contract-ok"

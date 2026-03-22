@@ -1,6 +1,6 @@
-# LHA3 Quantum Memory System for AZME - Advanced Quantum Memory Management
-# This module implements advanced quantum memory management for the AZME system,
-# providing fractal storage, consciousness integration, and quantum coherence preservation.
+# Runtime LHA3-shaped memory orchestration for AZME (events + structured maps in AZL).
+# "Compression" here means ratio fields and filtered structure sizes (counts / keys), not a portable byte codec.
+# LHA3_COMPRESSION_MODEL=heuristic_retention — NOT byte-level codec; see docs/LHA3_COMPRESSION_HONESTY.md
 
 component ::runtime.memory.lha3_memory_system {
   init {

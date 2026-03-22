@@ -9,6 +9,8 @@ cd "$ROOT_DIR"
 DOC="docs/LHA3_COMPRESSION_HONESTY.md"
 ENGINE="azl/quantum/memory/lha3_quantum_engine.azl"
 MEMORY="azl/memory/lha3_quantum_memory.azl"
+RUNTIME_LHA3="azl/runtime/memory/lha3_memory_system.azl"
+FRACTAL="azl/memory/fractal_memory_compression.azl"
 ANCHOR="LHA3_COMPRESSION_HONESTY_CONTRACT_V1"
 MARKER="LHA3_COMPRESSION_MODEL=heuristic_retention"
 
@@ -40,6 +42,16 @@ fi
 if ! rg -qF "$MARKER" "$MEMORY"; then
   echo "ERROR[LHA3_COMPRESSION_HONESTY]: implementation marker missing in $MEMORY (expected $MARKER)" >&2
   exit 224
+fi
+
+if ! rg -qF "$MARKER" "$RUNTIME_LHA3"; then
+  echo "ERROR[LHA3_COMPRESSION_HONESTY]: implementation marker missing in $RUNTIME_LHA3 (expected $MARKER)" >&2
+  exit 226
+fi
+
+if ! rg -qF "$MARKER" "$FRACTAL"; then
+  echo "ERROR[LHA3_COMPRESSION_HONESTY]: implementation marker missing in $FRACTAL (expected $MARKER)" >&2
+  exit 227
 fi
 
 echo "lha3-compression-honesty-contract-ok"

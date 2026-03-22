@@ -15,6 +15,9 @@ mkdir -p .azl
 echo "[verify-qlha3] LHA3 compression honesty contract (docs + source markers)"
 bash scripts/verify_lha3_compression_honesty_contract.sh
 
+echo "[verify-qlha3] quantum crypto demo tier (AZL surface markers)"
+bash scripts/verify_quantum_crypto_demo_tier_contract.sh
+
 cleanup_verify_qlha3() {
   chmod +x scripts/azl_teardown_verify_native_stack.sh 2>/dev/null || true
   bash scripts/azl_teardown_verify_native_stack.sh "$PORT" "$TOKEN" || true

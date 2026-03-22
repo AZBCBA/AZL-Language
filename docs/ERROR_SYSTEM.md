@@ -105,7 +105,7 @@ Production scripts return **non-zero** with **`ERROR:`** on **stderr**; no silen
 
 ### LHA3 compression honesty contract (`scripts/verify_lha3_compression_honesty_contract.sh`)
 
-Runs **before** the native stack inside **`scripts/verify_quantum_lha3_stack.sh`**. Ensures **`docs/LHA3_COMPRESSION_HONESTY.md`** exists with contract anchor **`LHA3_COMPRESSION_HONESTY_CONTRACT_V1`**, and **`LHA3_COMPRESSION_MODEL=heuristic_retention`** markers remain in **`azl/quantum/memory/lha3_quantum_engine.azl`** and **`azl/memory/lha3_quantum_memory.azl`**. Prefix **`ERROR[LHA3_COMPRESSION_HONESTY]:`** on stderr.
+Runs **before** the native stack inside **`scripts/verify_quantum_lha3_stack.sh`**. Ensures **`docs/LHA3_COMPRESSION_HONESTY.md`** exists with contract anchor **`LHA3_COMPRESSION_HONESTY_CONTRACT_V1`**, and **`LHA3_COMPRESSION_MODEL=heuristic_retention`** markers remain in **`azl/quantum/memory/lha3_quantum_engine.azl`**, **`azl/memory/lha3_quantum_memory.azl`**, **`azl/runtime/memory/lha3_memory_system.azl`**, and **`azl/memory/fractal_memory_compression.azl`**. Prefix **`ERROR[LHA3_COMPRESSION_HONESTY]:`** on stderr.
 
 | Exit | Meaning |
 |------|---------|
@@ -115,6 +115,19 @@ Runs **before** the native stack inside **`scripts/verify_quantum_lha3_stack.sh`
 | **223** | Marker missing in **`lha3_quantum_engine.azl`** |
 | **224** | Marker missing in **`lha3_quantum_memory.azl`** |
 | **225** | **`rg`** not found |
+| **226** | Marker missing in **`azl/runtime/memory/lha3_memory_system.azl`** |
+| **227** | Marker missing in **`azl/memory/fractal_memory_compression.azl`** |
+
+### Quantum crypto demo tier (`scripts/verify_quantum_crypto_demo_tier_contract.sh`)
+
+Runs inside **`scripts/verify_quantum_lha3_stack.sh`** immediately after the LHA3 compression honesty script. Requires **`AZL_CRYPTO_DEMO_SURFACE=DEMO_NON_CRYPTO_STUB`** in **`azl/quantum/processor/quantum_encryption.azl`**, **`hpqvpn.azl`**, and **`agent_channels.azl`**. Prefix **`ERROR[QUANTUM_CRYPTO_DEMO]:`** on stderr.
+
+| Exit | Meaning |
+|------|---------|
+| **905** | Not repository root |
+| **906** | **`rg`** not found |
+| **907** | Listed **`.azl`** file missing |
+| **908** | Demo marker missing in a listed file |
 
 ### AZL literal codec container — doc contract (`scripts/verify_azl_literal_codec_container_doc_contract.sh`)
 
@@ -166,7 +179,7 @@ Runs in **`scripts/run_tests.sh`**. Compiles **`tools/azl_core_engine.c`**, **`t
 
 ### RepertoireField surface contract (`scripts/verify_repertoire_field_surface_contract.sh`)
 
-Runs at the start of **`scripts/run_tests.sh`**. Ensures **`docs/AZL_GPU_NEURAL_SURFACE_MAP.md`** contains **`REPERTOIREFIELD_SURFACE_CONTRACT_V1`** and **RepertoireField**, and **`azl/quantum/real_quantum_processor.azl`** exists. Prefix **`ERROR[REPERTOIREFIELD_SURFACE]:`** on stderr.
+Runs at the start of **`scripts/run_tests.sh`**. Ensures **`docs/AZL_GPU_NEURAL_SURFACE_MAP.md`** contains **`REPERTOIREFIELD_SURFACE_CONTRACT_V1`** and **RepertoireField**, **`azl/quantum/real_quantum_processor.azl`** exists, and that file contains **`REPERTOIREFIELD_IMPL_SCOPE=canonical_qc_numeric_processor`** (bounded simulator surface, not the full product API). Prefix **`ERROR[REPERTOIREFIELD_SURFACE]:`** on stderr.
 
 | Exit | Meaning |
 |------|---------|
@@ -176,6 +189,7 @@ Runs at the start of **`scripts/run_tests.sh`**. Ensures **`docs/AZL_GPU_NEURAL_
 | **233** | Contract anchor missing |
 | **234** | **RepertoireField** string missing from doc |
 | **235** | **`real_quantum_processor.azl`** missing |
+| **236** | Impl scope marker missing in **`real_quantum_processor.azl`** |
 
 ### Rust off-tree doc contract (`scripts/verify_rust_offtree_doc_contract.sh`)
 

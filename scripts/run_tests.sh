@@ -20,6 +20,7 @@ chmod +x \
   scripts/verify_azl_literal_codec_roundtrip.sh \
   scripts/verify_azl_core_engine.sh \
   scripts/build_azl_core_engine.sh \
+  scripts/verify_quantum_crypto_demo_tier_contract.sh \
   2>/dev/null || true
 bash scripts/verify_repertoire_field_surface_contract.sh
 bash scripts/verify_rust_offtree_doc_contract.sh

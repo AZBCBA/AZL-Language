@@ -1,5 +1,8 @@
-# Hybrid Post-Quantum VPN (HPQVPN) Subsystem
-# Handles hybrid quantum-classical VPN protocols
+# AZL_CRYPTO_DEMO_SURFACE=DEMO_NON_CRYPTO_STUB
+# =============================================================================
+# Simulation-only “VPN” events: algorithm names and “aes_256_gcm” strings are props for demos, not real wire crypto.
+# No Kyber, no AEAD, no key agreement — see docs/AZL_ENGINEERING_REALITY_AUDIT.md §5 and ::quantum.encryption pattern.
+# =============================================================================
 
 component ::quantum.hpqvpn {
   init {
@@ -43,6 +46,12 @@ component ::quantum.hpqvpn {
     set ::protocol_state = "initialized"
     set ::vpn_success = false
     set ::tunnel_established = false
+
+    say "SECURITY: ::quantum.hpqvpn is DEMO_NON_CRYPTO_STUB — labels simulate crypto; not production VPN or cryptography"
+    emit "quantum.hpqvpn.ready" with {
+      security_tier: "DEMO_NON_CRYPTO_STUB",
+      simulation_only: true
+    }
   }
 
   behavior {
