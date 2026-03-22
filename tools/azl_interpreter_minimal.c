@@ -1961,6 +1961,8 @@ static int parse_skip_eol(ParseTokPair *pairs, int np, int i) {
   return i;
 }
 
+static int pair_brace_close_idx(ParseTokPair *pairs, int np, int open_idx);
+
 static void parse_acc_append(char *acc, size_t accap, const char *chunk) {
   if (!chunk || !chunk[0]) return;
   size_t al = strlen(acc);
@@ -2039,6 +2041,70 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
   if (chunk_sz < AZL_LISTEN_CHUNK_NEED)
     return -1;
   if (j >= np) return -1;
+  /* if ( true|false|1|0 ) { say … } — one say inside then-branch; false → empty chunk (F176). */
+  if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "if") == 0) {
+    j = parse_skip_eol(pairs, np, j + 1);
+    if (j >= np || strcmp(pairs[j].typ, "paren") != 0 || strcmp(pairs[j].val, "(") != 0) return -1;
+    j = parse_skip_eol(pairs, np, j + 1);
+    if (j >= np || strcmp(pairs[j].typ, "identifier") != 0) return -1;
+    int truthy = -1;
+    if (strcmp(pairs[j].val, "true") == 0 || strcmp(pairs[j].val, "1") == 0)
+      truthy = 1;
+    else if (strcmp(pairs[j].val, "false") == 0 || strcmp(pairs[j].val, "0") == 0)
+      truthy = 0;
+    else
+      return -1;
+    j++;
+    j = parse_skip_eol(pairs, np, j);
+    if (j >= np || strcmp(pairs[j].typ, "paren") != 0 || strcmp(pairs[j].val, ")") != 0) return -1;
+    j = parse_skip_eol(pairs, np, j + 1);
+    if (j >= np || strcmp(pairs[j].typ, "brace") != 0 || strcmp(pairs[j].val, "{") != 0) return -1;
+    int jb_open = j;
+    int jb_close = pair_brace_close_idx(pairs, np, jb_open);
+    if (jb_close < 0) return -1;
+    if (truthy) {
+      int ji = parse_skip_eol(pairs, np, jb_open + 1);
+      if (ji >= jb_close) return -1;
+      if (strcmp(pairs[ji].typ, "identifier") != 0 || strcmp(pairs[ji].val, "say") != 0) return -1;
+      ji = parse_skip_eol(pairs, np, ji + 1);
+      char msg[224];
+      msg[0] = '\0';
+      size_t ml = 0;
+      while (ji < jb_close) {
+        if (strcmp(pairs[ji].typ, "eol") == 0) {
+          if (msg[0] == '\0') {
+            ji++;
+            continue;
+          }
+          ji++;
+          continue;
+        }
+        if (strcmp(pairs[ji].typ, "identifier") == 0 || strcmp(pairs[ji].typ, "string") == 0) {
+          if (ml > 0U && ml + 1U < sizeof(msg)) msg[ml++] = ' ';
+          size_t rem = sizeof(msg) - ml - 1U;
+          if (rem > 0U) {
+            azl_fmt_cat_field(msg + ml, rem, 199, pairs[ji].val);
+            ml = strlen(msg);
+            if (ml > 199U) {
+              msg[199] = '\0';
+              ml = 199U;
+            }
+          }
+          ji++;
+          continue;
+        }
+        return -1;
+      }
+      if (msg[0] == '\0') return -1;
+      (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|say|%.199s", evn, msg);
+      if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+      *j_out = jb_close + 1;
+      return 0;
+    }
+    chunk_out[0] = '\0';
+    *j_out = jb_close + 1;
+    return 0;
+  }
   if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "say") == 0) {
     j = parse_skip_eol(pairs, np, j + 1);
     char msg[224];

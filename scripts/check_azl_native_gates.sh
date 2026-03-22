@@ -5352,6 +5352,31 @@ if [ "$F175_C_OUT" != "$F175_PY_OUT" ]; then
   exit 776
 fi
 
+echo "[gate] F176: C vs Python — parse_tokens listen { if ( true ) { say … } }"
+F176EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_if_say.azl"
+F176_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F176EX" boot.entry 2>&1)"
+f176_c_rc=$?
+if [ "$f176_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_tokens_listen_if_say exited $f176_c_rc: $F176_C_OUT"
+  exit 783
+fi
+if ! printf '%s\n' "$F176_C_OUT" | awk 'NR==1{if($0!="listen|f176|say|F176_INNER")exit 1} NR==2{if($0!="P0_SEM_F176_OK")exit 1} END{if(NR!=2)exit 1}'; then
+  echo "ERROR: expected F176 stdout (2 lines), got: $F176_C_OUT"
+  exit 783
+fi
+F176_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F176EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f176_py_rc=$?
+if [ "$f176_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_tokens_listen_if_say exited $f176_py_rc: $F176_PY_OUT"
+  exit 784
+fi
+if [ "$F176_C_OUT" != "$F176_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_tokens_listen_if_say" >&2
+  echo "C:  $F176_C_OUT" >&2
+  echo "Py: $F176_PY_OUT" >&2
+  exit 785
+fi
+
 echo "[gate] F179: C vs Python — parse_tokens listen { set … ; emit \"…\" with { k: v } }"
 F179EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_set_emit_quoted_event.azl"
 F179_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F179EX" boot.entry 2>&1)"

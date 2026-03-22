@@ -7,7 +7,7 @@
 **Baseline (re-verify after major spine/minimal changes):**  
 `bash scripts/check_azl_native_gates.sh` → 0; `bash scripts/verify_azl_interpreter_semantic_spine_smoke.sh` → 0; `bash scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh` → 0; optional full `RUN_OPTIONAL_BENCHES=0 make verify`.
 
-**Gate numbering gap:** **F176–F178** are **reserved** in the doc plan for inner **`if`**, **`return`**, and **`memory`+`listen`** token walks — not yet implemented as gates (requires **`parse_listen_inner_body`** / parse loop extensions).
+**Gate numbering gap:** **F177–F178** still **open** (inner **`return`**, **`memory`+`listen`** mix). **F176** shipped (**783–785**): **`if ( true|false|1|0 ) { say … }`** inside **`listen { … }`** (false branch emits no row; Python skips empty inner lines).
 
 ---
 
@@ -33,7 +33,7 @@
 - [x] 15. **F173** — set + **`emit … with { a: b, c: d }`** — shipped (**768–770**).
 - [x] 16. **F174** — **`say` + `set` + `emit`** — shipped (**771–773**).
 - [x] 17. **F175** — **`emit` then `set`** — shipped (**774–776**).
-- [ ] 18. **F176** — inner **`if (true) { say … }`** in `parse_tokens` — **open** (parser extension).
+- [x] 18. **F176** — inner **`if (…) { say … }`** — shipped (**783–785**); condition **`true`/`1`/`false`/`0`** only.
 - [ ] 19. **F177** — inner **`return`** in listen parse — **open** (parser extension).
 - [ ] 20. **F178** — **`memory` + `listen`** same walk — **open** (fixture + parser if needed).
 - [x] 21. **F179** — quoted inner **`emit`** in multi-line listen — shipped (**777–779**).
