@@ -24,7 +24,7 @@
 - [ ] 9. Document which `azl_interpreter.azl` lines each P0.1c extension covers — **open** (incremental doc per extension).
 - [x] 10. New spine failures typed — **process** (ERROR_SYSTEM + scripts; no silent success in gates).
 - [x] 11. Keep `make verify` steps 3–4 authoritative — **wired** in `run_full_repo_verification.sh`.
-- [x] 12. Refresh roadmap/TIER_B F-gate ranges when the suite moves — **done** through **F180** (2026-03-24).
+- [x] 12. Refresh roadmap/TIER_B F-gate ranges when the suite moves — **done** through **F181** (2026-03-24).
 
 ## B. C↔Python parity gates (13–35)
 
@@ -87,4 +87,4 @@
 
 - [ ] 88. Spec + 3–5 tests per [AZL_ENGINEERING_REALITY_AUDIT.md](AZL_ENGINEERING_REALITY_AUDIT.md) — **open** (research/product track).
 
-**Last updated:** 2026-03-24 (F173–F180 + **F177–F178** inner **`return`** / **`memory`+`listen`** buffer).
+**Last updated:** 2026-03-24 (F173–F181 incl. **F177–F178** parse + **F181** **`execute_ast`** **`listen|…|return`** stub dispatch).

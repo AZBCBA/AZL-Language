@@ -5427,6 +5427,31 @@ if [ "$F178_C_OUT" != "$F178_PY_OUT" ]; then
   exit 791
 fi
 
+echo "[gate] F181: C vs Python — execute_ast memory|listen|…|return (+ bare return) + memory|emit ×2"
+F181EX="${ROOT_DIR}/azl/tests/p0_semantic_execute_ast_memory_listen_return_stack.azl"
+F181_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F181EX" boot.entry 2>&1)"
+f181_c_rc=$?
+if [ "$f181_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_ast_memory_listen_return_stack exited $f181_c_rc: $F181_C_OUT"
+  exit 792
+fi
+if ! printf '%s\n' "$F181_C_OUT" | awk 'NR==1{if($0!="F181_TREE")exit 1} NR==2{if($0!="F181_TOP")exit 1} NR==3{if($0!="F181_WITH_PAY")exit 1} NR==4{if($0!="F181_MEM")exit 1} NR==5{if($0!="f181_mod_tag")exit 1} NR==6{if($0!="EX181_POST")exit 1} NR==7{if($0!="Said: F181_MEM")exit 1} NR==8{if($0!="EC181_INNER")exit 1} NR==9{if($0!="Said: F181_MEM")exit 1} NR==10{if($0!="P0_SEM_F181_OK")exit 1} END{if(NR!=10)exit 1}'; then
+  echo "ERROR: expected F181 memory|listen|return stack stdout (10 lines), got: $F181_C_OUT"
+  exit 792
+fi
+F181_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F181EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f181_py_rc=$?
+if [ "$f181_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_ast_memory_listen_return_stack exited $f181_py_rc: $F181_PY_OUT"
+  exit 793
+fi
+if [ "$F181_C_OUT" != "$F181_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_ast_memory_listen_return_stack" >&2
+  echo "C:  $F181_C_OUT" >&2
+  echo "Py: $F181_PY_OUT" >&2
+  exit 794
+fi
+
 echo "[gate] F179: C vs Python — parse_tokens listen { set … ; emit \"…\" with { k: v } }"
 F179EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_set_emit_quoted_event.azl"
 F179_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F179EX" boot.entry 2>&1)"

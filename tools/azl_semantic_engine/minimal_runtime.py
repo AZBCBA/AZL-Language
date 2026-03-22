@@ -2054,7 +2054,7 @@ class MinimalAZLRuntime:
         return pairs if (ok_parse and pairs) else None
 
     def _execute_ast_try_listen_stub(self, lrest: str) -> str | None:
-        """Parse ``evt|say|…`` / ``evt|emit|…`` / ``evt|set|…`` tail after a ``listen|`` prefix; register execute_ast stub if valid."""
+        """Parse ``evt|say|…`` / ``evt|emit|…`` / ``evt|set|…`` / ``evt|return[|…]`` tail after a ``listen|`` prefix; register execute_ast stub if valid."""
         bar = lrest.find("|")
         if bar <= 0:
             return None
@@ -2088,6 +2088,11 @@ class MinimalAZLRuntime:
                 gval = srest[sbar + 1 :]
                 if gkey.startswith("::"):
                     stub = (levn[:63], "set", gkey[:63], gval[:255])
+        elif levn and ltail.startswith("return|"):
+            lpay = ltail[7:]
+            stub = (levn[:63], "return", lpay[:255], "")
+        elif levn and ltail == "return":
+            stub = (levn[:63], "return", "", "")
         if stub is None:
             return None
         sev = stub[0]
@@ -3087,6 +3092,9 @@ class MinimalAZLRuntime:
                         elif skind == "set":
                             if sa1.startswith("::"):
                                 self.var_set(sa1, sa2[:MAX_VAR_VALUE_LEN])
+                        elif skind == "return":
+                            if sa1:
+                                print(sa1, flush=True)
                         else:
                             print(sa1, flush=True)
                         break

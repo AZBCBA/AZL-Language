@@ -1,0 +1,42 @@
+# Gate F181: `::execute_ast` — `memory|listen|…|return|payload` + `memory|listen|…|return` (bare) stubs, then `memory|emit|…` ×2 + `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p181_memory_listen_return with { ast: "f181-root", scope: "f181-sc", nodes: "import|f181_mod_tag
+say|F181_TOP
+memory|listen|f181_a|return|F181_WITH_PAY
+memory|listen|f181_b|return
+memory|emit|f181_a
+memory|emit|f181_b
+memory|say|F181_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC181_INNER"
+      say ::event.data.result
+      say "P0_SEM_F181_OK"
+    }
+    listen for "p181_memory_listen_return" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F181_VM_ON_BAD"
+        return
+      }
+      say "F181_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX181_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

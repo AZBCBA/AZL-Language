@@ -76,15 +76,16 @@ static void var_set(const char *k, const char *v);
 static int g_listener_nesting = 0;
 static int g_listener_break = 0;
 
-/* execute_ast listen|event|say|… / emit|… / set|… — stub listeners (F99–F102); cleared each execute_ast walk */
+/* execute_ast listen|event|say|… / emit|… / set|… / return […] — stub listeners (F99–F102); cleared each execute_ast walk */
 #define MAX_EXECUTE_AST_STUB_LISTENERS 8
 #define EXEC_AST_STUB_SAY 0
 #define EXEC_AST_STUB_EMIT 1
 #define EXEC_AST_STUB_SET 2
+#define EXEC_AST_STUB_RETURN 3
 typedef struct {
   char event[64];
-  int kind; /* EXEC_AST_STUB_SAY, EMIT, or SET */
-  char body[256]; /* say text, bare emit target, or set value */
+  int kind; /* EXEC_AST_STUB_SAY, EMIT, SET, or RETURN */
+  char body[256]; /* say text, bare emit target, set value, or optional return payload */
   char set_key[64]; /* ::global for SET; empty for say/emit */
   int emit_npayload; /* 0 = bare emit; else use emit_payload[0..emit_npayload) */
   PayloadKV emit_payload[MAX_PAYLOAD_KEYS];
@@ -198,6 +199,22 @@ static int exec_ast_stub_register_set(const char *ev, const char *gkey, const ch
   return 0;
 }
 
+static int exec_ast_stub_register_return(const char *ev, const char *pay) {
+  if (!ev || !ev[0]) return -1;
+  const char *b = pay ? pay : "";
+  for (int i = 0; i < g_n_exec_ast_stubs; i++)
+    if (strcmp(g_exec_ast_stubs[i].event, ev) == 0) return 0;
+  if (g_n_exec_ast_stubs >= MAX_EXECUTE_AST_STUB_LISTENERS) return -1;
+  (void)snprintf(g_exec_ast_stubs[g_n_exec_ast_stubs].event,
+                 sizeof(g_exec_ast_stubs[g_n_exec_ast_stubs].event), "%s", ev);
+  g_exec_ast_stubs[g_n_exec_ast_stubs].kind = EXEC_AST_STUB_RETURN;
+  (void)snprintf(g_exec_ast_stubs[g_n_exec_ast_stubs].body, sizeof(g_exec_ast_stubs[0].body), "%.255s", b);
+  g_exec_ast_stubs[g_n_exec_ast_stubs].set_key[0] = '\0';
+  g_exec_ast_stubs[g_n_exec_ast_stubs].emit_npayload = 0;
+  g_n_exec_ast_stubs++;
+  return 0;
+}
+
 static int exec_ast_stub_dispatch(const char *ev) {
   if (!ev || !ev[0]) return 0;
   for (int i = 0; i < g_n_exec_ast_stubs; i++) {
@@ -211,6 +228,12 @@ static int exec_ast_stub_dispatch(const char *ev) {
       process_events();
     } else if (g_exec_ast_stubs[i].kind == EXEC_AST_STUB_SET) {
       var_set(g_exec_ast_stubs[i].set_key, g_exec_ast_stubs[i].body);
+    } else if (g_exec_ast_stubs[i].kind == EXEC_AST_STUB_RETURN) {
+      if (g_exec_ast_stubs[i].body[0]) {
+        fputs(g_exec_ast_stubs[i].body, stdout);
+        fputc('\n', stdout);
+        fflush(stdout);
+      }
     } else {
       fputs(g_exec_ast_stubs[i].body, stdout);
       fputc('\n', stdout);
@@ -1463,6 +1486,11 @@ static void execute_ast_listen_line(const char *after_listen, char *result, size
     keybuf[kl] = '\0';
     const char *val = sep + 1;
     if (exec_ast_stub_register_set(evn, keybuf, val) != 0) return;
+  } else if (strncmp(q, "return|", 7U) == 0) {
+    const char *pay = q + 7;
+    if (exec_ast_stub_register_return(evn, pay) != 0) return;
+  } else if (strcmp(q, "return") == 0) {
+    if (exec_ast_stub_register_return(evn, "") != 0) return;
   } else
     return;
   (void)snprintf(result, rsz, "Listen: %.120s", evn);
