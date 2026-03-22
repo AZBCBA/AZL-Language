@@ -1,0 +1,30 @@
+# Gate F171: ::parse_tokens — listen { set ::g = V ; emit EV ; } → listen|…|set|… then listen|…|emit|… (two rows)
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f171_parse with { }
+  }
+  behavior {
+    listen for "f171_parse" {
+      set ::tokens = []
+      set ::l1 = "listen for f171 { set ::g171 = V171"
+      set ::l2 = "emit E171"
+      set ::l3 = "}"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::l1, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l2, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 2, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l3, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 3, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F171_OK"
+    }
+  }
+}

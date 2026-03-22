@@ -14,6 +14,8 @@ if ! command -v gcc >/dev/null 2>&1; then
 fi
 
 echo "Building azl-interpreter-minimal..."
-gcc -O2 -Wall -Wextra -o "$OUT_BIN" tools/azl_interpreter_minimal.c
+: "${AZL_MINIMAL_CFLAGS:=-Wformat-truncation=2 -Werror=format-truncation}"
+# shellcheck disable=SC2086
+gcc -O2 -Wall -Wextra $AZL_MINIMAL_CFLAGS -o "$OUT_BIN" tools/azl_interpreter_minimal.c
 echo "Built: $OUT_BIN"
 echo "$OUT_BIN"
