@@ -4,11 +4,11 @@
 # runs tools/azl_runtime_spine_host.py with AZL_ENTRY=azl.spine.behavior.entry, asserts the full in-file chain:
 # interpret → tokenize → parse → execute (say line) → execute_complete listener (Interpretation complete:).
 # Harness: smoke/smoke2 same code → cache hits; third–fifth multi-line embedded say depth; smoke6 literal AZL_S6_ONLY;
-# smoke7 repeats smoke6 code → second pair of (cache hit) lines on that snippet.
+# smoke7 repeats smoke6 code → second pair of (cache hit) lines on that snippet; smoke8 new literal AZL_S8_MARK.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–561).
+# See docs/ERROR_SYSTEM.md (exits 548–562).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -93,8 +93,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=7)}' "$out"; then
-  err "stdout expected >=7 \"Interpretation complete:\" lines (harness seven emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=8)}' "$out"; then
+  err "stdout expected >=8 \"Interpretation complete:\" lines (harness eight emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -122,6 +122,11 @@ if ! awk '/AZL_S6_ONLY/{n++} END{exit !(n>=2)}' "$out"; then
   err "stdout expected >=2 lines containing AZL_S6_ONLY (sixth + seventh interpret same code)"
   cat "$out" >&2 || true
   exit 561
+fi
+if ! rg -q 'AZL_S8_MARK' "$out"; then
+  err "stdout missing eighth-interpret literal say marker AZL_S8_MARK"
+  cat "$out" >&2 || true
+  exit 562
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"
