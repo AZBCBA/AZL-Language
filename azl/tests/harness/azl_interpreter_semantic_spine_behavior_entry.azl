@@ -22,6 +22,7 @@
 #   - nineteenth emit interpret — evaluated truthy global; multi-statement then-branch (two say lines, same shape as P16); AZL_SPINE_P19_A before AZL_SPINE_P19_B; AZL_SPINE_P19_BAD must not run.
 #   - twentieth emit interpret — evaluated falsey global; multi-statement otherwise-branch (two say lines); AZL_SPINE_P20_A before AZL_SPINE_P20_B; AZL_SPINE_P20_BAD must not run.
 #   - twenty-first emit interpret — `if ( ::azl_spine_p21 == 1 )` expression condition (not lone `::var`); AZL_SPINE_P21_IF; AZL_SPINE_P21_BAD must not run.
+#   - twenty-second emit interpret — `if ( ::azl_spine_p22 == 2 )` false expression path; AZL_SPINE_P22_ELSE; AZL_SPINE_P22_BAD must not run.
 
 component ::azl.spine.behavior.entry {
   init {
@@ -65,6 +66,8 @@ if ( ::azl_spine_p20 ) { say 'AZL_SPINE_P20_BAD' } otherwise { say 'AZL_SPINE_P2
 say 'AZL_SPINE_P20_B' }", component_name: "smoke20" }
     emit interpret with { code: "set ::azl_spine_p21 = 1
 if ( ::azl_spine_p21 == 1 ) { say 'AZL_SPINE_P21_IF' } otherwise { say 'AZL_SPINE_P21_BAD' }", component_name: "smoke21" }
+    emit interpret with { code: "set ::azl_spine_p22 = 1
+if ( ::azl_spine_p22 == 2 ) { say 'AZL_SPINE_P22_BAD' } otherwise { say 'AZL_SPINE_P22_ELSE' }", component_name: "smoke22" }
     say "AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT"
   }
 }

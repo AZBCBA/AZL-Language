@@ -17,10 +17,11 @@
 # smoke19 evaluated truthy then-branch: two say lines in then-block; P19_A before P19_B; P19_BAD must not appear.
 # smoke20 evaluated falsey otherwise-branch: two say lines in otherwise-block; P20_A before P20_B; P20_BAD must not appear.
 # smoke21 if ( ::azl_spine_p21 == 1 ) expression condition; P21_IF only; P21_BAD must not appear.
+# smoke22 if ( ::azl_spine_p22 == 2 ) false expression path; P22_ELSE only; P22_BAD must not appear.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–650).
+# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–652).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -107,8 +108,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=21)}' "$out"; then
-  err "stdout expected >=21 \"Interpretation complete:\" lines (harness twenty-one emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=22)}' "$out"; then
+  err "stdout expected >=22 \"Interpretation complete:\" lines (harness twenty-two emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -278,6 +279,16 @@ if rg -q 'AZL_SPINE_P21_BAD' "$out"; then
   err "stdout must not contain twenty-first-interpret otherwise marker AZL_SPINE_P21_BAD"
   cat "$out" >&2 || true
   exit 650
+fi
+if rg -q 'AZL_SPINE_P22_BAD' "$out"; then
+  err "stdout must not contain twenty-second-interpret skipped then-body marker AZL_SPINE_P22_BAD (::azl_spine_p22 == 2 is false)"
+  cat "$out" >&2 || true
+  exit 651
+fi
+if ! rg -q 'AZL_SPINE_P22_ELSE' "$out"; then
+  err "stdout missing twenty-second-interpret otherwise marker AZL_SPINE_P22_ELSE (expression false path on real file path)"
+  cat "$out" >&2 || true
+  exit 652
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"
