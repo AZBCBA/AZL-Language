@@ -1,22 +1,14 @@
 #!/usr/bin/env python3
 """
-Semantic runtime spine host: runs the Python AZL subset engine (parity with
-tools/azl_interpreter_minimal.c) on AZL_COMBINED_PATH + AZL_ENTRY.
+Load combined AZL (AZL_COMBINED_PATH + AZL_ENTRY) and run the Python minimal spine engine.
 
-Full AZL-in-AZL self-host (azl/runtime/interpreter/azl_interpreter.azl as source)
-remains a widening track; this host is the production integration point for
-native mode when AZL_RUNTIME_SPINE=azl_interpreter|semantic.
+Interpreter meaning is in ``azl/runtime/interpreter/azl_interpreter.azl``; this process only boots that text
+through ``azl_semantic_engine.minimal_runtime`` (C parity via ``tools/azl_interpreter_minimal.c``). It does not
+define interpreter semantics — only host I/O and the bootstrap bridge.
 
-P0 widening: `azl/tests/p0_semantic_interpreter_slice.azl` is parity-gated vs C
-(gate F3 in check_azl_native_gates.sh). Run: `bash scripts/run_semantic_interpreter_slice.sh`.
-
-P0.1b (release): `scripts/verify_azl_interpreter_semantic_spine_smoke.sh` concatenates
-`azl/tests/stubs/azl_security_for_interpreter_spine.azl` + `azl/runtime/interpreter/azl_interpreter.azl`,
-sets AZL_COMBINED_PATH and AZL_ENTRY=azl.interpreter, and asserts clean `init` (see docs/ERROR_SYSTEM.md).
-
-P0.1c (release): `scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh` adds
-`azl/tests/harness/azl_interpreter_semantic_spine_behavior_entry.azl`, uses AZL_ENTRY=azl.spine.behavior.entry,
-and asserts nine interpret passes + execute_complete + >=4 in-file (cache hit) lines (two duplicate-code pairs) + multi-line embedded say depth + duplicate AZL_S6_ONLY + AZL_S8_MARK literal pass + set+say P9 marker (ERROR_SYSTEM.md exits 548–562, 611).
+Smoke: ``scripts/verify_azl_interpreter_semantic_spine_smoke.sh`` (init); ``…_behavior_smoke.sh`` (deeper interpret
+harness). Interpreter slice gate: ``azl/tests/p0_semantic_interpreter_slice.azl`` (F3). Gate G2: ``--semantic-owner``
+prints which engine runs the spine (must stay Python minimal for Tier B contract).
 
 Exit codes:
   71 — ERR_AZL_COMBINED_PATH_INVALID
@@ -25,11 +17,6 @@ Exit codes:
   74 — ERR_USAGE (unknown CLI arguments)
   2–4 — engine I/O / tokenize (see azl_semantic_engine.minimal_runtime)
   5 — expression / if parse error (minimal contract)
-
-CLI:
-  --semantic-owner — print one stdout line ``AZL_SEMANTIC_OWNER=minimal_runtime_python`` and exit 0.
-    Used by ``scripts/verify_semantic_spine_owner_contract.sh`` (native gate G2). Tier B P0.1: the
-    semantic spine must not silently become C minimal as execution owner.
 """
 
 from __future__ import annotations

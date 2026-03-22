@@ -1,15 +1,14 @@
 /*
- * AZL Minimal C Interpreter - Phase 1 Skeleton
- * Proof-of-concept: parses and executes a tiny AZL subset.
- * Extensible foundation for full C-based AZL execution.
+ * Minimal C spine runtime: bootstrap + native parity vs tools/azl_semantic_engine/minimal_runtime.py.
+ *
+ * Interpreter semantics are owned by azl/runtime/interpreter/azl_interpreter.azl; this file implements the
+ * shared contract for gates and CLI — not an alternate semantic source.
  *
  * Usage: azl_interpreter_minimal <file.azl> [entry_component]
  * Env: AZL_COMBINED_PATH, AZL_ENTRY
  *
- * emit ... with { k: v } binds ::event.data.<k> per queued event (see azl/tests/p0_semantic_*.azl, gates F10-F122).
- * Expression if-conditions: or, && (short-circuit; each && arm is ==/!=/sum; truth is true/1 only), ==, !=, +, -, :: paths.
- * for-in inside if { } is allowed when g_listener_nesting > 0 (listener context); still forbidden in component init { }.
- * return exits the current listener body (including from inside if { }); return in init skips rest of init.
+ * emit ... with { k: v } binds ::event.data.<k> (fixtures azl/tests/p0_semantic_*.azl, F10+).
+ * Expressions: or, && (short-circuit), ==, !=, +, -, :: paths; for-in inside if in listeners only; return as above.
  */
 
 #define _GNU_SOURCE
@@ -872,7 +871,7 @@ static int eval_or(int *i, char *out, size_t outsz) {
   return 0;
 }
 
-/* After a primary value, consume optional `.toInt()` calls (AZL interpreter init). */
+/* After a primary, optional `.toInt()` chain (spine expression contract; see azl_interpreter.azl env reads). */
 static int apply_to_int_suffixes(int *i, char *out, size_t outsz, int *nullish) {
   while (*i + 2 < g_ntok && strcmp(g_tok[*i], ".") == 0 && strcmp(g_tok[*i + 1], "toInt") == 0 &&
          strcmp(g_tok[*i + 2], "(") == 0) {
@@ -1234,7 +1233,7 @@ static int lhs_is_var_push_call(const char *k, char *base_out, size_t base_sz) {
   return bl >= 3U ? 1 : 0;
 }
 
-/* Spine builtins: ::vm_compile_ast(::ast) sets ::vc.ok / ::vc.error / ::vc.bytecode (mirrors azl_interpreter.azl execute VM branch). */
+/* Spine stub: ::vm_compile_ast → ::vc.* fields (fixture shapes from azl_interpreter.azl VM branch). */
 static void builtin_vm_compile_ast_apply(const char *ast_in) {
   var_set("::vc.ok", "false");
   var_set("::vc.error", "");
@@ -1479,7 +1478,7 @@ static void execute_ast_listen_line(const char *after_listen, char *result, size
   (void)snprintf(result, rsz, "Listen: %.120s", evn);
 }
 
-/* execute_ast fn|name|say|payload — register one-line user function body (interpreter on/call slice). */
+/* execute_ast pipe fn|name|say|… — encoding for top-level ``on`` in azl_interpreter.azl (host walk only). */
 static void execute_ast_fn_line(const char *after_fn, char *result, size_t rsz) {
   const char *p = after_fn ? after_fn : "";
   const char *p1 = strchr(p, '|');

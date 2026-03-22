@@ -1,22 +1,11 @@
 """
-Faithful port of tools/azl_interpreter_minimal.c token stream + execution semantics.
-Single source of behavioral truth: keep in sync with C when changing the minimal contract.
+Spine bootstrap engine (Python), kept in lockstep with ``tools/azl_interpreter_minimal.c`` for native F-gates.
 
-Nested ``listen`` may run inside ``init`` / listener bodies; ``emit`` inside ``exec_block``
-drains the event queue (``process_events``) so chained handlers match the interpret→tokenize shape.
-Each queued event may carry a ``with { … }`` payload bound as ``::event.data.<key>`` for that dispatch
-(F10–F99 parity fixtures under ``azl/tests/p0_semantic_*.azl``).
-``&&`` chains ``==``/``!=``/sum primaries with short-circuit (truth for ``&&`` continuation: ``true`` / ``1`` only).
-``for-in`` inside ``if`` then-branch is allowed when already in a listener (``_listener_nesting > 0``), not in component ``init``.
-``return`` at listener depth exits the
-current listener body (including from inside ``if { … }``); ``return`` in top-level ``init`` skips the rest of ``init``.
-``set ::dst = ::src.split("delim")`` stores split segments joined by newlines; ``for ::v in ::dst { … }`` (listener
-bodies only) iterates those segments — matches the ``::code.split("\\n")`` + line loop shape in ``azl_interpreter.azl``.
-``::var.length`` in expressions yields the string length as a decimal string (unset base → ``0``).
-``set ::dst = ::src.split_chars()`` stores Unicode code points of ``::src`` joined by newlines (``for ::c in ::dst`` matches ``for ::char in ::line_text`` in ``azl_interpreter.azl``).
-``set ::buf.push("literal")`` / ``::var`` / ``{ type: "…", value: "…" | ::var, line: N | ::var, column: M | ::var }`` appends one newline-delimited segment (object rows serialize as ``tz|…|…|…|…`` with ``\\|`` / ``\\\\`` escapes). ``set ::acc = ::lhs.concat(::rhs)`` joins two buffers with newline (``[]`` / empty same as ``for ::row in``). ``Var.v`` stores up to ``MAX_VAR_VALUE_LEN`` bytes (tz concat; wider than the 255-byte ``execute_ast`` pipe-row cap).
-Double-quoted ``say "…"`` expands ``::dotted.path`` and ``::dotted.path.length`` (same ``.length`` rule as expressions: byte length of stored value; unset → ``0``). Single-quoted ``say '…'`` stays literal.
-Binary ``-`` in expressions is supported only when both operands are canonical base-10 integers (``::column - ::name.length`` tokenize-line shape); otherwise use ``+`` string/int rules.
+Interpreter-shaped semantics live in ``azl/runtime/interpreter/azl_interpreter.azl``. This module hosts builtins and
+pipe encodings so combined AZL runs under ``tools/azl_runtime_spine_host.py`` — it must **implement** that contract
+and stay C-parity, not define divergent meaning. Rules for listeners, ``emit``/queue drain, ``if``/``&&``/``for-in``,
+tokenize/parse builtins, and ``execute_ast`` row shapes: align with the AZL file and C; regressions live under
+``azl/tests/p0_semantic_*.azl``.
 """
 
 from __future__ import annotations
@@ -37,7 +26,7 @@ MAX_VAR_VALUE_LEN = 2047
 # azl_interpreter.azl serialized token/ast buffers on spine (cache round-trips, concat); not C-minimal parity surface.
 INTERP_BLOB_VAR_MAX = 65536
 
-# Bare identifiers in set/if (interpreter-shaped; see azl_interpreter.azl tokenize/parse).
+# Bare identifier RHS in ``set`` (contract from azl_interpreter.azl; see exec_set).
 _BARE_ID_FORBIDDEN = frozenset(
     {
         "if",
@@ -178,7 +167,7 @@ class MinimalAZLRuntime:
     _execute_ast_listen_stubs: list[tuple[str, str, str, str]] = field(
         default_factory=list, repr=False
     )  # (event, "say"|"emit"|"set", arg1, arg2)
-    # Interpreter spine (azl_interpreter.azl): flat cache maps; aggregate literals are "{}" in minimal.
+    # Host backing for ::perf.* maps from azl_interpreter.azl (literal "{}" aggregates on spine).
     _perf_tok_cache: dict[str, str] = field(default_factory=dict, repr=False)
     _perf_ast_cache: dict[str, str] = field(default_factory=dict, repr=False)
 
@@ -775,7 +764,7 @@ class MinimalAZLRuntime:
         return "\n".join(out_lines)
 
     def _parse_tokens_nodes_from_buffer(self, buf: str) -> str:
-        """Map ``tz|…`` token rows to ``::ast.nodes`` lines for ``execute_ast`` (spine parse slice)."""
+        """Serialize tz buffer → ``::ast.nodes`` pipe text for bootstrap ``::execute_ast`` (contract vs C + AZL parse)."""
         pairs = self._parse_tz_buffer_pairs(buf)
         out_lines: list[str] = []
         i = 0
@@ -1830,7 +1819,7 @@ class MinimalAZLRuntime:
         return "Listen: " + levn[:120]
 
     def _execute_spine_component_v1(self, ast_base: str) -> str:
-        """Run structured component slice: behavior (one ``register_listener`` per ``listen`` with a flat synthetic token stream for the whole body: ``say`` / ``set`` / ``emit``), then ``init``, ``memory`` — same phase order as ``execute_component`` / ``execute_listen`` in ``azl_interpreter.azl``."""
+        """Bootstrap walk of ``spine_component_v1`` rows; phase order is fixed by azl_interpreter.azl ``execute_component`` (host must not reorder)."""
         self._execute_ast_listen_stubs.clear()
         spine = self.var_get(ast_base + ".spine") or ""
         lines_raw = spine.split("\n")
@@ -1963,7 +1952,7 @@ class MinimalAZLRuntime:
         return out
 
     def _builtin_execute_ast_result(self, ast_base: str) -> str:
-        """Walk ``<ast_base>.nodes``: preloop ``import|`` / ``link|`` (F98, F112–F114, F118, F120, F121, F122); main ``component|`` / ``memory|set|…`` / ``memory|say|…`` / ``memory|emit|…`` / ``memory|listen|…`` (F104–F148) / ``listen|…|…`` (F99–F103); ``say|`` (F93); ``emit|`` / ``emit|ev|with|…`` (F94–F97); ``set|::k|v`` (F95)."""
+        """Bootstrap walk of serialized ``::ast.nodes`` (same pipe contract as azl_interpreter.azl ``execute_ast``). F-gate indices: preloop import|/link| (F98, F112–F122); memory/listen/say/emit/set rows (F93–F148)."""
         em = (self.var_get(ast_base + ".exec_model") or "").strip()
         if em == "spine_component_v1":
             return self._execute_spine_component_v1(ast_base)[:255]
@@ -2010,6 +1999,7 @@ class MinimalAZLRuntime:
                     post = rest[wi + len(w) :]
                     pairs = self._parse_execute_ast_with_tail(post)
                     if evn and pairs:
+                        # Harness-only line; payload dispatch semantics live in azl_interpreter.azl ::emit_event_resolved.
                         if os.environ.get("AZL_SPINE_BEHAVIOR_SMOKE_PAYLOAD_MARK") == "1":
                             print("AZL_EMIT_WITH_PAYLOAD", flush=True)
                         self.queue_push(evn[:63], pairs)
@@ -2059,6 +2049,7 @@ class MinimalAZLRuntime:
                         post = rest[wi + len(w) :]
                         pairs = self._parse_execute_ast_with_tail(post)
                         if evn and pairs:
+                            # Harness-only; see top-level emit|with| branch.
                             if os.environ.get("AZL_SPINE_BEHAVIOR_SMOKE_PAYLOAD_MARK") == "1":
                                 print("AZL_EMIT_WITH_PAYLOAD", flush=True)
                             self.queue_push(evn[:63], pairs)
@@ -2428,8 +2419,7 @@ class MinimalAZLRuntime:
             and not v.startswith("::")
             and v not in ("true", "false", "null")
         ):
-            # Bare RHS is a global reference (::name) when that var exists (interpreter-shaped
-            # `set ::tokens = cached_tok`); otherwise keep legacy literal-string behavior.
+            # Per azl_interpreter.azl: bare RHS is existing ``::name`` if bound (e.g. cache-hit token path); else literal.
             gk = "::" + v
             for bx in self.vars:
                 if bx.k == gk:
