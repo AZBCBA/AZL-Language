@@ -1,0 +1,32 @@
+# Gate F169: spine_component_v1 — behavior listen body with say + set + emit (one synthetic
+# token stream), then init/memory. Not pipe-row ::ast.nodes for this slice.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f169_spine with { }
+  }
+  behavior {
+    listen for "f169_spine" {
+      set ::tokens = []
+      set ::tx = "component ::Spine169 { behavior { listen for \"E169\" { say 'F169_S' set ::lb169 = mark emit F169_X } } init { say 'F169_I' emit E169 } memory { say 'F169_M' say ::lb169 } }"
+      set ::ln = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::tx, ::ln))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F169_VM_ON_BAD"
+        return
+      }
+      set ::scope = "spine_scope"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::result
+      say "P0_SEM_F169_OK"
+    }
+  }
+}

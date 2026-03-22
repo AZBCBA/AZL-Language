@@ -525,7 +525,11 @@ class MinimalAZLRuntime:
     def _try_parse_component_spine_v1_from_pairs(
         self, pairs: list[tuple[str, str]]
     ) -> str | None:
-        """If ``pairs`` is exactly the supported component slice, return tab-separated spine text."""
+        """If ``pairs`` is exactly the supported component slice, return tab-separated spine text.
+
+        Structured execution slice (not full AST): one ``listen`` whose body is one or more
+        ``say`` / ``set`` / ``emit`` statements, plus ``init`` and ``memory`` as before.
+        """
         n = len(pairs)
 
         def skip_e(i: int) -> int:
@@ -559,7 +563,7 @@ class MinimalAZLRuntime:
         i_start, i_close = ini
         m_start, m_close = mem
 
-        # behavior: listen for <ev> { say <string> }
+        # behavior: listen for <ev> { one or more of say / set / emit }
         j = skip_e(b_start)
         if j >= b_close or pairs[j] != ("identifier", "listen"):
             return None
@@ -584,15 +588,52 @@ class MinimalAZLRuntime:
         l_close = self._pair_brace_close_index(pairs, lb)
         if l_close is None:
             return None
+        bh_lines: list[str] = []
         j = skip_e(lb + 1)
-        if j >= l_close or pairs[j] != ("identifier", "say"):
+        while j < l_close:
+            if pairs[j] == ("identifier", "say"):
+                j = skip_e(j + 1)
+                if j >= l_close or pairs[j][0] != "string":
+                    return None
+                bh_say_tok = self._quote_azl_single_from_inner(pairs[j][1][:200])
+                bh_lines.append("bh\tlisten\t" + evn + "\tsay\t" + bh_say_tok)
+                j = skip_e(j + 1)
+                continue
+            if pairs[j] == ("identifier", "set"):
+                j = skip_e(j + 1)
+                if j >= l_close or pairs[j][0] != "identifier":
+                    return None
+                vk = pairs[j][1][:80]
+                if not vk.startswith("::"):
+                    return None
+                j = skip_e(j + 1)
+                if j >= l_close or pairs[j] != ("operator", "="):
+                    return None
+                j = skip_e(j + 1)
+                if j >= l_close or pairs[j][0] != "identifier":
+                    return None
+                val = pairs[j][1][:120]
+                if "|" in val or "\t" in val:
+                    return None
+                bh_lines.append("bh\tlisten\t" + evn + "\tset\t" + vk + "\t" + val)
+                j = skip_e(j + 1)
+                continue
+            if pairs[j] == ("identifier", "emit"):
+                j = skip_e(j + 1)
+                if j >= l_close or pairs[j][0] != "identifier":
+                    return None
+                eev = pairs[j][1][:63]
+                if "|" in eev or "\t" in eev:
+                    return None
+                bh_lines.append("bh\tlisten\t" + evn + "\temit\t" + eev)
+                j = skip_e(j + 1)
+                continue
             return None
-        j = skip_e(j + 1)
-        if j >= l_close or pairs[j][0] != "string":
-            return None
-        bh_say_tok = self._quote_azl_single_from_inner(pairs[j][1][:200])
-        j = skip_e(j + 1)
+        while j < l_close and pairs[j][0] == "eol":
+            j = skip_e(j + 1)
         if j != l_close:
+            return None
+        if not bh_lines:
             return None
         j = skip_e(l_close + 1)
         while j < b_close and pairs[j][0] == "eol":
@@ -633,13 +674,21 @@ class MinimalAZLRuntime:
         while j < m_close:
             if pairs[j] == ("identifier", "say"):
                 j = skip_e(j + 1)
-                if j >= m_close or pairs[j][0] != "string":
+                if j >= m_close:
                     return None
-                mem_lines.append(
-                    "mem\tsay\t" + self._quote_azl_single_from_inner(pairs[j][1][:200])
-                )
-                j = skip_e(j + 1)
-                continue
+                st, sv = pairs[j]
+                if st == "string":
+                    mem_lines.append(
+                        "mem\tsay\t"
+                        + self._quote_azl_single_from_inner(sv[:200])
+                    )
+                    j = skip_e(j + 1)
+                    continue
+                if st == "identifier" and sv.startswith("::"):
+                    mem_lines.append("mem\tsay\t" + sv[:80])
+                    j = skip_e(j + 1)
+                    continue
+                return None
             if pairs[j] == ("identifier", "set"):
                 j = skip_e(j + 1)
                 if j >= m_close or pairs[j][0] != "identifier":
@@ -668,7 +717,7 @@ class MinimalAZLRuntime:
         out_lines = [
             "spine_component_v1",
             "comp\t" + comp_name,
-            "bh\tlisten\t" + evn + "\tsay\t" + bh_say_tok,
+            *bh_lines,
             *init_lines,
             *mem_lines,
         ]
@@ -1677,7 +1726,7 @@ class MinimalAZLRuntime:
         return "Listen: " + levn[:120]
 
     def _execute_spine_component_v1(self, ast_base: str) -> str:
-        """Run structured component slice: behavior (``register_listener`` + synthetic body), ``init``, ``memory`` — same phase order as ``execute_component`` / ``execute_listen`` in ``azl_interpreter.azl``."""
+        """Run structured component slice: behavior (one ``register_listener`` per ``listen`` with a flat synthetic token stream for the whole body: ``say`` / ``set`` / ``emit``), then ``init``, ``memory`` — same phase order as ``execute_component`` / ``execute_listen`` in ``azl_interpreter.azl``."""
         self._execute_ast_listen_stubs.clear()
         spine = self.var_get(ast_base + ".spine") or ""
         lines_raw = spine.split("\n")
@@ -1722,15 +1771,40 @@ class MinimalAZLRuntime:
         out = "Execution completed"
         if (self.var_get("::halted") or "") == "true":
             return "Execution halted due to error"
+        bh_toks: list[str] = []
+        cur_ev: str | None = None
         for parts in bh:
-            if len(parts) < 5 or parts[1] != "listen" or parts[3] != "say":
+            if len(parts) < 5 or parts[1] != "listen":
                 return "execute_spine_bad_behavior"
             ev = parts[2][:63]
-            msg_tok = parts[4][:220]
-            self.register_listener(
-                ev, 0, 0, synthetic_toks=["say", msg_tok]
-            )
+            op = parts[3]
+            if cur_ev is None:
+                cur_ev = ev
+            elif ev != cur_ev:
+                return "execute_spine_bad_behavior"
+            if op == "say":
+                if len(parts) < 5:
+                    return "execute_spine_bad_behavior"
+                bh_toks.extend(["say", parts[4][:220]])
+            elif op == "set":
+                if len(parts) < 6:
+                    return "execute_spine_bad_behavior"
+                vk = parts[4][:80]
+                vv = parts[5][:MAX_VAR_VALUE_LEN]
+                if not vk.startswith("::"):
+                    return "execute_spine_bad_behavior"
+                bh_toks.extend(["set", vk, "=", vv])
+            elif op == "emit":
+                if len(parts) < 5:
+                    return "execute_spine_bad_behavior"
+                bh_toks.extend(["emit", parts[4][:63]])
+            else:
+                return "execute_spine_bad_behavior"
             out = "Listen: " + ev[:120]
+        if cur_ev is not None and bh_toks:
+            self.register_listener(
+                cur_ev, 0, 0, synthetic_toks=bh_toks
+            )
         for parts in ini:
             if (self.var_get("::halted") or "") == "true":
                 return "Execution halted due to error"
@@ -2209,6 +2283,16 @@ class MinimalAZLRuntime:
             _ = a2
             outv = self._builtin_execute_ast_result(a1)
             self.var_set(k, outv[:MAX_VAR_VALUE_LEN])
+            return
+        if (
+            v
+            and (v[0].isalpha() or v[0] == "_")
+            and all(ch.isalnum() or ch == "_" for ch in v)
+            and not v.startswith("::")
+            and v not in ("true", "false", "null")
+        ):
+            self.var_set(k, v[:MAX_VAR_VALUE_LEN])
+            i[0] += 1
             return
         val = self.eval_expr(i)
         self.var_set(k, val)
