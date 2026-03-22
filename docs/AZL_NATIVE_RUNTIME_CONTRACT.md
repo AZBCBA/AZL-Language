@@ -4,6 +4,8 @@ This document defines the hard direction for AZL as an independent language runt
 
 **Spine decision (current vs target, P0–P5):** [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md) — read this first so you do not confuse **today’s default runtime child** (C minimal on the combined file) with the **decided semantic core** (AZL interpreter).
 
+**Target architecture:** **C orchestrates; AZL interprets.** **`azl/runtime/interpreter/azl_interpreter.azl`** is the **intended semantic owner** (what AZL means at full depth). **`tools/azl_semantic_engine/minimal_runtime.py`** and **`tools/azl_interpreter_minimal.c`** are **temporary** **bootstrap**, **parity**, and **contract** carriers on a **narrow** subset — not the long-term spec of the language. **Honest gap:** the **default / canonical** native path still does **not** run that interpreter file as the semantic engine; see [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md) **Current state vs target state**.
+
 ## Primary entry (clone → verify → run — operational truth)
 
 After **git clone** of this repository:
@@ -45,14 +47,14 @@ AZL must converge to a standalone language stack for end users:
 
 Canonical **native enterprise** startup (`scripts/start_azl_native_mode.sh` → `run_enterprise_daemon.sh`) sets `AZL_NATIVE_RUNTIME_CMD` when unset using **`scripts/azl_resolve_native_runtime_cmd.sh`**, which reads **`AZL_RUNTIME_SPINE`**:
 
-| `AZL_RUNTIME_SPINE` | Default `AZL_NATIVE_RUNTIME_CMD` | Semantic owner |
-|---------------------|----------------------------------|----------------|
-| unset or `c_minimal` | `bash scripts/azl_c_interpreter_runtime.sh` | **C minimal** (`tools/azl_interpreter_minimal.c`) on the combined bundle |
-| `azl_interpreter` or `semantic` | `bash scripts/azl_azl_interpreter_runtime.sh` | **`tools/azl_runtime_spine_host.py`** → **`tools/azl_semantic_engine/`** — Python executor with **subset parity** to C minimal (not yet `azl_interpreter.azl` self-host) |
+| `AZL_RUNTIME_SPINE` | Default `AZL_NATIVE_RUNTIME_CMD` | What runs (today) | Intended semantic owner |
+|---------------------|----------------------------------|-------------------|-------------------------|
+| unset or `c_minimal` | `bash scripts/azl_c_interpreter_runtime.sh` | **C minimal** on the combined bundle | **`azl_interpreter.azl`** (not on this path yet) |
+| `azl_interpreter` or `semantic` | `bash scripts/azl_azl_interpreter_runtime.sh` | **`tools/azl_runtime_spine_host.py`** → **`minimal_runtime.py`** **host** running combined `.azl` (including **`azl_interpreter.azl`** when present in the bundle) | **`azl_interpreter.azl`** — Python is the **carrier**, not the definition of AZL |
 
 The **C minimal** path **does not** load or execute `azl/runtime/interpreter/azl_interpreter.azl`, so it **never consults** `AZL_USE_VM`.
 
-The **semantic** path runs the **Python minimal-parity** engine on `AZL_COMBINED_PATH` (same contract surface as C minimal). **Full** AZL-in-AZL semantics via `azl_interpreter.azl` remain a **widening** track (see **`docs/PROJECT_COMPLETION_ROADMAP.md`**). Operators can set **`AZL_NATIVE_RUNTIME_CMD`** explicitly to override both defaults.
+The **semantic** path uses a **Python host** to execute the **AZL sources** on `AZL_COMBINED_PATH`; **`minimal_runtime`** remains a **bootstrap / parity** implementation surface, not the long-term semantic authority. **Default enterprise** behavior is still **not** “C orchestrates → child runs **`azl_interpreter.azl`** only” — see [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md). Operators can set **`AZL_NATIVE_RUNTIME_CMD`** explicitly to override both defaults.
 
 `AZL_USE_VM` matters when execution reaches **`::azl.interpreter`**’s **`execute`** handler (pure-AZL bootstrap, self-hosted paths, tests, or any future runtime that runs the AZL interpreter instead of the C skeleton).
 
