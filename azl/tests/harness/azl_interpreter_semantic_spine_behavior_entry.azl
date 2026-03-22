@@ -43,6 +43,8 @@
 #   - fortieth emit interpret — mixed `== 5` / `== 6` / `::azl_spine_p40_flag` / `== 5` again; P40_A then B then C then D; BAD1–BAD4 must not run.
 #   - forty-first emit interpret — otherwise OUTER then set `::azl_spine_p41_n = 7` then inner `== 7`; P41_OUTER then P41_INNER; BAD1/BAD2 must not run.
 #   - forty-second emit interpret — plain then, `::azl_spine_p42_n == 8` false → B, set false then multi-statement otherwise C/D; P42_A then B then C then D; BAD1–BAD3 must not run.
+#   - forty-third emit interpret — triple sequential `==` after `set` mutation each time; P43_A then P43_B then P43_C; BAD1–BAD3 must not run.
+#   - forty-fourth emit interpret — outer otherwise L1, inner otherwise L2, inner-inner then L3; P44_L1 then L2 then L3; BAD1–BAD3 must not run.
 
 component ::azl.spine.behavior.entry {
   init {
@@ -200,6 +202,20 @@ if ( ::azl_spine_p42_n == 8 ) { say 'AZL_SPINE_P42_BAD2' } otherwise { say 'AZL_
 set ::azl_spine_p42 = false
 if ( ::azl_spine_p42 ) { say 'AZL_SPINE_P42_BAD3' } otherwise { say 'AZL_SPINE_P42_C'
 say 'AZL_SPINE_P42_D' }", component_name: "smoke42" }
+    emit interpret with { code: "set ::azl_spine_p43 = 10
+if ( ::azl_spine_p43 == 10 ) { say 'AZL_SPINE_P43_A' } otherwise { say 'AZL_SPINE_P43_BAD1' }
+set ::azl_spine_p43 = 11
+if ( ::azl_spine_p43 == 10 ) { say 'AZL_SPINE_P43_BAD2' } otherwise { say 'AZL_SPINE_P43_B' }
+set ::azl_spine_p43 = 12
+if ( ::azl_spine_p43 == 12 ) { say 'AZL_SPINE_P43_C' } otherwise { say 'AZL_SPINE_P43_BAD3' }", component_name: "smoke43" }
+    emit interpret with { code: "set ::azl_spine_p44 = false
+if ( ::azl_spine_p44 ) { say 'AZL_SPINE_P44_BAD1' } otherwise {
+say 'AZL_SPINE_P44_L1'
+if ( false ) { say 'AZL_SPINE_P44_BAD2' } otherwise {
+say 'AZL_SPINE_P44_L2'
+if ( true ) { say 'AZL_SPINE_P44_L3' } otherwise { say 'AZL_SPINE_P44_BAD3' }
+}
+}", component_name: "smoke44" }
     say "AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT"
   }
 }

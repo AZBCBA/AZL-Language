@@ -38,10 +38,12 @@
 # smoke40 long mix ==5/==6/flag/==5 again; P40_A..D order; BAD1–BAD4 must not appear.
 # smoke41 otherwise OUTER then set ::azl_spine_p41_n then inner ==7; P41_OUTER then P41_INNER; BAD1/BAD2 must not appear.
 # smoke42 plain branch, expression false → B, set false then multi-statement otherwise C/D; P42_A..D order; BAD1–BAD3 must not appear.
+# smoke43 triple sequential == with set mutation between; P43_A then P43_B then P43_C; BAD1–BAD3 must not appear.
+# smoke44 outer false L1, nested otherwise L2, inner then L3; P44_L1 then L2 then L3; BAD1–BAD3 must not appear.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–713).
+# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–719).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -128,8 +130,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=42)}' "$out"; then
-  err "stdout expected >=42 \"Interpretation complete:\" lines (harness forty-two emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=44)}' "$out"; then
+  err "stdout expected >=44 \"Interpretation complete:\" lines (harness forty-four emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -709,6 +711,46 @@ if ! awk '
   err "stdout expected AZL_SPINE_P42_A then B then C then D (final multi-statement otherwise)"
   cat "$out" >&2 || true
   exit 713
+fi
+if rg -q 'AZL_SPINE_P43_BAD1' "$out" || rg -q 'AZL_SPINE_P43_BAD2' "$out" || rg -q 'AZL_SPINE_P43_BAD3' "$out"; then
+  err "stdout must not contain AZL_SPINE_P43_BAD1, AZL_SPINE_P43_BAD2, or AZL_SPINE_P43_BAD3 (triple expression after mutation)"
+  cat "$out" >&2 || true
+  exit 714
+fi
+if ! rg -q 'AZL_SPINE_P43_A' "$out" || ! rg -q 'AZL_SPINE_P43_B' "$out" || ! rg -q 'AZL_SPINE_P43_C' "$out"; then
+  err "stdout missing forty-third-interpret markers AZL_SPINE_P43_A / B / C"
+  cat "$out" >&2 || true
+  exit 715
+fi
+if ! awk '
+  /AZL_SPINE_P43_A/ && !a { a = NR }
+  /AZL_SPINE_P43_B/ && !b { b = NR }
+  /AZL_SPINE_P43_C/ && !c { c = NR }
+  END { exit !(a && b && c && a < b && b < c) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P43_A then P43_B then P43_C (sequential == after each set)"
+  cat "$out" >&2 || true
+  exit 716
+fi
+if rg -q 'AZL_SPINE_P44_BAD1' "$out" || rg -q 'AZL_SPINE_P44_BAD2' "$out" || rg -q 'AZL_SPINE_P44_BAD3' "$out"; then
+  err "stdout must not contain AZL_SPINE_P44_BAD1, AZL_SPINE_P44_BAD2, or AZL_SPINE_P44_BAD3 (nested outer false inner false inner-inner true)"
+  cat "$out" >&2 || true
+  exit 717
+fi
+if ! rg -q 'AZL_SPINE_P44_L1' "$out" || ! rg -q 'AZL_SPINE_P44_L2' "$out" || ! rg -q 'AZL_SPINE_P44_L3' "$out"; then
+  err "stdout missing forty-fourth-interpret markers AZL_SPINE_P44_L1 / L2 / L3"
+  cat "$out" >&2 || true
+  exit 718
+fi
+if ! awk '
+  /AZL_SPINE_P44_L1/ && !a { a = NR }
+  /AZL_SPINE_P44_L2/ && !b { b = NR }
+  /AZL_SPINE_P44_L3/ && !c { c = NR }
+  END { exit !(a && b && c && a < b && b < c) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P44_L1 then L2 then L3 (outer otherwise → nested otherwise → inner then)"
+  cat "$out" >&2 || true
+  exit 719
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"
