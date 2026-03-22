@@ -14,7 +14,7 @@ current listener body (including from inside ``if { … }``); ``return`` in top-
 bodies only) iterates those segments — matches the ``::code.split("\\n")`` + line loop shape in ``azl_interpreter.azl``.
 ``::var.length`` in expressions yields the string length as a decimal string (unset base → ``0``).
 ``set ::dst = ::src.split_chars()`` stores Unicode code points of ``::src`` joined by newlines (``for ::c in ::dst`` matches ``for ::char in ::line_text`` in ``azl_interpreter.azl``).
-``set ::buf.push("literal")`` / ``::var`` / ``{ type: "…", value: "…" | ::var, line: N | ::var, column: M | ::var }`` appends one newline-delimited segment (object rows serialize as ``tz|…|…|…|…`` with ``\\|`` / ``\\\\`` escapes). ``set ::acc = ::lhs.concat(::rhs)`` joins two buffers with newline (``[]`` / empty same as ``for ::row in``).
+``set ::buf.push("literal")`` / ``::var`` / ``{ type: "…", value: "…" | ::var, line: N | ::var, column: M | ::var }`` appends one newline-delimited segment (object rows serialize as ``tz|…|…|…|…`` with ``\\|`` / ``\\\\`` escapes). ``set ::acc = ::lhs.concat(::rhs)`` joins two buffers with newline (``[]`` / empty same as ``for ::row in``). ``Var.v`` stores up to ``MAX_VAR_VALUE_LEN`` bytes (tz concat; wider than the 255-byte ``execute_ast`` pipe-row cap).
 Double-quoted ``say "…"`` expands ``::dotted.path`` and ``::dotted.path.length`` (same ``.length`` rule as expressions: byte length of stored value; unset → ``0``). Single-quoted ``say '…'`` stays literal.
 Binary ``-`` in expressions is supported only when both operands are canonical base-10 integers (``::column - ::name.length`` tokenize-line shape); otherwise use ``+`` string/int rules.
 """
@@ -32,6 +32,8 @@ MAX_VARS = 256
 MAX_LISTENERS = 64
 MAX_EVENTS = 32
 MAX_PAYLOAD_KEYS = 8
+# Bytes stored per Var.v (tz concat / ::tokens). Execute_ast pipe rows stay capped at 255 elsewhere.
+MAX_VAR_VALUE_LEN = 511
 
 # Bare identifiers in set/if (interpreter-shaped; see azl_interpreter.azl tokenize/parse).
 _BARE_ID_FORBIDDEN = frozenset(
@@ -205,10 +207,10 @@ class MinimalAZLRuntime:
     def var_set(self, k: str, v: str) -> None:
         for i, x in enumerate(self.vars):
             if x.k == k:
-                self.vars[i] = Var(k=k, v=v[:255])
+                self.vars[i] = Var(k=k, v=v[:MAX_VAR_VALUE_LEN])
                 return
         if len(self.vars) < MAX_VARS:
-            self.vars.append(Var(k=k[:63], v=v[:255]))
+            self.vars.append(Var(k=k[:63], v=v[:MAX_VAR_VALUE_LEN]))
 
     def queue_push(self, ev: str, payload: list[tuple[str, str]] | None = None) -> None:
         if len(self.queue) >= MAX_EVENTS:
@@ -1126,7 +1128,7 @@ class MinimalAZLRuntime:
                 raw = self._perf_tok_cache.get(key_s)
                 if raw is None:
                     return "", 1
-                return raw[:255], 0
+                return raw[:MAX_VAR_VALUE_LEN], 0
             if t == "::perf.ast_cache":
                 i[0] += 1
                 if i[0] >= self.ntok or self.tok[i[0]] != "[":
@@ -1141,7 +1143,7 @@ class MinimalAZLRuntime:
                 raw = self._perf_ast_cache.get(key_s)
                 if raw is None:
                     return "", 1
-                return raw[:255], 0
+                return raw[:MAX_VAR_VALUE_LEN], 0
             vv = self.var_get(t)
             i[0] += 1
             if vv is None:
@@ -1323,7 +1325,7 @@ class MinimalAZLRuntime:
         if raw is None:
             raw = ""
         for seg in raw.split("\n") if raw else [""]:
-            self.var_set(loop_var, seg[:255])
+            self.var_set(loop_var, seg[:MAX_VAR_VALUE_LEN])
             self.exec_block(
                 body_start, body_end, preserve_listener_break_on_exit=True
             )
@@ -1441,7 +1443,7 @@ class MinimalAZLRuntime:
             if seg.startswith("import|"):
                 tail = seg[7:]
                 if tail:
-                    self.var_set("::p0_exec_import_last", tail[:255])
+                    self.var_set("::p0_exec_import_last", tail[:MAX_VAR_VALUE_LEN])
             elif seg.startswith("link|"):
                 tail = seg[5:]
                 if tail:
@@ -1483,7 +1485,7 @@ class MinimalAZLRuntime:
                     gkey = rest[:bar]
                     gval = rest[bar + 1 :]
                     if gkey.startswith("::"):
-                        self.var_set(gkey, gval[:255])
+                        self.var_set(gkey, gval[:MAX_VAR_VALUE_LEN])
                         result = "Set " + gkey + " = " + gval[:150]
             elif seg.startswith("component|"):
                 ctail = seg[10:]
@@ -1499,7 +1501,7 @@ class MinimalAZLRuntime:
                         gkey = rest[:bar]
                         gval = rest[bar + 1 :]
                         if gkey.startswith("::"):
-                            self.var_set(gkey, gval[:255])
+                            self.var_set(gkey, gval[:MAX_VAR_VALUE_LEN])
                             result = "Set " + gkey + " = " + gval[:150]
                 elif mrest.startswith("say|"):
                     pay = mrest[4:]
@@ -1570,7 +1572,7 @@ class MinimalAZLRuntime:
                 joined = seg
             else:
                 joined = cur + "\n" + seg
-            self.var_set(base, joined[:255])
+            self.var_set(base, joined[:MAX_VAR_VALUE_LEN])
             return
         if t0.startswith("::"):
             k = t0
@@ -1650,7 +1652,7 @@ class MinimalAZLRuntime:
                 joined = lp
             else:
                 joined = lp + "\n" + rp
-            self.var_set(k, joined[:255])
+            self.var_set(k, joined[:MAX_VAR_VALUE_LEN])
             return
         if v == "[":
             self._consume_agg_literal(i)
@@ -1679,7 +1681,7 @@ class MinimalAZLRuntime:
             i[0] += 1
             src = self.var_get(base) or ""
             joined = "\n".join(tuple(src))
-            self.var_set(k, joined[:255])
+            self.var_set(k, joined[:MAX_VAR_VALUE_LEN])
             return
         if (
             v.startswith("::")
@@ -1703,7 +1705,7 @@ class MinimalAZLRuntime:
             i[0] += 1
             src = self.var_get(base) or ""
             joined = "\n".join(src.split(delim))
-            self.var_set(k, joined[:255])
+            self.var_set(k, joined[:MAX_VAR_VALUE_LEN])
             return
 
         def _hash_blob(var_tok: str) -> str:
@@ -1760,7 +1762,7 @@ class MinimalAZLRuntime:
             buf = self.var_get(arg) or ""
             nodes_s = self._parse_tokens_nodes_from_buffer(buf)
             self.var_set("::ast", "{}")
-            self.var_set("::ast.nodes", nodes_s[:255])
+            self.var_set("::ast.nodes", nodes_s[:MAX_VAR_VALUE_LEN])
             self.var_set(k, "{}")
             return
         if v == "::vm_compile_ast":
@@ -1809,7 +1811,7 @@ class MinimalAZLRuntime:
                 )
             i[0] += 1
             outv = self._vm_run_bytecode_result(bc)
-            self.var_set(k, outv[:255])
+            self.var_set(k, outv[:MAX_VAR_VALUE_LEN])
             return
         if v == "::execute_ast":
             i[0] += 1
@@ -1850,7 +1852,7 @@ class MinimalAZLRuntime:
             i[0] += 1
             _ = a2
             outv = self._builtin_execute_ast_result(a1)
-            self.var_set(k, outv[:255])
+            self.var_set(k, outv[:MAX_VAR_VALUE_LEN])
             return
         val = self.eval_expr(i)
         self.var_set(k, val)
@@ -2165,7 +2167,7 @@ class MinimalAZLRuntime:
                             self.process_events()
                         elif skind == "set":
                             if sa1.startswith("::"):
-                                self.var_set(sa1, sa2[:255])
+                                self.var_set(sa1, sa2[:MAX_VAR_VALUE_LEN])
                         else:
                             print(sa1, flush=True)
                         break

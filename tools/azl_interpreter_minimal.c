@@ -26,6 +26,8 @@
 #define MAX_LISTENERS 64
 #define MAX_EVENTS 32
 #define MAX_PAYLOAD_KEYS 8
+/* Var string values (tz concat buffers, ::tokens); larger than execute_ast row cap (255). */
+#define AZL_MINIMAL_VAR_CAP 512
 
 typedef struct { char key[48]; char v[256]; } PayloadKV;
 typedef struct {
@@ -40,7 +42,7 @@ static const char *g_tok[MAX_TOKS];
 static int g_ntok;
 
 /* Variable store: key -> value (string) */
-typedef struct { char k[64]; char v[256]; } Var;
+typedef struct { char k[64]; char v[AZL_MINIMAL_VAR_CAP]; } Var;
 static Var g_vars[MAX_VARS];
 static int g_nvars;
 
@@ -612,8 +614,8 @@ static int parse_push_tz_object(int *i, char *seg, size_t seg_sz) {
   tz_esc_field_c(vl, ev, sizeof(ev));
   tz_esc_field_c(ln, el, sizeof(el));
   tz_esc_field_c(col, ec, sizeof(ec));
-  /* Worst-case escaped row can exceed seg (Var.v is 256); format into scratch to avoid
-   * -Wformat-truncation, then copy — matches Python joined[:255] truncation at var_set. */
+  /* Worst-case escaped row can exceed seg (Var.v is AZL_MINIMAL_VAR_CAP); format into scratch to avoid
+   * -Wformat-truncation, then copy — matches Python Var.v truncation at var_set. */
   char enc[512];
   int nw = snprintf(enc, sizeof(enc), "tz|%s|%s|%s|%s", et, ev, el, ec);
   if (nw < 0 || (size_t)nw >= sizeof(enc))
@@ -2265,7 +2267,7 @@ static void exec_set(int *i) {
     (*i)++;
     const char *cur0 = var_get(push_base);
     const char *cur = (cur0 && cur0[0] && strcmp(cur0, "[]") != 0) ? cur0 : "";
-    char out[256] = {0};
+    char out[AZL_MINIMAL_VAR_CAP] = {0};
     if (!cur[0])
       (void)snprintf(out, sizeof(out), "%s", seg);
     else
@@ -2278,7 +2280,7 @@ static void exec_set(int *i) {
   (*i)++;
   if (*i >= g_ntok) return;
   const char *v = g_tok[*i];
-  char val[256] = {0};
+  char val[AZL_MINIMAL_VAR_CAP] = {0};
   char concat_base[64];
   if (v && rhs_is_var_concat_call(v, concat_base, sizeof(concat_base))) {
     (*i)++;
@@ -2296,7 +2298,7 @@ static void exec_set(int *i) {
       fprintf(stderr, "azl_interpreter_minimal: .concat bad arg\n");
       exit(5);
     }
-    char rgt_concat[256];
+    char rgt_concat[AZL_MINIMAL_VAR_CAP];
     rgt_concat[0] = '\0';
     if (strcmp(carg, "::tokenize_line") == 0) {
       (*i)++;

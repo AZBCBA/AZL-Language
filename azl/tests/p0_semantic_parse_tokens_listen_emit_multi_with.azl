@@ -1,0 +1,24 @@
+# Gate F165: ::parse_tokens — listen + emit … with { a: b, c: d } → listen|f165|emit|em165|with|a|b|c|d
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f165_parse with { }
+  }
+  behavior {
+    listen for "f165_parse" {
+      set ::tokens = []
+      set ::tx = "listen for f165 { emit em165 with { a: b, c: d } }"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::tx, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F165_OK"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+# Gate F164: ::parse_tokens — `memory emit m164 with { a: b, c: d }` → `memory|emit|m164|with|a|b|c|d` (multi-pair; Var.v[255]-safe).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f164_parse with { }
+  }
+  behavior {
+    listen for "f164_parse" {
+      set ::tokens = []
+      set ::tx = "memory emit m164 with { a: b, c: d }"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::tx, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F164_OK"
+    }
+  }
+}
