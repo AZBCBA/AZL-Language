@@ -752,7 +752,7 @@ Tier B **P0.1** release crumb: concatenates **`azl/tests/stubs/azl_security_for_
 
 ### Real interpreter behavior bridge on semantic spine (`scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh`)
 
-Tier B **P0.1c** release crumb: concatenates **`azl/tests/stubs/azl_security_for_interpreter_spine.azl`** + **`azl/tests/harness/azl_interpreter_semantic_spine_behavior_entry.azl`** + **`azl/runtime/interpreter/azl_interpreter.azl`**, runs **`tools/azl_runtime_spine_host.py`** with **`AZL_ENTRY=azl.spine.behavior.entry`**, asserts exit **0**, no **`component not found: ::azl.security`** on stderr, stdout contains **`Pure AZL Interpreter Initialized`**, **`AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT`**, and proof of parse/execute (**`AZL_SPINE_SEMANTIC_PARSE_EXECUTE_BRIDGE`** or **`Said: x`** from a real **`say`** step after **`::parse_tokens`** / **`::tokenize_line`** on the semantic spine — not full **`azl_interpreter.azl`** parse). Prefix **`ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]:`** on stderr.
+Tier B **P0.1c** release crumb: concatenates **`azl/tests/stubs/azl_security_for_interpreter_spine.azl`** + **`azl/tests/harness/azl_interpreter_semantic_spine_behavior_entry.azl`** + **`azl/runtime/interpreter/azl_interpreter.azl`**, runs **`tools/azl_runtime_spine_host.py`** with **`AZL_ENTRY=azl.spine.behavior.entry`**, asserts exit **0**, no **`component not found: ::azl.security`** on stderr, stdout contains **`Pure AZL Interpreter Initialized`**, **`AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT`**, substring **`Execution complete`** (in-file **`listen for "execute"`** body after **`::execute_ast`**), and **`Interpretation complete:`** (in-file **`listen for "execute_complete"`** chain). Proves **interpret → tokenize → parse → execute → execute_complete** on the real interpreter file, not only a parse bridge marker. Prefix **`ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]:`** on stderr.
 
 | Exit | Meaning |
 |------|---------|
@@ -764,7 +764,8 @@ Tier B **P0.1c** release crumb: concatenates **`azl/tests/stubs/azl_security_for
 | **551** | **`link ::azl.security`** still unresolved (stderr pattern) |
 | **552** | Stdout missing interpreter init marker |
 | **553** | Stdout missing **`AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT`** |
-| **554** | Stdout missing parse/execute proof (**`AZL_SPINE_SEMANTIC_PARSE_EXECUTE_BRIDGE`** or **`Said: x`**) |
+| **554** | Stdout missing **`Execution complete`** (execute listener did not finish after **`::execute_ast`**) |
+| **555** | Stdout missing **`Interpretation complete:`** (**`execute_complete`** listener did not run) |
 
 ### Enterprise POST /v1/chat benchmark (`scripts/benchmark_enterprise_v1_chat.sh`)
 

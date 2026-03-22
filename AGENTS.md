@@ -19,7 +19,7 @@
 - **`docs/ERROR_SYSTEM.md`** — mandatory failure behavior.  
 - Integration: **`docs/INTEGRATION_VERIFY.md`** (`make verify`).
 - **P0.1b (release):** **`scripts/verify_azl_interpreter_semantic_spine_smoke.sh`** runs inside **`run_full_repo_verification.sh`** step **3** — real **`azl/runtime/interpreter/azl_interpreter.azl`** **`init`** on Python spine (**`docs/ERROR_SYSTEM.md`** **286–290**).
-- **P0.1c (release):** **`scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh`** step **4** — harness + same interpreter file; **`emit interpret`** drives **interpret→tokenize→parse→execute** on **`minimal_runtime`** (**`docs/ERROR_SYSTEM.md`** **548–554**); stdout must show parse/execute proof (**bridge marker or `Said: x`**); not a claim of full **`azl_interpreter.azl`** parse/execute semantics yet.
+- **P0.1c (release):** **`scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh`** step **4** — harness + same interpreter file; **`emit interpret`** drives **interpret→tokenize→parse→execute→execute_complete** on **`minimal_runtime`** (**`docs/ERROR_SYSTEM.md`** **548–555**); stdout must show **`Execution complete`** and **`Interpretation complete:`** from the **real** in-file listeners; still not a claim of full in-file **`::parse_tokens`** / structured **`::ast.nodes`** vs **`azl_interpreter.azl`** long term.
 
 ## Semantic spine parity (C minimal ↔ Python `minimal_runtime`)
 

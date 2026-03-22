@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Tier B P0.1 — real interpreter behavior path on the semantic spine (Python minimal_runtime).
 # Concatenates stub ::azl.security + behavior-entry harness + azl/runtime/interpreter/azl_interpreter.azl,
-# runs tools/azl_runtime_spine_host.py with AZL_ENTRY=azl.spine.behavior.entry, asserts interpret→tokenize→parse→execute
-# completes (bridge marker + POST_EMIT). Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
+# runs tools/azl_runtime_spine_host.py with AZL_ENTRY=azl.spine.behavior.entry, asserts the full in-file chain:
+# interpret → tokenize → parse → execute (say line) → execute_complete listener (Interpretation complete:).
+# Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–554).
+# See docs/ERROR_SYSTEM.md (exits 548–555).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -80,10 +81,15 @@ if ! rg -q 'AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT' "$out"; then
   cat "$out" >&2 || true
   exit 553
 fi
-if ! rg -q 'AZL_SPINE_SEMANTIC_PARSE_EXECUTE_BRIDGE|Said: x' "$out"; then
-  err "stdout missing parse/execute proof (bridge marker or Said: x from real say parse)"
+if ! rg -q 'Execution complete' "$out"; then
+  err "stdout missing execute listener completion (in-file say \"⚡ Execution complete\" after ::execute_ast)"
   cat "$out" >&2 || true
   exit 554
+fi
+if ! rg -q 'Interpretation complete:' "$out"; then
+  err "stdout missing execute_complete listener (in-file \"Interpretation complete:\" after nested event chain)"
+  cat "$out" >&2 || true
+  exit 555
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"
