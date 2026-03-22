@@ -950,7 +950,10 @@ component ::azl.interpreter {
       # Set current component for capability checks
       ::azl.security.set_current(::component_name)
       
-      # PHASE 1: Pre-register listeners from behavior BEFORE init to ensure early emits are caught
+      # PHASE 1: Pre-register listeners from behavior BEFORE init to ensure early emits are caught.
+      # Phase E spine bootstrap: Python host ``_execute_spine_component_v1_body`` (``spine_component_v1``) mirrors
+      # this order — register synthetic listener bodies, then run ``init`` (``emit`` drains the event queue there),
+      # then ``memory``. Do not reorder without updating the host.
       if ::component.sections.behavior {
         for ::statement in ::component.sections.behavior.statements {
           if ::halted { break }
@@ -1116,6 +1119,9 @@ component ::azl.interpreter {
       if ::listeners && ::listeners[ev_name] {
         set ::actions = ::listeners[ev_name]
         set ::prev_comp = ( ::azl.security ? ::azl.security.current_component : "" )
+        # In-file tree: every listener entry for ``ev_name`` runs. Python ``minimal_runtime.process_events`` may
+        # dispatch only the first matching registration for an event (spine harness contract); do not claim
+        # identical multi-listener fan-out across carriers from this loop alone.
         for ::listener in ::actions {
           set ::target_owner = (::listener.owner || ::prev_comp)
           if ::azl.security { ::azl.security.set_current(::target_owner) }
@@ -1219,7 +1225,7 @@ component ::azl.interpreter {
       return "vm_ok"
     }
     
-    # Execute listen statement
+    # Execute listen statement (Phase E: must run before init emits on the same component; see ``execute_component``).
     ::execute_listen = (statement) => {
       set ::event = ::statement.event
       say "👂 Register listener for event: ::event"

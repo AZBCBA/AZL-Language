@@ -50,10 +50,11 @@
 # smoke52 mutation flip A/B then multi-statement then C/D; BAD1–BAD3 must not appear.
 # smoke53 outer false A, inner true B, then expr ==2 false → C; BAD1–BAD3 must not appear.
 # smoke54 five-step mixed expr/flag/final otherwise E; P54_A..E order; BAD1–BAD5 must not appear.
+# smoke55 spine_component_v1: two listeners (say+set+emit chain + downstream listener), init emit, memory re-reads ::azl_spine_p55_flag; ordered AZL_SPINE_P55_* + p55_chain_ok; AZL_SPINE_P55_BAD must not appear on stdout.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–749).
+# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–752).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -140,8 +141,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=54)}' "$out"; then
-  err "stdout expected >=54 \"Interpretation complete:\" lines (harness fifty-four emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=55)}' "$out"; then
+  err "stdout expected >=55 \"Interpretation complete:\" lines (harness fifty-five emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -965,6 +966,31 @@ if ! awk '
   err "stdout expected AZL_SPINE_P54_A then B then C then D then E"
   cat "$out" >&2 || true
   exit 749
+fi
+if rg -q 'AZL_SPINE_P55_BAD' "$out"; then
+  err "stdout must not contain AZL_SPINE_P55_BAD (fifty-fifth interpret spine_component_v1 wrong-path marker)"
+  cat "$out" >&2 || true
+  exit 751
+fi
+if ! rg -q 'AZL_SPINE_P55_INIT' "$out" || ! rg -q 'AZL_SPINE_P55_A' "$out" || ! rg -q 'AZL_SPINE_P55_FINAL' "$out" || ! rg -q 'AZL_SPINE_P55_MEM' "$out"; then
+  err "stdout missing fifty-fifth interpret spine_component_v1 markers AZL_SPINE_P55_INIT / P55_A / P55_FINAL / P55_MEM"
+  cat "$out" >&2 || true
+  exit 750
+fi
+if ! awk '
+  /^p55_chain_ok$/ && !c1 { c1 = NR; next }
+  /^p55_chain_ok$/ && c1 && !c2 { c2 = NR }
+  /AZL_SPINE_P55_INIT/ && !i { i = NR }
+  /AZL_SPINE_P55_A/ && !a { a = NR }
+  /AZL_SPINE_P55_FINAL/ && !f { f = NR }
+  /AZL_SPINE_P55_MEM/ && !m { m = NR }
+  END {
+    exit !(i && a && c1 && f && m && c2 && i < a && a < c1 && c1 < f && f < m && m < c2)
+  }
+' "$out"; then
+  err "stdout fifty-fifth interpret spine_component_v1 order wrong: expect P55_INIT then P55_A then first p55_chain_ok (listener B say ::flag) then P55_FINAL then P55_MEM then second p55_chain_ok (memory)"
+  cat "$out" >&2 || true
+  exit 752
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"

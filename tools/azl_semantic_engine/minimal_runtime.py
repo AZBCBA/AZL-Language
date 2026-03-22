@@ -19,7 +19,10 @@ from dataclasses import dataclass, field
 BUF_SIZE = 2 * 1024 * 1024
 MAX_TOKS = 65536
 MAX_VARS = 256
-MAX_LISTENERS = 64
+# Combined interpreter + behavior-entry harness registers many top-level listeners; ``spine_component_v1``
+# then adds synthetic listeners. C minimal stays at 64 (``tools/azl_interpreter_minimal.c``); Python spine
+# host needs headroom so embedded components are not silently starved (harness alone reaches ~128 slots).
+MAX_LISTENERS = 256
 MAX_EVENTS = 32
 MAX_PAYLOAD_KEYS = 8
 # Bytes stored per Var.v (tz concat / ::tokens). Execute_ast pipe rows stay capped at 255 elsewhere.

@@ -46,6 +46,7 @@
 #   - forty-third emit interpret — triple sequential `==` after `set` mutation each time; P43_A then P43_B then P43_C; BAD1–BAD3 must not run.
 #   - forty-fourth emit interpret — outer otherwise L1, inner otherwise L2, inner-inner then L3; P44_L1 then L2 then L3; BAD1–BAD3 must not run.
 #   - forty-fifth through fifty-fourth — P45 set+inner == after mutation; P46 five-way plain alternation; P47 expr then expr else then flag; P48 outer then multi-statement inner otherwise; P49 outer otherwise + set + multi-statement then; P50 three-level mixed ==; P51 A then B/C nested otherwise; P52 mutation flip + multi-statement then; P53 outer false inner true + expr else; P54 five-step mixed finale.
+#   - fifty-fifth emit interpret — embedded ``spine_component_v1`` slice: two ``listen for`` blocks (multi-statement listener A: say + set + emit; listener B: say global + say final); init emits first event; chained emit runs second listener; memory re-reads persisted ``::azl_spine_p55_flag`` (stdout order **AZL_SPINE_P55_*** markers + **p55_chain_ok**); must **not** emit **AZL_SPINE_P55_BAD**.
 
 component ::azl.spine.behavior.entry {
   init {
@@ -289,6 +290,27 @@ if ( ::azl_spine_p54_flag ) { say 'AZL_SPINE_P54_C' } otherwise { say 'AZL_SPINE
 set ::azl_spine_p54 = 7
 if ( ::azl_spine_p54 == 7 ) { say 'AZL_SPINE_P54_D' } otherwise { say 'AZL_SPINE_P54_BAD4' }
 if ( false ) { say 'AZL_SPINE_P54_BAD5' } otherwise { say 'AZL_SPINE_P54_E' }", component_name: "smoke54" }
+    emit interpret with { code: "component ::SpineP55 {
+  behavior {
+    listen for 'azl_spine_p55_start' {
+      say 'AZL_SPINE_P55_A'
+      set ::azl_spine_p55_flag = p55_chain_ok
+      emit azl_spine_p55_next
+    }
+    listen for 'azl_spine_p55_next' {
+      say ::azl_spine_p55_flag
+      say 'AZL_SPINE_P55_FINAL'
+    }
+  }
+  init {
+    say 'AZL_SPINE_P55_INIT'
+    emit azl_spine_p55_start
+  }
+  memory {
+    say 'AZL_SPINE_P55_MEM'
+    say ::azl_spine_p55_flag
+  }
+}", component_name: "smoke55" }
     say "AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT"
   }
 }
