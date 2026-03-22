@@ -1,0 +1,35 @@
+# Gate F150: ::parse_tokens — say + set + emit (tz rows from ::tokenize_line); stays within ::tokens Var.v[255] cap.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f150_parse with { }
+  }
+  behavior {
+    listen for "f150_parse" {
+      set ::tokens = []
+      set ::t1 = "say A"
+      set ::n1 = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::t1, ::n1))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::t2 = "set ::f=z"
+      set ::n2 = "2"
+      set ::tokens = ::tokens.concat(::tokenize_line(::t2, ::n2))
+      set ::tokens.push({ type: "eol", value: ";", line: 2, column: 0 })
+      set ::t3 = "emit e"
+      set ::n3 = "3"
+      set ::tokens = ::tokens.concat(::tokenize_line(::t3, ::n3))
+      set ::tokens.push({ type: "eol", value: ";", line: 3, column: 0 })
+      set ::_pt = ::parse_tokens(::tokens)
+      set ::rows = ::ast.nodes.split("\n")
+      for ::rn in ::rows {
+        say ::rn
+      }
+      say "P0_SEM_F150_OK"
+    }
+  }
+}

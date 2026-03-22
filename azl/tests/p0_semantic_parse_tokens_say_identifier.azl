@@ -1,0 +1,23 @@
+# Gate F149: ::parse_tokens(::tokens) — tz buffer (identifier say + operand + eol) → ::ast.nodes execute line say|…
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f149_parse with { }
+  }
+  behavior {
+    listen for "f149_parse" {
+      set ::tokens = []
+      set ::tokens.push({ type: "identifier", value: "say", line: 1, column: 1 })
+      set ::tokens.push({ type: "identifier", value: "F149_PAYLOAD", line: 1, column: 5 })
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::_pt = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F149_OK"
+    }
+  }
+}

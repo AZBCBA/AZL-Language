@@ -1,0 +1,35 @@
+# Gate F151: ::parse_tokens — import + link + say (tz rows from ::tokenize_line); Var.v[255]-safe.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f151_parse with { }
+  }
+  behavior {
+    listen for "f151_parse" {
+      set ::tokens = []
+      set ::u1 = "import m"
+      set ::v1 = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::u1, ::v1))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::u2 = "link ::l"
+      set ::v2 = "2"
+      set ::tokens = ::tokens.concat(::tokenize_line(::u2, ::v2))
+      set ::tokens.push({ type: "eol", value: ";", line: 2, column: 0 })
+      set ::u3 = "say Z"
+      set ::v3 = "3"
+      set ::tokens = ::tokens.concat(::tokenize_line(::u3, ::v3))
+      set ::tokens.push({ type: "eol", value: ";", line: 3, column: 0 })
+      set ::_pt = ::parse_tokens(::tokens)
+      set ::rows = ::ast.nodes.split("\n")
+      for ::rn in ::rows {
+        say ::rn
+      }
+      say "P0_SEM_F151_OK"
+    }
+  }
+}

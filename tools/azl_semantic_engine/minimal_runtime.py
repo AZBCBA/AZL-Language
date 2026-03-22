@@ -248,14 +248,241 @@ class MinimalAZLRuntime:
         ]
         return "tz|" + "|".join(parts)
 
-    def _builtin_tokenize_line_stub(self, line_text: str, line_no_s: str) -> str:
+    @staticmethod
+    def _tz_unsplit_tail_fields(tail: str) -> list[str] | None:
+        """Split ``tail`` on unescaped ``|`` (tz row body after the ``tz|`` prefix)."""
+        fields: list[str] = []
+        cur: list[str] = []
+        p = 0
+        n = len(tail)
+        while p < n:
+            if tail[p] == "\\" and p + 1 < n:
+                cur.append(tail[p + 1])
+                p += 2
+                continue
+            if tail[p] == "|":
+                fields.append("".join(cur))
+                cur = []
+                p += 1
+                continue
+            cur.append(tail[p])
+            p += 1
+        fields.append("".join(cur))
+        return fields
+
+    def _parse_tz_buffer_pairs(self, buf: str) -> list[tuple[str, str]]:
+        rows: list[tuple[str, str]] = []
+        for raw_line in buf.split("\n"):
+            line = raw_line.strip()
+            if not line.startswith("tz|"):
+                continue
+            fields = self._tz_unsplit_tail_fields(line[3:])
+            if not fields or len(fields) < 4:
+                continue
+            rows.append((fields[0][:64], fields[1][:220]))
+        return rows
+
+    @staticmethod
+    def _skip_eol_pairs(pairs: list[tuple[str, str]], i: int) -> int:
+        while i < len(pairs) and pairs[i][0] == "eol":
+            i += 1
+        return i
+
+    def _parse_with_brace_pairs(
+        self, pairs: list[tuple[str, str]], j: int
+    ) -> tuple[list[tuple[str, str]], int] | None:
+        """After ``with``, parse ``{ k: v (, …)* }`` into ``(key, value)`` pairs (``execute_ast`` payload)."""
+        n = len(pairs)
+        j = self._skip_eol_pairs(pairs, j)
+        if j >= n or pairs[j] != ("brace", "{"):
+            return None
+        j += 1
+        kv: list[tuple[str, str]] = []
+        while j < n:
+            typ, val = pairs[j]
+            if typ == "eol":
+                j += 1
+                continue
+            if typ == "brace" and val == "}":
+                return (kv, j + 1)
+            if typ == "identifier" and val == ",":
+                j += 1
+                continue
+            if typ != "identifier":
+                return None
+            if val.endswith(":") and len(val) > 1:
+                key = val[:-1].strip()[:47]
+                j += 1
+            else:
+                key = val.strip()[:47]
+                j += 1
+                j = self._skip_eol_pairs(pairs, j)
+            if j >= n:
+                return None
+            vt, vv = pairs[j]
+            if vt not in ("identifier", "string"):
+                return None
+            if not key or not all(ch.isalnum() or ch == "_" for ch in key):
+                return None
+            kv.append((key, vv[:80]))
+            j += 1
+        return None
+
+    def _parse_tokens_nodes_from_buffer(self, buf: str) -> str:
+        """Map ``tz|…`` token rows to ``::ast.nodes`` lines for ``execute_ast`` (spine parse slice)."""
+        pairs = self._parse_tz_buffer_pairs(buf)
+        out_lines: list[str] = []
+        i = 0
+        n = len(pairs)
+        while i < n:
+            typ, val = pairs[i]
+            if typ == "eol":
+                i += 1
+                continue
+            if typ == "identifier" and val == "say":
+                j = self._skip_eol_pairs(pairs, i + 1)
+                parts: list[str] = []
+                while j < n:
+                    t2, v2 = pairs[j]
+                    if t2 == "eol" or (t2 == "brace" and v2 == "}"):
+                        break
+                    if t2 in ("identifier", "string"):
+                        parts.append(v2)
+                        j += 1
+                        continue
+                    break
+                if parts:
+                    out_lines.append("say|" + " ".join(parts)[:200])
+                    i = j
+                    continue
+            if typ == "identifier" and val == "set":
+                j = self._skip_eol_pairs(pairs, i + 1)
+                if j >= n:
+                    i += 1
+                    continue
+                vt, vv = pairs[j]
+                if vt != "identifier" or not vv.startswith("::"):
+                    i += 1
+                    continue
+                var_name = vv[:80]
+                j += 1
+                j = self._skip_eol_pairs(pairs, j)
+                if j >= n or pairs[j] != ("operator", "="):
+                    i += 1
+                    continue
+                j += 1
+                rhs_parts: list[str] = []
+                while j < n:
+                    t2, v2 = pairs[j]
+                    if t2 == "eol" or (t2 == "brace" and v2 == "}"):
+                        break
+                    if t2 in ("identifier", "string"):
+                        rhs_parts.append(v2)
+                        j += 1
+                        continue
+                    break
+                if rhs_parts:
+                    rhs = " ".join(rhs_parts)[:200]
+                    out_lines.append("set|" + var_name + "|" + rhs)
+                i = j
+                continue
+            if typ == "identifier" and val == "emit":
+                j = self._skip_eol_pairs(pairs, i + 1)
+                ev_parts: list[str] = []
+                with_idx = -1
+                while j < n:
+                    t2, v2 = pairs[j]
+                    if t2 == "eol" or (t2 == "brace" and v2 == "}"):
+                        break
+                    if t2 == "identifier" and v2 == "with":
+                        with_idx = j
+                        break
+                    if t2 in ("identifier", "string"):
+                        ev_parts.append(v2)
+                        j += 1
+                        continue
+                    break
+                if not ev_parts:
+                    i += 1
+                    continue
+                ev = " ".join(ev_parts)[:120]
+                if "|" in ev:
+                    i += 1
+                    continue
+                if with_idx >= 0:
+                    parsed = self._parse_with_brace_pairs(pairs, with_idx + 1)
+                    if parsed:
+                        kvs, j2 = parsed
+                        if kvs:
+                            tail = "|".join(f"{k}|{v}" for k, v in kvs)
+                            seg = ("emit|" + ev + "|with|" + tail)[:255]
+                            out_lines.append(seg)
+                        else:
+                            out_lines.append("emit|" + ev)
+                        i = j2
+                        continue
+                    out_lines.append("emit|" + ev)
+                    i = with_idx + 1
+                    continue
+                out_lines.append("emit|" + ev)
+                i = j
+                continue
+            if typ == "identifier" and val == "import":
+                j = self._skip_eol_pairs(pairs, i + 1)
+                if j < n and pairs[j][0] in ("identifier", "string"):
+                    out_lines.append("import|" + pairs[j][1][:200])
+                    i = j + 1
+                    continue
+            if typ == "identifier" and val == "link":
+                j = self._skip_eol_pairs(pairs, i + 1)
+                if j < n and pairs[j][0] in ("identifier", "string"):
+                    out_lines.append("link|" + pairs[j][1][:200])
+                    i = j + 1
+                    continue
+            i += 1
+        if not out_lines:
+            return "say|AZL_SPINE_SEMANTIC_PARSE_EXECUTE_BRIDGE"
+        return "\n".join(out_lines)
+
+    def _token_to_tz_row(self, tok: str, ln: str, col_s: str) -> str:
+        if len(tok) >= 2 and tok[0] in "\"'":
+            inner = self._unescape_azl_string_token(tok)
+            return self._format_tz_row("string", inner[:200], ln, col_s)
+        if tok in ("{", "}"):
+            return self._format_tz_row("brace", tok[:1], ln, col_s)
+        if tok in ("(", ")"):
+            return self._format_tz_row("paren", tok[:1], ln, col_s)
+        if tok == "=":
+            return self._format_tz_row("operator", "=", ln, col_s)
+        return self._format_tz_row("identifier", tok[:200], ln, col_s)
+
+    def _builtin_tokenize_line(self, line_text: str, line_no_s: str) -> str:
         s = (line_text or "").strip()
         if not s:
             return ""
         ln = (line_no_s or "1").strip()
         if not ln.isdigit():
             ln = "1"
-        return self._format_tz_row("identifier", s[:80], ln, "1")
+        try:
+            toks = tokenize_source(s)
+        except Exception:
+            return self._format_tz_row("identifier", s[:80], ln, "1")
+        if not toks:
+            return ""
+        n = len(s)
+        p = 0
+        rows: list[str] = []
+        for t in toks:
+            while p < n and s[p] in " \t\r":
+                p += 1
+            col_s = str(p + 1)
+            if p + len(t) <= n and s[p : p + len(t)] == t:
+                rows.append(self._token_to_tz_row(t, ln, col_s))
+                p += len(t)
+            else:
+                rows.append(self._token_to_tz_row(t, ln, "1"))
+                p = min(p + max(len(t), 1), n)
+        return "\n".join(rows)
 
     def _try_spine_interpreter_builtin_statement(self, i: list[int]) -> bool:
         """Standalone ``::insert_cache(...)`` / ``::touch_cache_key(...)`` in listener bodies."""
@@ -1142,7 +1369,7 @@ class MinimalAZLRuntime:
                         5, "azl_semantic_engine: tokenize_line missing )"
                     )
                 i[0] += 1
-                rgt = self._builtin_tokenize_line_stub(
+                rgt = self._builtin_tokenize_line(
                     self.var_get(a1) or "", self.var_get(a2) or "1"
                 )
             elif not carg.startswith("::"):
@@ -1273,12 +1500,10 @@ class MinimalAZLRuntime:
             if i[0] >= self.ntok or self.tok[i[0]] != ")":
                 raise SemanticEngineError(5, "azl_semantic_engine: parse_tokens missing )")
             i[0] += 1
-            _ = self.var_get(arg)
+            buf = self.var_get(arg) or ""
+            nodes_s = self._parse_tokens_nodes_from_buffer(buf)
             self.var_set("::ast", "{}")
-            self.var_set(
-                "::ast.nodes",
-                "say|AZL_SPINE_SEMANTIC_PARSE_EXECUTE_BRIDGE",
-            )
+            self.var_set("::ast.nodes", nodes_s[:255])
             self.var_set(k, "{}")
             return
         if v == "::vm_compile_ast":

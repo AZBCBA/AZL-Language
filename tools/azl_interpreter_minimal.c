@@ -1413,6 +1413,454 @@ static void builtin_execute_ast_into(char *val, size_t valsz, const char *ast_ba
   (void)snprintf(val, valsz, "%s", result);
 }
 
+/* --- tz buffer: tokenize_line (per-line) + parse_tokens (say + operand) — parity with minimal_runtime.py --- */
+
+static int tl_id_char(int c) {
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+         c == '_' || c == ':' || c == '.';
+}
+
+static void builtin_tokenize_line_c(const char *line_text, const char *line_no_s, char *out, size_t outcap) {
+  out[0] = '\0';
+  if (!outcap) return;
+  const char *raw = line_text ? line_text : "";
+  while (*raw == ' ' || *raw == '\t' || *raw == '\r' || *raw == '\n') raw++;
+  char sl[512];
+  size_t L = strlen(raw);
+  while (L > 0U && (raw[L - 1U] == ' ' || raw[L - 1U] == '\t' || raw[L - 1U] == '\r' ||
+                    raw[L - 1U] == '\n'))
+    L--;
+  if (L >= sizeof(sl)) L = sizeof(sl) - 1U;
+  memcpy(sl, raw, L);
+  sl[L] = '\0';
+  if (!L) return;
+
+  char lnbuf[24];
+  if (line_no_s && line_no_s[0]) {
+    int ok = 1;
+    for (const char *q = line_no_s; *q; q++) {
+      if (!isdigit((unsigned char)*q)) ok = 0;
+    }
+    if (ok)
+      (void)snprintf(lnbuf, sizeof(lnbuf), "%s", line_no_s);
+    else
+      (void)snprintf(lnbuf, sizeof(lnbuf), "1");
+  } else
+    (void)snprintf(lnbuf, sizeof(lnbuf), "1");
+
+  int pos = 0;
+  int n = (int)strlen(sl);
+  while (pos < n) {
+    while (pos < n && (sl[pos] == ' ' || sl[pos] == '\t' || sl[pos] == '\r')) pos++;
+    if (pos >= n) break;
+    if (sl[pos] == '#' || (pos + 1 < n && sl[pos] == '/' && sl[pos + 1] == '/')) break;
+    int col = pos + 1;
+    char colbuf[24];
+    (void)snprintf(colbuf, sizeof(colbuf), "%d", col);
+    char tok[160];
+    size_t tl = 0;
+    unsigned char ch = (unsigned char)sl[pos];
+    if (ch == '"' || ch == '\'') {
+      char q = (char)ch;
+      if (tl < sizeof(tok) - 1U) tok[tl++] = q;
+      pos++;
+      while (pos < n) {
+        if (sl[pos] == '\\' && pos + 1 < n) {
+          if (tl + 1U < sizeof(tok) - 1U) {
+            tok[tl++] = '\\';
+            tok[tl++] = sl[pos + 1];
+          }
+          pos += 2;
+          continue;
+        }
+        if (sl[pos] == q) {
+          if (tl < sizeof(tok) - 1U) tok[tl++] = q;
+          pos++;
+          break;
+        }
+        if (tl < sizeof(tok) - 1U) tok[tl++] = sl[pos];
+        pos++;
+      }
+      tok[tl] = '\0';
+    } else if (ch == '=' && pos + 1 < n && sl[pos + 1] == '=') {
+      (void)snprintf(tok, sizeof(tok), "==");
+      pos += 2;
+    } else if (ch == '!' && pos + 1 < n && sl[pos + 1] == '=') {
+      (void)snprintf(tok, sizeof(tok), "!=");
+      pos += 2;
+    } else if (ch == '&' && pos + 1 < n && sl[pos + 1] == '&') {
+      (void)snprintf(tok, sizeof(tok), "&&");
+      pos += 2;
+    } else if (tl_id_char((int)ch)) {
+      while (pos < n && tl_id_char((int)(unsigned char)sl[pos])) {
+        if (tl < sizeof(tok) - 1U) tok[tl++] = sl[pos];
+        pos++;
+      }
+      tok[tl] = '\0';
+    } else {
+      tok[0] = (char)ch;
+      tok[1] = '\0';
+      pos++;
+    }
+
+    const char *typ = "identifier";
+    char inner[256];
+    inner[0] = '\0';
+    const char *val = tok;
+    if (tok[0] == '"' || tok[0] == '\'') {
+      typ = "string";
+      if (unescape_azl_string_token(tok, inner, sizeof(inner)) < 0) inner[0] = '\0';
+      val = inner;
+    } else if (strcmp(tok, "{") == 0 || strcmp(tok, "}") == 0) {
+      typ = "brace";
+      val = tok;
+    } else if (strcmp(tok, "(") == 0 || strcmp(tok, ")") == 0) {
+      typ = "paren";
+      val = tok;
+    } else if (strcmp(tok, "=") == 0) {
+      typ = "operator";
+      val = "=";
+    }
+
+    char row[512];
+    char et[96], ev[224], el[48], ec[48];
+    tz_esc_field_c(typ, et, sizeof(et));
+    tz_esc_field_c(val, ev, sizeof(ev));
+    tz_esc_field_c(lnbuf, el, sizeof(el));
+    tz_esc_field_c(colbuf, ec, sizeof(ec));
+    int nw = snprintf(row, sizeof(row), "tz|%s|%s|%s|%s", et, ev, el, ec);
+    if (nw < 0 || (size_t)nw >= sizeof(row)) break;
+    size_t olen = strlen(out);
+    size_t rlen = (size_t)nw;
+    if (olen + (olen ? 1U : 0U) + rlen + 1U >= outcap) break;
+    if (olen) {
+      out[olen++] = '\n';
+      out[olen] = '\0';
+    }
+    (void)snprintf(out + olen, outcap - olen, "%s", row);
+  }
+}
+
+static int tz_line_type_value(const char *line, char *typ_out, size_t tcap, char *val_out, size_t vcap) {
+  if (!line || strncmp(line, "tz|", 3U) != 0) return -1;
+  const char *p = line + 3;
+  size_t o = 0;
+  while (*p) {
+    if (*p == '\\' && p[1]) {
+      if (o + 1U < tcap) typ_out[o++] = p[1];
+      p += 2;
+      continue;
+    }
+    if (*p == '|') {
+      p++;
+      break;
+    }
+    if (o + 1U < tcap) typ_out[o++] = *p;
+    p++;
+  }
+  typ_out[o] = '\0';
+  o = 0;
+  while (*p) {
+    if (*p == '\\' && p[1]) {
+      if (o + 1U < vcap) val_out[o++] = p[1];
+      p += 2;
+      continue;
+    }
+    if (*p == '|') break;
+    if (o + 1U < vcap) val_out[o++] = *p;
+    p++;
+  }
+  val_out[o] = '\0';
+  return (typ_out[0] != '\0') ? 0 : -1;
+}
+
+typedef struct {
+  char typ[64];
+  char val[220];
+} ParseTokPair;
+
+static int parse_skip_eol(ParseTokPair *pairs, int np, int i) {
+  while (i < np && strcmp(pairs[i].typ, "eol") == 0) i++;
+  return i;
+}
+
+static void parse_acc_append(char *acc, size_t accap, const char *chunk) {
+  if (!chunk || !chunk[0]) return;
+  size_t al = strlen(acc);
+  size_t cl = strlen(chunk);
+  if (al + (al ? 1U : 0U) + cl + 1U >= accap) return;
+  if (al) {
+    acc[al++] = '\n';
+    acc[al] = '\0';
+  }
+  (void)snprintf(acc + al, accap - al, "%s", chunk);
+}
+
+/* After `with`, parse `{ k: v (,…)* }` → `k|v|…` in tail_out; *j_out past `}`. */
+static int parse_with_brace_payload(ParseTokPair *pairs, int np, int j, int *j_out, char *tail_out,
+                                    size_t tail_sz) {
+  tail_out[0] = '\0';
+  j = parse_skip_eol(pairs, np, j);
+  if (j >= np || strcmp(pairs[j].typ, "brace") != 0 || strcmp(pairs[j].val, "{") != 0) return -1;
+  j++;
+  char *tp = tail_out;
+  char *tend = tail_out + tail_sz;
+  int need_sep = 0;
+  while (j < np) {
+    if (strcmp(pairs[j].typ, "eol") == 0) {
+      j++;
+      continue;
+    }
+    if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) {
+      j++;
+      *j_out = j;
+      return 0;
+    }
+    if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, ",") == 0) {
+      j++;
+      continue;
+    }
+    if (strcmp(pairs[j].typ, "identifier") != 0) return -1;
+    char key[56];
+    char raw[220];
+    (void)snprintf(raw, sizeof(raw), "%.199s", pairs[j].val);
+    j++;
+    size_t rlen = strlen(raw);
+    if (rlen >= 2U && raw[rlen - 1U] == ':') {
+      raw[rlen - 1U] = '\0';
+      (void)snprintf(key, sizeof(key), "%.47s", raw);
+    } else {
+      (void)snprintf(key, sizeof(key), "%.47s", raw);
+      j = parse_skip_eol(pairs, np, j);
+      if (j >= np) return -1;
+    }
+    if (!key[0]) return -1;
+    for (const char *q = key; *q; q++) {
+      if (!isalnum((unsigned char)*q) && *q != '_') return -1;
+    }
+    if (j >= np) return -1;
+    if (strcmp(pairs[j].typ, "identifier") != 0 && strcmp(pairs[j].typ, "string") != 0) return -1;
+    char vbuf[88];
+    (void)snprintf(vbuf, sizeof(vbuf), "%.79s", pairs[j].val);
+    j++;
+    if (need_sep && (size_t)(tend - tp) > 1U) {
+      *tp++ = '|';
+      *tp = '\0';
+    }
+    need_sep = 1;
+    int nw = snprintf(tp, (size_t)(tend - tp), "%.47s|%s", key, vbuf);
+    if (nw < 0 || (size_t)nw >= (size_t)(tend - tp)) return -1;
+    tp += (size_t)nw;
+  }
+  return -1;
+}
+
+static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t nodes_cap) {
+  ParseTokPair pairs[64];
+  int np = 0;
+  const char *q = buf ? buf : "";
+  while (*q) {
+    char linebuf[512];
+    const char *nl = strchr(q, '\n');
+    size_t seglen = nl ? (size_t)(nl - q) : strlen(q);
+    if (seglen >= sizeof(linebuf)) seglen = sizeof(linebuf) - 1U;
+    memcpy(linebuf, q, seglen);
+    linebuf[seglen] = '\0';
+    char *a = linebuf;
+    while (*a == ' ' || *a == '\t') a++;
+    char *b = a + strlen(a);
+    while (b > a && (b[-1] == ' ' || b[-1] == '\t')) b--;
+    *b = '\0';
+    if (strncmp(a, "tz|", 3U) == 0 && np < 64) {
+      char t0[80], v0[224];
+      if (tz_line_type_value(a, t0, sizeof(t0), v0, sizeof(v0)) == 0) {
+        (void)snprintf(pairs[np].typ, sizeof(pairs[np].typ), "%.63s", t0);
+        (void)snprintf(pairs[np].val, sizeof(pairs[np].val), "%.199s", v0);
+        np++;
+      }
+    }
+    if (!nl) break;
+    q = nl + 1;
+  }
+
+  char acc[256];
+  acc[0] = '\0';
+  for (int i = 0; i < np;) {
+    if (strcmp(pairs[i].typ, "eol") == 0) {
+      i++;
+      continue;
+    }
+    if (strcmp(pairs[i].typ, "identifier") == 0 && strcmp(pairs[i].val, "say") == 0) {
+      int j = parse_skip_eol(pairs, np, i + 1);
+      char msg[224];
+      msg[0] = '\0';
+      size_t ml = 0;
+      while (j < np) {
+        if (strcmp(pairs[j].typ, "eol") == 0) break;
+        if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) break;
+        if (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0) {
+          if (ml > 0U && ml + 1U < sizeof(msg)) msg[ml++] = ' ';
+          size_t rem = sizeof(msg) - ml - 1U;
+          if (rem > 0U) {
+            (void)snprintf(msg + ml, rem, "%.199s", pairs[j].val);
+            ml = strlen(msg);
+            if (ml > 199U) {
+              msg[199] = '\0';
+              ml = 199U;
+            }
+          }
+          j++;
+          continue;
+        }
+        break;
+      }
+      if (msg[0]) {
+        char chunk[280];
+        (void)snprintf(chunk, sizeof(chunk), "say|%.199s", msg);
+        parse_acc_append(acc, sizeof(acc), chunk);
+        i = j;
+        continue;
+      }
+    }
+    if (strcmp(pairs[i].typ, "identifier") == 0 && strcmp(pairs[i].val, "set") == 0) {
+      int j = parse_skip_eol(pairs, np, i + 1);
+      if (j >= np) {
+        i++;
+        continue;
+      }
+      if (strcmp(pairs[j].typ, "identifier") != 0 || pairs[j].val[0] != ':' || pairs[j].val[1] != ':') {
+        i++;
+        continue;
+      }
+      char varn[96];
+      (void)snprintf(varn, sizeof(varn), "%.79s", pairs[j].val);
+      j++;
+      j = parse_skip_eol(pairs, np, j);
+      if (j >= np || strcmp(pairs[j].typ, "operator") != 0 || strcmp(pairs[j].val, "=") != 0) {
+        i++;
+        continue;
+      }
+      j++;
+      char rhs[224];
+      rhs[0] = '\0';
+      size_t rl = 0;
+      while (j < np) {
+        if (strcmp(pairs[j].typ, "eol") == 0) break;
+        if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) break;
+        if (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0) {
+          if (rl > 0U && rl + 1U < sizeof(rhs)) rhs[rl++] = ' ';
+          size_t rem = sizeof(rhs) - rl - 1U;
+          if (rem > 0U) {
+            (void)snprintf(rhs + rl, rem, "%.199s", pairs[j].val);
+            rl = strlen(rhs);
+            if (rl > 199U) {
+              rhs[199] = '\0';
+              rl = 199U;
+            }
+          }
+          j++;
+          continue;
+        }
+        break;
+      }
+      if (rhs[0]) {
+        char chunk[320];
+        (void)snprintf(chunk, sizeof(chunk), "set|%s|%.199s", varn, rhs);
+        parse_acc_append(acc, sizeof(acc), chunk);
+      }
+      i = j;
+      continue;
+    }
+    if (strcmp(pairs[i].typ, "identifier") == 0 && strcmp(pairs[i].val, "emit") == 0) {
+      int j = parse_skip_eol(pairs, np, i + 1);
+      char ev[160];
+      ev[0] = '\0';
+      size_t el = 0;
+      int with_idx = -1;
+      while (j < np) {
+        if (strcmp(pairs[j].typ, "eol") == 0) break;
+        if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) break;
+        if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "with") == 0) {
+          with_idx = j;
+          break;
+        }
+        if (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0) {
+          if (el > 0U && el + 1U < sizeof(ev)) ev[el++] = ' ';
+          size_t rem = sizeof(ev) - el - 1U;
+          if (rem > 0U) {
+            (void)snprintf(ev + el, rem, "%.119s", pairs[j].val);
+            el = strlen(ev);
+            if (el > 119U) {
+              ev[119] = '\0';
+              el = 119U;
+            }
+          }
+          j++;
+          continue;
+        }
+        break;
+      }
+      if (!ev[0] || strchr(ev, '|') != NULL) {
+        i++;
+        continue;
+      }
+      if (with_idx >= 0) {
+        int j2 = 0;
+        char wtail[200];
+        if (parse_with_brace_payload(pairs, np, with_idx + 1, &j2, wtail, sizeof(wtail)) == 0) {
+          char chunk[320];
+          if (wtail[0]) {
+            (void)snprintf(chunk, sizeof(chunk), "emit|%.119s|with|%s", ev, wtail);
+            if (strlen(chunk) > 254U) chunk[254] = '\0';
+            parse_acc_append(acc, sizeof(acc), chunk);
+          } else {
+            (void)snprintf(chunk, sizeof(chunk), "emit|%.119s", ev);
+            parse_acc_append(acc, sizeof(acc), chunk);
+          }
+          i = j2;
+          continue;
+        }
+        char chunkb[200];
+        (void)snprintf(chunkb, sizeof(chunkb), "emit|%.119s", ev);
+        parse_acc_append(acc, sizeof(acc), chunkb);
+        i = with_idx + 1;
+        continue;
+      }
+      char chunkc[200];
+      (void)snprintf(chunkc, sizeof(chunkc), "emit|%.119s", ev);
+      parse_acc_append(acc, sizeof(acc), chunkc);
+      i = j;
+      continue;
+    }
+    if (strcmp(pairs[i].typ, "identifier") == 0 && strcmp(pairs[i].val, "import") == 0) {
+      int j = parse_skip_eol(pairs, np, i + 1);
+      if (j < np &&
+          (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0)) {
+        char chunk[280];
+        (void)snprintf(chunk, sizeof(chunk), "import|%.199s", pairs[j].val);
+        parse_acc_append(acc, sizeof(acc), chunk);
+        i = j + 1;
+        continue;
+      }
+    }
+    if (strcmp(pairs[i].typ, "identifier") == 0 && strcmp(pairs[i].val, "link") == 0) {
+      int j = parse_skip_eol(pairs, np, i + 1);
+      if (j < np &&
+          (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0)) {
+        char chunk[280];
+        (void)snprintf(chunk, sizeof(chunk), "link|%.199s", pairs[j].val);
+        parse_acc_append(acc, sizeof(acc), chunk);
+        i = j + 1;
+        continue;
+      }
+    }
+    i++;
+  }
+  if (!acc[0])
+    (void)snprintf(acc, sizeof(acc), "%s", "say|AZL_SPINE_SEMANTIC_PARSE_EXECUTE_BRIDGE");
+  (void)snprintf(nodes_out, nodes_cap, "%.254s", acc);
+}
+
 /* Execute set ::var = value */
 static void exec_set(int *i) {
   (*i)++;
@@ -1491,16 +1939,51 @@ static void exec_set(int *i) {
       fprintf(stderr, "azl_interpreter_minimal: .concat bad arg\n");
       exit(5);
     }
-    (*i)++;
+    char rgt_concat[256];
+    rgt_concat[0] = '\0';
+    if (strcmp(carg, "::tokenize_line") == 0) {
+      (*i)++;
+      if (*i >= g_ntok || strcmp(g_tok[*i], "(") != 0) {
+        fprintf(stderr, "azl_interpreter_minimal: tokenize_line missing (\n");
+        exit(5);
+      }
+      (*i)++;
+      if (*i >= g_ntok || g_tok[*i][0] != ':' || g_tok[*i][1] != ':') {
+        fprintf(stderr, "azl_interpreter_minimal: tokenize_line bad line_text\n");
+        exit(5);
+      }
+      const char *a1 = g_tok[*i];
+      (*i)++;
+      if (*i >= g_ntok || strcmp(g_tok[*i], ",") != 0) {
+        fprintf(stderr, "azl_interpreter_minimal: tokenize_line missing ,\n");
+        exit(5);
+      }
+      (*i)++;
+      if (*i >= g_ntok || g_tok[*i][0] != ':' || g_tok[*i][1] != ':') {
+        fprintf(stderr, "azl_interpreter_minimal: tokenize_line bad line_no\n");
+        exit(5);
+      }
+      const char *a2 = g_tok[*i];
+      (*i)++;
+      if (*i >= g_ntok || strcmp(g_tok[*i], ")") != 0) {
+        fprintf(stderr, "azl_interpreter_minimal: tokenize_line missing )\n");
+        exit(5);
+      }
+      (*i)++;
+      builtin_tokenize_line_c(var_get(a1), var_get(a2), rgt_concat, sizeof(rgt_concat));
+    } else {
+      (*i)++;
+      const char *r0 = var_get(carg);
+      if (r0) (void)snprintf(rgt_concat, sizeof(rgt_concat), "%s", r0);
+    }
     if (*i >= g_ntok || strcmp(g_tok[*i], ")") != 0) {
       fprintf(stderr, "azl_interpreter_minimal: .concat missing )\n");
       exit(5);
     }
     (*i)++;
     const char *l0 = var_get(concat_base);
-    const char *r0 = var_get(carg);
     const char *lp = (l0 && l0[0] && strcmp(l0, "[]") != 0) ? l0 : "";
-    const char *rp = (r0 && r0[0] && strcmp(r0, "[]") != 0) ? r0 : "";
+    const char *rp = (rgt_concat[0] && strcmp(rgt_concat, "[]") != 0) ? rgt_concat : "";
     if (!lp[0])
       (void)snprintf(val, sizeof(val), "%s", rp);
     else if (!rp[0])
@@ -1567,6 +2050,32 @@ static void exec_set(int *i) {
     const char *srct = var_get(split_base);
     split_join_newlines(srct, delimbuf, val, sizeof(val));
     var_set(k, val);
+    return;
+  }
+  if (v && strcmp(v, "::parse_tokens") == 0) {
+    (*i)++;
+    if (*i >= g_ntok || strcmp(g_tok[*i], "(") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: parse_tokens missing (\n");
+      exit(5);
+    }
+    (*i)++;
+    if (*i >= g_ntok || g_tok[*i][0] != ':' || g_tok[*i][1] != ':') {
+      fprintf(stderr, "azl_interpreter_minimal: parse_tokens bad arg\n");
+      exit(5);
+    }
+    const char *ptarg = g_tok[*i];
+    (*i)++;
+    if (*i >= g_ntok || strcmp(g_tok[*i], ")") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: parse_tokens missing )\n");
+      exit(5);
+    }
+    (*i)++;
+    const char *ptbuf = var_get(ptarg);
+    char nodesb[256];
+    builtin_parse_tokens_nodes(ptbuf, nodesb, sizeof(nodesb));
+    var_set("::ast", "{}");
+    var_set("::ast.nodes", nodesb);
+    var_set(k, "{}");
     return;
   }
   if (v && strcmp(v, "::vm_compile_ast") == 0) {

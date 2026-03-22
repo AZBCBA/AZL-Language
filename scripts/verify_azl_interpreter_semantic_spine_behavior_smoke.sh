@@ -80,8 +80,8 @@ if ! rg -q 'AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT' "$out"; then
   cat "$out" >&2 || true
   exit 553
 fi
-if ! rg -q 'AZL_SPINE_SEMANTIC_PARSE_EXECUTE_BRIDGE' "$out"; then
-  err "stdout missing parse/execute bridge marker (minimal_runtime execute_ast stub path)"
+if ! rg -q 'AZL_SPINE_SEMANTIC_PARSE_EXECUTE_BRIDGE|Said: x' "$out"; then
+  err "stdout missing parse/execute proof (bridge marker or Said: x from real say parse)"
   cat "$out" >&2 || true
   exit 554
 fi

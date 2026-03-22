@@ -1,0 +1,24 @@
+# Gate F152: ::parse_tokens — `emit ev with { k: v }` → `emit|ev|with|k|v` (execute_ast pipe encoding). Var.v[255]-safe single line.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f152_parse with { }
+  }
+  behavior {
+    listen for "f152_parse" {
+      set ::tokens = []
+      set ::tx = "emit w with { k: a }"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::tx, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F152_OK"
+    }
+  }
+}
