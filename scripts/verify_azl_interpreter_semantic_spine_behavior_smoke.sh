@@ -14,10 +14,13 @@
 # smoke16 if ( false ) { … } otherwise { two says } — ordered multi-statement otherwise; P16_BAD must not appear; P16_A before P16_B on stdout.
 # smoke17 set ::azl_spine_p17 = true then if ( ::azl_spine_p17 ) { … } otherwise { … } — evaluated condition (if| + host execute_ast); P17_IF only; P17_BAD must not appear.
 # smoke18 set ::azl_spine_p18 = false then if ( ::azl_spine_p18 ) { … } otherwise { … } — evaluated falsey global; P18_ELSE only; P18_BAD must not appear.
+# smoke19 evaluated truthy then-branch: two say lines in then-block; P19_A before P19_B; P19_BAD must not appear.
+# smoke20 evaluated falsey otherwise-branch: two say lines in otherwise-block; P20_A before P20_B; P20_BAD must not appear.
+# smoke21 if ( ::azl_spine_p21 == 1 ) expression condition; P21_IF only; P21_BAD must not appear.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–642).
+# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–650).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -104,8 +107,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=18)}' "$out"; then
-  err "stdout expected >=18 \"Interpretation complete:\" lines (harness eighteen emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=21)}' "$out"; then
+  err "stdout expected >=21 \"Interpretation complete:\" lines (harness twenty-one emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -227,6 +230,54 @@ if ! rg -q 'AZL_SPINE_P18_ELSE' "$out"; then
   err "stdout missing eighteenth-interpret otherwise marker AZL_SPINE_P18_ELSE (set false + if (::azl_spine_p18) on real file path)"
   cat "$out" >&2 || true
   exit 642
+fi
+if rg -q 'AZL_SPINE_P19_BAD' "$out"; then
+  err "stdout must not contain nineteenth-interpret otherwise marker AZL_SPINE_P19_BAD (evaluated truthy then-branch)"
+  cat "$out" >&2 || true
+  exit 643
+fi
+if ! rg -q 'AZL_SPINE_P19_A' "$out" || ! rg -q 'AZL_SPINE_P19_B' "$out"; then
+  err "stdout missing nineteenth-interpret then-branch markers AZL_SPINE_P19_A and/or AZL_SPINE_P19_B"
+  cat "$out" >&2 || true
+  exit 644
+fi
+if ! awk '
+  /AZL_SPINE_P19_A/ && !a { a = NR }
+  /AZL_SPINE_P19_B/ && !b { b = NR }
+  END { exit !(a && b && a < b) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P19_A line before AZL_SPINE_P19_B (multi-statement then)"
+  cat "$out" >&2 || true
+  exit 645
+fi
+if rg -q 'AZL_SPINE_P20_BAD' "$out"; then
+  err "stdout must not contain twentieth-interpret then-branch marker AZL_SPINE_P20_BAD (evaluated falsey otherwise)"
+  cat "$out" >&2 || true
+  exit 646
+fi
+if ! rg -q 'AZL_SPINE_P20_A' "$out" || ! rg -q 'AZL_SPINE_P20_B' "$out"; then
+  err "stdout missing twentieth-interpret otherwise markers AZL_SPINE_P20_A and/or AZL_SPINE_P20_B"
+  cat "$out" >&2 || true
+  exit 647
+fi
+if ! awk '
+  /AZL_SPINE_P20_A/ && !a { a = NR }
+  /AZL_SPINE_P20_B/ && !b { b = NR }
+  END { exit !(a && b && a < b) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P20_A line before AZL_SPINE_P20_B (multi-statement otherwise)"
+  cat "$out" >&2 || true
+  exit 648
+fi
+if ! rg -q 'AZL_SPINE_P21_IF' "$out"; then
+  err "stdout missing twenty-first-interpret expression-condition if marker AZL_SPINE_P21_IF (::azl_spine_p21 == 1)"
+  cat "$out" >&2 || true
+  exit 649
+fi
+if rg -q 'AZL_SPINE_P21_BAD' "$out"; then
+  err "stdout must not contain twenty-first-interpret otherwise marker AZL_SPINE_P21_BAD"
+  cat "$out" >&2 || true
+  exit 650
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"
