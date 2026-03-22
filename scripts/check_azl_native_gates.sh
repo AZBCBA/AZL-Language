@@ -5231,7 +5231,7 @@ echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh
 
-echo "[gate] G2: semantic spine execution owner = Python minimal_runtime (not C minimal)"
+echo "[gate] G2: semantic spec line = azl_interpreter.azl path; spine exec owner = Python minimal_runtime (not C minimal)"
 chmod +x scripts/verify_semantic_spine_owner_contract.sh 2>/dev/null || true
 bash scripts/verify_semantic_spine_owner_contract.sh
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tier B P0.1 — semantic spine execution owner is Python minimal_runtime, not C minimal.
+# Tier B P0.1 — interpreter spec is azl_interpreter.azl; spine execution stays Python minimal_runtime (not C minimal).
 # Fails if the azl_interpreter spine launcher or host stops delegating to tools/azl_semantic_engine.
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -30,8 +30,10 @@ if [ "$probe_rc" -ne 0 ]; then
   echo "ERROR: spine host --semantic-owner must exit 0, got rc=$probe_rc out=$probe_out" >&2
   exit 97
 fi
-if [ "$probe_out" != "AZL_SEMANTIC_OWNER=minimal_runtime_python" ]; then
-  echo "ERROR: spine host must print exactly: AZL_SEMANTIC_OWNER=minimal_runtime_python" >&2
+expected=$'AZL_SEMANTIC_SPEC_OWNER=azl/runtime/interpreter/azl_interpreter.azl\nAZL_SPINE_EXEC_OWNER=minimal_runtime_python'
+if [ "$probe_out" != "$expected" ]; then
+  echo "ERROR: spine host --semantic-owner must print exactly (two lines, this order):" >&2
+  printf '%s\n' "$expected" >&2
   printf '%s\n' "$probe_out" >&2
   exit 98
 fi

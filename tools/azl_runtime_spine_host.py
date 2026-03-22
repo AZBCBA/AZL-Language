@@ -7,8 +7,8 @@ through ``azl_semantic_engine.minimal_runtime`` (C parity via ``tools/azl_interp
 define interpreter semantics — only host I/O and the bootstrap bridge.
 
 Smoke: ``scripts/verify_azl_interpreter_semantic_spine_smoke.sh`` (init); ``…_behavior_smoke.sh`` (deeper interpret
-harness). Interpreter slice gate: ``azl/tests/p0_semantic_interpreter_slice.azl`` (F3). Gate G2: ``--semantic-owner``
-prints which engine runs the spine (must stay Python minimal for Tier B contract).
+harness). Interpreter slice gate: ``azl/tests/p0_semantic_interpreter_slice.azl`` (F3). Gate G2: ``--semantic-owner`` prints fixed lines: interpreter spec path (``azl_interpreter.azl``) and spine
+execution owner (Python ``minimal_runtime``; must not be C minimal for Tier B contract).
 
 Exit codes:
   71 — ERR_AZL_COMBINED_PATH_INVALID
@@ -24,7 +24,11 @@ from __future__ import annotations
 import os
 import sys
 
-_SEMANTIC_OWNER_LINE = "AZL_SEMANTIC_OWNER=minimal_runtime_python"
+# Fixed two-line probe for G2 / verify_semantic_spine_owner_contract.sh (order is contract).
+_SEMANTIC_PROBE_LINE_SPEC = (
+    "AZL_SEMANTIC_SPEC_OWNER=azl/runtime/interpreter/azl_interpreter.azl"
+)
+_SEMANTIC_PROBE_LINE_SPINE_EXEC = "AZL_SPINE_EXEC_OWNER=minimal_runtime_python"
 
 
 def main() -> int:
@@ -36,7 +40,8 @@ def main() -> int:
                     file=sys.stderr,
                 )
                 return 74
-            print(_SEMANTIC_OWNER_LINE, flush=True)
+            print(_SEMANTIC_PROBE_LINE_SPEC, flush=True)
+            print(_SEMANTIC_PROBE_LINE_SPINE_EXEC, flush=True)
             return 0
         print(
             "azl_runtime_spine_host: ERR_USAGE unknown arguments (use --semantic-owner only)",

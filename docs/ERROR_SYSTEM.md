@@ -739,7 +739,7 @@ Semantic parity slices **F5–F170** map to the rows below (**F9** stdout mismat
 | **625** | Python spine host **`p0_semantic_spine_component_listen_emit_with_payload`** failed (**F170**) |
 | **626** | C vs Python **`p0_semantic_spine_component_listen_emit_with_payload`** stdout mismatch (**F170**) |
 | **97** | Semantic spine owner probe failed ( **`verify_semantic_spine_owner_contract.sh`**: bad **`--semantic-owner`** exit or missing host) |
-| **98** | Semantic spine owner line mismatch (expected **`AZL_SEMANTIC_OWNER=minimal_runtime_python`**) |
+| **98** | Semantic spine owner probe stdout mismatch (expected two lines: **`AZL_SEMANTIC_SPEC_OWNER=azl/runtime/interpreter/azl_interpreter.azl`** then **`AZL_SPINE_EXEC_OWNER=minimal_runtime_python`**) |
 | **99** | **`azl_azl_interpreter_runtime.sh`** no longer **`exec python3`** spine host (C must not own semantic spine) |
 | **100** | **`azl_runtime_spine_host.py`** missing **`minimal_runtime.run_file`** import contract |
 
@@ -765,7 +765,7 @@ Tier B **P0.1** guard: with **`AZL_RUNTIME_SPINE=azl_interpreter`**, the child l
 |------|---------|
 | **92** | **`python3`** not found |
 | **97** | Owner probe failed (host missing, or **`--semantic-owner`** not exit **0**) |
-| **98** | Owner stdout line not exactly **`AZL_SEMANTIC_OWNER=minimal_runtime_python`** |
+| **98** | Owner stdout not exactly the two fixed **`--semantic-owner`** lines (spec path then **`AZL_SPINE_EXEC_OWNER=minimal_runtime_python`**) |
 | **99** | Semantic launcher contract broken (**`exec python3`** / **`azl_runtime_spine_host.py`**) |
 | **100** | Spine host import contract broken (**`minimal_runtime.run_file`**) |
 
