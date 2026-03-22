@@ -1,8 +1,9 @@
 # Tier B P0.1 — semantic spine behavior-entry harness (test-only).
 # Concatenated after azl_security_for_interpreter_spine.azl and before
 # azl/runtime/interpreter/azl_interpreter.azl. Entry component: ::azl.spine.behavior.entry
-# links the real interpreter, then two emit interpret (same code) — second pass exercises
-# in-file tok_cache + ast_cache hit branches (azl_interpreter.azl tokenize/parse listeners).
+# links the real interpreter, then:
+#   - two emit interpret (same code) — second pass exercises in-file tok_cache + ast_cache hits;
+#   - third emit interpret (two-line user code) — exercises in-file split("\n"), parse loop, two say executes.
 
 component ::azl.spine.behavior.entry {
   init {
@@ -11,6 +12,8 @@ component ::azl.spine.behavior.entry {
     say "AZL_SPINE_BEHAVIOR_ENTRY_LINKED"
     emit interpret with { code: "say x", component_name: "smoke" }
     emit interpret with { code: "say x", component_name: "smoke2" }
+    emit interpret with { code: "say AZL_SPINE_DEPTH_A
+say AZL_SPINE_DEPTH_B", component_name: "smoke3" }
     say "AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT"
   }
 }

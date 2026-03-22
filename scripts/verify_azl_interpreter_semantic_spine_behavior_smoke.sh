@@ -3,11 +3,12 @@
 # Concatenates stub ::azl.security + behavior-entry harness + azl/runtime/interpreter/azl_interpreter.azl,
 # runs tools/azl_runtime_spine_host.py with AZL_ENTRY=azl.spine.behavior.entry, asserts the full in-file chain:
 # interpret → tokenize → parse → execute (say line) → execute_complete listener (Interpretation complete:).
-# Harness runs two interpret emits (same code) so the second pass must hit in-file tok_cache + ast_cache.
+# Harness: two interpret emits (same code) so the second pass hits in-file tok_cache + ast_cache; third emit
+# runs two-line embedded code (two say statements) to exercise more of azl_interpreter.azl tokenize/parse/execute.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–557).
+# See docs/ERROR_SYSTEM.md (exits 548–558).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -92,8 +93,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=2)}' "$out"; then
-  err "stdout expected >=2 \"Interpretation complete:\" lines (harness second emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=3)}' "$out"; then
+  err "stdout expected >=3 \"Interpretation complete:\" lines (harness three emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -101,6 +102,11 @@ if ! awk '/\(cache hit\)/{n++} END{exit !(n>=2)}' "$out"; then
   err "stdout expected >=2 in-file \"(cache hit)\" lines (tokenize + parse cache on second interpret)"
   cat "$out" >&2 || true
   exit 557
+fi
+if ! rg -q 'AZL_SPINE_DEPTH_A' "$out" || ! rg -q 'AZL_SPINE_DEPTH_B' "$out"; then
+  err "stdout missing third-interpret two-line say markers AZL_SPINE_DEPTH_A / AZL_SPINE_DEPTH_B"
+  cat "$out" >&2 || true
+  exit 558
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"
