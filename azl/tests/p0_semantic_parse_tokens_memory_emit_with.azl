@@ -1,0 +1,24 @@
+# Gate F163: ::parse_tokens — `memory emit f163 with { pk: pv }` → `memory|emit|f163|with|pk|pv` (execute_ast pipe encoding). Var.v[255]-safe single line.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f163_parse with { }
+  }
+  behavior {
+    listen for "f163_parse" {
+      set ::tokens = []
+      set ::tx = "memory emit f163 with { pk: pv }"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::tx, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F163_OK"
+    }
+  }
+}
