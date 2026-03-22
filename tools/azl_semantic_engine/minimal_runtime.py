@@ -380,10 +380,36 @@ class MinimalAZLRuntime:
     def _parse_listen_inner_to_row(
         self, pairs: list[tuple[str, str]], j: int, n: int, evn: str
     ) -> tuple[str, int] | None:
-        """Parse one statement inside ``listen … { … }`` → ``listen|<evn>|say|…`` / ``…|emit|…`` / ``…|set|…``."""
+        """Parse one statement inside ``listen … { … }`` → say / emit / set / return rows."""
         if j >= n:
             return None
         t0, v0 = pairs[j]
+        if t0 == "identifier" and v0 == "return":
+            j = self._skip_eol_pairs(pairs, j + 1)
+            parts_r: list[str] = []
+            while j < n:
+                t2, v2 = pairs[j]
+                if t2 == "eol":
+                    j += 1
+                    if parts_r:
+                        pay = " ".join(parts_r)[:199]
+                        seg = ("listen|" + evn + "|return|" + pay)[:255]
+                    else:
+                        seg = ("listen|" + evn + "|return")[:255]
+                    return (seg, j)
+                if t2 == "brace" and v2 == "}":
+                    if parts_r:
+                        pay = " ".join(parts_r)[:199]
+                        seg = ("listen|" + evn + "|return|" + pay)[:255]
+                    else:
+                        seg = ("listen|" + evn + "|return")[:255]
+                    return (seg, j + 1)
+                if t2 in ("identifier", "string"):
+                    parts_r.append(v2)
+                    j += 1
+                    continue
+                return None
+            return None
         if t0 == "identifier" and v0 == "if":
             j = self._skip_eol_pairs(pairs, j + 1)
             if j >= n or pairs[j] != ("paren", "("):
@@ -1325,6 +1351,7 @@ class MinimalAZLRuntime:
                 "if",
                 "else",
                 "otherwise",
+                "return",
             ):
                 j = self._skip_eol_pairs(pairs, i + 1)
                 if j < n and pairs[j] == ("paren", "("):

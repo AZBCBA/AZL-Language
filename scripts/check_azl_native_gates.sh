@@ -5377,6 +5377,56 @@ if [ "$F176_C_OUT" != "$F176_PY_OUT" ]; then
   exit 785
 fi
 
+echo "[gate] F177: C vs Python — parse_tokens listen { return … }"
+F177EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_return.azl"
+F177_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F177EX" boot.entry 2>&1)"
+f177_c_rc=$?
+if [ "$f177_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_tokens_listen_return exited $f177_c_rc: $F177_C_OUT"
+  exit 786
+fi
+if ! printf '%s\n' "$F177_C_OUT" | awk 'NR==1{if($0!="listen|f177|return|F177_MARK")exit 1} NR==2{if($0!="P0_SEM_F177_OK")exit 1} END{if(NR!=2)exit 1}'; then
+  echo "ERROR: expected F177 stdout (2 lines), got: $F177_C_OUT"
+  exit 786
+fi
+F177_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F177EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f177_py_rc=$?
+if [ "$f177_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_tokens_listen_return exited $f177_py_rc: $F177_PY_OUT"
+  exit 787
+fi
+if [ "$F177_C_OUT" != "$F177_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_tokens_listen_return" >&2
+  echo "C:  $F177_C_OUT" >&2
+  echo "Py: $F177_PY_OUT" >&2
+  exit 788
+fi
+
+echo "[gate] F178: C vs Python — parse_tokens memory say … + listen { say … }"
+F178EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_memory_then_listen.azl"
+F178_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F178EX" boot.entry 2>&1)"
+f178_c_rc=$?
+if [ "$f178_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_tokens_memory_then_listen exited $f178_c_rc: $F178_C_OUT"
+  exit 789
+fi
+if ! printf '%s\n' "$F178_C_OUT" | awk 'NR==1{if($0!="memory|say|F178_MEM")exit 1} NR==2{if($0!="listen|f178|say|F178_INNER")exit 1} NR==3{if($0!="P0_SEM_F178_OK")exit 1} END{if(NR!=3)exit 1}'; then
+  echo "ERROR: expected F178 stdout (3 lines), got: $F178_C_OUT"
+  exit 789
+fi
+F178_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F178EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f178_py_rc=$?
+if [ "$f178_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_tokens_memory_then_listen exited $f178_py_rc: $F178_PY_OUT"
+  exit 790
+fi
+if [ "$F178_C_OUT" != "$F178_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_tokens_memory_then_listen" >&2
+  echo "C:  $F178_C_OUT" >&2
+  echo "Py: $F178_PY_OUT" >&2
+  exit 791
+fi
+
 echo "[gate] F179: C vs Python — parse_tokens listen { set … ; emit \"…\" with { k: v } }"
 F179EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_set_emit_quoted_event.azl"
 F179_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F179EX" boot.entry 2>&1)"

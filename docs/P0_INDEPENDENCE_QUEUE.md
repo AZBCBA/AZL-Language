@@ -7,7 +7,7 @@
 **Baseline (re-verify after major spine/minimal changes):**  
 `bash scripts/check_azl_native_gates.sh` → 0; `bash scripts/verify_azl_interpreter_semantic_spine_smoke.sh` → 0; `bash scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh` → 0; optional full `RUN_OPTIONAL_BENCHES=0 make verify`.
 
-**Gate numbering gap:** **F177–F178** still **open** (inner **`return`**, **`memory`+`listen`** mix). **F176** shipped (**783–785**): **`if ( true|false|1|0 ) { say … }`** inside **`listen { … }`** (false branch emits no row; Python skips empty inner lines).
+**Gate numbering:** **F177** (**786–788**) inner **`return`** in **`listen { … }`** → **`listen|<ev>|return[|<payload>]`**; **F178** (**789–791**) **`memory say`** then **`listen { say … }`** in one **`::parse_tokens`** buffer. **F176** (**783–785**): inner **`if ( literal ) { say … }`**.
 
 ---
 
@@ -34,8 +34,8 @@
 - [x] 16. **F174** — **`say` + `set` + `emit`** — shipped (**771–773**).
 - [x] 17. **F175** — **`emit` then `set`** — shipped (**774–776**).
 - [x] 18. **F176** — inner **`if (…) { say … }`** — shipped (**783–785**); condition **`true`/`1`/`false`/`0`** only.
-- [ ] 19. **F177** — inner **`return`** in listen parse — **open** (parser extension).
-- [ ] 20. **F178** — **`memory` + `listen`** same walk — **open** (fixture + parser if needed).
+- [x] 19. **F177** — inner **`return`** in listen parse — shipped (**786–788**).
+- [x] 20. **F178** — **`memory` + `listen`** same walk — shipped (**789–791**).
 - [x] 21. **F179** — quoted inner **`emit`** in multi-line listen — shipped (**777–779**).
 - [x] 22. **F180** — inner **`with`** value **`::…`** token text in ast row — shipped (**780–782**).
 - [x] 23. Var/row buffers audited for F173–F180 shapes — **no cap increase required** (same as F171/F172).
@@ -87,4 +87,4 @@
 
 - [ ] 88. Spec + 3–5 tests per [AZL_ENGINEERING_REALITY_AUDIT.md](AZL_ENGINEERING_REALITY_AUDIT.md) — **open** (research/product track).
 
-**Last updated:** 2026-03-24 (F173–F180 + doc baseline; honesty pass on “cannot close in one PR” items).
+**Last updated:** 2026-03-24 (F173–F180 + **F177–F178** inner **`return`** / **`memory`+`listen`** buffer).

@@ -2034,13 +2034,59 @@ static int parse_with_brace_payload(ParseTokPair *pairs, int np, int j, int *j_o
   return -1;
 }
 
-/* One of say|… / emit|… / set|… inside `listen for ev [then] { … }`; chunk_out ≤254 chars; *j_out after stmt (eol or past `}`). */
+/* One of say|… / emit|… / set|… / return [payload] inside `listen for ev [then] { … }`; chunk_out ≤254 chars; *j_out after stmt (eol or past `}`). */
 static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const char *evn, char *chunk_out,
                                    size_t chunk_sz, int *j_out) {
   chunk_out[0] = '\0';
   if (chunk_sz < AZL_LISTEN_CHUNK_NEED)
     return -1;
   if (j >= np) return -1;
+  /* return [ … ] — bare `return` or `return a b` → listen|ev|return or listen|ev|return|payload (F177). */
+  if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "return") == 0) {
+    j = parse_skip_eol(pairs, np, j + 1);
+    char pay[224];
+    pay[0] = '\0';
+    size_t pl = 0;
+    while (j < np) {
+      if (strcmp(pairs[j].typ, "eol") == 0) {
+        j++;
+        if (pay[0]) {
+          (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|return|%.199s", evn, pay);
+        } else {
+          (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|return", evn);
+        }
+        if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+        *j_out = j;
+        return 0;
+      }
+      if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) {
+        if (pay[0]) {
+          (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|return|%.199s", evn, pay);
+        } else {
+          (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|return", evn);
+        }
+        if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+        *j_out = j + 1;
+        return 0;
+      }
+      if (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0) {
+        if (pl > 0U && pl + 1U < sizeof(pay)) pay[pl++] = ' ';
+        size_t rem = sizeof(pay) - pl - 1U;
+        if (rem > 0U) {
+          azl_fmt_cat_field(pay + pl, rem, 199, pairs[j].val);
+          pl = strlen(pay);
+          if (pl > 199U) {
+            pay[199] = '\0';
+            pl = 199U;
+          }
+        }
+        j++;
+        continue;
+      }
+      return -1;
+    }
+    return -1;
+  }
   /* if ( true|false|1|0 ) { say … } — one say inside then-branch; false → empty chunk (F176). */
   if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "if") == 0) {
     j = parse_skip_eol(pairs, np, j + 1);
@@ -3073,7 +3119,8 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
           strcmp(vk, "emit") != 0 &&
           strcmp(vk, "listen") != 0 && strcmp(vk, "import") != 0 && strcmp(vk, "link") != 0 &&
           strcmp(vk, "component") != 0 && strcmp(vk, "memory") != 0 && strcmp(vk, "on") != 0 &&
-          strcmp(vk, "for") != 0 && strcmp(vk, "then") != 0 && strcmp(vk, "with") != 0) {
+          strcmp(vk, "for") != 0 && strcmp(vk, "then") != 0 && strcmp(vk, "with") != 0 &&
+          strcmp(vk, "return") != 0) {
         int jc = parse_skip_eol(pairs, np, i + 1);
         if (jc < np && strcmp(pairs[jc].typ, "paren") == 0 && strcmp(pairs[jc].val, "(") == 0) {
           jc++;
