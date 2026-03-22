@@ -21,10 +21,12 @@
 # smoke23 if ( ::azl_spine_p23 == 2 ) true expression path, multi-statement then; P23_A before P23_B; P23_BAD must not appear.
 # smoke24 if ( ::azl_spine_p24 == 3 ) false expression path, multi-statement otherwise; P24_A before P24_B; P24_BAD must not appear.
 # smoke25 two sequential ifs on ::azl_spine_p25; P25_T before P25_F; P25_BAD1 and P25_BAD2 must not appear.
+# smoke26 nested if inside then-branch; P26_OUTER before P26_INNER; P26_BAD1 and P26_BAD2 must not appear.
+# smoke27 nested if inside otherwise-branch; P27_OUTER before P27_INNER; P27_BAD1 and P27_BAD2 must not appear.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–662).
+# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–668).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -111,8 +113,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=25)}' "$out"; then
-  err "stdout expected >=25 \"Interpretation complete:\" lines (harness twenty-five emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=27)}' "$out"; then
+  err "stdout expected >=27 \"Interpretation complete:\" lines (harness twenty-seven emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -354,6 +356,44 @@ if ! awk '
   err "stdout expected AZL_SPINE_P25_T line before AZL_SPINE_P25_F (ordered sequential ifs in one emitted program)"
   cat "$out" >&2 || true
   exit 662
+fi
+if ! rg -q 'AZL_SPINE_P26_OUTER' "$out" || ! rg -q 'AZL_SPINE_P26_INNER' "$out"; then
+  err "stdout missing twenty-sixth-interpret nested-if-in-then markers AZL_SPINE_P26_OUTER and/or AZL_SPINE_P26_INNER"
+  cat "$out" >&2 || true
+  exit 663
+fi
+if rg -q 'AZL_SPINE_P26_BAD1' "$out" || rg -q 'AZL_SPINE_P26_BAD2' "$out"; then
+  err "stdout must not contain AZL_SPINE_P26_BAD1 or AZL_SPINE_P26_BAD2 (nested if in then-branch)"
+  cat "$out" >&2 || true
+  exit 664
+fi
+if ! awk '
+  /AZL_SPINE_P26_OUTER/ && !o { o = NR }
+  /AZL_SPINE_P26_INNER/ && !i { i = NR }
+  END { exit !(o && i && o < i) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P26_OUTER line before AZL_SPINE_P26_INNER (nested if inside then)"
+  cat "$out" >&2 || true
+  exit 665
+fi
+if ! rg -q 'AZL_SPINE_P27_OUTER' "$out" || ! rg -q 'AZL_SPINE_P27_INNER' "$out"; then
+  err "stdout missing twenty-seventh-interpret nested-if-in-otherwise markers AZL_SPINE_P27_OUTER and/or AZL_SPINE_P27_INNER"
+  cat "$out" >&2 || true
+  exit 666
+fi
+if rg -q 'AZL_SPINE_P27_BAD1' "$out" || rg -q 'AZL_SPINE_P27_BAD2' "$out"; then
+  err "stdout must not contain AZL_SPINE_P27_BAD1 or AZL_SPINE_P27_BAD2 (nested if inside otherwise)"
+  cat "$out" >&2 || true
+  exit 667
+fi
+if ! awk '
+  /AZL_SPINE_P27_OUTER/ && !o { o = NR }
+  /AZL_SPINE_P27_INNER/ && !i { i = NR }
+  END { exit !(o && i && o < i) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P27_OUTER line before AZL_SPINE_P27_INNER (nested if inside otherwise)"
+  cat "$out" >&2 || true
+  exit 668
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"
