@@ -4077,6 +4077,31 @@ if [ "$F124_C_OUT" != "$F124_PY_OUT" ]; then
   exit 475
 fi
 
+echo "[gate] F125: C vs Python — preloop import|+link| then component|×3 + memory|say| between (triple linked inits interleaved)"
+F125EX="${ROOT_DIR}/azl/tests/p0_semantic_execute_ast_preloop_three_component_memory_say.azl"
+F125_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F125EX" boot.entry 2>&1)"
+f125_c_rc=$?
+if [ "$f125_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_ast_preloop_three_component_memory_say exited $f125_c_rc: $F125_C_OUT"
+  exit 476
+fi
+if ! printf '%s\n' "$F125_C_OUT" | awk 'NR==1{if($0!="F125_TREE")exit 1} NR==2{if($0!="P125_LINK_SID")exit 1} NR==3{if($0!="P125_A")exit 1} NR==4{if($0!="F125_M1")exit 1} NR==5{if($0!="P125_B")exit 1} NR==6{if($0!="F125_M2")exit 1} NR==7{if($0!="P125_C")exit 1} NR==8{if($0!="F125_M3")exit 1} NR==9{if($0!="f125_mod_tag")exit 1} NR==10{if($0!="EX125_POST")exit 1} NR==11{if($0!="Said: F125_M3")exit 1} NR==12{if($0!="EC125_INNER")exit 1} NR==13{if($0!="Said: F125_M3")exit 1} NR==14{if($0!="P0_SEM_F125_OK")exit 1} END{if(NR!=14)exit 1}'; then
+  echo "ERROR: expected F125 preloop + three component| + memory|say| interleave stdout (14 lines), got: $F125_C_OUT"
+  exit 476
+fi
+F125_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F125EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f125_py_rc=$?
+if [ "$f125_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_ast_preloop_three_component_memory_say exited $f125_py_rc: $F125_PY_OUT"
+  exit 477
+fi
+if [ "$F125_C_OUT" != "$F125_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_ast_preloop_three_component_memory_say" >&2
+  echo "C:  $F125_C_OUT" >&2
+  echo "Py: $F125_PY_OUT" >&2
+  exit 478
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

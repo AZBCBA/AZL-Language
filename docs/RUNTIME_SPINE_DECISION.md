@@ -148,7 +148,9 @@ the trace today is: **`start_azl_native_mode.sh`** → **`run_enterprise_daemon.
 
 **P0execpreiltwocomponentmemorysay (`execute_ast` **`import|/`link|`** preloop then **`component|alpha`** then **`memory|say|…`** then **`component|beta`** then **`memory|say|…`**, 2026-03-22):** Two distinct **`component|`** rows interleaved with a memory stdout row — source order vs **`run_linked_component`**. Gate **F124**: **`azl/tests/p0_semantic_execute_ast_preloop_two_component_memory_say.azl`** (exits **473–475**, **P0execpreiltwocomponentmemorysay**).
 
-**Open next (spine queue):** deeper **`execute_ast`** vs **`execute_component` / `execute_listen`** (triple+ **`component|`**, **`memory|emit`** between components, non-stub memory bodies) — **F125+**; **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** phase **E** depth + phase **F** behavior claim.
+**P0execpreilthreecomponentmemorysay (`execute_ast` **`import|/`link|`** preloop then **three** **`component|…`** rows each separated by **`memory|say|…`**, 2026-03-22):** Triple linked-**`init`** interleave + trailing **`memory|say|…`**. Gate **F125**: **`azl/tests/p0_semantic_execute_ast_preloop_three_component_memory_say.azl`** (exits **476–478**, **P0execpreilthreecomponentmemorysay**).
+
+**Open next (spine queue):** deeper **`execute_ast`** vs **`execute_component` / `execute_listen`** (**`memory|emit`** between **`component|`**, non-stub memory bodies, real **`execute_listen`**) — **F126+**; **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** phase **E** depth + phase **F** behavior claim.
 
 **P0.1 execution order (vertical slices):** Maintainership sequence for **`azl_interpreter.azl`** on the semantic spine — parity gates (**A**), real-file **`init`** smoke (**B**), then **tokenize → parse → execute** slices (**C–E**) before claiming full **behavior** (**F**). Single source: **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** § **P0.1 — Long-term execution order** and **[TIER_B_BACKLOG.md](TIER_B_BACKLOG.md)** § **P0.1 execution checklist**.
 
