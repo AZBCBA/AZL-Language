@@ -5,6 +5,8 @@
  */
 #define _GNU_SOURCE
 #include "azl_core_engine.h"
+#include "azl_bytecode.h"
+#include "azl_compiler.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -815,6 +817,48 @@ AzlErr azl_bridge_submit_http(AzlSysproxyBridge *b, const AzlHttpJob *job) {
   return AZL_OK;
 }
 
+static const char *vm_const_get(const AzlBytecodeProgram *p, uint32_t idx) {
+  if (!p || idx >= p->nconst)
+    return NULL;
+  return p->consts[idx];
+}
+
+/* Native VM: flat opcode array -> azl_engine_emit on OP_EMIT (no Python). */
+AzlErr azl_vm_exec_block(AzlEngine *eng, const AzlBytecodeProgram *prog) {
+  if (!eng || !prog || !prog->code)
+    return AZL_ERR_INVALID;
+  for (size_t pc = 0; pc < prog->ncode; pc++) {
+    const AzlBytecodeInstr *in = &prog->code[pc];
+    switch (in->op) {
+    case AZL_OP_NOP:
+    case AZL_OP_LISTEN:
+      break;
+    case AZL_OP_HALT:
+      return AZL_OK;
+    case AZL_OP_LOAD_CONST:
+      (void)vm_const_get(prog, in->a);
+      break;
+    case AZL_OP_CALL:
+      break;
+    case AZL_OP_EMIT: {
+      const char *ev = vm_const_get(prog, in->a);
+      const char *k = vm_const_get(prog, in->b);
+      const char *v = vm_const_get(prog, in->c);
+      if (!ev || !k || !v)
+        return AZL_ERR_INVALID;
+      AzlPayloadKV kv = {k, v, NULL};
+      AzlErr r = azl_engine_emit(eng, ev, &kv);
+      if (r != AZL_OK)
+        return r;
+      break;
+    }
+    default:
+      return AZL_ERR_INVALID;
+    }
+  }
+  return AZL_OK;
+}
+
 int azl_bridge_poll(AzlSysproxyBridge *b) {
   if (!b)
     return 0;
@@ -906,6 +950,12 @@ int main(void) {
   azl_engine_register_listener(e, "outer", on_emit_nested, NULL);
   azl_engine_emit(e, "outer", &kv);
   azl_engine_destroy(e);
+
+  if (azl_bytecode_selftest() != 0)
+    return 4;
+
+  if (azl_compiler_selftest() != 0)
+    return 5;
 
   printf("azl_core_engine_selftest: ok\n");
   return 0;

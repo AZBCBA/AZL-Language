@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "consts": [
+    "hello",
+    "message",
+    "Hello World"
+  ],
+  "code": [
+    { "op": "emit", "event": 0, "key": 1, "val": 2 },
+    { "op": "halt" }
+  ]
+}

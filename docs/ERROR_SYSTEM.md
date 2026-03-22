@@ -151,14 +151,14 @@ Runs in **`scripts/run_tests.sh`**. **`PYTHONPATH=tools`** **`python3 -m azl_lit
 
 ### Native core engine selftest (`scripts/verify_azl_core_engine.sh`)
 
-Runs in **`scripts/run_tests.sh`**. Compiles **`tools/azl_core_engine.c`** and **`tools/azl_bytecode.c`** with **`AZL_CORE_ENGINE_SELFTEST`** (multi-listener dispatch, fixed-depth recursion guard, JSON bytecode VM hello-world from **`tools/testdata/vm_hello_world.json`**). Prefix **`ERROR[AZL_CORE_ENGINE_VERIFY]:`** on stderr.
+Runs in **`scripts/run_tests.sh`**. Compiles **`tools/azl_core_engine.c`**, **`tools/azl_bytecode.c`**, and **`tools/azl_compiler.c`** with **`AZL_CORE_ENGINE_SELFTEST`** (multi-listener dispatch, fixed-depth recursion guard, JSON bytecode hello-world **`tools/testdata/vm_hello_world.json`**, AZL-source compile + VM hello **`tools/testdata/vm_hello.azl`**). Prefix **`ERROR[AZL_CORE_ENGINE_VERIFY]:`** on stderr.
 
 | Exit | Meaning |
 |------|---------|
 | **627** | Not repository root / **`tools/azl_core_engine.c`** missing |
 | **628** | **`gcc`** not found |
 | **629** | Compile failed (**`-Wall -Wextra -Werror`**) |
-| **630** | Selftest process failed |
+| **630** | Selftest process failed (**`azl_core_engine_selftest`** exit **4** = JSON bytecode VM, **5** = AZL compiler / **`vm_hello.azl`**) |
 
 ### RepertoireField surface contract (`scripts/verify_repertoire_field_surface_contract.sh`)
 

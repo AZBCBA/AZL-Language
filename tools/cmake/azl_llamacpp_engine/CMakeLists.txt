@@ -32,6 +32,8 @@ add_executable(azl-native-engine
   "${AZL_REPO_ROOT}/tools/azl_native_engine.c"
   "${AZL_REPO_ROOT}/tools/azl_core_engine.c"
   "${AZL_REPO_ROOT}/tools/azl_native_engine_core_host.c"
+  "${AZL_REPO_ROOT}/tools/azl_bytecode.c"
+  "${AZL_REPO_ROOT}/tools/azl_compiler.c"
   "${AZL_REPO_ROOT}/tools/azl_gguf_infer_llamacpp.cpp"
 )
 

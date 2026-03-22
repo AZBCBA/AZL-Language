@@ -7,8 +7,10 @@ OUT_BIN="${OUT_DIR}/azl-native-engine"
 SRC_ENGINE="${ROOT_DIR}/tools/azl_native_engine.c"
 SRC_CORE="${ROOT_DIR}/tools/azl_core_engine.c"
 SRC_HOST="${ROOT_DIR}/tools/azl_native_engine_core_host.c"
+SRC_BC="${ROOT_DIR}/tools/azl_bytecode.c"
+SRC_CMP="${ROOT_DIR}/tools/azl_compiler.c"
 
-for f in "$SRC_ENGINE" "$SRC_CORE" "$SRC_HOST"; do
+for f in "$SRC_ENGINE" "$SRC_CORE" "$SRC_HOST" "$SRC_BC" "$SRC_CMP"; do
   if [ ! -f "$f" ]; then
     echo "ERROR: missing source file: $f" >&2
     exit 2
@@ -24,6 +26,6 @@ mkdir -p "$OUT_DIR"
 # Default gate build: no llama.cpp. For in-process GGUF (linked llama.cpp), use:
 #   LLAMA_CPP_ROOT=/path/to/llama.cpp ./scripts/build_azl_native_engine_with_llamacpp.sh
 gcc -O2 -Wall -Wextra -pthread -I"${ROOT_DIR}/tools" \
-  -o "$OUT_BIN" "$SRC_ENGINE" "$SRC_CORE" "$SRC_HOST"
+  -o "$OUT_BIN" "$SRC_ENGINE" "$SRC_CORE" "$SRC_HOST" "$SRC_BC" "$SRC_CMP"
 chmod +x "$OUT_BIN"
 echo "$OUT_BIN"

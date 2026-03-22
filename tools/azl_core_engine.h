@@ -49,6 +49,16 @@ typedef void (*AzlListenerFn)(AzlEngine *engine, const AzlEvent *event, void *us
 typedef void (*AzlEngineErrorFn)(AzlEngine *engine, AzlErr code, const char *message,
                                  void *userdata);
 
+/* --- Bytecode VM opcodes (native core; loader/exec in tools/azl_bytecode.c) --- */
+typedef enum AzlOpcode {
+  AZL_OP_NOP = 0,
+  AZL_OP_HALT = 1,
+  AZL_OP_LOAD_CONST = 2,
+  AZL_OP_EMIT = 3,
+  AZL_OP_CALL = 4,
+  AZL_OP_LISTEN = 5,
+} AzlOpcode;
+
 /* --- Arena: bump allocator, reset between bursts (zero freelist fragmentation) --- */
 AzlArena *azl_arena_create(size_t capacity_bytes);
 void azl_arena_destroy(AzlArena *a);

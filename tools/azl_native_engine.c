@@ -19,6 +19,8 @@
 #include <strings.h>
 
 #include "azl_native_engine_core_host.h"
+#include "azl_compiler.h"
+#include "azl_bytecode.h"
 
 #ifdef AZL_WITH_LLAMACPP
 #include "azl_gguf_infer_llamacpp.h"
@@ -46,12 +48,30 @@ typedef struct {
   char runtime_command[1024];
   int use_native_core;
   int native_core_demo;
+  char compile_azl_path[1024];
   AzlNativeCoreHost native_core;
 } EngineState;
 
 static void on_signal(int sig) {
   (void)sig;
   g_running = 0;
+}
+
+/* Optional: run compiled .azl (emit hello → message) at startup; prints payload line. */
+static void native_compile_hello_sink(AzlEngine *eng, const AzlEvent *ev, void *ud) {
+  (void)eng;
+  (void)ud;
+  const char *msg = NULL;
+  for (const AzlPayloadKV *p = ev->payload; p; p = p->next) {
+    if (p->key && strcmp(p->key, "message") == 0) {
+      msg = p->value ? p->value : "";
+      break;
+    }
+  }
+  if (msg) {
+    printf("%s\n", msg);
+    fflush(stdout);
+  }
 }
 
 static const char *getenv_or(const char *k, const char *fallback) {
@@ -1566,6 +1586,8 @@ int main(int argc, char **argv) {
             "  --use-native-core   Embed azl_core_engine; skip AZL_NATIVE_RUNTIME_CMD child (benchmark).\n");
     fprintf(stderr,
             "  --native-core-demo  After start, emit async Ollama /api/generate (needs curl; OLLAMA_HOST).\n");
+    fprintf(stderr,
+            "  --compile-azl PATH  With --use-native-core: compile .azl subset to bytecode and vm_exec.\n");
     return 2;
   }
   EngineState st;
@@ -1579,6 +1601,14 @@ int main(int argc, char **argv) {
     }
     if (strcmp(argv[i], "--native-core-demo") == 0) {
       st.native_core_demo = 1;
+      continue;
+    }
+    if (strcmp(argv[i], "--compile-azl") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "native-engine: --compile-azl requires a path\n");
+        return 2;
+      }
+      snprintf(st.compile_azl_path, sizeof(st.compile_azl_path), "%s", argv[++i]);
       continue;
     }
     if (!bundle_arg)
@@ -1596,6 +1626,10 @@ int main(int argc, char **argv) {
   }
   if (st.native_core_demo && !st.use_native_core) {
     fprintf(stderr, "native-engine: --native-core-demo requires --use-native-core\n");
+    return 2;
+  }
+  if (st.compile_azl_path[0] != '\0' && !st.use_native_core) {
+    fprintf(stderr, "native-engine: --compile-azl requires --use-native-core\n");
     return 2;
   }
   snprintf(st.bundle_path, sizeof(st.bundle_path), "%s", bundle_arg);
@@ -1625,6 +1659,8 @@ int main(int argc, char **argv) {
   signal(SIGINT, on_signal);
   signal(SIGTERM, on_signal);
 
+  /* Native core: event + HTTP bridge + bytecode VM live in-process; no AZL_NATIVE_RUNTIME_CMD
+   * child (no Python minimal_runtime / C minimal interpreter subprocess for event logic). */
   if (st.use_native_core) {
     char cwdbuf[512];
     if (getenv("AZL_REPO_ROOT") == NULL && getcwd(cwdbuf, sizeof(cwdbuf)) != NULL)
@@ -1638,6 +1674,24 @@ int main(int argc, char **argv) {
       fprintf(stderr, "native-engine: azl_native_core_register_stdlib_net_http failed\n");
       azl_native_core_host_shutdown(&st.native_core);
       return 17;
+    }
+    if (st.compile_azl_path[0] != '\0') {
+      azl_engine_register_listener(st.native_core.eng, "hello", native_compile_hello_sink, NULL);
+      AzlBytecodeProgram bcprog;
+      azl_bytecode_program_init_empty(&bcprog);
+      char cerr[512];
+      if (azl_compile_file(st.compile_azl_path, &bcprog, cerr, sizeof(cerr)) != 0) {
+        fprintf(stderr, "native-engine: --compile-azl %s: %s\n", st.compile_azl_path, cerr);
+        azl_native_core_host_shutdown(&st.native_core);
+        return 18;
+      }
+      if (azl_vm_exec_block(st.native_core.eng, &bcprog) != AZL_OK) {
+        fprintf(stderr, "native-engine: vm_exec after --compile-azl failed\n");
+        azl_bytecode_program_destroy(&bcprog);
+        azl_native_core_host_shutdown(&st.native_core);
+        return 19;
+      }
+      azl_bytecode_program_destroy(&bcprog);
     }
     if (st.native_core_demo)
       azl_native_core_emit_demo_ollama(&st.native_core);
