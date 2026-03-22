@@ -5,11 +5,13 @@
 # interpret → tokenize → parse → execute (say line) → execute_complete listener (Interpretation complete:).
 # Harness: smoke/smoke2 same code → cache hits; third–fifth multi-line embedded say depth; smoke6 literal AZL_S6_ONLY;
 # smoke7 repeats smoke6 code → second pair of (cache hit) lines on that snippet; smoke8 new literal AZL_S8_MARK;
-# smoke9 set ::… then say — exercises execute_ast set row on the real file path.
+# smoke9 set ::… then say — exercises execute_ast set row on the real file path;
+# smoke10 bare emit — ::execute_emit / ::emit_event_resolved (spine surfaces result as Interpretation complete: Emitted: …).
+# smoke11 emit with payload — payload branch + host prints AZL_EMIT_WITH_PAYLOAD (matches in-file marker intent).
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–562, 611).
+# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–629).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -56,6 +58,8 @@ fi
 unset AZL_INTERPRETER_DAEMON || true
 export AZL_COMBINED_PATH="$COMBINED"
 export AZL_ENTRY=azl.spine.behavior.entry
+# Proof-only: mirror ::emit_event_resolved payload marker on stdout without mutating F96+ gate fixtures.
+export AZL_SPINE_BEHAVIOR_SMOKE_PAYLOAD_MARK=1
 
 out="$(mktemp "${TMPDIR:-/tmp}/azl_interpreter_spine_behavior_smoke_out.XXXXXX")"
 errf="$(mktemp "${TMPDIR:-/tmp}/azl_interpreter_spine_behavior_smoke_err.XXXXXX")"
@@ -94,8 +98,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=9)}' "$out"; then
-  err "stdout expected >=9 \"Interpretation complete:\" lines (harness nine emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=11)}' "$out"; then
+  err "stdout expected >=11 \"Interpretation complete:\" lines (harness eleven emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -133,6 +137,21 @@ if ! rg -q 'AZL_SPINE_P9_SET_LINE' "$out"; then
   err "stdout missing ninth-interpret set+say marker AZL_SPINE_P9_SET_LINE"
   cat "$out" >&2 || true
   exit 611
+fi
+if ! rg -q 'Emitted: AZL_SPINE_P10_USER_EMIT' "$out"; then
+  err "stdout missing tenth-interpret user emit result (Interpretation complete: Emitted: AZL_SPINE_P10_USER_EMIT)"
+  cat "$out" >&2 || true
+  exit 627
+fi
+if ! rg -q 'Emitted: AZL_SPINE_P11' "$out"; then
+  err "stdout missing eleventh-interpret emit-with-payload result (Emitted: AZL_SPINE_P11)"
+  cat "$out" >&2 || true
+  exit 628
+fi
+if ! rg -q 'AZL_EMIT_WITH_PAYLOAD' "$out"; then
+  err "stdout missing in-file payload emit marker AZL_EMIT_WITH_PAYLOAD (::emit_event_resolved)"
+  cat "$out" >&2 || true
+  exit 629
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"

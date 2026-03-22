@@ -34,6 +34,8 @@ MAX_EVENTS = 32
 MAX_PAYLOAD_KEYS = 8
 # Bytes stored per Var.v (tz concat / ::tokens). Execute_ast pipe rows stay capped at 255 elsewhere.
 MAX_VAR_VALUE_LEN = 2047
+# azl_interpreter.azl serialized token/ast buffers on spine (cache round-trips, concat); not C-minimal parity surface.
+INTERP_BLOB_VAR_MAX = 65536
 
 # Bare identifiers in set/if (interpreter-shaped; see azl_interpreter.azl tokenize/parse).
 _BARE_ID_FORBIDDEN = frozenset(
@@ -206,13 +208,27 @@ class MinimalAZLRuntime:
                 return v.v
         return None
 
+    def _value_cap_for_key(self, k: str) -> int:
+        if k in (
+            "::tokens",
+            "::ast",
+            "::cached_tok",
+            "::cached_ast",
+            "::ast.nodes",
+            "::ast.spine",
+            "::lines",
+        ):
+            return INTERP_BLOB_VAR_MAX
+        return MAX_VAR_VALUE_LEN
+
     def var_set(self, k: str, v: str) -> None:
+        cap = self._value_cap_for_key(k)
         for i, x in enumerate(self.vars):
             if x.k == k:
-                self.vars[i] = Var(k=k, v=v[:MAX_VAR_VALUE_LEN])
+                self.vars[i] = Var(k=k, v=v[:cap])
                 return
         if len(self.vars) < MAX_VARS:
-            self.vars.append(Var(k=k[:63], v=v[:MAX_VAR_VALUE_LEN]))
+            self.vars.append(Var(k=k[:63], v=v[:cap]))
 
     def queue_push(self, ev: str, payload: list[tuple[str, str]] | None = None) -> None:
         if len(self.queue) >= MAX_EVENTS:
@@ -1119,7 +1135,7 @@ class MinimalAZLRuntime:
                         5, "azl_semantic_engine: insert_cache missing )"
                     )
                 i[0] += 1
-                self._perf_ast_cache[key_raw[:200]] = ast_v[:4096]
+                self._perf_ast_cache[key_raw[:200]] = ast_v[:65536]
                 return True
             if not self.tok[i[0]].startswith("::"):
                 raise SemanticEngineError(
@@ -1142,7 +1158,7 @@ class MinimalAZLRuntime:
                     5, "azl_semantic_engine: insert_cache missing )"
                 )
             i[0] += 1
-            self._perf_tok_cache[key_raw[:200]] = toks_v[:4096]
+            self._perf_tok_cache[key_raw[:200]] = toks_v[:65536]
             return True
         if t == "::touch_cache_key":
             i[0] += 1
@@ -1463,7 +1479,9 @@ class MinimalAZLRuntime:
                 raw = self._perf_tok_cache.get(key_s)
                 if raw is None:
                     return "", 1
-                return raw[:MAX_VAR_VALUE_LEN], 0
+                # Values are capped at insert (::insert_cache uses 65536); do not re-truncate to
+                # MAX_VAR_VALUE_LEN or tokenize/parse cache hits corrupt the interpreter chain.
+                return raw, 0
             if t == "::perf.ast_cache":
                 i[0] += 1
                 if i[0] >= self.ntok or self.tok[i[0]] != "[":
@@ -1478,7 +1496,7 @@ class MinimalAZLRuntime:
                 raw = self._perf_ast_cache.get(key_s)
                 if raw is None:
                     return "", 1
-                return raw[:MAX_VAR_VALUE_LEN], 0
+                return raw, 0
             vv = self.var_get(t)
             i[0] += 1
             if vv is None:
@@ -1940,6 +1958,8 @@ class MinimalAZLRuntime:
                     post = rest[wi + len(w) :]
                     pairs = self._parse_execute_ast_with_tail(post)
                     if evn and pairs:
+                        if os.environ.get("AZL_SPINE_BEHAVIOR_SMOKE_PAYLOAD_MARK") == "1":
+                            print("AZL_EMIT_WITH_PAYLOAD", flush=True)
                         self.queue_push(evn[:63], pairs)
                         self.process_events()
                         result = "Emitted: " + evn[:120]
@@ -1987,6 +2007,8 @@ class MinimalAZLRuntime:
                         post = rest[wi + len(w) :]
                         pairs = self._parse_execute_ast_with_tail(post)
                         if evn and pairs:
+                            if os.environ.get("AZL_SPINE_BEHAVIOR_SMOKE_PAYLOAD_MARK") == "1":
+                                print("AZL_EMIT_WITH_PAYLOAD", flush=True)
                             self.queue_push(evn[:63], pairs)
                             self.process_events()
                             result = "Emitted: " + evn[:120]
@@ -2043,7 +2065,7 @@ class MinimalAZLRuntime:
                 joined = seg
             else:
                 joined = cur + "\n" + seg
-            self.var_set(base, joined[:MAX_VAR_VALUE_LEN])
+            self.var_set(base, joined)
             return
         if t0.startswith("::"):
             k = t0
@@ -2123,7 +2145,7 @@ class MinimalAZLRuntime:
                 joined = lp
             else:
                 joined = lp + "\n" + rp
-            self.var_set(k, joined[:MAX_VAR_VALUE_LEN])
+            self.var_set(k, joined)
             return
         if v == "[":
             self._consume_agg_literal(i)
@@ -2152,7 +2174,7 @@ class MinimalAZLRuntime:
             i[0] += 1
             src = self.var_get(base) or ""
             joined = "\n".join(tuple(src))
-            self.var_set(k, joined[:MAX_VAR_VALUE_LEN])
+            self.var_set(k, joined)
             return
         if (
             v.startswith("::")
@@ -2176,7 +2198,7 @@ class MinimalAZLRuntime:
             i[0] += 1
             src = self.var_get(base) or ""
             joined = "\n".join(src.split(delim))
-            self.var_set(k, joined[:MAX_VAR_VALUE_LEN])
+            self.var_set(k, joined)
             return
 
         def _hash_blob(var_tok: str) -> str:
@@ -2236,12 +2258,12 @@ class MinimalAZLRuntime:
             self.var_set("::ast", "{}")
             if spine is not None:
                 self.var_set("::ast.exec_model", "spine_component_v1")
-                self.var_set("::ast.spine", spine[:MAX_VAR_VALUE_LEN])
+                self.var_set("::ast.spine", spine)
                 self.var_set("::ast.nodes", "")
             else:
                 self.var_set("::ast.exec_model", "")
                 nodes_s = self._parse_tokens_nodes_from_buffer(buf)
-                self.var_set("::ast.nodes", nodes_s[:MAX_VAR_VALUE_LEN])
+                self.var_set("::ast.nodes", nodes_s)
             self.var_set(k, "{}")
             return
         if v == "::vm_compile_ast":
@@ -2340,6 +2362,14 @@ class MinimalAZLRuntime:
             and not v.startswith("::")
             and v not in ("true", "false", "null")
         ):
+            # Bare RHS is a global reference (::name) when that var exists (interpreter-shaped
+            # `set ::tokens = cached_tok`); otherwise keep legacy literal-string behavior.
+            gk = "::" + v
+            for bx in self.vars:
+                if bx.k == gk:
+                    self.var_set(k, bx.v)
+                    i[0] += 1
+                    return
             self.var_set(k, v[:MAX_VAR_VALUE_LEN])
             i[0] += 1
             return

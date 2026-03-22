@@ -910,6 +910,7 @@ component ::azl.interpreter {
       set ::recursion_depth = ::recursion_depth + 1
       set ::dispatch_stack.push(ev_name)
       say "📡 Emitting event: " + ev_name
+      if payload_val != null { say "AZL_EMIT_WITH_PAYLOAD" }
       set ::variables["event"] = { name: ev_name, data: payload_val }
       set ::ev_name = ev_name
       emit ::ev_name
