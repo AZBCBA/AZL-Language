@@ -1,5 +1,7 @@
-# Native compiler branch demo: variables + if — expect emit "success" when status matches
+# Native compiler: if/else with variable-backed emit payload on success branch.
 set status = "ok"
 if ( status == "ok" ) {
-  emit "success" { "result": "yes" }
+  emit "success" { "result": status }
+} else {
+  emit "failure" { "result": "no" }
 }

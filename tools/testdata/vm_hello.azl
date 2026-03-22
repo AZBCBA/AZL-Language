@@ -1,2 +1,3 @@
-# Native core: minimal compile-only subset (emit + quoted payload map).
-emit "hello" { "message": "Hello World" }
+# Native core: emit payload value from a local (set + EMIT_VAR).
+set msg = "Hello World"
+emit "hello" { "message": msg }

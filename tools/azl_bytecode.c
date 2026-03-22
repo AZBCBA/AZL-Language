@@ -278,8 +278,10 @@ static int parse_one_code_obj(J *j, AzlBytecodeInstr *ins) {
   char opname[32] = {0};
   uint32_t ev = 0, ky = 0, vl = 0;
   uint32_t slot = 0, target = 0, false_idx = 0, true_idx = 0;
+  uint32_t val_slot = 0;
   int have_ev = 0, have_ky = 0, have_vl = 0;
   int have_slot = 0, have_target = 0, have_false_idx = 0, have_true_idx = 0;
+  int have_val_slot = 0;
   while (j->i < j->n) {
     j_skip_ws(j);
     if (j->s[j->i] == '}') {
@@ -309,6 +311,10 @@ static int parse_one_code_obj(J *j, AzlBytecodeInstr *ins) {
       if (j_parse_uint(j, &vl) != 0)
         return -1;
       have_vl = 1;
+    } else if (strcmp(kbuf, "val_slot") == 0) {
+      if (j_parse_uint(j, &val_slot) != 0)
+        return -1;
+      have_val_slot = 1;
     } else if (strcmp(kbuf, "slot") == 0) {
       if (j_parse_uint(j, &slot) != 0)
         return -1;
@@ -360,11 +366,18 @@ static int parse_one_code_obj(J *j, AzlBytecodeInstr *ins) {
       return -1;
   } else if (strcmp(opname, "emit") == 0) {
     ins->op = AZL_OP_EMIT;
-    if (!have_ev || !have_ky || !have_vl)
+    if (!have_ev || !have_ky || !have_vl || have_val_slot)
       return -1;
     ins->a = ev;
     ins->b = ky;
     ins->c = vl;
+  } else if (strcmp(opname, "emit_var") == 0) {
+    ins->op = AZL_OP_EMIT_VAR;
+    if (!have_ev || !have_ky || !have_val_slot || have_vl)
+      return -1;
+    ins->a = ev;
+    ins->b = ky;
+    ins->c = val_slot;
   } else if (strcmp(opname, "call") == 0 || strcmp(opname, "listen") == 0) {
     return -1;
   } else if (strcmp(opname, "store_var") == 0) {
@@ -573,8 +586,47 @@ int azl_bytecode_selftest(void) {
     azl_bytecode_program_destroy(&prog);
     return -1;
   }
+  azl_bytecode_program_destroy(&prog);
+
+  const char *paths2[] = {"tools/testdata/vm_emit_var.json", "testdata/vm_emit_var.json", NULL};
+  f = NULL;
+  const char *used2 = NULL;
+  for (int i = 0; paths2[i]; i++) {
+    f = fopen(paths2[i], "rb");
+    if (f) {
+      used2 = paths2[i];
+      break;
+    }
+  }
+  if (!f) {
+    fprintf(stderr, "azl_bytecode_selftest: cannot open vm_emit_var.json\n");
+    azl_engine_destroy(e);
+    return -1;
+  }
+  n = fread(buf, 1, sizeof(buf) - 1, f);
+  fclose(f);
+  buf[n] = '\0';
+  if (azl_bytecode_load_json(buf, n, &prog, err, sizeof(err)) != 0) {
+    fprintf(stderr, "azl_bytecode_selftest: load_json vm_emit_var failed: %s\n", err);
+    azl_engine_destroy(e);
+    return -1;
+  }
+  g_bc_hello_ok = 0;
+  xr = azl_vm_exec_block(e, &prog);
+  if (xr != AZL_OK) {
+    fprintf(stderr, "azl_bytecode_selftest: vm_emit_var vm_exec failed (%d)\n", (int)xr);
+    azl_engine_destroy(e);
+    azl_bytecode_program_destroy(&prog);
+    return -1;
+  }
+  if (!g_bc_hello_ok) {
+    fprintf(stderr, "azl_bytecode_selftest: emit_var bundle did not observe Hello World\n");
+    azl_engine_destroy(e);
+    azl_bytecode_program_destroy(&prog);
+    return -1;
+  }
   azl_engine_destroy(e);
   azl_bytecode_program_destroy(&prog);
-  fprintf(stderr, "azl_bytecode_selftest: ok (%s)\n", used ? used : "?");
+  fprintf(stderr, "azl_bytecode_selftest: ok (%s, %s)\n", used ? used : "?", used2 ? used2 : "?");
   return 0;
 }

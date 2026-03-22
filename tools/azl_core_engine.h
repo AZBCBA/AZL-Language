@@ -63,6 +63,7 @@ typedef enum AzlOpcode {
   AZL_OP_JUMP = 8,
   AZL_OP_JUMP_IF_FALSE = 9,
   AZL_OP_EQ = 10,
+  AZL_OP_EMIT_VAR = 11,
 } AzlOpcode;
 
 /* --- Arena: bump allocator, reset between bursts (zero freelist fragmentation) --- */

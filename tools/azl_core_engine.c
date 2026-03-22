@@ -942,6 +942,27 @@ AzlErr azl_vm_exec_block(AzlEngine *eng, const AzlBytecodeProgram *prog) {
       pc++;
       break;
     }
+    case AZL_OP_EMIT_VAR: {
+      const char *ev = vm_const_get(prog, in->a);
+      const char *k = vm_const_get(prog, in->b);
+      if (!ev || !k)
+        return AZL_ERR_INVALID;
+      if (in->c >= AZL_VM_VAR_MAX)
+        return AZL_ERR_INVALID;
+      if (vars[in->c] == UINT32_MAX)
+        return AZL_ERR_INVALID;
+      if (vars[in->c] >= prog->nconst)
+        return AZL_ERR_INVALID;
+      const char *v = vm_const_get(prog, vars[in->c]);
+      if (!v)
+        return AZL_ERR_INVALID;
+      AzlPayloadKV kv = {k, v, NULL};
+      AzlErr r = azl_engine_emit(eng, ev, &kv);
+      if (r != AZL_OK)
+        return r;
+      pc++;
+      break;
+    }
     default:
       return AZL_ERR_INVALID;
     }

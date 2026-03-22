@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "consts": ["hello", "message", "Hello World"],
+  "code": [
+    { "op": "load_const", "a": 2 },
+    { "op": "store_var", "slot": 0 },
+    { "op": "emit_var", "event": 0, "key": 1, "val_slot": 0 },
+    { "op": "halt" }
+  ]
+}

@@ -380,7 +380,7 @@ static int parse_stmt(Parse *p) {
   return -1;
 }
 
-/* emit STRING { STRING : STRING (, STRING : STRING)* } */
+/* emit STRING { STRING : STRING | IDENT (, …)* } — value is const string or local name (EMIT / EMIT_VAR). */
 static int parse_emit_stmt(Parse *p) {
   if (parse_expect(p, TK_EMIT) != 0)
     return -1;
@@ -418,15 +418,25 @@ static int parse_emit_stmt(Parse *p) {
     parse_bump(p);
     if (parse_expect(p, TK_COLON) != 0)
       return -1;
-    if (p->cur.k != TK_STRING) {
-      parse_err(p, "expected value string");
+    AzlBytecodeInstr ins;
+    if (p->cur.k == TK_STRING) {
+      int vi = add_const(p, p->cur.text);
+      if (vi < 0)
+        return -1;
+      parse_bump(p);
+      ins = (AzlBytecodeInstr){AZL_OP_EMIT, (uint32_t)ev, (uint32_t)ki, (uint32_t)vi};
+    } else if (p->cur.k == TK_IDENT) {
+      int sl = local_find(p, p->cur.text);
+      if (sl < 0) {
+        parse_err(p, "unknown variable in emit payload");
+        return -1;
+      }
+      parse_bump(p);
+      ins = (AzlBytecodeInstr){AZL_OP_EMIT_VAR, (uint32_t)ev, (uint32_t)ki, (uint32_t)sl};
+    } else {
+      parse_err(p, "expected value string or identifier");
       return -1;
     }
-    int vi = add_const(p, p->cur.text);
-    if (vi < 0)
-      return -1;
-    parse_bump(p);
-    AzlBytecodeInstr ins = {AZL_OP_EMIT, (uint32_t)ev, (uint32_t)ki, (uint32_t)vi};
     if (add_insn(p, &ins) != 0)
       return -1;
   }
@@ -524,6 +534,7 @@ static const char *cmp_payload(const AzlEvent *ev, const char *key) {
 
 static int g_cmp_ok;
 static int g_branch_ok;
+static int g_branch_saw_failure;
 
 static void cmp_on_hello(AzlEngine *eng, const AzlEvent *ev, void *ud) {
   (void)eng;
@@ -537,8 +548,15 @@ static void cmp_on_success(AzlEngine *eng, const AzlEvent *ev, void *ud) {
   (void)eng;
   (void)ud;
   const char *r = cmp_payload(ev, "result");
-  if (r && strcmp(r, "yes") == 0)
+  if (r && strcmp(r, "ok") == 0)
     g_branch_ok = 1;
+}
+
+static void cmp_on_failure(AzlEngine *eng, const AzlEvent *ev, void *ud) {
+  (void)eng;
+  (void)ud;
+  (void)ev;
+  g_branch_saw_failure = 1;
 }
 
 int azl_compiler_selftest(void) {
@@ -634,7 +652,9 @@ int azl_compiler_selftest(void) {
     return -1;
   }
   g_branch_ok = 0;
+  g_branch_saw_failure = 0;
   azl_engine_register_listener(e, "success", cmp_on_success, NULL);
+  azl_engine_register_listener(e, "failure", cmp_on_failure, NULL);
   if (azl_vm_exec_block(e, &prog) != AZL_OK) {
     fprintf(stderr, "azl_compiler_selftest: branch vm_exec failed\n");
     azl_engine_destroy(e);
@@ -643,8 +663,8 @@ int azl_compiler_selftest(void) {
   }
   azl_bytecode_program_destroy(&prog);
   azl_engine_destroy(e);
-  if (!g_branch_ok) {
-    fprintf(stderr, "azl_compiler_selftest: branch did not emit success/result=yes\n");
+  if (!g_branch_ok || g_branch_saw_failure) {
+    fprintf(stderr, "azl_compiler_selftest: branch did not emit success/result=ok or spurious failure event\n");
     return -1;
   }
   fprintf(stderr, "azl_compiler_selftest: ok (%s, %s)\n", used ? used : "?", bused ? bused : "?");

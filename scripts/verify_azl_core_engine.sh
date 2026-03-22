@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Native core engine: compile tools/azl_core_engine.c + bytecode + compiler selftests.
-# Verifies JSON bytecode (vm_hello_world.json), AZL compile (vm_hello.azl + vm_branch.azl), and VM exec.
+# Verifies JSON bytecode (vm_hello_world.json + vm_emit_var.json), AZL compile (vm_hello.azl + vm_branch.azl), and VM exec.
 # Native bytecode subset: no call/listen op names in JSON; VM rejects legacy opcode slots 4–5.
 # Exit codes: docs/ERROR_SYSTEM.md § Native core engine selftest.
 set -euo pipefail
