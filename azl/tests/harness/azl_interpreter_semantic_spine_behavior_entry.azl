@@ -40,6 +40,7 @@ say AZL_SPINE_P9_SET_LINE", component_name: "smoke9" }
     emit interpret with { code: "emit AZL_SPINE_P11 with { pk: 'AZL_SPINE_P11_MARK' }", component_name: "smoke11" }
     emit interpret with { code: "on a { say 'AZL_S12_FN' }
 a()", component_name: "smoke12" }
+    emit interpret with { code: "let ::azl_spine_p13 = 'AZL_S13_MARK'", component_name: "smoke13" }
     say "AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT"
   }
 }

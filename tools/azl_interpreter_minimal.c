@@ -1398,6 +1398,23 @@ static void execute_ast_set_line(const char *after_set, char *result, size_t rsz
   (void)snprintf(result, rsz, "Set %s = %.150s", keybuf, vbuf);
 }
 
+static void execute_ast_let_line(const char *after_let, char *result, size_t rsz) {
+  const char *p = after_let ? after_let : "";
+  const char *sep = strchr(p, '|');
+  if (!sep || sep == p) return;
+  char keybuf[96];
+  size_t kl = (size_t)(sep - p);
+  if (kl >= sizeof(keybuf)) kl = sizeof(keybuf) - 1U;
+  memcpy(keybuf, p, kl);
+  keybuf[kl] = '\0';
+  if (keybuf[0] != ':' || keybuf[1] != ':') return;
+  const char *val = sep + 1;
+  char vbuf[256];
+  (void)snprintf(vbuf, sizeof(vbuf), "%s", val ? val : "");
+  var_set(keybuf, vbuf);
+  (void)snprintf(result, rsz, "Let %s = %.150s", keybuf, vbuf);
+}
+
 static void execute_ast_listen_line(const char *after_listen, char *result, size_t rsz);
 
 /* memory|set|::k|v, memory|say|text, memory|emit|…, memory|listen|… — stub memory rows (F104–F148; F115+ = memory|listen|… same stub table as listen|). */
@@ -1781,6 +1798,8 @@ static void builtin_execute_ast_into(char *val, size_t valsz, const char *ast_ba
       execute_ast_emit_line(line + 5, result, sizeof(result));
     } else if (strncmp(line, "set|", 4U) == 0) {
       execute_ast_set_line(line + 4, result, sizeof(result));
+    } else if (strncmp(line, "let|", 4U) == 0) {
+      execute_ast_let_line(line + 4, result, sizeof(result));
     } else if (strncmp(line, "component|", 10U) == 0) {
       execute_ast_component_line(line + 10, result, sizeof(result));
     } else if (strncmp(line, "memory|", 7U) == 0) {
@@ -2604,6 +2623,55 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
       i = j;
       continue;
     }
+    if (strcmp(pairs[i].typ, "identifier") == 0 && strcmp(pairs[i].val, "let") == 0) {
+      int j = parse_skip_eol(pairs, np, i + 1);
+      if (j >= np) {
+        i++;
+        continue;
+      }
+      if (strcmp(pairs[j].typ, "identifier") != 0 || pairs[j].val[0] != ':' || pairs[j].val[1] != ':') {
+        i++;
+        continue;
+      }
+      char varn_let[96];
+      (void)snprintf(varn_let, sizeof(varn_let), "%.79s", pairs[j].val);
+      j++;
+      j = parse_skip_eol(pairs, np, j);
+      if (j >= np || strcmp(pairs[j].typ, "operator") != 0 || strcmp(pairs[j].val, "=") != 0) {
+        i++;
+        continue;
+      }
+      j++;
+      char rhs_let[224];
+      rhs_let[0] = '\0';
+      size_t rl2 = 0;
+      while (j < np) {
+        if (strcmp(pairs[j].typ, "eol") == 0) break;
+        if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) break;
+        if (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0) {
+          if (rl2 > 0U && rl2 + 1U < sizeof(rhs_let)) rhs_let[rl2++] = ' ';
+          size_t rem = sizeof(rhs_let) - rl2 - 1U;
+          if (rem > 0U) {
+            (void)snprintf(rhs_let + rl2, rem, "%.199s", pairs[j].val);
+            rl2 = strlen(rhs_let);
+            if (rl2 > 199U) {
+              rhs_let[199] = '\0';
+              rl2 = 199U;
+            }
+          }
+          j++;
+          continue;
+        }
+        break;
+      }
+      if (rhs_let[0]) {
+        char chunk_let[320];
+        (void)snprintf(chunk_let, sizeof(chunk_let), "let|%s|%.199s", varn_let, rhs_let);
+        parse_acc_append(acc, sizeof(acc), chunk_let);
+      }
+      i = j;
+      continue;
+    }
     if (strcmp(pairs[i].typ, "identifier") == 0 && strcmp(pairs[i].val, "emit") == 0) {
       int j = parse_skip_eol(pairs, np, i + 1);
       char ev[160];
@@ -2958,7 +3026,8 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
     }
     if (strcmp(pairs[i].typ, "identifier") == 0) {
       const char *vk = pairs[i].val;
-      if (strcmp(vk, "say") != 0 && strcmp(vk, "set") != 0 && strcmp(vk, "emit") != 0 &&
+      if (strcmp(vk, "say") != 0 && strcmp(vk, "set") != 0 && strcmp(vk, "let") != 0 &&
+          strcmp(vk, "emit") != 0 &&
           strcmp(vk, "listen") != 0 && strcmp(vk, "import") != 0 && strcmp(vk, "link") != 0 &&
           strcmp(vk, "component") != 0 && strcmp(vk, "memory") != 0 && strcmp(vk, "on") != 0 &&
           strcmp(vk, "for") != 0 && strcmp(vk, "then") != 0 && strcmp(vk, "with") != 0) {

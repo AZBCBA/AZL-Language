@@ -99,8 +99,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=12)}' "$out"; then
-  err "stdout expected >=12 \"Interpretation complete:\" lines (harness twelve emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=13)}' "$out"; then
+  err "stdout expected >=13 \"Interpretation complete:\" lines (harness thirteen emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -163,6 +163,11 @@ if ! rg -q 'called:a' "$out"; then
   err "stdout missing twelfth-interpret call result (Interpretation complete: called:a)"
   cat "$out" >&2 || true
   exit 631
+fi
+if ! rg -q 'Let ::azl_spine_p13' "$out" || ! rg -q 'AZL_S13_MARK' "$out"; then
+  err "stdout missing thirteenth-interpret top-level let (Let ::azl_spine_p13 … AZL_S13_MARK)"
+  cat "$out" >&2 || true
+  exit 632
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"

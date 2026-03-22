@@ -310,6 +310,9 @@ component ::azl.interpreter {
         } else if ::token.value == "set" {
           set ::set_node = ::parse_set_statement(::tokens)
           set ::ast.nodes.push(::set_node)
+        } else if ::token.value == "let" {
+          set ::let_node = ::parse_let_statement(::tokens)
+          set ::ast.nodes.push(::let_node)
         } else if ::token.value == "emit" {
           set ::emit_node = ::parse_emit_statement(::tokens)
           set ::ast.nodes.push(::emit_node)
@@ -764,6 +767,8 @@ component ::azl.interpreter {
           set ::result = ::execute_say(::node)
         } else if ::node.type == "set" {
           set ::result = ::execute_set(::node)
+        } else if ::node.type == "let" {
+          set ::result = ::execute_let(::node)
         } else if ::node.type == "emit" {
           set ::result = ::execute_emit(::node)
         } else if ::node.type == "listen" {

@@ -821,6 +821,37 @@ class MinimalAZLRuntime:
                     out_lines.append("set|" + var_name + "|" + rhs)
                 i = j
                 continue
+            if typ == "identifier" and val == "let":
+                j = self._skip_eol_pairs(pairs, i + 1)
+                if j >= n:
+                    i += 1
+                    continue
+                vt, vv = pairs[j]
+                if vt != "identifier" or not vv.startswith("::"):
+                    i += 1
+                    continue
+                var_let = vv[:80]
+                j += 1
+                j = self._skip_eol_pairs(pairs, j)
+                if j >= n or pairs[j] != ("operator", "="):
+                    i += 1
+                    continue
+                j += 1
+                rhs_let: list[str] = []
+                while j < n:
+                    t2, v2 = pairs[j]
+                    if t2 == "eol" or (t2 == "brace" and v2 == "}"):
+                        break
+                    if t2 in ("identifier", "string"):
+                        rhs_let.append(v2)
+                        j += 1
+                        continue
+                    break
+                if rhs_let:
+                    rhs_l = " ".join(rhs_let)[:200]
+                    out_lines.append("let|" + var_let + "|" + rhs_l)
+                i = j
+                continue
             if typ == "identifier" and val == "emit":
                 j = self._skip_eol_pairs(pairs, i + 1)
                 ev_parts: list[str] = []
@@ -1070,6 +1101,7 @@ class MinimalAZLRuntime:
             if typ == "identifier" and val not in (
                 "say",
                 "set",
+                "let",
                 "emit",
                 "listen",
                 "import",
@@ -2020,6 +2052,15 @@ class MinimalAZLRuntime:
                     if gkey.startswith("::"):
                         self.var_set(gkey, gval[:MAX_VAR_VALUE_LEN])
                         result = "Set " + gkey + " = " + gval[:150]
+            elif seg.startswith("let|"):
+                rest = seg[4:]
+                bar = rest.find("|")
+                if bar > 0:
+                    gkey = rest[:bar]
+                    gval = rest[bar + 1 :]
+                    if gkey.startswith("::"):
+                        self.var_set(gkey, gval[:MAX_VAR_VALUE_LEN])
+                        result = "Let " + gkey + " = " + gval[:150]
             elif seg.startswith("component|"):
                 ctail = seg[10:]
                 if ctail:
