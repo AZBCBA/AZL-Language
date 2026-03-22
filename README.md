@@ -103,7 +103,7 @@ Not part of `make verify`. Details: [docs/BENCHMARKS_REAL_WORLD.md](docs/BENCHMA
 - **Suite (native + optional enterprise):** `bash scripts/run_product_benchmark_suite.sh` — same as below, plus `/v1/chat` when `AZL_API_TOKEN` is set.
 - **C engine + Ollama:** `bash scripts/run_native_engine_llm_bench.sh` (starts a fresh `azl-native-engine`; requires `ollama serve` and a pulled model, e.g. `llama3.2:1b`).
 - **Three-way comparison** (Python / curl / C proxy): `bash scripts/benchmark_llm_ollama.sh` — set `AZL_BENCH_PORT` and `AZL_BENCH_TOKEN` if the engine is already running.
-- **Enterprise HTTP chat:** `AZL_API_TOKEN=… bash scripts/benchmark_enterprise_v1_chat.sh` with the combined daemon on `AZL_ENTERPRISE_PORT` (default `8080`).
+- **Enterprise HTTP chat:** `AZL_API_TOKEN=… bash scripts/benchmark_enterprise_v1_chat.sh` with the combined daemon on `AZL_ENTERPRISE_PORT` (default `8080`). Typed errors **`ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]`** / exits **2** / **91** / **93** / **94** / **95**: [docs/ERROR_SYSTEM.md](docs/ERROR_SYSTEM.md).
 
 See [docs/LLM_INFRASTRUCTURE_AUDIT.md](docs/LLM_INFRASTRUCTURE_AUDIT.md).
 

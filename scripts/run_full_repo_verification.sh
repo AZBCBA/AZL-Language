@@ -11,10 +11,10 @@
 #   6) verify_native_runtime_live  (minimal bundle — fast C-engine HTTP contract before long suite)
 #   7) run_all_tests  (scripts/run_tests.sh includes enterprise HTTP + qlha3 + grammar; see run_tests.sh)
 #
-# Optional tail (does not fail the script if skipped):
+# Optional tail (skips are non-fatal; if a bench runs, its non-zero exit fails this script):
 #   If Ollama is up: LLM_BENCH_REQS=3 run_native_engine_llm_bench.sh
 #   If AZL_API_TOKEN or .azl/local_api_token and POST /v1/chat != 404:
-#     LLM_BENCH_REQS=3 benchmark_enterprise_v1_chat.sh
+#     LLM_BENCH_REQS=3 benchmark_enterprise_v1_chat.sh (**ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]**, exits **2** / **91** / **93** / **94** / **95** — docs/ERROR_SYSTEM.md)
 #
 # Force-skip optional benches: RUN_OPTIONAL_BENCHES=0 (default is 1).
 #
@@ -84,13 +84,13 @@ if [ -n "${AZL_API_TOKEN:-}" ]; then
     --data-binary "ping" \
     "http://127.0.0.1:${PORT}/v1/chat" 2>/dev/null || echo "000")"
   if [ "$code" = "404" ] || [ "$code" = "000" ]; then
-    echo "[optional] SKIP enterprise /v1/chat — no route or unreachable (http=$code on port $PORT)"
+    echo "[optional] SKIP enterprise /v1/chat — probe http=$code on 127.0.0.1:${PORT} (need enterprise daemon: bash scripts/run_enterprise_daemon.sh; match AZL_BUILD_API_PORT and AZL_ENTERPRISE_PORT)"
   else
-    echo "[optional] Enterprise /v1/chat probe http=$code — bench (3 reqs)"
+    echo "[optional] Enterprise /v1/chat probe http=$code — benchmark_enterprise_v1_chat.sh (3 reqs; **ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]** — docs/ERROR_SYSTEM.md)"
     LLM_BENCH_REQS=3 bash scripts/benchmark_enterprise_v1_chat.sh
   fi
 else
-  echo "[optional] SKIP enterprise /v1/chat — no AZL_API_TOKEN or .azl/local_api_token"
+  echo "[optional] SKIP enterprise /v1/chat — set AZL_API_TOKEN or create .azl/local_api_token (first line, chmod 600); see docs/ERROR_SYSTEM.md (enterprise bench exit **2**)"
 fi
 
 echo ""

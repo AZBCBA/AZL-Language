@@ -75,7 +75,7 @@
 - **llama-server (loaded model):** `scripts/run_benchmark_llama_server.sh` — starts **`llama-server -m $AZL_GGUF_PATH`** (set **`LLAMA_SERVER_BIN`** if the binary is not on `PATH`; build with **`DLLAMA_BUILD_SERVER=ON`**), waits for **`/health`**, starts **`azl-native-engine`** with **`AZL_LLAMA_SERVER_URL`**, runs **`scripts/benchmark_llm_llama_server.py`** — **Python → upstream `/completion`** vs **Python → `POST /api/llm/llama_server/completion`** (fair “serving” comparison: one loaded model upstream). Env: **`LLM_BENCH_*`**, optional **`AZL_LLAMA_SERVER_PORT`** / **`AZL_BENCH_NATIVE_PORT`**.
 - **Product suite:** `scripts/run_product_benchmark_suite.sh` — runs `run_native_engine_llm_bench.sh`, then `benchmark_enterprise_v1_chat.sh` only when `AZL_API_TOKEN` is set.
 - **One-shot C engine + LLM bench:** `scripts/run_native_engine_llm_bench.sh` — builds `azl-native-engine`, starts it with minimal bootstrap (`azl/tests/c_minimal_link_ping.azl`), waits for capabilities, runs `benchmark_llm_ollama.sh` with matching `AZL_BENCH_PORT` / `AZL_BENCH_TOKEN`. Requires `ollama serve` and a pulled model (e.g. `llama3.2:1b`).
-- **Enterprise HTTP stack (different surface):** when the combined daemon serves `azl/system/http_server.azl`, chat is **`POST /v1/chat`** (or `/chat`) with **Bearer** auth — not **`POST /api/ollama/generate`**. **`scripts/benchmark_enterprise_v1_chat.sh`** measures latency for that route (requires running enterprise daemon + `AZL_API_TOKEN`).
+- **Enterprise HTTP stack (different surface):** when the combined daemon serves `azl/system/http_server.azl`, chat is **`POST /v1/chat`** (or `/chat`) with **Bearer** auth — not **`POST /api/ollama/generate`**. **`scripts/benchmark_enterprise_v1_chat.sh`** measures latency for that route (requires running enterprise daemon + `AZL_API_TOKEN`). Failures: **`ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]`**, exits **2** / **91** / **93** / **94** / **95** — [ERROR_SYSTEM.md](ERROR_SYSTEM.md).
 
 ---
 
@@ -93,7 +93,7 @@
 | `scripts/benchmark_llm_gguf_direct.py` | Python `llama-cli` vs `POST /api/llm/gguf_infer` timings |
 | `scripts/run_benchmark_llama_server.sh` | `llama-server` + engine with `AZL_LLAMA_SERVER_URL` + proxy benchmark |
 | `scripts/benchmark_llm_llama_server.py` | Direct `llama-server` `/completion` vs `POST /api/llm/llama_server/completion` |
-| `scripts/benchmark_enterprise_v1_chat.sh` | Enterprise `POST /v1/chat` latency (daemon + token) |
+| `scripts/benchmark_enterprise_v1_chat.sh` | Enterprise `POST /v1/chat` latency (daemon + token); **`ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]`** **2** / **91** / **93** / **94** / **95** |
 | `scripts/run_product_benchmark_suite.sh` | Native LLM bench + optional enterprise chat in one run |
 | `azl/system/azl_system_interface.azl` | `http_client` sysproxy integration |
 | `azl/integrations/anythingllm/azme_bridge.azl` | Ollama client (integration / host contexts) |

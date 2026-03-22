@@ -14,12 +14,18 @@
 #
 # Optional: .azl/local_api_token — first line used as AZL_API_TOKEN if env unset (.azl/ is gitignored).
 #
+# Script-owned exits (prefix ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]: on stderr): **2**, **91**, **93**, **94**, **95** — docs/ERROR_SYSTEM.md § Enterprise POST /v1/chat benchmark (numeric **91–95** overlap **gate G** — use stderr prefix + script name to disambiguate).
+#
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 # shellcheck disable=SC1091
 source "$ROOT_DIR/scripts/azl_local_layout.sh"
+
+err() {
+  echo "ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]: $*" >&2
+}
 
 PORT="${AZL_ENTERPRISE_PORT:-8080}"
 REQS="${LLM_BENCH_REQS:-10}"
@@ -32,27 +38,24 @@ if [ -z "${AZL_API_TOKEN:-}" ] && [ -f .azl/local_api_token ]; then
 fi
 
 if [ -z "${AZL_API_TOKEN:-}" ]; then
-  echo "ERROR: AZL_API_TOKEN is required (Bearer for /v1/chat)." >&2
-  echo "  Example: AZL_API_TOKEN=\$AZL_API_TOKEN bash scripts/benchmark_enterprise_v1_chat.sh" >&2
+  err "AZL_API_TOKEN is required (Bearer for POST /v1/chat). Set env or first line of .azl/local_api_token (chmod 600). See docs/ERROR_SYSTEM.md (exit 2)."
   exit 2
 fi
 
 if ! curl -fsS --max-time 3 "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1; then
-  echo "ERROR: nothing answered healthz on 127.0.0.1:${PORT}. Start: bash scripts/run_enterprise_daemon.sh" >&2
+  err "nothing answered GET /healthz on 127.0.0.1:${PORT} (exit 91). Start enterprise daemon: bash scripts/run_enterprise_daemon.sh — align AZL_BUILD_API_PORT with AZL_ENTERPRISE_PORT."
   exit 91
 fi
 
 HZ="$(curl -fsS --max-time 3 "http://127.0.0.1:${PORT}/healthz" 2>/dev/null || true)"
 # C native engine healthz uses ok:true + service azl-native-engine — wrong surface for this bench
 if echo "$HZ" | grep -q '"ok":true' && echo "$HZ" | grep -q 'azl-native-engine'; then
-  echo "ERROR: port ${PORT} looks like the C native engine (healthz is azl-native-engine)." >&2
-  echo "  For Ollama via C proxy use: bash scripts/run_native_engine_llm_bench.sh" >&2
-  echo "  Or: bash scripts/benchmark_llm_ollama.sh with AZL_BENCH_PORT / AZL_BENCH_TOKEN" >&2
+  err "port ${PORT} is the C native engine (healthz service azl-native-engine) — exit 93. For Ollama via C proxy: bash scripts/run_native_engine_llm_bench.sh. For enterprise chat you need run_enterprise_daemon.sh on this port."
   exit 93
 fi
 
 if curl -fsS --max-time 2 "http://127.0.0.1:${PORT}/api/llm/capabilities" 2>/dev/null | grep -q '"ollama_http_proxy":true'; then
-  echo "ERROR: port ${PORT} exposes C native GET /api/llm/capabilities; this script targets enterprise POST /v1/chat only." >&2
+  err "port ${PORT} exposes C native GET /api/llm/capabilities — exit 93. This script benchmarks enterprise POST /v1/chat only (azl/system/http_server.azl)."
   exit 93
 fi
 
@@ -63,9 +66,7 @@ probe="$(curl -sS -o /dev/null -w "%{http_code}" -m 5 -X POST \
   --data-binary "ping" \
   "http://127.0.0.1:${PORT}/v1/chat" 2>/dev/null || echo "000")"
 if [ "$probe" = "404" ]; then
-  echo "ERROR: POST /v1/chat returned 404 on 127.0.0.1:${PORT}." >&2
-  echo "  Nothing is serving the enterprise HTTP routes (see azl/system/http_server.azl)." >&2
-  echo "  Start: bash scripts/run_enterprise_daemon.sh  (check AZL_BUILD_API_PORT matches AZL_ENTERPRISE_PORT)" >&2
+  err "POST /v1/chat returned 404 on 127.0.0.1:${PORT} — exit 95. Enterprise HTTP routes missing; see azl/system/http_server.azl. Start: bash scripts/run_enterprise_daemon.sh"
   exit 95
 fi
 
@@ -131,6 +132,6 @@ REPORT="${AZL_BENCHMARKS_DIR}/benchmark_enterprise_v1_chat_$(date +%Y%m%d_%H%M%S
 echo ""
 echo "[bench] saved: $REPORT"
 if [ "$fail" -gt 0 ]; then
-  echo "ERROR: $fail request(s) failed (401 wrong token, 404 route, or daemon not serving http_server)." >&2
+  err "$fail request(s) failed — exit 94 (wrong Bearer token, timeout, or daemon error serving POST /v1/chat)."
   exit 94
 fi

@@ -45,7 +45,7 @@ Source of truth for current vs target: [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE
 | Ollama proxy | `POST /api/ollama/generate` — `scripts/benchmark_llm_ollama.sh`, `scripts/run_native_engine_llm_bench.sh` |
 | Subprocess GGUF (no Ollama) | `POST /api/llm/gguf_infer` — `scripts/run_benchmark_gguf_direct.sh` |
 | Loaded model (`llama-server`) | `POST /api/llm/llama_server/completion` — `scripts/run_benchmark_llama_server.sh` |
-| Enterprise chat (not C proxy) | `POST /v1/chat` — `scripts/benchmark_enterprise_v1_chat.sh` |
+| Enterprise chat (not C proxy) | `POST /v1/chat` — `scripts/benchmark_enterprise_v1_chat.sh` (**`ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]`**, exits **2** / **91** / **93** / **94** / **95** in [ERROR_SYSTEM.md](ERROR_SYSTEM.md)) |
 | **Partner LLM proof (minimal bundle)** | `scripts/run_proof_llm_python_vs_azl.sh` + `scripts/proof_llm_python_vs_azl.py` — default **1000×** per path (Python → Ollama vs `POST /api/ollama/generate`); `.azl/proof_llm_python_vs_azl_*.md` (mean/p95 **AZL/Python** ratios). |
 | **Partner LLM proof (enterprise `.azl` loaded)** | `scripts/run_proof_llm_enterprise_bundle.sh` — same comparison after loading the **fat** combined file from `scripts/build_enterprise_combined.sh` (same component list as `run_enterprise_daemon.sh`); report **`PROOF_REPORT_DISCLAIMER`** states C proxy vs `/v1/chat` scope. |
 | **Host `getenv` via sysproxy** | `tools/sysproxy.c` op **`getenv`**; `export fn host_getenv` + syscall **`proc.getenv`** in `azl/system/azl_system_interface.azl`; `azl/host/exec_bridge.azl` seeds **`::internal`** after `link ::azl.system_interface`. Ops: [OPERATIONS.md](../OPERATIONS.md). |

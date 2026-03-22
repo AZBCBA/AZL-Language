@@ -36,6 +36,8 @@
 
 Optional Ollama / enterprise chat benches are **off** so local LLM setup is not required.
 
+**Optional benches on (maintainer / high-coverage):** `RUN_OPTIONAL_BENCHES=1 bash scripts/run_full_repo_verification.sh` — runs the same eight steps, then probes Ollama at **`127.0.0.1:11434`** and, when **`AZL_API_TOKEN`** or **`.azl/local_api_token`** is set and **`POST /v1/chat`** is not **404**, runs **`benchmark_enterprise_v1_chat.sh`**. Enterprise chat failures use **`ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]`** (exits **2** / **91** / **93** / **94** / **95**) in **[ERROR_SYSTEM.md](ERROR_SYSTEM.md)**. See **[RELEASE_READY.md](../RELEASE_READY.md)** § Optional — product / LLM benchmarks and **[CANONICAL_HTTP_PROFILE.md](CANONICAL_HTTP_PROFILE.md)** (Profile A vs B).
+
 ---
 
 ## Trusting documentation (parts → vehicle)

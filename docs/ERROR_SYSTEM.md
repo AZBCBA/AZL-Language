@@ -96,6 +96,12 @@ Production scripts return **non-zero** with **`ERROR:`** on **stderr**; no silen
 | | **86** | Capabilities missing **`ollama_http_proxy`** |
 | | **87** | Stub/embedded capabilities contract mismatch (**`ERR_*` / `error:null`**) |
 | | **88** | Embedded **`gguf`** shape invalid or **`gguf_in_process`** boolean missing |
+| `scripts/benchmark_enterprise_v1_chat.sh` | **2** | **`AZL_API_TOKEN`** unset and no **`.azl/local_api_token`** |
+| | **91** | **`GET /healthz`** unreachable on enterprise port |
+| | **93** | Wrong profile: C **`healthz`** or C-like **`/api/llm/capabilities`** |
+| | **94** | Benchmark **`curl`** request(s) failed |
+| | **95** | **`POST /v1/chat`** returned **404** |
+| | | Prefix **`ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]:`** — § *Enterprise POST /v1/chat benchmark* (**91**–**95** overlap **gate G**; use stderr + script) |
 
 ### LHA3 compression honesty contract (`scripts/verify_lha3_compression_honesty_contract.sh`)
 
@@ -726,6 +732,20 @@ Tier B **P0.1c** release crumb: concatenates **`azl/tests/stubs/azl_security_for
 | **552** | Stdout missing interpreter init marker |
 | **553** | Stdout missing **`AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT`** |
 | **554** | Stdout missing **`AZL_SPINE_SEMANTIC_PARSE_EXECUTE_BRIDGE`** |
+
+### Enterprise POST /v1/chat benchmark (`scripts/benchmark_enterprise_v1_chat.sh`)
+
+Optional latency benchmark against the **enterprise** HTTP stack (**`azl/system/http_server.azl`**), not the C **`azl-native-engine`** Ollama proxy (**`/api/ollama/generate`**). Invoked from **`scripts/run_product_benchmark_suite.sh`** and, when a token is present and **`POST /v1/chat`** is not **404**, from **`scripts/run_full_repo_verification.sh`** (**`RUN_OPTIONAL_BENCHES=1`**). Prefix **`ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]:`** on stderr.
+
+**Bash exit codes are 0–255.** Exits **91**–**95** here reuse the same integers as **gate G** (**`verify_runtime_spine_contract.sh`**) — always use **stderr** (**`ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]`**) and **which script ran** to interpret **`$?`**.
+
+| Exit | Meaning |
+|------|---------|
+| **2** | **`AZL_API_TOKEN`** unset and no **`.azl/local_api_token`** (first line) |
+| **91** | **`GET /healthz`** unreachable on **`127.0.0.1:${AZL_ENTERPRISE_PORT}`** (default **8080**) |
+| **93** | Wrong surface: **`healthz`** is C **`azl-native-engine`**, or **`GET /api/llm/capabilities`** looks like the C engine |
+| **94** | One or more benchmark **`curl`** requests failed (auth, timeout, or daemon error) |
+| **95** | **`POST /v1/chat`** probe returned **404** (enterprise route not mounted on that port) |
 
 ### Strength bar (`scripts/verify_azl_strength_bar.sh`)
 

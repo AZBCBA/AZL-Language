@@ -40,7 +40,7 @@ Three **different** surfaces — do not mix them up:
 | `scripts/run_product_benchmark_suite.sh` | Runs **native LLM bench** first; runs **enterprise /v1/chat** only if `AZL_API_TOKEN` is set (one command for ops sweeps). |
 | `scripts/run_native_engine_llm_bench.sh` | Builds and starts **C `azl-native-engine`**, then runs the Ollama comparison (needs `ollama serve` + a model). |
 | `scripts/benchmark_llm_ollama.sh` | Python vs curl vs **C engine** `POST /api/ollama/generate` (only if `GET /api/llm/capabilities` reports the proxy). |
-| `scripts/benchmark_enterprise_v1_chat.sh` | **Enterprise daemon** `POST /v1/chat` with `AZL_API_TOKEN` (not the C Ollama proxy). |
+| `scripts/benchmark_enterprise_v1_chat.sh` | **Enterprise daemon** `POST /v1/chat` with `AZL_API_TOKEN` (not the C Ollama proxy). Typed stderr **`ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]`**; exits **2** / **91** / **93** / **94** / **95** in **[ERROR_SYSTEM.md](ERROR_SYSTEM.md)**. |
 | `scripts/run_benchmark_llama_server.sh` | **`llama-server`** with model loaded once: direct `/completion` vs **`POST /api/llm/llama_server/completion`** on the native engine (see `LLM_INFRASTRUCTURE_AUDIT.md`). |
 
 For local runs only, you may store the daemon token in **`.azl/local_api_token`** (first line; `chmod 600`); **`run_product_benchmark_suite.sh`** and **`benchmark_enterprise_v1_chat.sh`** read it if **`AZL_API_TOKEN`** is unset.

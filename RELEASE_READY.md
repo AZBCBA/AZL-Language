@@ -60,14 +60,16 @@ Documented in `docs/AZL_DOCUMENTATION_CANON.md` §1.7. This **does not** replace
 
 ## Optional — product / LLM benchmarks
 
-After gates are green, you can measure latency on real backends (not required for release exit code):
+After gates are green, you can measure latency on real backends (not required for **`make verify`**, which sets **`RUN_OPTIONAL_BENCHES=0`**):
 
 ```bash
+RUN_OPTIONAL_BENCHES=1 bash scripts/run_full_repo_verification.sh
+# or:
 bash scripts/run_product_benchmark_suite.sh
 ```
 
-- Requires **`ollama serve`** and a pulled model for the C-engine leg.
-- The enterprise **`POST /v1/chat`** leg runs only if **`AZL_API_TOKEN`** is set in the environment (daemon on **`AZL_ENTERPRISE_PORT`**, default `8080`). For local convenience you may put the token in **`.azl/local_api_token`** (first line only; **`chmod 600`**); that directory is gitignored.
+- **C-engine / Ollama leg:** requires **`ollama serve`** and a pulled model when **`127.0.0.1:11434`** is reachable; otherwise the optional step logs a skip.
+- **Enterprise `POST /v1/chat` leg:** requires **Profile B** (see [docs/CANONICAL_HTTP_PROFILE.md](docs/CANONICAL_HTTP_PROFILE.md)): daemon such as **`bash scripts/run_enterprise_daemon.sh`**, **`AZL_API_TOKEN`** matching the process (or **`.azl/local_api_token`** first line, **`chmod 600`**), and **`AZL_BUILD_API_PORT`** aligned with **`AZL_ENTERPRISE_PORT`** (default **8080**). Typed failures: **`ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]`**, exits **2** / **91** / **93** / **94** / **95** in **[docs/ERROR_SYSTEM.md](docs/ERROR_SYSTEM.md)** (**91**–**95** overlap **gate G** numbers — use stderr prefix).
 
 ## Expected Runtime Signals
 

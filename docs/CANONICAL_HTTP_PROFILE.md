@@ -24,7 +24,7 @@ Two different HTTP personalities exist in this repository. **Pick one per deploy
 | **Health** | `GET /healthz` — shape depends on wiring; must **not** be mistaken for Profile A when benchmarking |
 | **Chat** | `POST /v1/chat` (and `/chat`) with **Bearer** `AZL_API_TOKEN` |
 | **LLM** | Routed inside AZL (not the same as Profile A’s `/api/ollama/generate` unless explicitly bridged) |
-| **Bench** | `scripts/benchmark_enterprise_v1_chat.sh` (requires real token + route); **404 on `/v1/chat`** ⇒ you are **not** on Profile B for that port |
+| **Bench** | `scripts/benchmark_enterprise_v1_chat.sh` (requires real token + route); **404 on `/v1/chat`** ⇒ you are **not** on Profile B for that port (**exit 95**, **`ERROR[AZL_ENTERPRISE_V1_CHAT_BENCH]`** — [ERROR_SYSTEM.md](ERROR_SYSTEM.md)) |
 
 ## CI
 
