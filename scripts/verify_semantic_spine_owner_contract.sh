@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Tier B P0.1 — interpreter spec is azl_interpreter.azl; spine execution stays Python minimal_runtime (not C minimal).
-# Fails if the azl_interpreter spine launcher or host stops delegating to tools/azl_semantic_engine.
+# Gate G2 — semantic spine *owner contract* (docs: RUNTIME_SPINE_DECISION.md, AZL_NATIVE_RUNTIME_CONTRACT.md).
+# Target state: C orchestrates; AZL (azl_interpreter.azl) interprets. Today: transitional.
+#   Line 1  AZL_SEMANTIC_SPEC_OWNER   = intended language-meaning anchor (.azl file path).
+#   Line 2  AZL_SPINE_EXEC_OWNER      = who steps AZL on the semantic launcher path today (minimal_runtime_python).
+# C minimal remains default enterprise semantics until spine policy flips; G2 does not claim otherwise.
+# Fails if the semantic spine launcher/host stops delegating to tools/azl_semantic_engine/minimal_runtime.
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -32,14 +36,14 @@ if [ "$probe_rc" -ne 0 ]; then
 fi
 expected=$'AZL_SEMANTIC_SPEC_OWNER=azl/runtime/interpreter/azl_interpreter.azl\nAZL_SPINE_EXEC_OWNER=minimal_runtime_python'
 if [ "$probe_out" != "$expected" ]; then
-  echo "ERROR: spine host --semantic-owner must print exactly (two lines, this order):" >&2
+  echo "ERROR: spine host --semantic-owner stdout must match exactly (spec anchor, then spine exec carrier):" >&2
   printf '%s\n' "$expected" >&2
   printf '%s\n' "$probe_out" >&2
   exit 98
 fi
 
 if ! rg -q '^exec python3' "$LAUNCHER"; then
-  echo "ERROR: $LAUNCHER must exec python3 spine host (semantic owner is not C minimal)" >&2
+  echo "ERROR: $LAUNCHER must exec python3 spine host (semantic launcher must not become C minimal)" >&2
   exit 99
 fi
 if ! rg -q 'azl_runtime_spine_host\.py' "$LAUNCHER"; then
@@ -51,4 +55,4 @@ if ! rg -q 'from azl_semantic_engine\.minimal_runtime import run_file' "$HOST_PY
   exit 100
 fi
 
-echo "semantic-spine-owner-contract-ok"
+echo "semantic-spine-owner-contract-ok (spec=azl_interpreter.azl spine-exec=minimal_runtime_python)"
