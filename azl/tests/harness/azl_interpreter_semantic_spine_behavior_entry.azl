@@ -31,6 +31,8 @@
 #   - twenty-eighth emit interpret — outer expression `== 2`, inner `== 3` nested if in then; P28_OUTER then P28_INNER; P28_BAD1 and P28_BAD2 must not run.
 #   - twenty-ninth emit interpret — three sequential ifs on ::azl_spine_p29 (true / false / true); P29_A then P29_B then P29_C; BAD1–BAD3 must not run.
 #   - thirtieth emit interpret — multi-statement then on `== 1` then second if `== 2` false → otherwise C; P30_A then P30_B then P30_C; P30_BAD1 and P30_BAD2 must not run.
+#   - thirty-first emit interpret — evaluated outer true; nested `if ( true )` multi-statement then; P31_OUTER then P31_A then P31_B; P31_BAD1 and P31_BAD2 must not run.
+#   - thirty-second emit interpret — evaluated outer false; nested `if ( false )` multi-statement otherwise; P32_OUTER then P32_A then P32_B; P32_BAD1 and P32_BAD2 must not run.
 
 component ::azl.spine.behavior.entry {
   init {
@@ -111,6 +113,18 @@ if ( ::azl_spine_p29 ) { say 'AZL_SPINE_P29_C' } otherwise { say 'AZL_SPINE_P29_
 if ( ::azl_spine_p30 == 1 ) { say 'AZL_SPINE_P30_A'
 say 'AZL_SPINE_P30_B' } otherwise { say 'AZL_SPINE_P30_BAD1' }
 if ( ::azl_spine_p30 == 2 ) { say 'AZL_SPINE_P30_BAD2' } otherwise { say 'AZL_SPINE_P30_C' }", component_name: "smoke30" }
+    emit interpret with { code: "set ::azl_spine_p31 = true
+if ( ::azl_spine_p31 ) {
+say 'AZL_SPINE_P31_OUTER'
+if ( true ) { say 'AZL_SPINE_P31_A'
+say 'AZL_SPINE_P31_B' } otherwise { say 'AZL_SPINE_P31_BAD1' }
+} otherwise { say 'AZL_SPINE_P31_BAD2' }", component_name: "smoke31" }
+    emit interpret with { code: "set ::azl_spine_p32 = false
+if ( ::azl_spine_p32 ) { say 'AZL_SPINE_P32_BAD1' } otherwise {
+say 'AZL_SPINE_P32_OUTER'
+if ( false ) { say 'AZL_SPINE_P32_BAD2' } otherwise { say 'AZL_SPINE_P32_A'
+say 'AZL_SPINE_P32_B' }
+}", component_name: "smoke32" }
     say "AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT"
   }
 }

@@ -26,10 +26,12 @@
 # smoke28 nested expression if in outer then; P28_OUTER before P28_INNER; P28_BAD1 and P28_BAD2 must not appear.
 # smoke29 three sequential ifs on ::azl_spine_p29; P29_A before P29_B before P29_C; BAD1–BAD3 must not appear.
 # smoke30 multi-statement then on ==1 then second if ==2 false → C; P30_A before P30_B before P30_C; BAD1/BAD2 must not appear.
+# smoke31 nested multi-statement then under evaluated outer true; P31_OUTER then P31_A then P31_B; BAD1/BAD2 must not appear.
+# smoke32 nested multi-statement otherwise under evaluated outer false; P32_OUTER then P32_A then P32_B; BAD1/BAD2 must not appear.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–677).
+# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–683).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -116,8 +118,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=30)}' "$out"; then
-  err "stdout expected >=30 \"Interpretation complete:\" lines (harness thirty emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=32)}' "$out"; then
+  err "stdout expected >=32 \"Interpretation complete:\" lines (harness thirty-two emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -456,6 +458,46 @@ if ! awk '
   err "stdout expected AZL_SPINE_P30_A then P30_B then P30_C (multi-statement then + second if otherwise)"
   cat "$out" >&2 || true
   exit 677
+fi
+if rg -q 'AZL_SPINE_P31_BAD1' "$out" || rg -q 'AZL_SPINE_P31_BAD2' "$out"; then
+  err "stdout must not contain AZL_SPINE_P31_BAD1 or AZL_SPINE_P31_BAD2 (nested multi-statement then under outer true)"
+  cat "$out" >&2 || true
+  exit 678
+fi
+if ! rg -q 'AZL_SPINE_P31_OUTER' "$out" || ! rg -q 'AZL_SPINE_P31_A' "$out" || ! rg -q 'AZL_SPINE_P31_B' "$out"; then
+  err "stdout missing thirty-first-interpret markers AZL_SPINE_P31_OUTER / P31_A / P31_B"
+  cat "$out" >&2 || true
+  exit 679
+fi
+if ! awk '
+  /AZL_SPINE_P31_OUTER/ && !o { o = NR }
+  /AZL_SPINE_P31_A/ && !a { a = NR }
+  /AZL_SPINE_P31_B/ && !b { b = NR }
+  END { exit !(o && a && b && o < a && a < b) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P31_OUTER then P31_A then P31_B (nested multi-statement inner then)"
+  cat "$out" >&2 || true
+  exit 680
+fi
+if rg -q 'AZL_SPINE_P32_BAD1' "$out" || rg -q 'AZL_SPINE_P32_BAD2' "$out"; then
+  err "stdout must not contain AZL_SPINE_P32_BAD1 or AZL_SPINE_P32_BAD2 (nested multi-statement otherwise under outer false)"
+  cat "$out" >&2 || true
+  exit 681
+fi
+if ! rg -q 'AZL_SPINE_P32_OUTER' "$out" || ! rg -q 'AZL_SPINE_P32_A' "$out" || ! rg -q 'AZL_SPINE_P32_B' "$out"; then
+  err "stdout missing thirty-second-interpret markers AZL_SPINE_P32_OUTER / P32_A / P32_B"
+  cat "$out" >&2 || true
+  exit 682
+fi
+if ! awk '
+  /AZL_SPINE_P32_OUTER/ && !o { o = NR }
+  /AZL_SPINE_P32_A/ && !a { a = NR }
+  /AZL_SPINE_P32_B/ && !b { b = NR }
+  END { exit !(o && a && b && o < a && a < b) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P32_OUTER then P32_A then P32_B (nested multi-statement inner otherwise)"
+  cat "$out" >&2 || true
+  exit 683
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"
