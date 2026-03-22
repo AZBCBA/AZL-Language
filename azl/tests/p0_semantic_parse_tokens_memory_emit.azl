@@ -1,0 +1,24 @@
+# Gate F162: ::parse_tokens — `memory emit F162_EVT` → `memory|emit|F162_EVT` (execute_ast memory row shape, bare emit).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f162_parse with { }
+  }
+  behavior {
+    listen for "f162_parse" {
+      set ::tokens = []
+      set ::tx = "memory emit F162_EVT"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::tx, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F162_OK"
+    }
+  }
+}
