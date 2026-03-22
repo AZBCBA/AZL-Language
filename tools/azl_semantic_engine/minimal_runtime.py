@@ -736,7 +736,7 @@ class MinimalAZLRuntime:
         return "Listen: " + levn[:120]
 
     def _builtin_execute_ast_result(self, ast_base: str) -> str:
-        """Walk ``<ast_base>.nodes``: preloop ``import|`` / ``link|`` (F98, F112–F114, F118, F120, F121, F122); main ``component|`` / ``memory|set|…`` / ``memory|say|…`` / ``memory|emit|…`` / ``memory|listen|…`` (F104–F127) / ``listen|…|…`` (F99–F103); ``say|`` (F93); ``emit|`` / ``emit|ev|with|…`` (F94–F97); ``set|::k|v`` (F95)."""
+        """Walk ``<ast_base>.nodes``: preloop ``import|`` / ``link|`` (F98, F112–F114, F118, F120, F121, F122); main ``component|`` / ``memory|set|…`` / ``memory|say|…`` / ``memory|emit|…`` / ``memory|listen|…`` (F104–F128) / ``listen|…|…`` (F99–F103); ``say|`` (F93); ``emit|`` / ``emit|ev|with|…`` (F94–F97); ``set|::k|v`` (F95)."""
         nk = ast_base + ".nodes"
         raw = self.var_get(nk) or ""
         result = "Execution completed"

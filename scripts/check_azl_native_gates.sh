@@ -4152,6 +4152,31 @@ if [ "$F127_C_OUT" != "$F127_PY_OUT" ]; then
   exit 484
 fi
 
+echo "[gate] F128: C vs Python — preloop import|+link| then component| + three memory|emit|…|with|… + component| + memory|say|"
+F128EX="${ROOT_DIR}/azl/tests/p0_semantic_execute_ast_preloop_component_memory_triple_emit_component_say.azl"
+F128_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F128EX" boot.entry 2>&1)"
+f128_c_rc=$?
+if [ "$f128_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_ast_preloop_component_memory_triple_emit_component_say exited $f128_c_rc: $F128_C_OUT"
+  exit 485
+fi
+if ! printf '%s\n' "$F128_C_OUT" | awk 'NR==1{if($0!="F128_TREE")exit 1} NR==2{if($0!="P128_LINK_SID")exit 1} NR==3{if($0!="P128_A")exit 1} NR==4{if($0!="F128_K1")exit 1} NR==5{if($0!="F128_K2")exit 1} NR==6{if($0!="F128_K3")exit 1} NR==7{if($0!="P128_B")exit 1} NR==8{if($0!="F128_MEM")exit 1} NR==9{if($0!="f128_mod_tag")exit 1} NR==10{if($0!="EX128_POST")exit 1} NR==11{if($0!="Said: F128_MEM")exit 1} NR==12{if($0!="EC128_INNER")exit 1} NR==13{if($0!="Said: F128_MEM")exit 1} NR==14{if($0!="P0_SEM_F128_OK")exit 1} END{if(NR!=14)exit 1}'; then
+  echo "ERROR: expected F128 preloop + component| + triple memory|emit|with + component| + memory|say stdout (14 lines), got: $F128_C_OUT"
+  exit 485
+fi
+F128_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F128EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f128_py_rc=$?
+if [ "$f128_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_ast_preloop_component_memory_triple_emit_component_say exited $f128_py_rc: $F128_PY_OUT"
+  exit 486
+fi
+if [ "$F128_C_OUT" != "$F128_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_ast_preloop_component_memory_triple_emit_component_say" >&2
+  echo "C:  $F128_C_OUT" >&2
+  echo "Py: $F128_PY_OUT" >&2
+  exit 487
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

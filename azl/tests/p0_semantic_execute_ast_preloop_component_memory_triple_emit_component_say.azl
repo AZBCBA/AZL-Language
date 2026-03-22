@@ -1,0 +1,70 @@
+# Gate F128: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **three** **`memory|emit|…|with|…`** rows (FIFO queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p128.linked {
+  init {
+    say "P128_LINK_SID"
+  }
+}
+
+component ::p128.a {
+  init {
+    say "P128_A"
+  }
+}
+
+component ::p128.b {
+  init {
+    say "P128_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p128_comp_triple_emit_comp with { ast: "f128-root", scope: "f128-sc", nodes: "import|f128_mod_tag
+link|::p128.linked
+component|p128.a
+memory|emit|f128_e1|with|key|F128_K1
+memory|emit|f128_e2|with|key|F128_K2
+memory|emit|f128_e3|with|key|F128_K3
+component|p128.b
+memory|say|F128_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC128_INNER"
+      say ::event.data.result
+      say "P0_SEM_F128_OK"
+    }
+    listen for "f128_e1" {
+      say ::event.data.key
+    }
+    listen for "f128_e2" {
+      say ::event.data.key
+    }
+    listen for "f128_e3" {
+      say ::event.data.key
+    }
+    listen for "p128_comp_triple_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F128_VM_ON_BAD"
+        return
+      }
+      say "F128_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX128_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}
