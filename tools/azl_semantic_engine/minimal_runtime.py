@@ -208,6 +208,13 @@ class MinimalAZLRuntime:
             "::lines",
         ):
             return INTERP_BLOB_VAR_MAX
+        # interpret / tokenize / parse chain passes large blobs via emit payloads
+        if k.startswith("::event.data.") and k in (
+            "::event.data.tokens",
+            "::event.data.code",
+            "::event.data.ast",
+        ):
+            return INTERP_BLOB_VAR_MAX
         return MAX_VAR_VALUE_LEN
 
     def var_set(self, k: str, v: str) -> None:
@@ -222,7 +229,15 @@ class MinimalAZLRuntime:
     def queue_push(self, ev: str, payload: list[tuple[str, str]] | None = None) -> None:
         if len(self.queue) >= MAX_EVENTS:
             return
-        pl = [(k[:47], v[:255]) for k, v in (payload or [])][:MAX_PAYLOAD_KEYS]
+        pl: list[tuple[str, str]] = []
+        for pk, pv in (payload or [])[:MAX_PAYLOAD_KEYS]:
+            kk = pk[:47]
+            cap = (
+                INTERP_BLOB_VAR_MAX
+                if kk in ("tokens", "code", "ast")
+                else 255
+            )
+            pl.append((kk, pv[:cap]))
         self.queue.append((ev[:63], pl))
 
     def queue_pop(self) -> tuple[str, list[tuple[str, str]]] | None:
@@ -763,17 +778,143 @@ class MinimalAZLRuntime:
         ]
         return "\n".join(out_lines)
 
-    def _parse_tokens_nodes_from_buffer(self, buf: str) -> str:
-        """Serialize tz buffer → ``::ast.nodes`` pipe text for bootstrap ``::execute_ast`` (contract vs C + AZL parse)."""
-        pairs = self._parse_tz_buffer_pairs(buf)
+    @staticmethod
+    def _brace_close_index(
+        pairs: list[tuple[str, str]], open_brace_idx: int, n: int
+    ) -> int:
+        depth = 0
+        k = open_brace_idx
+        while k < n:
+            t2, v2 = pairs[k]
+            if t2 == "brace" and v2 == "{":
+                depth += 1
+            elif t2 == "brace" and v2 == "}":
+                depth -= 1
+                if depth == 0:
+                    return k
+            k += 1
+        return -1
+
+    @staticmethod
+    def _collect_if_condition(
+        pairs: list[tuple[str, str]], j: int, n: int
+    ) -> tuple[str, int] | None:
+        depth = 1
+        parts: list[str] = []
+        while j < n:
+            t2, v2 = pairs[j]
+            if t2 == "paren" and v2 == "(":
+                depth += 1
+                parts.append("(")
+                j += 1
+                continue
+            if t2 == "paren" and v2 == ")":
+                depth -= 1
+                if depth == 0:
+                    return " ".join(parts).strip(), j + 1
+                parts.append(")")
+                j += 1
+                continue
+            if t2 in ("identifier", "string", "operator"):
+                parts.append(v2)
+                j += 1
+                continue
+            return None
+        return None
+
+    @staticmethod
+    def _normalize_if_cond_const(cond_raw: str) -> str | None:
+        eq_split = cond_raw.split(" = = ")
+        if len(eq_split) == 2:
+            cond_raw = eq_split[0].strip() + "==" + eq_split[1].strip()
+        s = cond_raw.strip()
+        while len(s) >= 2 and s[0] == "(" and s[-1] == ")":
+            inner = s[1:-1].strip()
+            if not inner:
+                break
+            s = inner
+        if s in ("true", "1"):
+            return "true"
+        if s in ("false", "0"):
+            return "false"
+        return None
+
+    def _try_parse_if_const_fold(
+        self, pairs: list[tuple[str, str]], i: int, n: int
+    ) -> tuple[list[str], int] | None:
+        if i >= n or pairs[i] != ("identifier", "if"):
+            return None
+        j = self._skip_eol_pairs(pairs, i + 1)
+        if j >= n or pairs[j] != ("paren", "("):
+            return None
+        j += 1
+        j = self._skip_eol_pairs(pairs, j)
+        cres = self._collect_if_condition(pairs, j, n)
+        if cres is None:
+            return None
+        cond_raw, j = cres
+        j = self._skip_eol_pairs(pairs, j)
+        if j >= n or pairs[j] != ("brace", "{"):
+            return None
+        then_open = j
+        then_close = self._brace_close_index(pairs, then_open, n)
+        if then_close < 0:
+            return None
+        then_lo = then_open + 1
+        then_hi = then_close
+        j = then_close + 1
+        else_lo: int | None = None
+        else_hi: int | None = None
+        j = self._skip_eol_pairs(pairs, j)
+        if (
+            j < n
+            and pairs[j][0] == "identifier"
+            and pairs[j][1] in ("else", "otherwise")
+        ):
+            j = self._skip_eol_pairs(pairs, j + 1)
+            if j < n and pairs[j] == ("brace", "{"):
+                e_open = j
+                e_close = self._brace_close_index(pairs, e_open, n)
+                if e_close < 0:
+                    return None
+                else_lo = e_open + 1
+                else_hi = e_close
+                j = e_close + 1
+
+        const = self._normalize_if_cond_const(cond_raw)
+        then_lines = self._parse_tokens_nodes_range(pairs, then_lo, then_hi)
+        else_lines: list[str] = (
+            self._parse_tokens_nodes_range(pairs, else_lo, else_hi)
+            if else_lo is not None and else_hi is not None
+            else []
+        )
+        if const == "true":
+            merged = then_lines
+        elif const == "false":
+            merged = else_lines
+        else:
+            merged = then_lines + else_lines
+        return (merged, j)
+
+    def _parse_tokens_nodes_range(
+        self, pairs: list[tuple[str, str]], lo: int, hi: int
+    ) -> list[str]:
+        """Half-open range ``[lo, hi)`` of tz pairs → execute_ast pipe lines."""
         out_lines: list[str] = []
-        i = 0
-        n = len(pairs)
+        i = lo
+        n = hi
         while i < n:
             typ, val = pairs[i]
             if typ == "eol":
                 i += 1
                 continue
+            if typ == "identifier" and val == "if":
+                folded = self._try_parse_if_const_fold(pairs, i, n)
+                if folded is not None:
+                    inner_lines, new_i = folded
+                    out_lines.extend(inner_lines)
+                    i = new_i
+                    continue
             if typ == "identifier" and val == "say":
                 j = self._skip_eol_pairs(pairs, i + 1)
                 parts: list[str] = []
@@ -1112,6 +1253,9 @@ class MinimalAZLRuntime:
                 "for",
                 "then",
                 "with",
+                "if",
+                "else",
+                "otherwise",
             ):
                 j = self._skip_eol_pairs(pairs, i + 1)
                 if j < n and pairs[j] == ("paren", "("):
@@ -1122,6 +1266,12 @@ class MinimalAZLRuntime:
                         i = j + 1
                         continue
             i += 1
+        return out_lines
+
+    def _parse_tokens_nodes_from_buffer(self, buf: str) -> str:
+        """Serialize tz buffer → ``::ast.nodes`` pipe text for bootstrap ``::execute_ast`` (contract vs C + AZL parse)."""
+        pairs = self._parse_tz_buffer_pairs(buf)
+        out_lines = self._parse_tokens_nodes_range(pairs, 0, len(pairs))
         if not out_lines:
             return "say|AZL_SPINE_SEMANTIC_PARSE_EXECUTE_BRIDGE"
         return "\n".join(out_lines)
@@ -2526,7 +2676,12 @@ class MinimalAZLRuntime:
                 inner = valtok
             i[0] += 1
             if key and len(out) < MAX_PAYLOAD_KEYS:
-                out.append((key, inner[:255]))
+                cap = (
+                    INTERP_BLOB_VAR_MAX
+                    if key in ("tokens", "code", "ast")
+                    else 255
+                )
+                out.append((key, inner[:cap]))
             if i[0] < self.ntok and self.tok[i[0]] == ",":
                 i[0] += 1
         return out

@@ -543,12 +543,13 @@ component ::azl.interpreter {
       return ::let_node
     }
 
-    # Parse if ( condition ) { statements } — top-level / section / nested if body
+    # Parse if ( condition ) { statements } [ otherwise { statements } ] — user "otherwise" is the alternate branch (host .azl reserves "else" near if; interpret code uses otherwise)
     ::parse_if_statement = (tokens) => {
       set ::if_node = {
         type: "if",
         condition: "",
-        when_true: []
+        when_true: [],
+        when_false: []
       }
       set ::current_pos = ::current_pos + 1
       if ::current_pos >= ::tokens.length { return ::if_node }
@@ -580,6 +581,10 @@ component ::azl.interpreter {
         }
       }
       set ::if_node.condition = ::cond
+      set ::eq_split = ::cond.split(" = = ")
+      if ::eq_split.length == 2 {
+        set ::if_node.condition = ::eq_split[0].trim() + "==" + ::eq_split[1].trim()
+      }
       if ::current_pos >= ::tokens.length { return ::if_node }
       set ::obr = ::tokens[::current_pos]
       if ::obr.type != "brace" || ::obr.value != "{" { return ::if_node }
@@ -621,6 +626,63 @@ component ::azl.interpreter {
           set ::if_node.when_true.push(::call_if)
         } else {
           set ::current_pos = ::current_pos + 1
+        }
+      }
+      while ::current_pos < ::tokens.length && ::tokens[::current_pos].type == "eol" {
+        set ::current_pos = ::current_pos + 1
+      }
+      if ::current_pos < ::tokens.length {
+        set ::e_tok = ::tokens[::current_pos]
+        if ::e_tok.value == "otherwise" {
+          set ::current_pos = ::current_pos + 1
+          while ::current_pos < ::tokens.length && ::tokens[::current_pos].type == "eol" {
+            set ::current_pos = ::current_pos + 1
+          }
+          if ::current_pos < ::tokens.length {
+            set ::e_br = ::tokens[::current_pos]
+            if ::e_br.type == "brace" && ::e_br.value == "{" {
+              set ::current_pos = ::current_pos + 1
+              while ::current_pos < ::tokens.length {
+                set ::token = ::tokens[::current_pos]
+                if ::token.type == "brace" && ::token.value == "}" {
+                  set ::current_pos = ::current_pos + 1
+                  break
+                } else if ::token.value == "say" {
+                  set ::say_e = ::parse_say_statement(::tokens)
+                  set ::if_node.when_false.push(::say_e)
+                } else if ::token.value == "set" {
+                  set ::set_e = ::parse_set_statement(::tokens)
+                  set ::if_node.when_false.push(::set_e)
+                } else if ::token.value == "emit" {
+                  set ::emit_e = ::parse_emit_statement(::tokens)
+                  set ::if_node.when_false.push(::emit_e)
+                } else if ::token.value == "listen" {
+                  set ::listen_e = ::parse_listen_statement(::tokens)
+                  set ::if_node.when_false.push(::listen_e)
+                } else if ::token.value == "let" {
+                  set ::let_e = ::parse_let_statement(::tokens)
+                  set ::if_node.when_false.push(::let_e)
+                } else if ::token.value == "on" {
+                  set ::fn_e = ::parse_on_function(::tokens)
+                  set ::if_node.when_false.push(::fn_e)
+                } else if ::token.value == "import" {
+                  set ::imp_e = ::parse_import_statement(::tokens)
+                  set ::if_node.when_false.push(::imp_e)
+                } else if ::token.value == "link" {
+                  set ::lnk_e = ::parse_link_statement(::tokens)
+                  set ::if_node.when_false.push(::lnk_e)
+                } else if ::token.value == "if" {
+                  set ::nest_e = ::parse_if_statement(::tokens)
+                  set ::if_node.when_false.push(::nest_e)
+                } else if (::token.type == "identifier" && ::current_pos + 1 < ::tokens.length && ::tokens[::current_pos + 1].type == "paren" && ::tokens[::current_pos + 1].value == "(") {
+                  set ::call_e = ::parse_call_statement(::tokens)
+                  set ::if_node.when_false.push(::call_e)
+                } else {
+                  set ::current_pos = ::current_pos + 1
+                }
+              }
+            }
+          }
         }
       }
       return ::if_node
@@ -958,10 +1020,22 @@ component ::azl.interpreter {
     # Execute if (condition) { ... } for parsed user code (interpret → execute_ast path)
     ::execute_if_statement = (statement) => {
       set ::cond_v = ::evaluate_expression(::statement.condition)
-      if (::cond_v == true || ::cond_v.toString() == "true") {
+      set ::is_false = (::cond_v == false || (::cond_v != null && ::cond_v.toString() == "false"))
+      set ::is_true = (::cond_v == true || (::cond_v != null && ::cond_v.toString() == "true"))
+      if (::is_false) {
+        for ::stmt2 in ::statement.when_false {
+          if ::halted { break }
+          ::execute_statement(::stmt2)
+        }
+      } else if (::is_true) {
         for ::stmt in ::statement.when_true {
           if ::halted { break }
           ::execute_statement(::stmt)
+        }
+      } else {
+        for ::stmt3 in ::statement.when_false {
+          if ::halted { break }
+          ::execute_statement(::stmt3)
         }
       }
       return "if:ok"

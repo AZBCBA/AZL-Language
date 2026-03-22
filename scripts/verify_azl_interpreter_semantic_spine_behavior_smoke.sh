@@ -10,10 +10,11 @@
 # smoke11 emit with payload — payload branch + host prints AZL_EMIT_WITH_PAYLOAD (matches in-file marker intent).
 # smoke12 on/call — top-level user function + call (registered:* / called:* via execute_ast fn|/call| spine encoding).
 # smoke14 if ( true ) { say … } — ::parse_if_statement + ::execute_if_statement on real file path.
+# smoke15 if ( false ) { … } otherwise { say … } — alternate branch; then-body marker must not appear.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–633).
+# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–634).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -100,8 +101,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=14)}' "$out"; then
-  err "stdout expected >=14 \"Interpretation complete:\" lines (harness fourteen emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=15)}' "$out"; then
+  err "stdout expected >=15 \"Interpretation complete:\" lines (harness fifteen emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -174,6 +175,16 @@ if ! rg -q 'AZL_SPINE_P14_IF' "$out"; then
   err "stdout missing fourteenth-interpret if-body say marker AZL_SPINE_P14_IF (::parse_if_statement / ::execute_if_statement)"
   cat "$out" >&2 || true
   exit 633
+fi
+if rg -q 'AZL_SPINE_P15_BAD' "$out"; then
+  err "stdout must not contain fifteenth-interpret skipped then-body marker AZL_SPINE_P15_BAD"
+  cat "$out" >&2 || true
+  exit 634
+fi
+if ! rg -q 'AZL_SPINE_P15_ELSE' "$out"; then
+  err "stdout missing fifteenth-interpret otherwise-branch say marker AZL_SPINE_P15_ELSE (if/false + otherwise on real file path)"
+  cat "$out" >&2 || true
+  exit 635
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"
