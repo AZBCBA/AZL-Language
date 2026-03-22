@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "consts": ["false", "true"],
+  "code": [
+    { "op": "load_const", "event": 0 },
+    { "op": "jump_if_false", "target": 99, "false_idx": 0 },
+    { "op": "halt" }
+  ]
+}

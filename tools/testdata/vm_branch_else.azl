@@ -1,0 +1,7 @@
+# Native compiler: else branch must run when condition is false; success must not fire.
+set status = "bad"
+if ( status == "ok" ) {
+  emit "success" { "result": status }
+} else {
+  emit "failure" { "result": "no" }
+}

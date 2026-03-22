@@ -299,10 +299,13 @@ static int parse_set_stmt(Parse *p) {
   strncpy(name, p->cur.text, sizeof(name) - 1u);
   name[sizeof(name) - 1u] = '\0';
   parse_bump(p);
-  if (parse_expect(p, TK_ASSIGN) != 0)
+  if (p->cur.k != TK_ASSIGN) {
+    parse_err(p, "expected '=' after set name");
     return -1;
+  }
+  parse_bump(p);
   if (p->cur.k != TK_STRING) {
-    parse_err(p, "expected string value");
+    parse_err(p, "expected string value after '=' in set");
     return -1;
   }
   int v = add_const(p, p->cur.text);
@@ -329,14 +332,20 @@ static int parse_if_stmt(Parse *p) {
     return -1;
   if (parse_cmp_expr(p) != 0)
     return -1;
-  if (parse_expect(p, TK_RPAREN) != 0)
+  if (p->cur.k != TK_RPAREN) {
+    parse_err(p, "expected ')' after if condition");
     return -1;
+  }
+  parse_bump(p);
   size_t jif_at = p->out->ncode;
   AzlBytecodeInstr jif = {AZL_OP_JUMP_IF_FALSE, 0u, (uint32_t)p->cfalse, 0};
   if (add_insn(p, &jif) != 0)
     return -1;
-  if (parse_expect(p, TK_LBRACE) != 0)
+  if (p->cur.k != TK_LBRACE) {
+    parse_err(p, "expected '{' to start if body");
     return -1;
+  }
+  parse_bump(p);
   while (p->cur.k != TK_RBRACE && p->cur.k != TK_EOF) {
     if (parse_stmt(p) != 0)
       return -1;
@@ -350,8 +359,11 @@ static int parse_if_stmt(Parse *p) {
     if (add_insn(p, &ju) != 0)
       return -1;
     p->out->code[jif_at].a = (uint32_t)p->out->ncode;
-    if (parse_expect(p, TK_LBRACE) != 0)
+    if (p->cur.k != TK_LBRACE) {
+      parse_err(p, "expected '{' to start else body");
       return -1;
+    }
+    parse_bump(p);
     while (p->cur.k != TK_RBRACE && p->cur.k != TK_EOF) {
       if (parse_stmt(p) != 0)
         return -1;
@@ -416,8 +428,11 @@ static int parse_emit_stmt(Parse *p) {
     if (ki < 0)
       return -1;
     parse_bump(p);
-    if (parse_expect(p, TK_COLON) != 0)
+    if (p->cur.k != TK_COLON) {
+      parse_err(p, "expected ':' after emit payload key");
       return -1;
+    }
+    parse_bump(p);
     AzlBytecodeInstr ins;
     if (p->cur.k == TK_STRING) {
       int vi = add_const(p, p->cur.text);
@@ -567,6 +582,180 @@ static void cmp_on_failure(AzlEngine *eng, const AzlEvent *ev, void *ud) {
   g_branch_saw_failure = 1;
 }
 
+static int resolve_testdata_path(const char *name, char *path, size_t pathsz) {
+  const char *prefixes[] = {"tools/testdata/", "testdata/", NULL};
+  for (int i = 0; prefixes[i]; i++) {
+    snprintf(path, pathsz, "%s%s", prefixes[i], name);
+    FILE *f = fopen(path, "rb");
+    if (f) {
+      fclose(f);
+      return 0;
+    }
+  }
+  return -1;
+}
+
+static int expect_compile_fail_named(const char *name, const char *needle) {
+  char path[512];
+  if (resolve_testdata_path(name, path, sizeof(path)) != 0) {
+    fprintf(stderr, "native_vm_negative: missing testdata %s\n", name);
+    return -1;
+  }
+  AzlBytecodeProgram prog;
+  azl_bytecode_program_init_empty(&prog);
+  char ebuf[512];
+  int r = azl_compile_file(path, &prog, ebuf, sizeof(ebuf));
+  azl_bytecode_program_destroy(&prog);
+  if (r == 0) {
+    fprintf(stderr, "native_vm_negative: expected compile failure for %s\n", name);
+    return -1;
+  }
+  if (!needle || !strstr(ebuf, needle)) {
+    fprintf(stderr, "native_vm_negative: %s: expected substring \"%s\" in error, got: %s\n", name,
+            needle ? needle : "", ebuf);
+    return -1;
+  }
+  return 0;
+}
+
+static int expect_vm_exec_fail_json_named(const char *name) {
+  char path[512];
+  if (resolve_testdata_path(name, path, sizeof(path)) != 0) {
+    fprintf(stderr, "native_vm_negative: missing json %s\n", name);
+    return -1;
+  }
+  FILE *fp = fopen(path, "rb");
+  if (!fp)
+    return -1;
+  char buf[8192];
+  size_t n = fread(buf, 1, sizeof(buf) - 1u, fp);
+  fclose(fp);
+  buf[n] = '\0';
+  AzlBytecodeProgram prog;
+  azl_bytecode_program_init_empty(&prog);
+  char ebuf[256];
+  if (azl_bytecode_load_json(buf, n, &prog, ebuf, sizeof(ebuf)) != 0) {
+    fprintf(stderr, "native_vm_negative: %s: expected JSON load to succeed, got: %s\n", name, ebuf);
+    azl_bytecode_program_destroy(&prog);
+    return -1;
+  }
+  AzlEngine *eng = azl_engine_create((size_t)1u << 16, 1024u, 64u);
+  if (!eng) {
+    azl_bytecode_program_destroy(&prog);
+    return -1;
+  }
+  AzlErr xr = azl_vm_exec_block(eng, &prog);
+  azl_engine_destroy(eng);
+  azl_bytecode_program_destroy(&prog);
+  if (xr == AZL_OK) {
+    fprintf(stderr, "native_vm_negative: %s: expected vm_exec to fail (non-OK AzlErr)\n", name);
+    return -1;
+  }
+  return 0;
+}
+
+static int g_else_fail_no;
+static int g_else_success_any;
+
+static void else_on_success_any(AzlEngine *eng, const AzlEvent *ev, void *ud) {
+  (void)eng;
+  (void)ud;
+  (void)ev;
+  g_else_success_any = 1;
+}
+
+static void else_on_failure_no(AzlEngine *eng, const AzlEvent *ev, void *ud) {
+  (void)eng;
+  (void)ud;
+  const char *r = cmp_payload(ev, "result");
+  if (r && strcmp(r, "no") == 0)
+    g_else_fail_no = 1;
+}
+
+static int expect_else_branch_fixture_ok(void) {
+  char path[512];
+  if (resolve_testdata_path("vm_branch_else.azl", path, sizeof(path)) != 0) {
+    fprintf(stderr, "native_vm_negative: vm_branch_else.azl missing\n");
+    return -1;
+  }
+  FILE *fp = fopen(path, "rb");
+  if (!fp)
+    return -1;
+  char bbuf[4096];
+  size_t bn = fread(bbuf, 1, sizeof(bbuf) - 1u, fp);
+  fclose(fp);
+  bbuf[bn] = '\0';
+  AzlBytecodeProgram prog;
+  azl_bytecode_program_init_empty(&prog);
+  char ebuf[256];
+  if (azl_compile_source(bbuf, bn, &prog, ebuf, sizeof(ebuf)) != 0) {
+    fprintf(stderr, "native_vm_negative: vm_branch_else compile: %s\n", ebuf);
+    azl_bytecode_program_destroy(&prog);
+    return -1;
+  }
+  AzlEngine *eng = azl_engine_create((size_t)1u << 16, 1024u, 64u);
+  if (!eng) {
+    azl_bytecode_program_destroy(&prog);
+    return -1;
+  }
+  g_else_fail_no = 0;
+  g_else_success_any = 0;
+  azl_engine_register_listener(eng, "success", else_on_success_any, NULL);
+  azl_engine_register_listener(eng, "failure", else_on_failure_no, NULL);
+  if (azl_vm_exec_block(eng, &prog) != AZL_OK) {
+    fprintf(stderr, "native_vm_negative: vm_branch_else vm_exec failed\n");
+    azl_engine_destroy(eng);
+    azl_bytecode_program_destroy(&prog);
+    return -1;
+  }
+  azl_bytecode_program_destroy(&prog);
+  azl_engine_destroy(eng);
+  if (!g_else_fail_no) {
+    fprintf(stderr, "native_vm_negative: else path did not emit failure with result=no\n");
+    return -1;
+  }
+  if (g_else_success_any) {
+    fprintf(stderr, "native_vm_negative: else path spuriously emitted success\n");
+    return -1;
+  }
+  return 0;
+}
+
+/* Compile-time / JSON-load / vm_exec negative and else-branch coverage (native subset). */
+static int native_vm_negative_and_edge_suite(void) {
+  if (expect_compile_fail_named("compile_bad_cond_unknown.azl", "unknown variable") != 0)
+    return -1;
+  if (expect_compile_fail_named("compile_bad_emit_unknown.azl", "unknown variable in emit payload") != 0)
+    return -1;
+  if (expect_compile_fail_named("compile_bad_if_no_paren.azl", "expected ')' after if condition") != 0)
+    return -1;
+  if (expect_compile_fail_named("compile_bad_if_no_brace.azl", "expected '{' to start if body") != 0)
+    return -1;
+  if (expect_compile_fail_named("compile_bad_emit_no_colon.azl", "expected ':' after emit payload key") != 0)
+    return -1;
+  if (expect_compile_fail_named("compile_bad_emit_no_rbrace.azl", "expected ',' or '}'") != 0)
+    return -1;
+  if (expect_compile_fail_named("compile_bad_set_no_eq.azl", "expected '=' after set name") != 0)
+    return -1;
+  if (expect_compile_fail_named("compile_bad_set_no_rhs.azl", "expected string value after '=' in set") != 0)
+    return -1;
+
+  if (expect_vm_exec_fail_json_named("vm_bad_jump_target.json") != 0)
+    return -1;
+  if (expect_vm_exec_fail_json_named("vm_bad_load_unset.json") != 0)
+    return -1;
+  if (expect_vm_exec_fail_json_named("vm_bad_emit_var_unset.json") != 0)
+    return -1;
+  if (expect_vm_exec_fail_json_named("vm_bad_store_slot.json") != 0)
+    return -1;
+
+  if (expect_else_branch_fixture_ok() != 0)
+    return -1;
+
+  fprintf(stderr, "native_vm_negative_and_edge_suite: ok\n");
+  return 0;
+}
+
 int azl_compiler_selftest(void) {
   static const char src[] = "emit \"hello\" { \"message\": \"Hello World\" }\n";
   AzlBytecodeProgram prog;
@@ -675,6 +864,10 @@ int azl_compiler_selftest(void) {
     fprintf(stderr, "azl_compiler_selftest: branch did not emit success/result=ok or spurious failure event\n");
     return -1;
   }
-  fprintf(stderr, "azl_compiler_selftest: ok (%s, %s)\n", used ? used : "?", bused ? bused : "?");
+  if (native_vm_negative_and_edge_suite() != 0) {
+    fprintf(stderr, "azl_compiler_selftest: native_vm_negative_and_edge_suite failed\n");
+    return -1;
+  }
+  fprintf(stderr, "azl_compiler_selftest: ok (%s, %s, negative+else)\n", used ? used : "?", bused ? bused : "?");
   return 0;
 }

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "consts": ["v"],
+  "code": [
+    { "op": "load_const", "event": 0 },
+    { "op": "store_var", "slot": 99 },
+    { "op": "halt" }
+  ]
+}
