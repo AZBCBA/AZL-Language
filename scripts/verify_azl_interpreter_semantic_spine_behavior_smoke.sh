@@ -9,8 +9,8 @@
 # smoke10 bare emit — ::execute_emit / ::emit_event_resolved (spine surfaces result as Interpretation complete: Emitted: …).
 # smoke11 emit with payload — payload branch + host prints AZL_EMIT_WITH_PAYLOAD (matches in-file marker intent).
 # smoke12 on/call — top-level user function + call (registered:* / called:* via execute_ast fn|/call| spine encoding).
-# smoke14 if ( true ) { say … } — meaning in azl_interpreter.azl; spine ::parse_tokens may emit say|… only (const fold).
-# smoke15 if ( false ) { … } otherwise { say … } — alternate branch; then-body marker must not appear (same const fold).
+# smoke14 if ( true ) { say … } — ::parse_if_statement / ::execute_if_statement; spine ::parse_tokens emits if| row; host execute_ast branches.
+# smoke15 if ( false ) { … } otherwise { say … } — alternate branch; then-body marker must not appear (same if| + host branch).
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.

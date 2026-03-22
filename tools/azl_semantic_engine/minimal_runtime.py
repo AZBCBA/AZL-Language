@@ -823,28 +823,37 @@ class MinimalAZLRuntime:
             return None
         return None
 
-    @staticmethod
-    def _spine_if_condition_const(cond_raw: str) -> str | None:
-        """Constant-foldable user condition only; aligns with ``::execute_if_statement`` true/false vs other."""
-        eq_split = cond_raw.split(" = = ")
-        if len(eq_split) == 2:
-            cond_raw = eq_split[0].strip() + "==" + eq_split[1].strip()
-        s = cond_raw.strip()
-        while len(s) >= 2 and s[0] == "(" and s[-1] == ")":
-            inner = s[1:-1].strip()
-            if not inner:
-                break
-            s = inner
-        if s in ("true", "1"):
-            return "true"
-        if s in ("false", "0"):
-            return "false"
-        return None
+    def _execute_ast_if_condition_take_then(self, cond_raw: str) -> bool:
+        """``if|`` branch choice only: reuse ``eval_expr`` + ``_cond_is_true`` (same host rule as ``exec_if``)."""
+        raw = (cond_raw or "").strip()
+        if not raw:
+            return False
+        raw = raw.replace(" = = ", "==")
+        try:
+            toks = tokenize_source(raw)
+        except Exception:
+            return False
+        if not toks:
+            return False
+        save_tok, save_ntok = self.tok, self.ntok
+        try:
+            self.tok = toks
+            self.ntok = len(toks)
+            idx = [0]
+            val = self.eval_expr(idx)
+            if idx[0] != self.ntok:
+                return False
+            return self._cond_is_true(val)
+        except SemanticEngineError:
+            return False
+        finally:
+            self.tok = save_tok
+            self.ntok = save_ntok
 
     def _try_parse_if_spine_row(
         self, pairs: list[tuple[str, str]], i: int, n: int
     ) -> tuple[str, int] | None:
-        """Serialize ``if`` / ``otherwise`` as one ``if|`` + JSON row (no branch choice here — see ``_builtin_execute_ast_run_lines``)."""
+        """Serialize ``if`` / ``otherwise`` as one ``if|`` + JSON row (branch in ``_builtin_execute_ast_run_lines``)."""
         if i >= n or pairs[i] != ("identifier", "if"):
             return None
         j = self._skip_eol_pairs(pairs, i + 1)
@@ -2135,7 +2144,7 @@ class MinimalAZLRuntime:
     def _builtin_execute_ast_run_lines(
         self, lines: list[str], fn_reg: dict[str, str], result: str
     ) -> str:
-        """Walk pipe rows (nested under ``if|`` branches share ``fn_reg``). Branch choice for ``if|`` matches ``azl_interpreter.azl`` ``::execute_if_statement``."""
+        """Walk pipe rows (nested under ``if|`` branches share ``fn_reg``). ``if|`` uses ``_execute_ast_if_condition_take_then``."""
         for line in lines:
             if (self.var_get("::halted") or "") == "true":
                 return "Execution halted due to error"
@@ -2163,8 +2172,8 @@ class MinimalAZLRuntime:
                     if isinstance(raw_else, list)
                     else []
                 )
-                const = self._spine_if_condition_const(str(c))
-                chosen = then_lines if const == "true" else else_lines
+                take_then = self._execute_ast_if_condition_take_then(str(c))
+                chosen = then_lines if take_then else else_lines
                 result = self._builtin_execute_ast_run_lines(chosen, fn_reg, result)
                 continue
             if seg.startswith("say|"):

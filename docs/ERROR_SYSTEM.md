@@ -807,9 +807,9 @@ Tier B **P0.1c** release crumb: concatenates **`azl/tests/stubs/azl_security_for
 | **561** | Fewer than **two** stdout lines containing **`AZL_S6_ONLY`** (sixth + seventh interpret share the same literal **`say`**) |
 | **562** | Stdout missing **`AZL_S8_MARK`** (eighth interpret single-line literal **`say`**) |
 | **611** | Stdout missing **`AZL_SPINE_P9_SET_LINE`** (ninth interpret **`set ::…`** + **`say`** — **`::execute_ast`** **`set|…`** row on real file path) |
-| **633** | Stdout missing **`AZL_SPINE_P14_IF`** (fourteenth interpret **`if ( true ) { say … }`** — meaning **`::parse_if_statement`** / **`::execute_if_statement`**; spine **`::parse_tokens`** may const-fold to **`say|…`**) |
+| **633** | Stdout missing **`AZL_SPINE_P14_IF`** (fourteenth interpret **`if ( true ) { say … }`** — **`::parse_if_statement`** / **`::execute_if_statement`**; spine **`::parse_tokens`** emits **`if|`**; host **`execute_ast`** branches) |
 | **634** | Stdout contains **`AZL_SPINE_P15_BAD`** (fifteenth interpret skipped then-branch must not run) |
-| **635** | Stdout missing **`AZL_SPINE_P15_ELSE`** (fifteenth interpret **`if ( false ) { … } otherwise { say … }`** — alternate branch; spine **`::parse_tokens`** may emit **`say|…`** only for literal conditions; meaning in **`::execute_if_statement`**) |
+| **635** | Stdout missing **`AZL_SPINE_P15_ELSE`** (fifteenth interpret **`if ( false ) { … } otherwise { say … }`** — alternate branch; **`if|`** row + host **`execute_ast`**; meaning in **`::execute_if_statement`**) |
 
 ### Enterprise POST /v1/chat benchmark (`scripts/benchmark_enterprise_v1_chat.sh`)
 
