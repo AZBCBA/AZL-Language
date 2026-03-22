@@ -8,10 +8,20 @@
 
 ## Semantic ownership (north star vs scaffolding)
 
-- **Target:** **C orchestrates; AZL interprets** — the native engine and launcher pass bundle + entry; **`azl/runtime/interpreter/azl_interpreter.azl`** (with its wired stack) is the **intended semantic owner** for full AZL meaning (parse, execute, events, components, VM branch where applicable).
-- **Temporary carriers (today):** **`tools/azl_semantic_engine/minimal_runtime.py`** (Python) and **`tools/azl_interpreter_minimal.c`** (C minimal) are **bootstrap**, **parity**, and **contract** carriers on a **narrow** subset (incl. **C↔Python** gates). They are **not** the long-term definition of the language.
-- **Plain limit:** The **default / canonical** enterprise runtime child still runs **C minimal** on the combined file; **`azl_interpreter.azl` is not executed on that default path yet**. Growing Python/C “second interpreters” does **not** replace landing the real interpreter on the spine.
-- **Gate G2 probe (`tools/azl_runtime_spine_host.py --semantic-owner`, checked by `scripts/verify_semantic_spine_owner_contract.sh`):** **`AZL_SEMANTIC_SPEC_OWNER=azl/runtime/interpreter/azl_interpreter.azl`** = **intended** language-meaning anchor (the AZL source that should own full semantics at steady state; not a claim that every CI gate already covers the whole file). **`AZL_SPINE_EXEC_OWNER=minimal_runtime_python`** = **who steps AZL source on the semantic launcher path today** (Python `minimal_runtime` as **bootstrap / parity / contract** carrier). That is **not** “Python is the language definition,” and it is **not** the default enterprise child (still **C minimal** until spine policy changes).
+- **Target (steady state):** **C orchestrates; AZL interprets** — the native engine and launcher still own process/orchestration (bundle path, entry env, child lifecycle); **`azl/runtime/interpreter/azl_interpreter.azl`** (with its wired stack) is the **intended semantic specification** for full AZL meaning (parse, execute, events, components, VM branch where applicable). Nothing in **Gate G2** replaces or implies that transition by itself.
+- **Current (transitional):** **`tools/azl_semantic_engine/minimal_runtime.py`** (Python) and **`tools/azl_interpreter_minimal.c`** (C minimal) remain **bootstrap**, **parity**, and **contract** carriers on a **narrow** subset (incl. **C↔Python** gates). The **default** enterprise runtime child is still **C minimal** on the combined file — **`azl_interpreter.azl` is not the executed semantic engine on that default path yet**. Opt-in **`AZL_RUNTIME_SPINE=azl_interpreter`** or **`semantic`** selects the **semantic launcher**, which today steps combined **`.azl`** through **Python `minimal_runtime`** (still a carrier, not the long-term language definition).
+- **Plain limit:** Growing Python/C “second interpreters” does **not** replace landing the real interpreter on the spine.
+
+### Gate G2 — semantic-owner probe (what it pins vs what it does not)
+
+**Checked by** `scripts/verify_semantic_spine_owner_contract.sh` via `tools/azl_runtime_spine_host.py --semantic-owner` (exact two-line stdout, fixed order):
+
+| Line | Name | Meaning |
+|------|------|---------|
+| 1 | **`AZL_SEMANTIC_SPEC_OWNER=azl/runtime/interpreter/azl_interpreter.azl`** | **Intended** language-meaning anchor (AZL source that should own full semantics at steady state). Not a claim that every CI gate already covers the whole file. |
+| 2 | **`AZL_SPINE_EXEC_OWNER=minimal_runtime_python`** | **Today’s exec carrier** on the **semantic launcher path only** — Python `minimal_runtime` steps **`.azl`** sources. Not “Python defines AZL,” not a statement that the **default** enterprise child has left **C minimal**, and **not** a fake owner flip toward target state. |
+
+**G2 does not:** change default spine policy, assert full in-file semantic coverage, or claim **C minimal** has been retired from the default path.
 
 ---
 

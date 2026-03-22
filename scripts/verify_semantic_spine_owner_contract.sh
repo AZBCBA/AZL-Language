@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # Gate G2 — semantic spine *owner contract* (docs: RUNTIME_SPINE_DECISION.md, AZL_NATIVE_RUNTIME_CONTRACT.md).
-# Target state: C orchestrates; AZL (azl_interpreter.azl) interprets. Today: transitional.
-#   Line 1  AZL_SEMANTIC_SPEC_OWNER   = intended language-meaning anchor (.azl file path).
-#   Line 2  AZL_SPINE_EXEC_OWNER      = who steps AZL on the semantic launcher path today (minimal_runtime_python).
-# C minimal remains default enterprise semantics until spine policy flips; G2 does not claim otherwise.
+#
+# Target (steady state): C orchestrates process/orchestration; AZL (azl_interpreter.azl) owns full meaning.
+# Current (transitional): default enterprise child = C minimal on combined bundle; semantic launcher only
+#   (AZL_RUNTIME_SPINE=azl_interpreter|semantic) uses Python minimal_runtime as exec carrier for .azl sources.
+#
+# Probe stdout (fixed order, exact match):
+#   Line 1  AZL_SEMANTIC_SPEC_OWNER   = intended spec anchor (.azl path), not “already shipped full depth.”
+#   Line 2  AZL_SPINE_EXEC_OWNER      = exec carrier on semantic launcher path today (minimal_runtime_python).
+# G2 does not flip default spine, retire C minimal, or fake transition to target state.
 # Fails if the semantic spine launcher/host stops delegating to tools/azl_semantic_engine/minimal_runtime.
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -55,4 +60,4 @@ if ! rg -q 'from azl_semantic_engine\.minimal_runtime import run_file' "$HOST_PY
   exit 100
 fi
 
-echo "semantic-spine-owner-contract-ok (spec=azl_interpreter.azl spine-exec=minimal_runtime_python)"
+echo "semantic-spine-owner-contract-ok (target=C-orchestrates-AZL-interprets; current=default-C-minimal semantic-launcher=minimal_runtime_python)"
