@@ -1,0 +1,33 @@
+# Gate F168: Structured AST slice (spine_component_v1): tokenize → ::parse_tokens fills
+# ::ast.exec_model + ::ast.spine (tab records). ::execute_ast runs behavior listeners
+# (register_listener + synthetic say body), then init, then memory — not pipe-row stubs.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f168_spine with { }
+  }
+  behavior {
+    listen for "f168_spine" {
+      set ::tokens = []
+      set ::tx = "component ::Spine168 { behavior { listen for \"E168\" { say 'F168_L' } } init { say 'F168_INIT' emit E168 } memory { set ::mem168 = x say 'F168_M' } }"
+      set ::ln = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::tx, ::ln))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F168_VM_ON_BAD"
+        return
+      }
+      set ::scope = "spine_scope"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::result
+      say "P0_SEM_F168_OK"
+    }
+  }
+}

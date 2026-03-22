@@ -5152,6 +5152,31 @@ if [ "$F167_C_OUT" != "$F167_PY_OUT" ]; then
   exit 617
 fi
 
+echo "[gate] F168: C vs Python — spine_component_v1 parse → execute_ast (init / listen / memory)"
+F168EX="${ROOT_DIR}/azl/tests/p0_semantic_spine_structured_component_e2e.azl"
+F168_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F168EX" boot.entry 2>&1)"
+f168_c_rc=$?
+if [ "$f168_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_spine_structured_component_e2e exited $f168_c_rc: $F168_C_OUT"
+  exit 618
+fi
+if ! printf '%s\n' "$F168_C_OUT" | awk 'NR==1{if($0!="F168_INIT")exit 1} NR==2{if($0!="F168_L")exit 1} NR==3{if($0!="F168_M")exit 1} NR==4{if($0!="Said: '\''F168_M'\''")exit 1} NR==5{if($0!="P0_SEM_F168_OK")exit 1} END{if(NR!=5)exit 1}'; then
+  echo "ERROR: expected F168 stdout (5 lines), got: $F168_C_OUT"
+  exit 618
+fi
+F168_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F168EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f168_py_rc=$?
+if [ "$f168_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_spine_structured_component_e2e exited $f168_py_rc: $F168_PY_OUT"
+  exit 619
+fi
+if [ "$F168_C_OUT" != "$F168_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_spine_structured_component_e2e" >&2
+  echo "C:  $F168_C_OUT" >&2
+  echo "Py: $F168_PY_OUT" >&2
+  exit 620
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

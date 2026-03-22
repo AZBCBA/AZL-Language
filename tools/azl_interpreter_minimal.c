@@ -27,7 +27,7 @@
 #define MAX_EVENTS 32
 #define MAX_PAYLOAD_KEYS 8
 /* Var string values (tz concat buffers, ::tokens); larger than execute_ast row cap (255). */
-#define AZL_MINIMAL_VAR_CAP 512
+#define AZL_MINIMAL_VAR_CAP 2048
 
 typedef struct { char key[48]; char v[256]; } PayloadKV;
 typedef struct {
@@ -46,10 +46,21 @@ typedef struct { char k[64]; char v[AZL_MINIMAL_VAR_CAP]; } Var;
 static Var g_vars[MAX_VARS];
 static int g_nvars;
 
-/* Listener: event_name -> block (start,end) */
-typedef struct { char event[64]; int block_start; int block_end; } Listener;
+/* Listener: event_name -> block (start,end) on g_tok, or synthetic slice on g_synth_tok */
+typedef struct {
+  char event[64];
+  int block_start;
+  int block_end;
+  unsigned char is_synth; /* 1: block_* are indices into g_synth_tok[g_nsynth_pool] */
+} Listener;
 static Listener g_listeners[MAX_LISTENERS];
 static int g_nlisteners;
+
+#define MAX_SYNTH_TOKS 64
+static char g_synth_lit[MAX_SYNTH_TOKS][96];
+static const char *g_synth_tok[MAX_SYNTH_TOKS];
+static int g_nsynth_pool;
+static int g_spine_saved_nlisteners;
 
 /* Event queue for dispatch (event name + optional emit with { k: v, ... } payload) */
 static QueuedEvent g_event_queue[MAX_EVENTS];
@@ -381,8 +392,28 @@ static void register_listener(const char *ev, int start, int end) {
                    "%s", ev ? ev : "");
     g_listeners[g_nlisteners].block_start = start;
     g_listeners[g_nlisteners].block_end = end;
+    g_listeners[g_nlisteners].is_synth = 0;
     g_nlisteners++;
   }
+}
+
+static void register_listener_synth(const char *ev, int synth_a, int synth_b_excl) {
+  if (g_nlisteners < MAX_LISTENERS && synth_a >= 0 && synth_b_excl > synth_a &&
+      synth_b_excl <= g_nsynth_pool) {
+    (void)snprintf(g_listeners[g_nlisteners].event, sizeof(g_listeners[g_nlisteners].event),
+                   "%s", ev ? ev : "");
+    g_listeners[g_nlisteners].block_start = synth_a;
+    g_listeners[g_nlisteners].block_end = synth_b_excl;
+    g_listeners[g_nlisteners].is_synth = 1;
+    g_nlisteners++;
+  }
+}
+
+static int synth_push_lit(const char *lit) {
+  if (!lit || g_nsynth_pool >= MAX_SYNTH_TOKS) return -1;
+  (void)snprintf(g_synth_lit[g_nsynth_pool], sizeof(g_synth_lit[0]), "%.95s", lit);
+  g_synth_tok[g_nsynth_pool] = g_synth_lit[g_nsynth_pool];
+  return g_nsynth_pool++;
 }
 
 static int find_block_end(int i);
@@ -746,6 +777,8 @@ static int apply_to_int_suffixes(int *i, char *out, size_t outsz, int *nullish) 
   return 0;
 }
 
+static int unescape_azl_string_token(const char *quoted, char *out, size_t outsz);
+
 static int eval_primary(int *i, char *out, size_t outsz, int *nullish) {
   *nullish = 0;
   out[0] = '\0';
@@ -763,11 +796,7 @@ static int eval_primary(int *i, char *out, size_t outsz, int *nullish) {
   }
 
   if (strlen(t) >= 2 && (t[0] == '"' || t[0] == '\'')) {
-    size_t len = strlen(t);
-    size_t n = (len >= 2) ? len - 2 : 0;
-    if (n >= outsz) n = outsz - 1;
-    memcpy(out, t + 1, n);
-    out[n] = '\0';
+    if (unescape_azl_string_token(t, out, outsz) < 0) return -1;
     (*i)++;
     return 0;
   }
@@ -1350,10 +1379,136 @@ static void execute_ast_link_line(const char *after_link) {
   run_linked_component(p);
 }
 
+static void exec_block_synth(int a, int b_excl);
+
+static void builtin_execute_spine_v1_into(char *val, size_t valsz, const char *ast_base) {
+  char ksp[160];
+  (void)snprintf(ksp, sizeof(ksp), "%s.spine", ast_base);
+  const char *sp0 = var_get(ksp);
+  char result[256];
+  (void)snprintf(result, sizeof(result), "Execution completed");
+  if (!sp0 || strncmp(sp0, "spine_component_v1", 18) != 0 ||
+      (sp0[18] != '\0' && sp0[18] != '\n' && sp0[18] != '\r')) {
+    (void)snprintf(val, valsz, "execute_spine_bad_header");
+    return;
+  }
+  const char *haltv0 = var_get("::halted");
+  if (haltv0 && strcmp(haltv0, "true") == 0) {
+    (void)snprintf(val, valsz, "Execution halted due to error");
+    return;
+  }
+  exec_ast_stubs_reset();
+  g_spine_saved_nlisteners = g_nlisteners;
+  g_nsynth_pool = 0;
+  char spbuf[AZL_MINIMAL_VAR_CAP];
+  (void)snprintf(spbuf, sizeof(spbuf), "%s", sp0);
+  char *save = NULL;
+  int first_ln = 1;
+  for (char *ln = strtok_r(spbuf, "\n", &save); ln; ln = strtok_r(NULL, "\n", &save)) {
+    const char *haltv = var_get("::halted");
+    if (haltv && strcmp(haltv, "true") == 0) {
+      (void)snprintf(result, sizeof(result), "Execution halted due to error");
+      break;
+    }
+    while (*ln == ' ' || *ln == '\t') ln++;
+    if (!ln[0]) continue;
+    if (first_ln) {
+      first_ln = 0;
+      continue;
+    }
+    if (strncmp(ln, "comp\t", 5U) == 0) continue;
+    if (strncmp(ln, "bh\t", 3U) == 0) {
+      char *p = ln + 3;
+      char *t1 = strchr(p, '\t');
+      if (!t1) goto spine_bad;
+      *t1 = '\0';
+      if (strcmp(p, "listen") != 0) goto spine_bad;
+      char *ev = t1 + 1;
+      char *t2 = strchr(ev, '\t');
+      if (!t2) goto spine_bad;
+      *t2 = '\0';
+      char *op = t2 + 1;
+      char *t3 = strchr(op, '\t');
+      if (!t3) goto spine_bad;
+      *t3 = '\0';
+      if (strcmp(op, "say") != 0) goto spine_bad;
+      const char *msg = t3 + 1;
+      int sb = g_nsynth_pool;
+      if (synth_push_lit("say") < 0) goto spine_bad;
+      if (synth_push_lit(msg) < 0) goto spine_bad;
+      register_listener_synth(ev, sb, g_nsynth_pool);
+      (void)snprintf(result, sizeof(result), "Listen: %.120s", ev);
+    } else if (strncmp(ln, "in\t", 3U) == 0) {
+      char *p = ln + 3;
+      char *t2 = strchr(p, '\t');
+      if (!t2) goto spine_bad;
+      *t2 = '\0';
+      const char *op = p;
+      const char *rest = t2 + 1;
+      if (strcmp(op, "say") == 0) {
+        int sb = g_nsynth_pool;
+        if (synth_push_lit("say") < 0) goto spine_bad;
+        if (synth_push_lit(rest) < 0) goto spine_bad;
+        exec_block_synth(sb, g_nsynth_pool);
+        (void)snprintf(result, sizeof(result), "Said: %.200s", rest);
+      } else if (strcmp(op, "emit") == 0) {
+        int sb = g_nsynth_pool;
+        if (synth_push_lit("emit") < 0) goto spine_bad;
+        if (synth_push_lit(rest) < 0) goto spine_bad;
+        exec_block_synth(sb, g_nsynth_pool);
+        (void)snprintf(result, sizeof(result), "Emitted: %.120s", rest);
+      } else
+        goto spine_bad;
+    } else if (strncmp(ln, "mem\t", 4U) == 0) {
+      char *t2 = strchr(ln + 4, '\t');
+      if (!t2) goto spine_bad;
+      *t2 = '\0';
+      const char *op = ln + 4;
+      const char *rest = t2 + 1;
+      if (strcmp(op, "say") == 0) {
+        int sb = g_nsynth_pool;
+        if (synth_push_lit("say") < 0) goto spine_bad;
+        if (synth_push_lit(rest) < 0) goto spine_bad;
+        exec_block_synth(sb, g_nsynth_pool);
+        (void)snprintf(result, sizeof(result), "Said: %.200s", rest);
+      } else if (strcmp(op, "set") == 0) {
+        char *t3 = strchr((char *)rest, '\t');
+        if (!t3) goto spine_bad;
+        *t3 = '\0';
+        const char *vk = rest;
+        const char *vv = t3 + 1;
+        if (vk[0] != ':' || vk[1] != ':') goto spine_bad;
+        int sb = g_nsynth_pool;
+        if (synth_push_lit("set") < 0) goto spine_bad;
+        if (synth_push_lit(vk) < 0) goto spine_bad;
+        if (synth_push_lit("=") < 0) goto spine_bad;
+        if (synth_push_lit(vv) < 0) goto spine_bad;
+        exec_block_synth(sb, g_nsynth_pool);
+        (void)snprintf(result, sizeof(result), "Set %s = %.150s", vk, vv);
+      } else
+        goto spine_bad;
+    } else
+      goto spine_bad;
+  }
+  g_nlisteners = g_spine_saved_nlisteners;
+  (void)snprintf(val, valsz, "%.254s", result);
+  return;
+spine_bad:
+  g_nlisteners = g_spine_saved_nlisteners;
+  (void)snprintf(val, valsz, "execute_spine_bad_line");
+}
+
 static void builtin_execute_ast_into(char *val, size_t valsz, const char *ast_base) {
   char nodes_key[160];
+  char kem[160];
   if (!ast_base || !ast_base[0] || strlen(ast_base) + 7U >= sizeof(nodes_key)) {
     (void)snprintf(val, valsz, "execute_ast_bad_base");
+    return;
+  }
+  (void)snprintf(kem, sizeof(kem), "%s.exec_model", ast_base);
+  const char *execm = var_get(kem);
+  if (execm && strcmp(execm, "spine_component_v1") == 0) {
+    builtin_execute_spine_v1_into(val, valsz, ast_base);
     return;
   }
   (void)snprintf(nodes_key, sizeof(nodes_key), "%s.nodes", ast_base);
@@ -1833,8 +1988,7 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
   return -1;
 }
 
-static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t nodes_cap) {
-  ParseTokPair pairs[64];
+static int tz_buf_to_pairs(const char *buf, ParseTokPair *pairs, int maxp) {
   int np = 0;
   const char *q = buf ? buf : "";
   while (*q) {
@@ -1849,7 +2003,7 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
     char *b = a + strlen(a);
     while (b > a && (b[-1] == ' ' || b[-1] == '\t')) b--;
     *b = '\0';
-    if (strncmp(a, "tz|", 3U) == 0 && np < 64) {
+    if (strncmp(a, "tz|", 3U) == 0 && np < maxp) {
       char t0[80], v0[224];
       if (tz_line_type_value(a, t0, sizeof(t0), v0, sizeof(v0)) == 0) {
         (void)snprintf(pairs[np].typ, sizeof(pairs[np].typ), "%.63s", t0);
@@ -1860,6 +2014,199 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
     if (!nl) break;
     q = nl + 1;
   }
+  return np;
+}
+
+static int pair_brace_close_idx(ParseTokPair *pairs, int np, int open_idx) {
+  if (open_idx >= np || strcmp(pairs[open_idx].typ, "brace") != 0 || strcmp(pairs[open_idx].val, "{") != 0)
+    return -1;
+  int d = 1;
+  int j = open_idx + 1;
+  while (j < np && d > 0) {
+    if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "{") == 0)
+      d++;
+    else if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0)
+      d--;
+    j++;
+  }
+  if (d != 0) return -1;
+  return j - 1;
+}
+
+static int find_section_block(ParseTokPair *p, int np, int is, int ie, const char *label, int *lo, int *hi) {
+  for (int i = is; i < ie; i++) {
+    if (strcmp(p[i].typ, "identifier") == 0 && strcmp(p[i].val, label) == 0) {
+      int j = parse_skip_eol(p, np, i + 1);
+      if (j >= ie) return -1;
+      if (strcmp(p[j].typ, "brace") != 0 || strcmp(p[j].val, "{") != 0) return -1;
+      int cl = pair_brace_close_idx(p, np, j);
+      if (cl < 0) return -1;
+      *lo = j + 1;
+      *hi = cl;
+      return 0;
+    }
+  }
+  return -1;
+}
+
+static void quote_azl_single_c(const char *inner, char *out, size_t cap) {
+  size_t o = 0;
+  if (cap < 3U) {
+    if (cap) out[0] = '\0';
+    return;
+  }
+  out[o++] = '\'';
+  for (const char *q = inner ? inner : ""; *q && o + 2 < cap; q++) {
+    if (*q == '\\' || *q == '\'') {
+      if (o + 3 >= cap) break;
+      out[o++] = '\\';
+    }
+    out[o++] = *q;
+  }
+  if (o + 1 < cap) out[o++] = '\'';
+  out[o] = '\0';
+}
+
+static int spine_line_app(char *buf, size_t cap, const char *line) {
+  size_t L = strlen(buf);
+  size_t l2 = strlen(line);
+  if (L + l2 + 2U >= cap) return -1;
+  if (L) {
+    buf[L++] = '\n';
+    buf[L] = '\0';
+  }
+  (void)snprintf(buf + L, cap - L, "%s", line);
+  return 0;
+}
+
+/* Returns 1 if spine written, 0 if not this slice */
+static int try_build_component_spine_v1(ParseTokPair *pairs, int np, char *spine, size_t spine_cap) {
+  int n = np;
+  int (*skip_e)(ParseTokPair *, int, int) = parse_skip_eol;
+  int i = skip_e(pairs, n, 0);
+  if (i >= n || strcmp(pairs[i].typ, "identifier") != 0 || strcmp(pairs[i].val, "component") != 0) return 0;
+  i = skip_e(pairs, n, i + 1);
+  if (i >= n || strcmp(pairs[i].typ, "identifier") != 0 || pairs[i].val[0] != ':' || pairs[i].val[1] != ':')
+    return 0;
+  char comp_name[128];
+  (void)snprintf(comp_name, sizeof(comp_name), "%.119s", pairs[i].val);
+  i = skip_e(pairs, n, i + 1);
+  if (i >= n || strcmp(pairs[i].typ, "brace") != 0 || strcmp(pairs[i].val, "{") != 0) return 0;
+  int comp_open = i;
+  int comp_close = pair_brace_close_idx(pairs, n, comp_open);
+  if (comp_close < 0) return 0;
+  int inner_s = comp_open + 1;
+  int inner_e = comp_close;
+  int b_lo, b_hi, i_lo, i_hi, m_lo, m_hi;
+  if (find_section_block(pairs, n, inner_s, inner_e, "behavior", &b_lo, &b_hi) != 0) return 0;
+  if (find_section_block(pairs, n, inner_s, inner_e, "init", &i_lo, &i_hi) != 0) return 0;
+  if (find_section_block(pairs, n, inner_s, inner_e, "memory", &m_lo, &m_hi) != 0) return 0;
+
+  int j = skip_e(pairs, n, b_lo);
+  if (j >= b_hi || strcmp(pairs[j].typ, "identifier") != 0 || strcmp(pairs[j].val, "listen") != 0) return 0;
+  j = skip_e(pairs, n, j + 1);
+  if (j >= b_hi || strcmp(pairs[j].typ, "identifier") != 0 || strcmp(pairs[j].val, "for") != 0) return 0;
+  j = skip_e(pairs, n, j + 1);
+  if (j >= b_hi) return 0;
+  char evn[72];
+  evn[0] = '\0';
+  if (strcmp(pairs[j].typ, "string") == 0 || strcmp(pairs[j].typ, "identifier") == 0)
+    (void)snprintf(evn, sizeof(evn), "%.63s", pairs[j].val);
+  if (!evn[0] || strchr(evn, '|') != NULL || strchr(evn, '\t') != NULL) return 0;
+  j = skip_e(pairs, n, j + 1);
+  if (j < b_hi && strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "then") == 0) j = skip_e(pairs, n, j + 1);
+  if (j >= b_hi || strcmp(pairs[j].typ, "brace") != 0 || strcmp(pairs[j].val, "{") != 0) return 0;
+  int lb = j;
+  int l_close = pair_brace_close_idx(pairs, n, lb);
+  if (l_close < 0) return 0;
+  j = skip_e(pairs, n, lb + 1);
+  if (j >= l_close || strcmp(pairs[j].typ, "identifier") != 0 || strcmp(pairs[j].val, "say") != 0) return 0;
+  j = skip_e(pairs, n, j + 1);
+  if (j >= l_close || strcmp(pairs[j].typ, "string") != 0) return 0;
+  char bh_q[240];
+  quote_azl_single_c(pairs[j].val, bh_q, sizeof(bh_q));
+  j = skip_e(pairs, n, j + 1);
+  if (j != l_close) return 0;
+  j = skip_e(pairs, n, l_close + 1);
+  while (j < b_hi && strcmp(pairs[j].typ, "eol") == 0) j = parse_skip_eol(pairs, n, j);
+  if (j != b_hi) return 0;
+
+  spine[0] = '\0';
+  if (spine_line_app(spine, spine_cap, "spine_component_v1") != 0) return 0;
+  char ln[512];
+  (void)snprintf(ln, sizeof(ln), "comp\t%s", comp_name);
+  if (spine_line_app(spine, spine_cap, ln) != 0) return 0;
+  (void)snprintf(ln, sizeof(ln), "bh\tlisten\t%s\tsay\t%s", evn, bh_q);
+  if (spine_line_app(spine, spine_cap, ln) != 0) return 0;
+
+  j = skip_e(pairs, n, i_lo);
+  while (j < i_hi) {
+    if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "say") == 0) {
+      j = skip_e(pairs, n, j + 1);
+      if (j >= i_hi || strcmp(pairs[j].typ, "string") != 0) return 0;
+      char qq[240];
+      quote_azl_single_c(pairs[j].val, qq, sizeof(qq));
+      (void)snprintf(ln, sizeof(ln), "in\tsay\t%s", qq);
+      if (spine_line_app(spine, spine_cap, ln) != 0) return 0;
+      j = skip_e(pairs, n, j + 1);
+      continue;
+    }
+    if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "emit") == 0) {
+      j = skip_e(pairs, n, j + 1);
+      if (j >= i_hi || strcmp(pairs[j].typ, "identifier") != 0) return 0;
+      char ee[72];
+      (void)snprintf(ee, sizeof(ee), "%.63s", pairs[j].val);
+      if (strchr(ee, '|') != NULL || strchr(ee, '\t') != NULL) return 0;
+      (void)snprintf(ln, sizeof(ln), "in\temit\t%s", ee);
+      if (spine_line_app(spine, spine_cap, ln) != 0) return 0;
+      j = skip_e(pairs, n, j + 1);
+      continue;
+    }
+    return 0;
+  }
+  while (j < i_hi && strcmp(pairs[j].typ, "eol") == 0) j = parse_skip_eol(pairs, n, j);
+  if (j != i_hi) return 0;
+
+  j = skip_e(pairs, n, m_lo);
+  while (j < m_hi) {
+    if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "say") == 0) {
+      j = skip_e(pairs, n, j + 1);
+      if (j >= m_hi || strcmp(pairs[j].typ, "string") != 0) return 0;
+      char qq[240];
+      quote_azl_single_c(pairs[j].val, qq, sizeof(qq));
+      (void)snprintf(ln, sizeof(ln), "mem\tsay\t%s", qq);
+      if (spine_line_app(spine, spine_cap, ln) != 0) return 0;
+      j = skip_e(pairs, n, j + 1);
+      continue;
+    }
+    if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "set") == 0) {
+      j = skip_e(pairs, n, j + 1);
+      if (j >= m_hi || strcmp(pairs[j].typ, "identifier") != 0 || pairs[j].val[0] != ':' || pairs[j].val[1] != ':')
+        return 0;
+      char vk[96];
+      (void)snprintf(vk, sizeof(vk), "%.79s", pairs[j].val);
+      j = skip_e(pairs, n, j + 1);
+      if (j >= m_hi || strcmp(pairs[j].typ, "operator") != 0 || strcmp(pairs[j].val, "=") != 0) return 0;
+      j = skip_e(pairs, n, j + 1);
+      if (j >= m_hi || strcmp(pairs[j].typ, "identifier") != 0) return 0;
+      char vv[128];
+      (void)snprintf(vv, sizeof(vv), "%.119s", pairs[j].val);
+      if (strchr(vv, '|') != NULL || strchr(vv, '\t') != NULL) return 0;
+      (void)snprintf(ln, sizeof(ln), "mem\tset\t%s\t%s", vk, vv);
+      if (spine_line_app(spine, spine_cap, ln) != 0) return 0;
+      j = skip_e(pairs, n, j + 1);
+      continue;
+    }
+    return 0;
+  }
+  while (j < m_hi && strcmp(pairs[j].typ, "eol") == 0) j = parse_skip_eol(pairs, n, j);
+  if (j != m_hi) return 0;
+  return 1;
+}
+
+static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t nodes_cap) {
+  ParseTokPair pairs[64];
+  int np = tz_buf_to_pairs(buf, pairs, 64);
 
   char acc[256];
   acc[0] = '\0';
@@ -2481,10 +2828,20 @@ static void exec_set(int *i) {
     }
     (*i)++;
     const char *ptbuf = var_get(ptarg);
-    char nodesb[256];
-    builtin_parse_tokens_nodes(ptbuf, nodesb, sizeof(nodesb));
+    ParseTokPair pp[64];
+    int npp = tz_buf_to_pairs(ptbuf, pp, 64);
+    char spineb[1024];
     var_set("::ast", "{}");
-    var_set("::ast.nodes", nodesb);
+    if (try_build_component_spine_v1(pp, npp, spineb, sizeof(spineb)) != 0) {
+      var_set("::ast.exec_model", "spine_component_v1");
+      var_set("::ast.spine", spineb);
+      var_set("::ast.nodes", "");
+    } else {
+      var_set("::ast.exec_model", "");
+      char nodesb[256];
+      builtin_parse_tokens_nodes(ptbuf, nodesb, sizeof(nodesb));
+      var_set("::ast.nodes", nodesb);
+    }
     var_set(k, "{}");
     return;
   }
@@ -2757,6 +3114,117 @@ static void exec_block(int start, int end) {
   exec_block_impl(start, end, 0);
 }
 
+static void exec_say_synth(int *i, int lim_excl) {
+  (*i)++;
+  if (*i >= lim_excl) return;
+  const char *s = g_synth_tok[*i];
+  if (s && strlen(s) >= 2 && s[0] == '"') {
+    size_t len = strlen(s);
+    size_t n = (len >= 2) ? len - 2 : 0;
+    if (say_expand_double_quoted(s + 1, n) != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: say double-quoted expand failed\n");
+      exit(5);
+    }
+    fputc('\n', stdout);
+    fflush(stdout);
+    (*i)++;
+  } else if (s && strlen(s) >= 2 && s[0] == '\'') {
+    size_t len = strlen(s);
+    fwrite(s + 1, 1, len - 2, stdout);
+    fputc('\n', stdout);
+    fflush(stdout);
+    (*i)++;
+  } else if (s && s[0] == ':' && s[1] == ':') {
+    const char *v = var_get(s);
+    if (v) fputs(v, stdout);
+    fputc('\n', stdout);
+    fflush(stdout);
+    (*i)++;
+  } else {
+    (*i)++;
+  }
+}
+
+static void exec_emit_synth(int *i, int lim_excl) {
+  (*i)++;
+  if (*i >= lim_excl) return;
+  const char *s = g_synth_tok[*i];
+  char ev[64] = {0};
+  int have_ev = 0;
+  if (s && strlen(s) >= 2 && (s[0] == '"' || s[0] == '\'')) {
+    size_t len = strlen(s);
+    if (len >= 2) {
+      size_t n = len - 2;
+      if (n >= sizeof(ev)) n = sizeof(ev) - 1U;
+      memcpy(ev, s + 1, n);
+      ev[n] = '\0';
+      have_ev = 1;
+    }
+  } else if (s && s[0] != '\0') {
+    (void)snprintf(ev, sizeof(ev), "%.63s", s);
+    have_ev = 1;
+  }
+  if (!have_ev) return;
+  (*i)++;
+  queue_push_event(ev, NULL, 0);
+}
+
+static void exec_set_synth_simple(int *i, int lim_excl) {
+  (*i)++;
+  if (*i >= lim_excl) return;
+  const char *k = g_synth_tok[*i];
+  if (!k || k[0] != ':' || k[1] != ':') {
+    (*i)++;
+    return;
+  }
+  (*i)++;
+  if (*i >= lim_excl || strcmp(g_synth_tok[*i], "=") != 0) return;
+  (*i)++;
+  if (*i >= lim_excl) return;
+  const char *vv = g_synth_tok[*i];
+  if (vv) var_set(k, vv);
+  (*i)++;
+}
+
+static void exec_block_synth(int a, int b_excl) {
+  g_listener_nesting++;
+  g_listener_break = 0;
+  int depth = 1;
+  int i = a;
+  while (i < b_excl) {
+    const char *t = g_synth_tok[i];
+    if (!t) break;
+    if (strcmp(t, "{") == 0) {
+      depth++;
+      i++;
+    } else if (strcmp(t, "}") == 0) {
+      depth--;
+      if (depth <= 0) break;
+      i++;
+    } else if (depth == 1 && strcmp(t, "return") == 0) {
+      i++;
+      g_listener_break = 1;
+      break;
+    } else if (depth == 1 && strcmp(t, "say") == 0) {
+      exec_say_synth(&i, b_excl);
+    } else if (depth == 1 && strcmp(t, "emit") == 0) {
+      exec_emit_synth(&i, b_excl);
+      process_events();
+    } else if (depth == 1 && strcmp(t, "set") == 0) {
+      exec_set_synth_simple(&i, b_excl);
+    } else if (depth == 1 && strcmp(t, "link") == 0) {
+      i++;
+      if (i < b_excl) {
+        run_linked_component(g_synth_tok[i]);
+        i++;
+      }
+    } else
+      i++;
+  }
+  g_listener_nesting--;
+  g_listener_break = 0;
+}
+
 /* Process event queue: dispatch to listeners */
 static void process_events(void) {
   QueuedEvent qe;
@@ -2765,7 +3233,10 @@ static void process_events(void) {
     int matched = 0;
     for (int j = 0; j < g_nlisteners; j++) {
       if (strcmp(g_listeners[j].event, qe.ev) == 0) {
-        exec_block(g_listeners[j].block_start, g_listeners[j].block_end);
+        if (g_listeners[j].is_synth)
+          exec_block_synth(g_listeners[j].block_start, g_listeners[j].block_end);
+        else
+          exec_block(g_listeners[j].block_start, g_listeners[j].block_end);
         matched = 1;
         break;
       }

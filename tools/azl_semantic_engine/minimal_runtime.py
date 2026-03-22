@@ -33,7 +33,7 @@ MAX_LISTENERS = 64
 MAX_EVENTS = 32
 MAX_PAYLOAD_KEYS = 8
 # Bytes stored per Var.v (tz concat / ::tokens). Execute_ast pipe rows stay capped at 255 elsewhere.
-MAX_VAR_VALUE_LEN = 511
+MAX_VAR_VALUE_LEN = 2047
 
 # Bare identifiers in set/if (interpreter-shaped; see azl_interpreter.azl tokenize/parse).
 _BARE_ID_FORBIDDEN = frozenset(
@@ -154,6 +154,8 @@ class Listener:
     event: str
     block_start: int
     block_end: int
+    # When set, dispatch runs this token slice (real listener body) instead of ``self.tok[block_*]``.
+    synthetic_toks: list[str] | None = None
 
 
 @dataclass
@@ -223,11 +225,32 @@ class MinimalAZLRuntime:
             return None
         return self.queue.pop(0)
 
-    def register_listener(self, ev: str, block_start: int, block_end: int) -> None:
+    def register_listener(
+        self,
+        ev: str,
+        block_start: int,
+        block_end: int,
+        synthetic_toks: list[str] | None = None,
+    ) -> None:
         if len(self.listeners) < MAX_LISTENERS:
             self.listeners.append(
-                Listener(event=ev[:63], block_start=block_start, block_end=block_end)
+                Listener(
+                    event=ev[:63],
+                    block_start=block_start,
+                    block_end=block_end,
+                    synthetic_toks=synthetic_toks,
+                )
             )
+
+    def _exec_with_tok_swap(self, alt: list[str], start: int, end: int) -> None:
+        """Run ``exec_block(start, end)`` against ``alt`` as the token stream (synthetic bodies)."""
+        old_tok, old_ntok = self.tok, self.ntok
+        self.tok = alt
+        self.ntok = len(alt)
+        try:
+            self.exec_block(start, end)
+        finally:
+            self.tok, self.ntok = old_tok, old_ntok
 
     @staticmethod
     def _normalize_bare_identifier_lhs(tok0: str) -> str | None:
@@ -454,6 +477,202 @@ class MinimalAZLRuntime:
                 return None
             return None
         return None
+
+    def _pair_brace_close_index(
+        self, pairs: list[tuple[str, str]], open_idx: int
+    ) -> int | None:
+        """``open_idx`` points at ``{``; return index of the matching ``}``."""
+        n = len(pairs)
+        if open_idx >= n or pairs[open_idx] != ("brace", "{"):
+            return None
+        d = 1
+        j = open_idx + 1
+        while j < n and d > 0:
+            if pairs[j] == ("brace", "{"):
+                d += 1
+            elif pairs[j] == ("brace", "}"):
+                d -= 1
+            j += 1
+        if d != 0:
+            return None
+        return j - 1
+
+    @staticmethod
+    def _quote_azl_single_from_inner(inner: str) -> str:
+        esc = inner.replace("\\", "\\\\").replace("'", "\\'")
+        return "'" + esc + "'"
+
+    def _try_find_section_block(
+        self,
+        pairs: list[tuple[str, str]],
+        inner_start: int,
+        inner_end: int,
+        label: str,
+    ) -> tuple[int, int] | None:
+        """``label { … }`` inside component body → ``(idx_after_open, idx_of_closing })``."""
+        i = inner_start
+        while i < inner_end:
+            if pairs[i] == ("identifier", label):
+                j = self._skip_eol_pairs(pairs, i + 1)
+                if j < inner_end and pairs[j] == ("brace", "{"):
+                    close = self._pair_brace_close_index(pairs, j)
+                    if close is None:
+                        return None
+                    return (j + 1, close)
+            i += 1
+        return None
+
+    def _try_parse_component_spine_v1_from_pairs(
+        self, pairs: list[tuple[str, str]]
+    ) -> str | None:
+        """If ``pairs`` is exactly the supported component slice, return tab-separated spine text."""
+        n = len(pairs)
+
+        def skip_e(i: int) -> int:
+            while i < n and pairs[i][0] == "eol":
+                i += 1
+            return i
+
+        i = skip_e(0)
+        if i >= n or pairs[i] != ("identifier", "component"):
+            return None
+        i = skip_e(i + 1)
+        if i >= n or pairs[i][0] != "identifier" or not pairs[i][1].startswith("::"):
+            return None
+        comp_name = pairs[i][1][:120]
+        i = skip_e(i + 1)
+        if i >= n or pairs[i] != ("brace", "{"):
+            return None
+        comp_open = i
+        comp_close = self._pair_brace_close_index(pairs, comp_open)
+        if comp_close is None:
+            return None
+        inner_s = comp_open + 1
+        inner_e = comp_close
+
+        bh = self._try_find_section_block(pairs, inner_s, inner_e, "behavior")
+        ini = self._try_find_section_block(pairs, inner_s, inner_e, "init")
+        mem = self._try_find_section_block(pairs, inner_s, inner_e, "memory")
+        if bh is None or ini is None or mem is None:
+            return None
+        b_start, b_close = bh
+        i_start, i_close = ini
+        m_start, m_close = mem
+
+        # behavior: listen for <ev> { say <string> }
+        j = skip_e(b_start)
+        if j >= b_close or pairs[j] != ("identifier", "listen"):
+            return None
+        j = skip_e(j + 1)
+        if j >= b_close or pairs[j] != ("identifier", "for"):
+            return None
+        j = skip_e(j + 1)
+        if j >= b_close:
+            return None
+        et, ev_raw = pairs[j]
+        if et not in ("string", "identifier"):
+            return None
+        evn = ev_raw[:63]
+        if not evn or "|" in evn or "\t" in evn or "\n" in evn:
+            return None
+        j = skip_e(j + 1)
+        if j < b_close and pairs[j] == ("identifier", "then"):
+            j = skip_e(j + 1)
+        if j >= b_close or pairs[j] != ("brace", "{"):
+            return None
+        lb = j
+        l_close = self._pair_brace_close_index(pairs, lb)
+        if l_close is None:
+            return None
+        j = skip_e(lb + 1)
+        if j >= l_close or pairs[j] != ("identifier", "say"):
+            return None
+        j = skip_e(j + 1)
+        if j >= l_close or pairs[j][0] != "string":
+            return None
+        bh_say_tok = self._quote_azl_single_from_inner(pairs[j][1][:200])
+        j = skip_e(j + 1)
+        if j != l_close:
+            return None
+        j = skip_e(l_close + 1)
+        while j < b_close and pairs[j][0] == "eol":
+            j = skip_e(j + 1)
+        if j != b_close:
+            return None
+
+        init_lines: list[str] = []
+        j = skip_e(i_start)
+        while j < i_close:
+            if pairs[j] == ("identifier", "say"):
+                j = skip_e(j + 1)
+                if j >= i_close or pairs[j][0] != "string":
+                    return None
+                init_lines.append(
+                    "in\tsay\t" + self._quote_azl_single_from_inner(pairs[j][1][:200])
+                )
+                j = skip_e(j + 1)
+                continue
+            if pairs[j] == ("identifier", "emit"):
+                j = skip_e(j + 1)
+                if j >= i_close or pairs[j][0] != "identifier":
+                    return None
+                eev = pairs[j][1][:63]
+                if "|" in eev or "\t" in eev:
+                    return None
+                init_lines.append("in\temit\t" + eev)
+                j = skip_e(j + 1)
+                continue
+            return None
+        while j < i_close and pairs[j][0] == "eol":
+            j = skip_e(j + 1)
+        if j != i_close:
+            return None
+
+        mem_lines: list[str] = []
+        j = skip_e(m_start)
+        while j < m_close:
+            if pairs[j] == ("identifier", "say"):
+                j = skip_e(j + 1)
+                if j >= m_close or pairs[j][0] != "string":
+                    return None
+                mem_lines.append(
+                    "mem\tsay\t" + self._quote_azl_single_from_inner(pairs[j][1][:200])
+                )
+                j = skip_e(j + 1)
+                continue
+            if pairs[j] == ("identifier", "set"):
+                j = skip_e(j + 1)
+                if j >= m_close or pairs[j][0] != "identifier":
+                    return None
+                vk = pairs[j][1][:80]
+                if not vk.startswith("::"):
+                    return None
+                j = skip_e(j + 1)
+                if j >= m_close or pairs[j] != ("operator", "="):
+                    return None
+                j = skip_e(j + 1)
+                if j >= m_close or pairs[j][0] != "identifier":
+                    return None
+                val = pairs[j][1][:120]
+                if "|" in val or "\t" in val:
+                    return None
+                mem_lines.append("mem\tset\t" + vk + "\t" + val)
+                j = skip_e(j + 1)
+                continue
+            return None
+        while j < m_close and pairs[j][0] == "eol":
+            j = skip_e(j + 1)
+        if j != m_close:
+            return None
+
+        out_lines = [
+            "spine_component_v1",
+            "comp\t" + comp_name,
+            "bh\tlisten\t" + evn + "\tsay\t" + bh_say_tok,
+            *init_lines,
+            *mem_lines,
+        ]
+        return "\n".join(out_lines)
 
     def _parse_tokens_nodes_from_buffer(self, buf: str) -> str:
         """Map ``tz|…`` token rows to ``::ast.nodes`` lines for ``execute_ast`` (spine parse slice)."""
@@ -1095,7 +1314,7 @@ class MinimalAZLRuntime:
                 nn = 0
             return s, nn
         if len(t) >= 2 and t[0] in "\"'":
-            inner = t[1:-1] if len(t) >= 2 else ""
+            inner = self._unescape_azl_string_token(t)
             i[0] += 1
             return inner, 0
         if t and (
@@ -1457,8 +1676,105 @@ class MinimalAZLRuntime:
             self._execute_ast_listen_stubs.append(stub)
         return "Listen: " + levn[:120]
 
+    def _execute_spine_component_v1(self, ast_base: str) -> str:
+        """Run structured component slice: behavior (``register_listener`` + synthetic body), ``init``, ``memory`` — same phase order as ``execute_component`` / ``execute_listen`` in ``azl_interpreter.azl``."""
+        self._execute_ast_listen_stubs.clear()
+        spine = self.var_get(ast_base + ".spine") or ""
+        lines_raw = spine.split("\n")
+        if not lines_raw or lines_raw[0].strip() != "spine_component_v1":
+            return "execute_spine_bad_header"
+        bh: list[list[str]] = []
+        ini: list[list[str]] = []
+        mem: list[list[str]] = []
+        for ln in lines_raw[1:]:
+            ln = ln.strip()
+            if not ln:
+                continue
+            parts = ln.split("\t")
+            if not parts:
+                continue
+            tag = parts[0]
+            if tag == "comp":
+                continue
+            if tag == "bh":
+                bh.append(parts)
+            elif tag == "in":
+                ini.append(parts)
+            elif tag == "mem":
+                mem.append(parts)
+            else:
+                return "execute_spine_bad_line"
+        if (self.var_get("::halted") or "") == "true":
+            return "Execution halted due to error"
+        saved_listener_count = len(self.listeners)
+        try:
+            return self._execute_spine_component_v1_body(bh, ini, mem)
+        finally:
+            while len(self.listeners) > saved_listener_count:
+                self.listeners.pop()
+
+    def _execute_spine_component_v1_body(
+        self,
+        bh: list[list[str]],
+        ini: list[list[str]],
+        mem: list[list[str]],
+    ) -> str:
+        out = "Execution completed"
+        if (self.var_get("::halted") or "") == "true":
+            return "Execution halted due to error"
+        for parts in bh:
+            if len(parts) < 5 or parts[1] != "listen" or parts[3] != "say":
+                return "execute_spine_bad_behavior"
+            ev = parts[2][:63]
+            msg_tok = parts[4][:220]
+            self.register_listener(
+                ev, 0, 0, synthetic_toks=["say", msg_tok]
+            )
+            out = "Listen: " + ev[:120]
+        for parts in ini:
+            if (self.var_get("::halted") or "") == "true":
+                return "Execution halted due to error"
+            if len(parts) < 3:
+                return "execute_spine_bad_init"
+            op = parts[1]
+            if op == "say":
+                msg_tok = parts[2][:220]
+                self._exec_with_tok_swap(["say", msg_tok], 0, 2)
+                out = "Said: " + msg_tok[:200]
+            elif op == "emit":
+                ev = parts[2][:63]
+                self._exec_with_tok_swap(["emit", ev], 0, 2)
+                out = "Emitted: " + ev[:120]
+            else:
+                return "execute_spine_bad_init"
+        for parts in mem:
+            if (self.var_get("::halted") or "") == "true":
+                return "Execution halted due to error"
+            if len(parts) < 3:
+                return "execute_spine_bad_memory"
+            op = parts[1]
+            if op == "say":
+                msg_tok = parts[2][:220]
+                self._exec_with_tok_swap(["say", msg_tok], 0, 2)
+                out = "Said: " + msg_tok[:200]
+            elif op == "set":
+                if len(parts) < 4:
+                    return "execute_spine_bad_memory"
+                vk = parts[2][:80]
+                vv = parts[3][:MAX_VAR_VALUE_LEN]
+                if not vk.startswith("::"):
+                    return "execute_spine_bad_memory"
+                self._exec_with_tok_swap(["set", vk, "=", vv], 0, 4)
+                out = "Set " + vk + " = " + vv[:150]
+            else:
+                return "execute_spine_bad_memory"
+        return out
+
     def _builtin_execute_ast_result(self, ast_base: str) -> str:
         """Walk ``<ast_base>.nodes``: preloop ``import|`` / ``link|`` (F98, F112–F114, F118, F120, F121, F122); main ``component|`` / ``memory|set|…`` / ``memory|say|…`` / ``memory|emit|…`` / ``memory|listen|…`` (F104–F148) / ``listen|…|…`` (F99–F103); ``say|`` (F93); ``emit|`` / ``emit|ev|with|…`` (F94–F97); ``set|::k|v`` (F95)."""
+        em = (self.var_get(ast_base + ".exec_model") or "").strip()
+        if em == "spine_component_v1":
+            return self._execute_spine_component_v1(ast_base)[:255]
         nk = ast_base + ".nodes"
         raw = self.var_get(nk) or ""
         result = "Execution completed"
@@ -1792,9 +2108,17 @@ class MinimalAZLRuntime:
                 raise SemanticEngineError(5, "azl_semantic_engine: parse_tokens missing )")
             i[0] += 1
             buf = self.var_get(arg) or ""
-            nodes_s = self._parse_tokens_nodes_from_buffer(buf)
+            pairs = self._parse_tz_buffer_pairs(buf)
+            spine = self._try_parse_component_spine_v1_from_pairs(pairs)
             self.var_set("::ast", "{}")
-            self.var_set("::ast.nodes", nodes_s[:MAX_VAR_VALUE_LEN])
+            if spine is not None:
+                self.var_set("::ast.exec_model", "spine_component_v1")
+                self.var_set("::ast.spine", spine[:MAX_VAR_VALUE_LEN])
+                self.var_set("::ast.nodes", "")
+            else:
+                self.var_set("::ast.exec_model", "")
+                nodes_s = self._parse_tokens_nodes_from_buffer(buf)
+                self.var_set("::ast.nodes", nodes_s[:MAX_VAR_VALUE_LEN])
             self.var_set(k, "{}")
             return
         if v == "::vm_compile_ast":
@@ -2181,7 +2505,12 @@ class MinimalAZLRuntime:
             matched = False
             for j, ln in enumerate(self.listeners):
                 if ln.event == ev:
-                    self.exec_block(ln.block_start, ln.block_end)
+                    if ln.synthetic_toks is not None:
+                        self._exec_with_tok_swap(
+                            ln.synthetic_toks, 0, len(ln.synthetic_toks)
+                        )
+                    else:
+                        self.exec_block(ln.block_start, ln.block_end)
                     matched = True
                     break
             if not matched:
