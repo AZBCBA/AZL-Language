@@ -1,0 +1,62 @@
+# Gate F126: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **`memory|emit|…|with|…`** (queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p126.linked {
+  init {
+    say "P126_LINK_SID"
+  }
+}
+
+component ::p126.a {
+  init {
+    say "P126_A"
+  }
+}
+
+component ::p126.b {
+  init {
+    say "P126_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p126_comp_emit_comp with { ast: "f126-root", scope: "f126-sc", nodes: "import|f126_mod_tag
+link|::p126.linked
+component|p126.a
+memory|emit|f126_mid|with|key|F126_FROM_MEM_EMIT
+component|p126.b
+memory|say|F126_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC126_INNER"
+      say ::event.data.result
+      say "P0_SEM_F126_OK"
+    }
+    listen for "f126_mid" {
+      say ::event.data.key
+    }
+    listen for "p126_comp_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F126_VM_ON_BAD"
+        return
+      }
+      say "F126_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX126_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

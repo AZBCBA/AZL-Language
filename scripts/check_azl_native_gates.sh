@@ -4102,6 +4102,31 @@ if [ "$F125_C_OUT" != "$F125_PY_OUT" ]; then
   exit 478
 fi
 
+echo "[gate] F126: C vs Python — preloop import|+link| then component| + memory|emit|…|with|… + component| + memory|say|"
+F126EX="${ROOT_DIR}/azl/tests/p0_semantic_execute_ast_preloop_component_memory_emit_component_say.azl"
+F126_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F126EX" boot.entry 2>&1)"
+f126_c_rc=$?
+if [ "$f126_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_ast_preloop_component_memory_emit_component_say exited $f126_c_rc: $F126_C_OUT"
+  exit 479
+fi
+if ! printf '%s\n' "$F126_C_OUT" | awk 'NR==1{if($0!="F126_TREE")exit 1} NR==2{if($0!="P126_LINK_SID")exit 1} NR==3{if($0!="P126_A")exit 1} NR==4{if($0!="F126_FROM_MEM_EMIT")exit 1} NR==5{if($0!="P126_B")exit 1} NR==6{if($0!="F126_MEM")exit 1} NR==7{if($0!="f126_mod_tag")exit 1} NR==8{if($0!="EX126_POST")exit 1} NR==9{if($0!="Said: F126_MEM")exit 1} NR==10{if($0!="EC126_INNER")exit 1} NR==11{if($0!="Said: F126_MEM")exit 1} NR==12{if($0!="P0_SEM_F126_OK")exit 1} END{if(NR!=12)exit 1}'; then
+  echo "ERROR: expected F126 preloop + component| + memory|emit|with + component| + memory|say stdout (12 lines), got: $F126_C_OUT"
+  exit 479
+fi
+F126_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F126EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f126_py_rc=$?
+if [ "$f126_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_ast_preloop_component_memory_emit_component_say exited $f126_py_rc: $F126_PY_OUT"
+  exit 480
+fi
+if [ "$F126_C_OUT" != "$F126_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_ast_preloop_component_memory_emit_component_say" >&2
+  echo "C:  $F126_C_OUT" >&2
+  echo "Py: $F126_PY_OUT" >&2
+  exit 481
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh
