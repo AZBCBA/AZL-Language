@@ -755,7 +755,7 @@ Tier B **P0.1** release crumb: concatenates **`azl/tests/stubs/azl_security_for_
 
 ### Real interpreter behavior bridge on semantic spine (`scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh`)
 
-Tier B **P0.1c** release crumb: concatenates **`azl/tests/stubs/azl_security_for_interpreter_spine.azl`** + **`azl/tests/harness/azl_interpreter_semantic_spine_behavior_entry.azl`** + **`azl/runtime/interpreter/azl_interpreter.azl`**, runs **`tools/azl_runtime_spine_host.py`** with **`AZL_ENTRY=azl.spine.behavior.entry`**, asserts exit **0**, no **`component not found: ::azl.security`** on stderr, stdout contains **`Pure AZL Interpreter Initialized`**, **`AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT`**, substring **`Execution complete`**, at least **three** **`Interpretation complete:`** lines (harness **`emit interpret`** ×3 — first two same **`code`** for cache exercise, third two-line embedded **`say`** statements), at least **two** **`(cache hit)`** substrings (in-file **tokenize** + **parse** on the second interpret), and both **`AZL_SPINE_DEPTH_A`** and **`AZL_SPINE_DEPTH_B`** (third interpret: **`::code.split("\n")`**, in-file **`parse_tokens`** loop, two **`execute_say`** outputs). Prefix **`ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]:`** on stderr.
+Tier B **P0.1c** release crumb: concatenates **`azl/tests/stubs/azl_security_for_interpreter_spine.azl`** + **`azl/tests/harness/azl_interpreter_semantic_spine_behavior_entry.azl`** + **`azl/runtime/interpreter/azl_interpreter.azl`**, runs **`tools/azl_runtime_spine_host.py`** with **`AZL_ENTRY=azl.spine.behavior.entry`**, asserts exit **0**, no **`component not found: ::azl.security`** on stderr, stdout contains **`Pure AZL Interpreter Initialized`**, **`AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT`**, substring **`Execution complete`**, at least **four** **`Interpretation complete:`** lines (harness **`emit interpret`** ×4 — first two same **`code`** for cache exercise, third two-line and fourth three-line embedded **`say`** chains), at least **two** **`(cache hit)`** substrings (in-file **tokenize** + **parse** on the second interpret), **`AZL_SPINE_DEPTH_A`** / **`AZL_SPINE_DEPTH_B`**, and **`AZL_SPINE_TRIPLE_1`** / **`_2`** / **`_3`**. Prefix **`ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]:`** on stderr.
 
 | Exit | Meaning |
 |------|---------|
@@ -769,9 +769,10 @@ Tier B **P0.1c** release crumb: concatenates **`azl/tests/stubs/azl_security_for
 | **553** | Stdout missing **`AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT`** |
 | **554** | Stdout missing **`Execution complete`** (execute listener did not finish after **`::execute_ast`**) |
 | **555** | Stdout missing **`Interpretation complete:`** (**`execute_complete`** listener did not run) |
-| **556** | Fewer than **three** **`Interpretation complete:`** lines (harness **three** **`emit interpret`**; third is multi-line depth path) |
+| **556** | Fewer than **four** **`Interpretation complete:`** lines (harness **four** **`emit interpret`**) |
 | **557** | Fewer than **two** **`(cache hit)`** substrings (in-file **tok_cache** / **ast_cache** miss on second interpret) |
-| **558** | Stdout missing **`AZL_SPINE_DEPTH_A`** or **`AZL_SPINE_DEPTH_B`** (third interpret two-line **`say`** path did not print both markers) |
+| **558** | Stdout missing **`AZL_SPINE_DEPTH_A`** or **`AZL_SPINE_DEPTH_B`** (third interpret two-line **`say`** path) |
+| **559** | Stdout missing **`AZL_SPINE_TRIPLE_1`**, **`AZL_SPINE_TRIPLE_2`**, or **`AZL_SPINE_TRIPLE_3`** (fourth interpret three-line **`say`** path) |
 
 ### Enterprise POST /v1/chat benchmark (`scripts/benchmark_enterprise_v1_chat.sh`)
 
