@@ -4127,6 +4127,31 @@ if [ "$F126_C_OUT" != "$F126_PY_OUT" ]; then
   exit 481
 fi
 
+echo "[gate] F127: C vs Python — preloop import|+link| then component| + two memory|emit|…|with|… + component| + memory|say|"
+F127EX="${ROOT_DIR}/azl/tests/p0_semantic_execute_ast_preloop_component_memory_dual_emit_component_say.azl"
+F127_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F127EX" boot.entry 2>&1)"
+f127_c_rc=$?
+if [ "$f127_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_ast_preloop_component_memory_dual_emit_component_say exited $f127_c_rc: $F127_C_OUT"
+  exit 482
+fi
+if ! printf '%s\n' "$F127_C_OUT" | awk 'NR==1{if($0!="F127_TREE")exit 1} NR==2{if($0!="P127_LINK_SID")exit 1} NR==3{if($0!="P127_A")exit 1} NR==4{if($0!="F127_K1")exit 1} NR==5{if($0!="F127_K2")exit 1} NR==6{if($0!="P127_B")exit 1} NR==7{if($0!="F127_MEM")exit 1} NR==8{if($0!="f127_mod_tag")exit 1} NR==9{if($0!="EX127_POST")exit 1} NR==10{if($0!="Said: F127_MEM")exit 1} NR==11{if($0!="EC127_INNER")exit 1} NR==12{if($0!="Said: F127_MEM")exit 1} NR==13{if($0!="P0_SEM_F127_OK")exit 1} END{if(NR!=13)exit 1}'; then
+  echo "ERROR: expected F127 preloop + component| + dual memory|emit|with + component| + memory|say stdout (13 lines), got: $F127_C_OUT"
+  exit 482
+fi
+F127_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F127EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f127_py_rc=$?
+if [ "$f127_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_ast_preloop_component_memory_dual_emit_component_say exited $f127_py_rc: $F127_PY_OUT"
+  exit 483
+fi
+if [ "$F127_C_OUT" != "$F127_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_ast_preloop_component_memory_dual_emit_component_say" >&2
+  echo "C:  $F127_C_OUT" >&2
+  echo "Py: $F127_PY_OUT" >&2
+  exit 484
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

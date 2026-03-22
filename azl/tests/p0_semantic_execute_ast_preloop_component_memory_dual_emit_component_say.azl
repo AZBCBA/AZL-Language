@@ -1,0 +1,66 @@
+# Gate F127: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **two** **`memory|emit|…|with|…`** rows (FIFO queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p127.linked {
+  init {
+    say "P127_LINK_SID"
+  }
+}
+
+component ::p127.a {
+  init {
+    say "P127_A"
+  }
+}
+
+component ::p127.b {
+  init {
+    say "P127_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p127_comp_dual_emit_comp with { ast: "f127-root", scope: "f127-sc", nodes: "import|f127_mod_tag
+link|::p127.linked
+component|p127.a
+memory|emit|f127_e1|with|key|F127_K1
+memory|emit|f127_e2|with|key|F127_K2
+component|p127.b
+memory|say|F127_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC127_INNER"
+      say ::event.data.result
+      say "P0_SEM_F127_OK"
+    }
+    listen for "f127_e1" {
+      say ::event.data.key
+    }
+    listen for "f127_e2" {
+      say ::event.data.key
+    }
+    listen for "p127_comp_dual_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F127_VM_ON_BAD"
+        return
+      }
+      say "F127_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX127_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}
