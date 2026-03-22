@@ -1,0 +1,24 @@
+# Gate F159: ::parse_tokens — `listen for f159 { set ::g159 = V159 }` → `listen|f159|set|::g159|V159`.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f159_parse with { }
+  }
+  behavior {
+    listen for "f159_parse" {
+      set ::tokens = []
+      set ::tx = "listen for f159 { set ::g159 = V159 }"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::tx, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F159_OK"
+    }
+  }
+}

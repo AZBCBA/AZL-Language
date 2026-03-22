@@ -1,0 +1,24 @@
+# Gate F156: ::parse_tokens — `listen for f156 then { say PAY156 }` → `listen|f156|say|PAY156`.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f156_parse with { }
+  }
+  behavior {
+    listen for "f156_parse" {
+      set ::tokens = []
+      set ::tx = "listen for f156 then { say PAY156 }"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::tx, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F156_OK"
+    }
+  }
+}

@@ -1655,6 +1655,158 @@ static int parse_with_brace_payload(ParseTokPair *pairs, int np, int j, int *j_o
   return -1;
 }
 
+/* One of say|… / emit|… / set|… inside `listen for ev [then] { … }`; chunk_out ≤254 chars; *j_out past outer `}`. */
+static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const char *evn, char *chunk_out,
+                                   size_t chunk_sz, int *j_out) {
+  chunk_out[0] = '\0';
+  if (j >= np) return -1;
+  if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "say") == 0) {
+    j = parse_skip_eol(pairs, np, j + 1);
+    char msg[224];
+    msg[0] = '\0';
+    size_t ml = 0;
+    while (j < np) {
+      if (strcmp(pairs[j].typ, "eol") == 0) {
+        j++;
+        continue;
+      }
+      if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) {
+        if (msg[0] == '\0') return -1;
+        j++;
+        (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|say|%.199s", evn, msg);
+        if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+        *j_out = j;
+        return 0;
+      }
+      if (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0) {
+        if (ml > 0U && ml + 1U < sizeof(msg)) msg[ml++] = ' ';
+        size_t rem = sizeof(msg) - ml - 1U;
+        if (rem > 0U) {
+          (void)snprintf(msg + ml, rem, "%.199s", pairs[j].val);
+          ml = strlen(msg);
+          if (ml > 199U) {
+            msg[199] = '\0';
+            ml = 199U;
+          }
+        }
+        j++;
+        continue;
+      }
+      return -1;
+    }
+    return -1;
+  }
+  if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "emit") == 0) {
+    j = parse_skip_eol(pairs, np, j + 1);
+    char ev_inner[160];
+    ev_inner[0] = '\0';
+    size_t el = 0;
+    int with_idx = -1;
+    while (j < np) {
+      if (strcmp(pairs[j].typ, "eol") == 0) {
+        j++;
+        continue;
+      }
+      if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) {
+        break;
+      }
+      if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "with") == 0) {
+        with_idx = j;
+        break;
+      }
+      if (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0) {
+        if (el > 0U && el + 1U < sizeof(ev_inner)) ev_inner[el++] = ' ';
+        size_t rem = sizeof(ev_inner) - el - 1U;
+        if (rem > 0U) {
+          (void)snprintf(ev_inner + el, rem, "%.119s", pairs[j].val);
+          el = strlen(ev_inner);
+          if (el > 119U) {
+            ev_inner[119] = '\0';
+            el = 119U;
+          }
+        }
+        j++;
+        continue;
+      }
+      return -1;
+    }
+    if (!ev_inner[0] || strchr(ev_inner, '|') != NULL) return -1;
+    if (with_idx >= 0) {
+      int j2 = 0;
+      char wtail[200];
+      if (parse_with_brace_payload(pairs, np, with_idx + 1, &j2, wtail, sizeof(wtail)) != 0) return -1;
+      j = j2;
+      if (wtail[0]) {
+        (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|emit|%.119s|with|%s", evn, ev_inner, wtail);
+      } else {
+        (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|emit|%.119s", evn, ev_inner);
+      }
+      if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+      while (j < np) {
+        if (strcmp(pairs[j].typ, "eol") == 0) {
+          j++;
+          continue;
+        }
+        if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) {
+          *j_out = j + 1;
+          return 0;
+        }
+        return -1;
+      }
+      return -1;
+    }
+    if (j >= np || strcmp(pairs[j].typ, "brace") != 0 || strcmp(pairs[j].val, "}") != 0) return -1;
+    (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|emit|%.119s", evn, ev_inner);
+    if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+    *j_out = j + 1;
+    return 0;
+  }
+  if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "set") == 0) {
+    j = parse_skip_eol(pairs, np, j + 1);
+    if (j >= np || strcmp(pairs[j].typ, "identifier") != 0 || pairs[j].val[0] != ':' || pairs[j].val[1] != ':')
+      return -1;
+    char varn[96];
+    (void)snprintf(varn, sizeof(varn), "%.79s", pairs[j].val);
+    j++;
+    j = parse_skip_eol(pairs, np, j);
+    if (j >= np || strcmp(pairs[j].typ, "operator") != 0 || strcmp(pairs[j].val, "=") != 0) return -1;
+    j++;
+    char rhs[224];
+    rhs[0] = '\0';
+    size_t rl = 0;
+    while (j < np) {
+      if (strcmp(pairs[j].typ, "eol") == 0) {
+        j++;
+        continue;
+      }
+      if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) {
+        if (rhs[0] == '\0') return -1;
+        (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|set|%s|%.199s", evn, varn, rhs);
+        if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+        *j_out = j + 1;
+        return 0;
+      }
+      if (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0) {
+        if (rl > 0U && rl + 1U < sizeof(rhs)) rhs[rl++] = ' ';
+        size_t rem = sizeof(rhs) - rl - 1U;
+        if (rem > 0U) {
+          (void)snprintf(rhs + rl, rem, "%.199s", pairs[j].val);
+          rl = strlen(rhs);
+          if (rl > 199U) {
+            rhs[199] = '\0';
+            rl = 199U;
+          }
+        }
+        j++;
+        continue;
+      }
+      return -1;
+    }
+    return -1;
+  }
+  return -1;
+}
+
 static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t nodes_cap) {
   ParseTokPair pairs[64];
   int np = 0;
@@ -1886,52 +2038,19 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
         continue;
       }
       j = parse_skip_eol(pairs, np, j + 1);
+      if (j < np && strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "then") == 0) {
+        j = parse_skip_eol(pairs, np, j + 1);
+      }
       if (j >= np || strcmp(pairs[j].typ, "brace") != 0 || strcmp(pairs[j].val, "{") != 0) {
         i++;
         continue;
       }
       j = parse_skip_eol(pairs, np, j + 1);
-      if (j >= np || strcmp(pairs[j].typ, "identifier") != 0 || strcmp(pairs[j].val, "say") != 0) {
-        i++;
-        continue;
-      }
-      j = parse_skip_eol(pairs, np, j + 1);
-      char msg[224];
-      msg[0] = '\0';
-      size_t ml = 0;
-      int ok_listen = 0;
-      while (j < np) {
-        if (strcmp(pairs[j].typ, "eol") == 0) {
-          j++;
-          continue;
-        }
-        if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) {
-          ok_listen = (msg[0] != '\0');
-          j++;
-          break;
-        }
-        if (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0) {
-          if (ml > 0U && ml + 1U < sizeof(msg)) msg[ml++] = ' ';
-          size_t rem = sizeof(msg) - ml - 1U;
-          if (rem > 0U) {
-            (void)snprintf(msg + ml, rem, "%.199s", pairs[j].val);
-            ml = strlen(msg);
-            if (ml > 199U) {
-              msg[199] = '\0';
-              ml = 199U;
-            }
-          }
-          j++;
-          continue;
-        }
-        break;
-      }
-      if (ok_listen) {
-        char chunk[320];
-        (void)snprintf(chunk, sizeof(chunk), "listen|%.63s|say|%.199s", evn, msg);
-        if (strlen(chunk) > 254U) chunk[254] = '\0';
-        parse_acc_append(acc, sizeof(acc), chunk);
-        i = j;
+      char lchunk[320];
+      int j2 = j;
+      if (parse_listen_inner_body(pairs, np, j, evn, lchunk, sizeof(lchunk), &j2) == 0) {
+        parse_acc_append(acc, sizeof(acc), lchunk);
+        i = j2;
         continue;
       }
       i++;

@@ -328,6 +328,115 @@ class MinimalAZLRuntime:
             j += 1
         return None
 
+    def _parse_listen_inner_to_row(
+        self, pairs: list[tuple[str, str]], j: int, n: int, evn: str
+    ) -> tuple[str, int] | None:
+        """Parse one statement inside ``listen … { … }`` → ``listen|<evn>|say|…`` / ``…|emit|…`` / ``…|set|…``."""
+        if j >= n:
+            return None
+        t0, v0 = pairs[j]
+        if t0 == "identifier" and v0 == "say":
+            j = self._skip_eol_pairs(pairs, j + 1)
+            parts: list[str] = []
+            while j < n:
+                t2, v2 = pairs[j]
+                if t2 == "eol":
+                    j += 1
+                    continue
+                if t2 == "brace" and v2 == "}":
+                    if not parts:
+                        return None
+                    j += 1
+                    msg = " ".join(parts)[:199]
+                    seg = ("listen|" + evn + "|say|" + msg)[:255]
+                    return (seg, j)
+                if t2 in ("identifier", "string"):
+                    parts.append(v2)
+                    j += 1
+                    continue
+                return None
+            return None
+        if t0 == "identifier" and v0 == "emit":
+            j = self._skip_eol_pairs(pairs, j + 1)
+            ev_parts: list[str] = []
+            with_idx = -1
+            while j < n:
+                t2, v2 = pairs[j]
+                if t2 == "eol":
+                    j += 1
+                    continue
+                if t2 == "brace" and v2 == "}":
+                    break
+                if t2 == "identifier" and v2 == "with":
+                    with_idx = j
+                    break
+                if t2 in ("identifier", "string"):
+                    ev_parts.append(v2)
+                    j += 1
+                    continue
+                return None
+            if not ev_parts:
+                return None
+            inner_ev = " ".join(ev_parts)[:120]
+            if "|" in inner_ev:
+                return None
+            if with_idx >= 0:
+                parsed = self._parse_with_brace_pairs(pairs, with_idx + 1)
+                if not parsed:
+                    return None
+                kvs, j2 = parsed
+                if kvs:
+                    tail = "|".join(f"{k}|{v}" for k, v in kvs)
+                    seg = ("listen|" + evn + "|emit|" + inner_ev + "|with|" + tail)[:255]
+                else:
+                    seg = ("listen|" + evn + "|emit|" + inner_ev)[:255]
+                j = j2
+                while j < n:
+                    t2, v2 = pairs[j]
+                    if t2 == "eol":
+                        j += 1
+                        continue
+                    if t2 == "brace" and v2 == "}":
+                        return (seg, j + 1)
+                    return None
+                return None
+            if j >= n or pairs[j] != ("brace", "}"):
+                return None
+            seg = ("listen|" + evn + "|emit|" + inner_ev)[:255]
+            return (seg, j + 1)
+        if t0 == "identifier" and v0 == "set":
+            j = self._skip_eol_pairs(pairs, j + 1)
+            if j >= n:
+                return None
+            vt, vv = pairs[j]
+            if vt != "identifier" or not vv.startswith("::"):
+                return None
+            var_name = vv[:80]
+            j += 1
+            j = self._skip_eol_pairs(pairs, j)
+            if j >= n or pairs[j] != ("operator", "="):
+                return None
+            j += 1
+            rhs_parts: list[str] = []
+            while j < n:
+                t2, v2 = pairs[j]
+                if t2 == "eol":
+                    j += 1
+                    continue
+                if t2 == "brace" and v2 == "}":
+                    if not rhs_parts:
+                        return None
+                    rhs = " ".join(rhs_parts)[:200]
+                    seg = ("listen|" + evn + "|set|" + var_name + "|" + rhs)[:255]
+                    return (seg, j + 1)
+                if t2 in ("identifier", "string"):
+                    rhs_parts.append(v2)
+                    j += 1
+                    continue
+                return None
+            return None
+        return None
+
     def _parse_tokens_nodes_from_buffer(self, buf: str) -> str:
         """Map ``tz|…`` token rows to ``::ast.nodes`` lines for ``execute_ast`` (spine parse slice)."""
         pairs = self._parse_tz_buffer_pairs(buf)
@@ -468,37 +577,19 @@ class MinimalAZLRuntime:
                     i += 1
                     continue
                 j = self._skip_eol_pairs(pairs, j + 1)
+                if j < n and pairs[j] == ("identifier", "then"):
+                    j = self._skip_eol_pairs(pairs, j + 1)
                 if j >= n or pairs[j] != ("brace", "{"):
                     i += 1
                     continue
                 j = self._skip_eol_pairs(pairs, j + 1)
-                if j >= n or pairs[j] != ("identifier", "say"):
+                parsed_ln = self._parse_listen_inner_to_row(pairs, j, n, evn)
+                if parsed_ln is None:
                     i += 1
                     continue
-                j = self._skip_eol_pairs(pairs, j + 1)
-                parts: list[str] = []
-                ok_listen = False
-                while j < n:
-                    t2, v2 = pairs[j]
-                    if t2 == "eol":
-                        j += 1
-                        continue
-                    if t2 == "brace" and v2 == "}":
-                        ok_listen = bool(parts)
-                        j += 1
-                        break
-                    if t2 in ("identifier", "string"):
-                        parts.append(v2)
-                        j += 1
-                        continue
-                    break
-                if ok_listen:
-                    msg = " ".join(parts)[:199]
-                    seg = ("listen|" + evn + "|say|" + msg)[:255]
-                    out_lines.append(seg)
-                    i = j
-                else:
-                    i += 1
+                line, j2 = parsed_ln
+                out_lines.append(line)
+                i = j2
                 continue
             i += 1
         if not out_lines:

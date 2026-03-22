@@ -4852,6 +4852,106 @@ if [ "$F155_C_OUT" != "$F155_PY_OUT" ]; then
   exit 580
 fi
 
+echo "[gate] F156: C vs Python — ::parse_tokens listen for … then { say … }"
+F156EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_then_say.azl"
+F156_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F156EX" boot.entry 2>&1)"
+f156_c_rc=$?
+if [ "$f156_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_tokens_listen_then_say exited $f156_c_rc: $F156_C_OUT"
+  exit 581
+fi
+if ! printf '%s\n' "$F156_C_OUT" | awk 'NR==1{if($0!="listen|f156|say|PAY156")exit 1} NR==2{if($0!="P0_SEM_F156_OK")exit 1} END{if(NR!=2)exit 1}'; then
+  echo "ERROR: expected F156 parse_tokens stdout (2 lines), got: $F156_C_OUT"
+  exit 581
+fi
+F156_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F156EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f156_py_rc=$?
+if [ "$f156_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_tokens_listen_then_say exited $f156_py_rc: $F156_PY_OUT"
+  exit 582
+fi
+if [ "$F156_C_OUT" != "$F156_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_tokens_listen_then_say" >&2
+  echo "C:  $F156_C_OUT" >&2
+  echo "Py: $F156_PY_OUT" >&2
+  exit 583
+fi
+
+echo "[gate] F157: C vs Python — ::parse_tokens listen { emit … }"
+F157EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_emit.azl"
+F157_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F157EX" boot.entry 2>&1)"
+f157_c_rc=$?
+if [ "$f157_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_tokens_listen_emit exited $f157_c_rc: $F157_C_OUT"
+  exit 584
+fi
+if ! printf '%s\n' "$F157_C_OUT" | awk 'NR==1{if($0!="listen|f157|emit|E157")exit 1} NR==2{if($0!="P0_SEM_F157_OK")exit 1} END{if(NR!=2)exit 1}'; then
+  echo "ERROR: expected F157 parse_tokens stdout (2 lines), got: $F157_C_OUT"
+  exit 584
+fi
+F157_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F157EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f157_py_rc=$?
+if [ "$f157_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_tokens_listen_emit exited $f157_py_rc: $F157_PY_OUT"
+  exit 585
+fi
+if [ "$F157_C_OUT" != "$F157_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_tokens_listen_emit" >&2
+  echo "C:  $F157_C_OUT" >&2
+  echo "Py: $F157_PY_OUT" >&2
+  exit 586
+fi
+
+echo "[gate] F158: C vs Python — ::parse_tokens listen { emit … with { k: v } }"
+F158EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_emit_with.azl"
+F158_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F158EX" boot.entry 2>&1)"
+f158_c_rc=$?
+if [ "$f158_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_tokens_listen_emit_with exited $f158_c_rc: $F158_C_OUT"
+  exit 587
+fi
+if ! printf '%s\n' "$F158_C_OUT" | awk 'NR==1{if($0!="listen|f158|emit|em158|with|k|a")exit 1} NR==2{if($0!="P0_SEM_F158_OK")exit 1} END{if(NR!=2)exit 1}'; then
+  echo "ERROR: expected F158 parse_tokens stdout (2 lines), got: $F158_C_OUT"
+  exit 587
+fi
+F158_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F158EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f158_py_rc=$?
+if [ "$f158_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_tokens_listen_emit_with exited $f158_py_rc: $F158_PY_OUT"
+  exit 588
+fi
+if [ "$F158_C_OUT" != "$F158_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_tokens_listen_emit_with" >&2
+  echo "C:  $F158_C_OUT" >&2
+  echo "Py: $F158_PY_OUT" >&2
+  exit 589
+fi
+
+echo "[gate] F159: C vs Python — ::parse_tokens listen { set ::g = v }"
+F159EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_set.azl"
+F159_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F159EX" boot.entry 2>&1)"
+f159_c_rc=$?
+if [ "$f159_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_tokens_listen_set exited $f159_c_rc: $F159_C_OUT"
+  exit 590
+fi
+if ! printf '%s\n' "$F159_C_OUT" | awk 'NR==1{if($0!="listen|f159|set|::g159|V159")exit 1} NR==2{if($0!="P0_SEM_F159_OK")exit 1} END{if(NR!=2)exit 1}'; then
+  echo "ERROR: expected F159 parse_tokens stdout (2 lines), got: $F159_C_OUT"
+  exit 590
+fi
+F159_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F159EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f159_py_rc=$?
+if [ "$f159_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_tokens_listen_set exited $f159_py_rc: $F159_PY_OUT"
+  exit 591
+fi
+if [ "$F159_C_OUT" != "$F159_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_tokens_listen_set" >&2
+  echo "C:  $F159_C_OUT" >&2
+  echo "Py: $F159_PY_OUT" >&2
+  exit 592
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh
