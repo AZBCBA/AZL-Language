@@ -322,6 +322,12 @@ component ::azl.interpreter {
         } else if ::token.value == "link" {
           set ::lnk_node = ::parse_link_statement(::tokens)
           set ::ast.nodes.push(::lnk_node)
+        } else if ::token.value == "on" {
+          set ::fn_node = ::parse_on_function(::tokens)
+          set ::ast.nodes.push(::fn_node)
+        } else if (::token.type == "identifier" && ::current_pos + 1 < ::tokens.length && ::tokens[::current_pos + 1].type == "paren" && ::tokens[::current_pos + 1].value == "(") {
+          set ::call_node = ::parse_call_statement(::tokens)
+          set ::ast.nodes.push(::call_node)
         } else {
           set ::current_pos = ::current_pos + 1
         }
@@ -762,6 +768,12 @@ component ::azl.interpreter {
           set ::result = ::execute_emit(::node)
         } else if ::node.type == "listen" {
           set ::result = ::execute_listen(::node)
+        } else if ::node.type == "function" {
+          if ::functions == null { set ::functions = {} }
+          set ::functions[::node.name] = ::node.body
+          set ::result = "registered:" + ::node.name
+        } else if ::node.type == "call" {
+          set ::result = ::execute_call(::node)
         }
       }
       

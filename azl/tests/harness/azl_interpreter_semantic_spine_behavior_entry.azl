@@ -13,6 +13,7 @@
 #   - ninth emit interpret (set global then say) — exercises ::execute_ast set|… row on real interpret→parse→execute chain (not covered by say-only smokes).
 #   - tenth emit interpret (bare emit user statement) — exercises ::execute_emit → ::emit_event_resolved on the real file path (📡 line + Emitted: in ::result).
 #   - eleventh emit interpret (emit … with { k: v }) — exercises payload path in ::emit_event_resolved (AZL_EMIT_WITH_PAYLOAD) on the real file path.
+#   - twelfth emit interpret (on name { say … } then name()) — exercises top-level ::parse_tokens + ::execute_ast function registration + ::execute_call on the real file path.
 
 component ::azl.spine.behavior.entry {
   init {
@@ -37,6 +38,8 @@ say Q5d", component_name: "smoke5" }
 say AZL_SPINE_P9_SET_LINE", component_name: "smoke9" }
     emit interpret with { code: "emit AZL_SPINE_P10_USER_EMIT", component_name: "smoke10" }
     emit interpret with { code: "emit AZL_SPINE_P11 with { pk: 'AZL_SPINE_P11_MARK' }", component_name: "smoke11" }
+    emit interpret with { code: "on a { say 'AZL_S12_FN' }
+a()", component_name: "smoke12" }
     say "AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT"
   }
 }

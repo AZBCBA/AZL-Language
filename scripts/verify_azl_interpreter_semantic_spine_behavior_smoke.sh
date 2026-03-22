@@ -8,6 +8,7 @@
 # smoke9 set ::… then say — exercises execute_ast set row on the real file path;
 # smoke10 bare emit — ::execute_emit / ::emit_event_resolved (spine surfaces result as Interpretation complete: Emitted: …).
 # smoke11 emit with payload — payload branch + host prints AZL_EMIT_WITH_PAYLOAD (matches in-file marker intent).
+# smoke12 on/call — top-level user function + call (registered:* / called:* via execute_ast fn|/call| spine encoding).
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
@@ -98,8 +99,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=11)}' "$out"; then
-  err "stdout expected >=11 \"Interpretation complete:\" lines (harness eleven emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=12)}' "$out"; then
+  err "stdout expected >=12 \"Interpretation complete:\" lines (harness twelve emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -152,6 +153,16 @@ if ! rg -q 'AZL_EMIT_WITH_PAYLOAD' "$out"; then
   err "stdout missing in-file payload emit marker AZL_EMIT_WITH_PAYLOAD (::emit_event_resolved)"
   cat "$out" >&2 || true
   exit 629
+fi
+if ! rg -q 'AZL_S12_FN' "$out"; then
+  err "stdout missing twelfth-interpret user function body output AZL_S12_FN (on/call → execute_call say path)"
+  cat "$out" >&2 || true
+  exit 630
+fi
+if ! rg -q 'called:a' "$out"; then
+  err "stdout missing twelfth-interpret call result (Interpretation complete: called:a)"
+  cat "$out" >&2 || true
+  exit 631
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"

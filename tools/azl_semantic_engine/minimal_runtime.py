@@ -1049,6 +1049,57 @@ class MinimalAZLRuntime:
                     out_lines.append(line)
                 i = j
                 continue
+            if typ == "identifier" and val == "on":
+                j = self._skip_eol_pairs(pairs, i + 1)
+                if j >= n or pairs[j][0] != "identifier":
+                    i += 1
+                    continue
+                fname = pairs[j][1][:63]
+                if not fname or "|" in fname:
+                    i += 1
+                    continue
+                j = self._skip_eol_pairs(pairs, j + 1)
+                if j >= n or pairs[j] != ("brace", "{"):
+                    i += 1
+                    continue
+                j = self._skip_eol_pairs(pairs, j + 1)
+                parsed_on = self._parse_listen_inner_to_row(
+                    pairs, j, n, "__dummy_on__"
+                )
+                if parsed_on is None:
+                    i += 1
+                    continue
+                ln_on, j2 = parsed_on
+                prefix = "listen|__dummy_on__|say|"
+                if not ln_on.startswith(prefix):
+                    i += 1
+                    continue
+                pay_on = ln_on[len(prefix) :]
+                out_lines.append(("fn|" + fname + "|say|" + pay_on)[:255])
+                i = j2
+                continue
+            if typ == "identifier" and val not in (
+                "say",
+                "set",
+                "emit",
+                "listen",
+                "import",
+                "link",
+                "component",
+                "memory",
+                "on",
+                "for",
+                "then",
+                "with",
+            ):
+                j = self._skip_eol_pairs(pairs, i + 1)
+                if j < n and pairs[j] == ("paren", "("):
+                    j += 1
+                    j = self._skip_eol_pairs(pairs, j)
+                    if j < n and pairs[j] == ("paren", ")"):
+                        out_lines.append(("call|" + val[:63])[:255])
+                        i = j + 1
+                        continue
             i += 1
         if not out_lines:
             return "say|AZL_SPINE_SEMANTIC_PARSE_EXECUTE_BRIDGE"
@@ -1922,6 +1973,7 @@ class MinimalAZLRuntime:
         if not raw.strip():
             return result
         self._execute_ast_listen_stubs.clear()
+        fn_reg: dict[str, str] = {}
         lines = raw.split("\n")
         for line in lines:
             if (self.var_get("::halted") or "") == "true":
@@ -2026,6 +2078,20 @@ class MinimalAZLRuntime:
                 lr = self._execute_ast_try_listen_stub(seg[7:])
                 if lr is not None:
                     result = lr
+            elif seg.startswith("fn|"):
+                rest = seg[3:]
+                trip = rest.split("|", 2)
+                if len(trip) == 3 and trip[1] == "say":
+                    fn_reg[trip[0][:63]] = trip[2][:200]
+                    result = "registered:" + trip[0][:120]
+            elif seg.startswith("call|"):
+                cname = seg[5:].split("|", 1)[0][:63]
+                cpay = fn_reg.get(cname)
+                if cpay is None:
+                    result = "fn_not_found"
+                else:
+                    print(cpay, flush=True)
+                    result = "called:" + cname[:120]
         return result[:255]
 
     def exec_set(self, i: list[int]) -> None:

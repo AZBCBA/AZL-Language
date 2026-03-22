@@ -91,6 +91,36 @@ static int g_n_exec_ast_stubs;
 
 static void exec_ast_stubs_reset(void) { g_n_exec_ast_stubs = 0; }
 
+#define MAX_EXEC_AST_FN 8
+static char g_exec_ast_fn_name[MAX_EXEC_AST_FN][64];
+static char g_exec_ast_fn_say[MAX_EXEC_AST_FN][200];
+static int g_n_exec_ast_fn;
+
+static void exec_ast_fn_reset(void) { g_n_exec_ast_fn = 0; }
+
+static void exec_ast_fn_set(const char *name, const char *say_pay) {
+  if (!name || !name[0] || !say_pay || !say_pay[0]) return;
+  int i;
+  for (i = 0; i < g_n_exec_ast_fn; i++) {
+    if (strcmp(g_exec_ast_fn_name[i], name) == 0) {
+      (void)snprintf(g_exec_ast_fn_say[i], sizeof(g_exec_ast_fn_say[0]), "%.199s", say_pay);
+      return;
+    }
+  }
+  if (g_n_exec_ast_fn >= MAX_EXEC_AST_FN) return;
+  (void)snprintf(g_exec_ast_fn_name[g_n_exec_ast_fn], sizeof(g_exec_ast_fn_name[0]), "%.63s", name);
+  (void)snprintf(g_exec_ast_fn_say[g_n_exec_ast_fn], sizeof(g_exec_ast_fn_say[0]), "%.199s", say_pay);
+  g_n_exec_ast_fn++;
+}
+
+static const char *exec_ast_fn_get(const char *name) {
+  if (!name || !name[0]) return NULL;
+  for (int i = g_n_exec_ast_fn - 1; i >= 0; i--) {
+    if (strcmp(g_exec_ast_fn_name[i], name) == 0) return g_exec_ast_fn_say[i];
+  }
+  return NULL;
+}
+
 static int exec_ast_stub_register(const char *ev, int kind, const char *body) {
   if (!ev || !ev[0] || !body || !body[0]) return -1;
   if (kind == EXEC_AST_STUB_EMIT && strchr(body, '|') != NULL) return -1;
@@ -1449,6 +1479,50 @@ static void execute_ast_listen_line(const char *after_listen, char *result, size
   (void)snprintf(result, rsz, "Listen: %.120s", evn);
 }
 
+/* execute_ast fn|name|say|payload — register one-line user function body (interpreter on/call slice). */
+static void execute_ast_fn_line(const char *after_fn, char *result, size_t rsz) {
+  const char *p = after_fn ? after_fn : "";
+  const char *p1 = strchr(p, '|');
+  if (!p1 || p1 == p) return;
+  char name[64];
+  size_t nl = (size_t)(p1 - p);
+  if (nl >= sizeof(name)) nl = sizeof(name) - 1U;
+  memcpy(name, p, nl);
+  name[nl] = '\0';
+  p = p1 + 1;
+  if (strncmp(p, "say|", 4U) != 0) return;
+  const char *pay = p + 4;
+  if (!pay[0]) return;
+  exec_ast_fn_set(name, pay);
+  (void)snprintf(result, rsz, "registered:%.120s", name);
+}
+
+static void execute_ast_call_line(const char *after_call, char *result, size_t rsz) {
+  char name[64];
+  name[0] = '\0';
+  const char *p = after_call ? after_call : "";
+  const char *bar = strchr(p, '|');
+  if (bar) {
+    size_t nl = (size_t)(bar - p);
+    if (nl >= sizeof(name)) nl = sizeof(name) - 1U;
+    if (nl > 0U) {
+      memcpy(name, p, nl);
+      name[nl] = '\0';
+    }
+  } else
+    (void)snprintf(name, sizeof(name), "%.63s", p);
+  if (!name[0]) return;
+  const char *pay = exec_ast_fn_get(name);
+  if (!pay) {
+    (void)snprintf(result, rsz, "fn_not_found");
+    return;
+  }
+  fputs(pay, stdout);
+  fputc('\n', stdout);
+  fflush(stdout);
+  (void)snprintf(result, rsz, "called:%.120s", name);
+}
+
 /* Shallow import stub (mirrors preloop resolve_module_now for import nodes; F98). */
 static void execute_ast_import_line(const char *after_import) {
   const char *p = after_import ? after_import : "";
@@ -1490,6 +1564,7 @@ static void builtin_execute_spine_v1_into(char *val, size_t valsz, const char *a
     return;
   }
   exec_ast_stubs_reset();
+  exec_ast_fn_reset();
   g_spine_saved_nlisteners = g_nlisteners;
   g_nsynth_pool = 0;
   char pending_bh_ev[72] = {0};
@@ -1667,6 +1742,7 @@ static void builtin_execute_ast_into(char *val, size_t valsz, const char *ast_ba
     return;
   }
   exec_ast_stubs_reset();
+  exec_ast_fn_reset();
   char buf1[512], buf2[512];
   (void)snprintf(buf1, sizeof(buf1), "%s", nodes0);
   (void)snprintf(buf2, sizeof(buf2), "%s", nodes0);
@@ -1712,6 +1788,10 @@ static void builtin_execute_ast_into(char *val, size_t valsz, const char *ast_ba
       execute_ast_memory_line(line + 7, result, sizeof(result));
     } else if (strncmp(line, "listen|", 7U) == 0) {
       execute_ast_listen_line(line + 7, result, sizeof(result));
+    } else if (strncmp(line, "fn|", 3U) == 0) {
+      execute_ast_fn_line(line + 3, result, sizeof(result));
+    } else if (strncmp(line, "call|", 5U) == 0) {
+      execute_ast_call_line(line + 5, result, sizeof(result));
     }
   }
   (void)snprintf(val, valsz, "%s", result);
@@ -2839,6 +2919,63 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
       }
       i++;
       continue;
+    }
+    if (strcmp(pairs[i].typ, "identifier") == 0 && strcmp(pairs[i].val, "on") == 0) {
+      int jo = parse_skip_eol(pairs, np, i + 1);
+      if (jo >= np || strcmp(pairs[jo].typ, "identifier") != 0) {
+        i++;
+        continue;
+      }
+      char fname[64];
+      (void)snprintf(fname, sizeof(fname), "%.63s", pairs[jo].val);
+      if (!fname[0] || strchr(fname, '|') != NULL) {
+        i++;
+        continue;
+      }
+      jo = parse_skip_eol(pairs, np, jo + 1);
+      if (jo >= np || strcmp(pairs[jo].typ, "brace") != 0 || strcmp(pairs[jo].val, "{") != 0) {
+        i++;
+        continue;
+      }
+      jo = parse_skip_eol(pairs, np, jo + 1);
+      char on_chunk[320];
+      int j2on = 0;
+      if (parse_listen_inner_body(pairs, np, jo, "__dummy_on__", on_chunk, sizeof(on_chunk), &j2on) != 0) {
+        i++;
+        continue;
+      }
+      static const char on_pref[] = "listen|__dummy_on__|say|";
+      if (strncmp(on_chunk, on_pref, sizeof(on_pref) - 1U) != 0) {
+        i++;
+        continue;
+      }
+      const char *pay_on = on_chunk + (sizeof(on_pref) - 1U);
+      char fn_line[320];
+      (void)snprintf(fn_line, sizeof(fn_line), "fn|%.63s|say|%.199s", fname, pay_on);
+      if (strlen(fn_line) > 254U) fn_line[254] = '\0';
+      parse_acc_append(acc, sizeof(acc), fn_line);
+      i = j2on;
+      continue;
+    }
+    if (strcmp(pairs[i].typ, "identifier") == 0) {
+      const char *vk = pairs[i].val;
+      if (strcmp(vk, "say") != 0 && strcmp(vk, "set") != 0 && strcmp(vk, "emit") != 0 &&
+          strcmp(vk, "listen") != 0 && strcmp(vk, "import") != 0 && strcmp(vk, "link") != 0 &&
+          strcmp(vk, "component") != 0 && strcmp(vk, "memory") != 0 && strcmp(vk, "on") != 0 &&
+          strcmp(vk, "for") != 0 && strcmp(vk, "then") != 0 && strcmp(vk, "with") != 0) {
+        int jc = parse_skip_eol(pairs, np, i + 1);
+        if (jc < np && strcmp(pairs[jc].typ, "paren") == 0 && strcmp(pairs[jc].val, "(") == 0) {
+          jc++;
+          jc = parse_skip_eol(pairs, np, jc);
+          if (jc < np && strcmp(pairs[jc].typ, "paren") == 0 && strcmp(pairs[jc].val, ")") == 0) {
+            char ccall[96];
+            (void)snprintf(ccall, sizeof(ccall), "call|%.63s", vk);
+            parse_acc_append(acc, sizeof(acc), ccall);
+            i = jc + 1;
+            continue;
+          }
+        }
+      }
     }
     i++;
   }
