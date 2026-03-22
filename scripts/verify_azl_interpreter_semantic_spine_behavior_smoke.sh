@@ -28,10 +28,18 @@
 # smoke30 multi-statement then on ==1 then second if ==2 false → C; P30_A before P30_B before P30_C; BAD1/BAD2 must not appear.
 # smoke31 nested multi-statement then under evaluated outer true; P31_OUTER then P31_A then P31_B; BAD1/BAD2 must not appear.
 # smoke32 nested multi-statement otherwise under evaluated outer false; P32_OUTER then P32_A then P32_B; BAD1/BAD2 must not appear.
+# smoke33 nested expression under outer ==1; P33_OUTER then P33_INNER; BAD1/BAD2 must not appear.
+# smoke34 three-level nesting L1/L2/L3; BAD1/BAD2/BAD3 must not appear.
+# smoke35 four alternating if outcomes A/B/C/D; BAD1–BAD4 must not appear.
+# smoke36 expression multi-statement then + second if multi-statement otherwise; P36_A..D order; BAD1/BAD2 must not appear.
+# smoke37 otherwise body sets global then inner if; P37_OUTER then P37_INNER; BAD1/BAD2 must not appear.
+# smoke38 expression branches after set mutation; P38_A then P38_B then P38_C; BAD1–BAD3 must not appear.
+# smoke39 double-nested mixed false/then in inner branches; P39_L1 then L2 then L3; BAD1–BAD3 must not appear.
+# smoke40 long mix ==5/==6/flag/==5 again; P40_A..D order; BAD1–BAD4 must not appear.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–683).
+# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–707).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -118,8 +126,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=32)}' "$out"; then
-  err "stdout expected >=32 \"Interpretation complete:\" lines (harness thirty-two emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=40)}' "$out"; then
+  err "stdout expected >=40 \"Interpretation complete:\" lines (harness forty emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -498,6 +506,167 @@ if ! awk '
   err "stdout expected AZL_SPINE_P32_OUTER then P32_A then P32_B (nested multi-statement inner otherwise)"
   cat "$out" >&2 || true
   exit 683
+fi
+if rg -q 'AZL_SPINE_P33_BAD1' "$out" || rg -q 'AZL_SPINE_P33_BAD2' "$out"; then
+  err "stdout must not contain AZL_SPINE_P33_BAD1 or AZL_SPINE_P33_BAD2 (nested expression under outer ==1)"
+  cat "$out" >&2 || true
+  exit 684
+fi
+if ! rg -q 'AZL_SPINE_P33_OUTER' "$out" || ! rg -q 'AZL_SPINE_P33_INNER' "$out"; then
+  err "stdout missing thirty-third-interpret markers AZL_SPINE_P33_OUTER and/or AZL_SPINE_P33_INNER"
+  cat "$out" >&2 || true
+  exit 685
+fi
+if ! awk '
+  /AZL_SPINE_P33_OUTER/ && !o { o = NR }
+  /AZL_SPINE_P33_INNER/ && !i { i = NR }
+  END { exit !(o && i && o < i) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P33_OUTER line before AZL_SPINE_P33_INNER"
+  cat "$out" >&2 || true
+  exit 686
+fi
+if rg -q 'AZL_SPINE_P34_BAD1' "$out" || rg -q 'AZL_SPINE_P34_BAD2' "$out" || rg -q 'AZL_SPINE_P34_BAD3' "$out"; then
+  err "stdout must not contain AZL_SPINE_P34_BAD1, AZL_SPINE_P34_BAD2, or AZL_SPINE_P34_BAD3 (three-level nesting)"
+  cat "$out" >&2 || true
+  exit 687
+fi
+if ! rg -q 'AZL_SPINE_P34_L1' "$out" || ! rg -q 'AZL_SPINE_P34_L2' "$out" || ! rg -q 'AZL_SPINE_P34_L3' "$out"; then
+  err "stdout missing thirty-fourth-interpret markers AZL_SPINE_P34_L1 / L2 / L3"
+  cat "$out" >&2 || true
+  exit 688
+fi
+if ! awk '
+  /AZL_SPINE_P34_L1/ && !a { a = NR }
+  /AZL_SPINE_P34_L2/ && !b { b = NR }
+  /AZL_SPINE_P34_L3/ && !c { c = NR }
+  END { exit !(a && b && c && a < b && b < c) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P34_L1 then L2 then L3 (three nested levels)"
+  cat "$out" >&2 || true
+  exit 689
+fi
+if rg -q 'AZL_SPINE_P35_BAD1' "$out" || rg -q 'AZL_SPINE_P35_BAD2' "$out" || rg -q 'AZL_SPINE_P35_BAD3' "$out" || rg -q 'AZL_SPINE_P35_BAD4' "$out"; then
+  err "stdout must not contain AZL_SPINE_P35_BAD1 through AZL_SPINE_P35_BAD4 (four alternating outcomes)"
+  cat "$out" >&2 || true
+  exit 690
+fi
+if ! rg -q 'AZL_SPINE_P35_A' "$out" || ! rg -q 'AZL_SPINE_P35_B' "$out" || ! rg -q 'AZL_SPINE_P35_C' "$out" || ! rg -q 'AZL_SPINE_P35_D' "$out"; then
+  err "stdout missing thirty-fifth-interpret markers AZL_SPINE_P35_A / B / C / D"
+  cat "$out" >&2 || true
+  exit 691
+fi
+if ! awk '
+  /AZL_SPINE_P35_A/ && !a { a = NR }
+  /AZL_SPINE_P35_B/ && !b { b = NR }
+  /AZL_SPINE_P35_C/ && !c { c = NR }
+  /AZL_SPINE_P35_D/ && !d { d = NR }
+  END { exit !(a && b && c && d && a < b && b < c && c < d) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P35_A then B then C then D (alternating branch sequence)"
+  cat "$out" >&2 || true
+  exit 692
+fi
+if rg -q 'AZL_SPINE_P36_BAD1' "$out" || rg -q 'AZL_SPINE_P36_BAD2' "$out"; then
+  err "stdout must not contain AZL_SPINE_P36_BAD1 or AZL_SPINE_P36_BAD2 (mixed multi-statement then/otherwise)"
+  cat "$out" >&2 || true
+  exit 693
+fi
+if ! rg -q 'AZL_SPINE_P36_A' "$out" || ! rg -q 'AZL_SPINE_P36_B' "$out" || ! rg -q 'AZL_SPINE_P36_C' "$out" || ! rg -q 'AZL_SPINE_P36_D' "$out"; then
+  err "stdout missing thirty-sixth-interpret markers AZL_SPINE_P36_A / B / C / D"
+  cat "$out" >&2 || true
+  exit 694
+fi
+if ! awk '
+  /AZL_SPINE_P36_A/ && !a { a = NR }
+  /AZL_SPINE_P36_B/ && !b { b = NR }
+  /AZL_SPINE_P36_C/ && !c { c = NR }
+  /AZL_SPINE_P36_D/ && !d { d = NR }
+  END { exit !(a && b && c && d && a < b && b < c && c < d) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P36_A then B then C then D (expression then + otherwise)"
+  cat "$out" >&2 || true
+  exit 695
+fi
+if rg -q 'AZL_SPINE_P37_BAD1' "$out" || rg -q 'AZL_SPINE_P37_BAD2' "$out"; then
+  err "stdout must not contain AZL_SPINE_P37_BAD1 or AZL_SPINE_P37_BAD2 (otherwise then inner branch flip)"
+  cat "$out" >&2 || true
+  exit 696
+fi
+if ! rg -q 'AZL_SPINE_P37_OUTER' "$out" || ! rg -q 'AZL_SPINE_P37_INNER' "$out"; then
+  err "stdout missing thirty-seventh-interpret markers AZL_SPINE_P37_OUTER and/or AZL_SPINE_P37_INNER"
+  cat "$out" >&2 || true
+  exit 697
+fi
+if ! awk '
+  /AZL_SPINE_P37_OUTER/ && !o { o = NR }
+  /AZL_SPINE_P37_INNER/ && !i { i = NR }
+  END { exit !(o && i && o < i) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P37_OUTER line before AZL_SPINE_P37_INNER"
+  cat "$out" >&2 || true
+  exit 698
+fi
+if rg -q 'AZL_SPINE_P38_BAD1' "$out" || rg -q 'AZL_SPINE_P38_BAD2' "$out" || rg -q 'AZL_SPINE_P38_BAD3' "$out"; then
+  err "stdout must not contain AZL_SPINE_P38_BAD1, AZL_SPINE_P38_BAD2, or AZL_SPINE_P38_BAD3 (expression after mutation)"
+  cat "$out" >&2 || true
+  exit 699
+fi
+if ! rg -q 'AZL_SPINE_P38_A' "$out" || ! rg -q 'AZL_SPINE_P38_B' "$out" || ! rg -q 'AZL_SPINE_P38_C' "$out"; then
+  err "stdout missing thirty-eighth-interpret markers AZL_SPINE_P38_A / B / C"
+  cat "$out" >&2 || true
+  exit 700
+fi
+if ! awk '
+  /AZL_SPINE_P38_A/ && !a { a = NR }
+  /AZL_SPINE_P38_B/ && !b { b = NR }
+  /AZL_SPINE_P38_C/ && !c { c = NR }
+  END { exit !(a && b && c && a < b && b < c) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P38_A then B then C (sequential == after set)"
+  cat "$out" >&2 || true
+  exit 701
+fi
+if rg -q 'AZL_SPINE_P39_BAD1' "$out" || rg -q 'AZL_SPINE_P39_BAD2' "$out" || rg -q 'AZL_SPINE_P39_BAD3' "$out"; then
+  err "stdout must not contain AZL_SPINE_P39_BAD1, AZL_SPINE_P39_BAD2, or AZL_SPINE_P39_BAD3 (double-nested mixed branches)"
+  cat "$out" >&2 || true
+  exit 702
+fi
+if ! rg -q 'AZL_SPINE_P39_L1' "$out" || ! rg -q 'AZL_SPINE_P39_L2' "$out" || ! rg -q 'AZL_SPINE_P39_L3' "$out"; then
+  err "stdout missing thirty-ninth-interpret markers AZL_SPINE_P39_L1 / L2 / L3"
+  cat "$out" >&2 || true
+  exit 703
+fi
+if ! awk '
+  /AZL_SPINE_P39_L1/ && !a { a = NR }
+  /AZL_SPINE_P39_L2/ && !b { b = NR }
+  /AZL_SPINE_P39_L3/ && !c { c = NR }
+  END { exit !(a && b && c && a < b && b < c) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P39_L1 then L2 then L3 (nested mixed true/false)"
+  cat "$out" >&2 || true
+  exit 704
+fi
+if rg -q 'AZL_SPINE_P40_BAD1' "$out" || rg -q 'AZL_SPINE_P40_BAD2' "$out" || rg -q 'AZL_SPINE_P40_BAD3' "$out" || rg -q 'AZL_SPINE_P40_BAD4' "$out"; then
+  err "stdout must not contain AZL_SPINE_P40_BAD1 through AZL_SPINE_P40_BAD4 (mixed == and flag branch)"
+  cat "$out" >&2 || true
+  exit 705
+fi
+if ! rg -q 'AZL_SPINE_P40_A' "$out" || ! rg -q 'AZL_SPINE_P40_B' "$out" || ! rg -q 'AZL_SPINE_P40_C' "$out" || ! rg -q 'AZL_SPINE_P40_D' "$out"; then
+  err "stdout missing fortieth-interpret markers AZL_SPINE_P40_A / B / C / D"
+  cat "$out" >&2 || true
+  exit 706
+fi
+if ! awk '
+  /AZL_SPINE_P40_A/ && !a { a = NR }
+  /AZL_SPINE_P40_B/ && !b { b = NR }
+  /AZL_SPINE_P40_C/ && !c { c = NR }
+  /AZL_SPINE_P40_D/ && !d { d = NR }
+  END { exit !(a && b && c && d && a < b && b < c && c < d) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P40_A then B then C then D (expression + flag + re-read ::azl_spine_p40)"
+  cat "$out" >&2 || true
+  exit 707
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"

@@ -33,6 +33,14 @@
 #   - thirtieth emit interpret — multi-statement then on `== 1` then second if `== 2` false → otherwise C; P30_A then P30_B then P30_C; P30_BAD1 and P30_BAD2 must not run.
 #   - thirty-first emit interpret — evaluated outer true; nested `if ( true )` multi-statement then; P31_OUTER then P31_A then P31_B; P31_BAD1 and P31_BAD2 must not run.
 #   - thirty-second emit interpret — evaluated outer false; nested `if ( false )` multi-statement otherwise; P32_OUTER then P32_A then P32_B; P32_BAD1 and P32_BAD2 must not run.
+#   - thirty-third emit interpret — outer `== 1` then nested `== 2` false → INNER; P33_OUTER then P33_INNER; P33_BAD1 and P33_BAD2 must not run.
+#   - thirty-fourth emit interpret — three nested levels (L1/L2/L3); P34_BAD1/BAD2/BAD3 must not run.
+#   - thirty-fifth emit interpret — four alternating if outcomes on ::azl_spine_p35 (A/B/C/D); P35_BAD1–BAD4 must not run.
+#   - thirty-sixth emit interpret — expression multi-statement then (`== 2`) then second if `== 3` false → multi-statement otherwise; P36_A through P36_D in order; BAD1/BAD2 must not run.
+#   - thirty-seventh emit interpret — outer otherwise with OUTER say then set true then inner if; P37_OUTER then P37_INNER; BAD1/BAD2 must not run.
+#   - thirty-eighth emit interpret — mutate ::azl_spine_p38 then `== 1` / `== 2` branches in sequence; P38_A then P38_B then P38_C; BAD1–BAD3 must not run.
+#   - thirty-ninth emit interpret — double-nested mixed true/false (L1 → inner otherwise → L2 → inner then → L3); P39_BAD1/BAD2/BAD3 must not run.
+#   - fortieth emit interpret — mixed `== 5` / `== 6` / `::azl_spine_p40_flag` / `== 5` again; P40_A then B then C then D; BAD1–BAD4 must not run.
 
 component ::azl.spine.behavior.entry {
   init {
@@ -125,6 +133,58 @@ say 'AZL_SPINE_P32_OUTER'
 if ( false ) { say 'AZL_SPINE_P32_BAD2' } otherwise { say 'AZL_SPINE_P32_A'
 say 'AZL_SPINE_P32_B' }
 }", component_name: "smoke32" }
+    emit interpret with { code: "set ::azl_spine_p33 = 1
+if ( ::azl_spine_p33 == 1 ) {
+say 'AZL_SPINE_P33_OUTER'
+if ( ::azl_spine_p33 == 2 ) { say 'AZL_SPINE_P33_BAD1' } otherwise { say 'AZL_SPINE_P33_INNER' }
+} otherwise { say 'AZL_SPINE_P33_BAD2' }", component_name: "smoke33" }
+    emit interpret with { code: "set ::azl_spine_p34 = true
+if ( ::azl_spine_p34 ) {
+say 'AZL_SPINE_P34_L1'
+if ( true ) {
+say 'AZL_SPINE_P34_L2'
+if ( true ) { say 'AZL_SPINE_P34_L3' } otherwise { say 'AZL_SPINE_P34_BAD1' }
+} otherwise { say 'AZL_SPINE_P34_BAD2' }
+} otherwise { say 'AZL_SPINE_P34_BAD3' }", component_name: "smoke34" }
+    emit interpret with { code: "set ::azl_spine_p35 = true
+if ( ::azl_spine_p35 ) { say 'AZL_SPINE_P35_A' } otherwise { say 'AZL_SPINE_P35_BAD1' }
+set ::azl_spine_p35 = false
+if ( ::azl_spine_p35 ) { say 'AZL_SPINE_P35_BAD2' } otherwise { say 'AZL_SPINE_P35_B' }
+set ::azl_spine_p35 = false
+if ( ::azl_spine_p35 ) { say 'AZL_SPINE_P35_BAD3' } otherwise { say 'AZL_SPINE_P35_C' }
+set ::azl_spine_p35 = true
+if ( ::azl_spine_p35 ) { say 'AZL_SPINE_P35_D' } otherwise { say 'AZL_SPINE_P35_BAD4' }", component_name: "smoke35" }
+    emit interpret with { code: "set ::azl_spine_p36 = 2
+if ( ::azl_spine_p36 == 2 ) { say 'AZL_SPINE_P36_A'
+say 'AZL_SPINE_P36_B' } otherwise { say 'AZL_SPINE_P36_BAD1' }
+if ( ::azl_spine_p36 == 3 ) { say 'AZL_SPINE_P36_BAD2' } otherwise { say 'AZL_SPINE_P36_C'
+say 'AZL_SPINE_P36_D' }", component_name: "smoke36" }
+    emit interpret with { code: "set ::azl_spine_p37 = false
+if ( ::azl_spine_p37 ) { say 'AZL_SPINE_P37_BAD1' } otherwise {
+say 'AZL_SPINE_P37_OUTER'
+set ::azl_spine_p37 = true
+if ( ::azl_spine_p37 ) { say 'AZL_SPINE_P37_INNER' } otherwise { say 'AZL_SPINE_P37_BAD2' }
+}", component_name: "smoke37" }
+    emit interpret with { code: "set ::azl_spine_p38 = 1
+if ( ::azl_spine_p38 == 1 ) { say 'AZL_SPINE_P38_A' } otherwise { say 'AZL_SPINE_P38_BAD1' }
+set ::azl_spine_p38 = 2
+if ( ::azl_spine_p38 == 1 ) { say 'AZL_SPINE_P38_BAD2' } otherwise { say 'AZL_SPINE_P38_B' }
+set ::azl_spine_p38 = 2
+if ( ::azl_spine_p38 == 2 ) { say 'AZL_SPINE_P38_C' } otherwise { say 'AZL_SPINE_P38_BAD3' }", component_name: "smoke38" }
+    emit interpret with { code: "set ::azl_spine_p39 = true
+if ( ::azl_spine_p39 ) {
+say 'AZL_SPINE_P39_L1'
+if ( false ) { say 'AZL_SPINE_P39_BAD1' } otherwise {
+say 'AZL_SPINE_P39_L2'
+if ( true ) { say 'AZL_SPINE_P39_L3' } otherwise { say 'AZL_SPINE_P39_BAD2' }
+}
+} otherwise { say 'AZL_SPINE_P39_BAD3' }", component_name: "smoke39" }
+    emit interpret with { code: "set ::azl_spine_p40 = 5
+if ( ::azl_spine_p40 == 5 ) { say 'AZL_SPINE_P40_A' } otherwise { say 'AZL_SPINE_P40_BAD1' }
+if ( ::azl_spine_p40 == 6 ) { say 'AZL_SPINE_P40_BAD2' } otherwise { say 'AZL_SPINE_P40_B' }
+set ::azl_spine_p40_flag = true
+if ( ::azl_spine_p40_flag ) { say 'AZL_SPINE_P40_C' } otherwise { say 'AZL_SPINE_P40_BAD3' }
+if ( ::azl_spine_p40 == 5 ) { say 'AZL_SPINE_P40_D' } otherwise { say 'AZL_SPINE_P40_BAD4' }", component_name: "smoke40" }
     say "AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT"
   }
 }
