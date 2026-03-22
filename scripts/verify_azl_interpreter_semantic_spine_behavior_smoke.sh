@@ -4,11 +4,11 @@
 # runs tools/azl_runtime_spine_host.py with AZL_ENTRY=azl.spine.behavior.entry, asserts the full in-file chain:
 # interpret → tokenize → parse → execute (say line) → execute_complete listener (Interpretation complete:).
 # Harness: two interpret emits (same code) so the second pass hits in-file tok_cache + ast_cache; third–fifth
-# emits run multi-line embedded code (two, three, then four say statements) for more azl_interpreter.azl surface.
+# emits run multi-line embedded say depth; sixth is another single-line literal say (smoke6) for an extra full interpret round.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–560).
+# See docs/ERROR_SYSTEM.md (exits 548–561).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -93,8 +93,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=5)}' "$out"; then
-  err "stdout expected >=5 \"Interpretation complete:\" lines (harness five emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=6)}' "$out"; then
+  err "stdout expected >=6 \"Interpretation complete:\" lines (harness six emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -117,6 +117,11 @@ if ! rg -q 'Q5a' "$out" || ! rg -q 'Q5b' "$out" || ! rg -q 'Q5c' "$out" || ! rg 
   err "stdout missing fifth-interpret four-line say markers Q5a / Q5b / Q5c / Q5d (compact: spine ::ast.nodes Var.v 255-byte budget)"
   cat "$out" >&2 || true
   exit 560
+fi
+if ! rg -q 'AZL_S6_ONLY' "$out"; then
+  err "stdout missing sixth-interpret literal say marker AZL_S6_ONLY"
+  cat "$out" >&2 || true
+  exit 561
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"
