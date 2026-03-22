@@ -365,11 +365,8 @@ static int parse_one_code_obj(J *j, AzlBytecodeInstr *ins) {
     ins->a = ev;
     ins->b = ky;
     ins->c = vl;
-  } else if (strcmp(opname, "call") == 0) {
-    ins->op = AZL_OP_CALL;
-    if (!have_ev)
-      return -1;
-    ins->a = ev;
+  } else if (strcmp(opname, "call") == 0 || strcmp(opname, "listen") == 0) {
+    return -1;
   } else if (strcmp(opname, "store_var") == 0) {
     ins->op = AZL_OP_STORE_VAR;
     if (!have_slot)

@@ -38,7 +38,8 @@ int azl_bytecode_load_json(const char *json, size_t json_len, AzlBytecodeProgram
                            size_t errbuf_sz);
 
 /* Execute program: operand stack + locals; OP_EMIT -> azl_engine_emit; OP_HALT stops;
- * OP_JUMP / OP_JUMP_IF_FALSE use instruction indices (pc may equal ncode to stop); OP_EQ needs true/false const indices. */
+ * OP_JUMP / OP_JUMP_IF_FALSE use instruction indices (pc may equal ncode to stop); OP_EQ needs true/false const indices.
+ * Opcodes 4–5 are rejected (see AzlOpcode AZL_OP_REJECTED_LEGACY_*); JSON loader rejects "call"/"listen" op names. */
 AzlErr azl_vm_exec_block(AzlEngine *eng, const AzlBytecodeProgram *prog);
 
 /* Run JSON hello-world bundle test; returns 0 on success. */

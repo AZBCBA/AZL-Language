@@ -857,10 +857,11 @@ AzlErr azl_vm_exec_block(AzlEngine *eng, const AzlBytecodeProgram *prog) {
     case AZL_OP_HALT:
       return AZL_OK;
     case AZL_OP_NOP:
-    case AZL_OP_LISTEN:
-    case AZL_OP_CALL:
       pc++;
       break;
+    case AZL_OP_REJECTED_LEGACY_4:
+    case AZL_OP_REJECTED_LEGACY_5:
+      return AZL_ERR_INVALID;
     case AZL_OP_LOAD_CONST:
       if (in->a >= prog->nconst)
         return AZL_ERR_INVALID;

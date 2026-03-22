@@ -55,8 +55,9 @@ typedef enum AzlOpcode {
   AZL_OP_HALT = 1,
   AZL_OP_LOAD_CONST = 2,
   AZL_OP_EMIT = 3,
-  AZL_OP_CALL = 4,
-  AZL_OP_LISTEN = 5,
+  /* Numeric 4–5 are rejected by azl_vm_exec_block and by the JSON loader (not language support). */
+  AZL_OP_REJECTED_LEGACY_4 = 4,
+  AZL_OP_REJECTED_LEGACY_5 = 5,
   AZL_OP_STORE_VAR = 6,
   AZL_OP_LOAD_VAR = 7,
   AZL_OP_JUMP = 8,

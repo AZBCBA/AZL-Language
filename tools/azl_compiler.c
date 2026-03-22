@@ -1,4 +1,5 @@
-/* Minimal AZL scanner + recursive-descent compiler → AzlBytecodeProgram (no JSON). */
+/* Minimal AZL scanner + recursive-descent compiler → AzlBytecodeProgram (no JSON).
+ * Supported statements: emit, set, if/else only (listen/for are not compiled here). */
 #define _GNU_SOURCE
 #include "azl_compiler.h"
 
@@ -159,10 +160,6 @@ static void lex_next(Lex *L, Tok *t) {
     t->text[w] = '\0';
     if (strcmp(t->text, "emit") == 0)
       t->k = TK_EMIT;
-    else if (strcmp(t->text, "listen") == 0)
-      t->k = TK_LISTEN;
-    else if (strcmp(t->text, "for") == 0)
-      t->k = TK_FOR;
     else if (strcmp(t->text, "set") == 0)
       t->k = TK_SET;
     else if (strcmp(t->text, "if") == 0)
