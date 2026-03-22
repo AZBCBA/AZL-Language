@@ -4502,6 +4502,31 @@ if [ "$F141_C_OUT" != "$F141_PY_OUT" ]; then
   exit 526
 fi
 
+echo "[gate] F142: C vs Python — preloop import|+link| then component| + six memory|emit|… (bare/with ×3) + component| + memory|say|"
+F142EX="${ROOT_DIR}/azl/tests/p0_semantic_execute_ast_preloop_component_memory_hexa_mixed_bare_with_bare_with_bare_with_emit_component_say.azl"
+F142_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F142EX" boot.entry 2>&1)"
+f142_c_rc=$?
+if [ "$f142_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_ast_preloop_component_memory_hexa_mixed_bare_with_bare_with_bare_with_emit_component_say exited $f142_c_rc: $F142_C_OUT"
+  exit 527
+fi
+if ! printf '%s\n' "$F142_C_OUT" | awk 'NR==1{if($0!="F142_TREE")exit 1} NR==2{if($0!="P142_LINK_SID")exit 1} NR==3{if($0!="P142_A")exit 1} NR==4{if($0!="F142_BARE_1")exit 1} NR==5{if($0!="F142_PA")exit 1} NR==6{if($0!="F142_BARE_3")exit 1} NR==7{if($0!="F142_PB")exit 1} NR==8{if($0!="F142_BARE_5")exit 1} NR==9{if($0!="F142_PC")exit 1} NR==10{if($0!="P142_B")exit 1} NR==11{if($0!="F142_MEM")exit 1} NR==12{if($0!="i")exit 1} NR==13{if($0!="EX142_POST")exit 1} NR==14{if($0!="Said: F142_MEM")exit 1} NR==15{if($0!="EC142_INNER")exit 1} NR==16{if($0!="Said: F142_MEM")exit 1} NR==17{if($0!="P0_SEM_F142_OK")exit 1} END{if(NR!=17)exit 1}'; then
+  echo "ERROR: expected F142 preloop + component| + hexa bare/with memory|emit + component| + memory|say stdout (17 lines), got: $F142_C_OUT"
+  exit 527
+fi
+F142_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F142EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f142_py_rc=$?
+if [ "$f142_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_ast_preloop_component_memory_hexa_mixed_bare_with_bare_with_bare_with_emit_component_say exited $f142_py_rc: $F142_PY_OUT"
+  exit 528
+fi
+if [ "$F142_C_OUT" != "$F142_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_ast_preloop_component_memory_hexa_mixed_bare_with_bare_with_bare_with_emit_component_say" >&2
+  echo "C:  $F142_C_OUT" >&2
+  echo "Py: $F142_PY_OUT" >&2
+  exit 529
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

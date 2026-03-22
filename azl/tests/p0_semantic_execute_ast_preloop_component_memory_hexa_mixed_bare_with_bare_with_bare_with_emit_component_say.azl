@@ -1,0 +1,82 @@
+# Gate F142: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **six** **`memory|emit|…`** rows (**bare** / **`with`** / **bare** / **`with`** / **bare** / **`with`**, FIFO), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset. Short **`import|i`** and **`e1`…`e6`** event names keep **`::ast.nodes`** within minimal **255-byte** bound.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p142.linked {
+  init {
+    say "P142_LINK_SID"
+  }
+}
+
+component ::p142.a {
+  init {
+    say "P142_A"
+  }
+}
+
+component ::p142.b {
+  init {
+    say "P142_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p142_comp_hexa_bare_with_bare_with_bare_with_emit_comp with { ast: "f142-root", scope: "f142-sc", nodes: "import|i
+link|::p142.linked
+component|p142.a
+memory|emit|e1
+memory|emit|e2|with|a|F142_PA
+memory|emit|e3
+memory|emit|e4|with|b|F142_PB
+memory|emit|e5
+memory|emit|e6|with|c|F142_PC
+component|p142.b
+memory|say|F142_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC142_INNER"
+      say ::event.data.result
+      say "P0_SEM_F142_OK"
+    }
+    listen for "e1" {
+      say "F142_BARE_1"
+    }
+    listen for "e2" {
+      say ::event.data.a
+    }
+    listen for "e3" {
+      say "F142_BARE_3"
+    }
+    listen for "e4" {
+      say ::event.data.b
+    }
+    listen for "e5" {
+      say "F142_BARE_5"
+    }
+    listen for "e6" {
+      say ::event.data.c
+    }
+    listen for "p142_comp_hexa_bare_with_bare_with_bare_with_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F142_VM_ON_BAD"
+        return
+      }
+      say "F142_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX142_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}
