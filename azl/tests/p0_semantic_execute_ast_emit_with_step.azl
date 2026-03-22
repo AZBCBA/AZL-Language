@@ -1,0 +1,38 @@
+# Gate F96: `::execute_ast` — `emit|event|with|key|value` queues emit with one payload field (minimal pipe encoding; mirrors `emit … with { }` binding). `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p96_emit_with_tree with { ast: "f96-root", scope: "f96-sc", nodes: "say|F96_A
+emit|f96_inner|with|f96_slot|F96_PAYLOAD" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC96_INNER"
+      say ::event.data.result
+      say "P0_SEM_F96_OK"
+    }
+    listen for "f96_inner" {
+      say ::event.data.f96_slot
+    }
+    listen for "p96_emit_with_tree" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F96_VM_ON_BAD"
+        return
+      }
+      say "F96_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say "EX96_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

@@ -1,0 +1,42 @@
+# Gate F119: `::execute_ast` — two stacked `memory|listen|ev|say|…` stubs, then `memory|emit|ev1`, `memory|emit|ev2`, then `memory|say|…` (source order). `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p119_memory_listen_stack with { ast: "f119-root", scope: "f119-sc", nodes: "import|f119_mod_tag
+say|F119_TOP
+memory|listen|f119_e1|say|F119_STUB_ONE
+memory|listen|f119_e2|say|F119_STUB_TWO
+memory|emit|f119_e1
+memory|emit|f119_e2
+memory|say|F119_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC119_INNER"
+      say ::event.data.result
+      say "P0_SEM_F119_OK"
+    }
+    listen for "p119_memory_listen_stack" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F119_VM_ON_BAD"
+        return
+      }
+      say "F119_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX119_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

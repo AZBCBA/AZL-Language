@@ -1,0 +1,45 @@
+# Gate F113: `::execute_ast` — preloop `import|` + `link|` then main-loop `say|` then `memory|say|…` (ordering between F98 preloop and memory section). `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p113.linked {
+  init {
+    say "P113_LINK_SID"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p113_preloop_say_memory with { ast: "f113-root", scope: "f113-sc", nodes: "import|f113_mod_tag
+link|::p113.linked
+say|F113_TOP
+memory|say|F113_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC113_INNER"
+      say ::event.data.result
+      say "P0_SEM_F113_OK"
+    }
+    listen for "p113_preloop_say_memory" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F113_VM_ON_BAD"
+        return
+      }
+      say "F113_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX113_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

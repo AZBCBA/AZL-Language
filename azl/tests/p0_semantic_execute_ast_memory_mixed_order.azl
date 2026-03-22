@@ -1,0 +1,40 @@
+# Gate F109: `::execute_ast` — mixed `memory|` rows: `set` then `emit` (drains) then `memory|say|…`; global from `set` visible after walk; stdout order matches source. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p109_memory_mixed with { ast: "f109-root", scope: "f109-sc", nodes: "memory|set|::f109_slot|F109_CELL
+memory|emit|f109_inner
+memory|say|F109_AFTER" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC109_INNER"
+      say ::event.data.result
+      say "P0_SEM_F109_OK"
+    }
+    listen for "f109_inner" {
+      say "F109_INNER_BODY"
+    }
+    listen for "p109_memory_mixed" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F109_VM_ON_BAD"
+        return
+      }
+      say "F109_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::f109_slot
+      say "EX109_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

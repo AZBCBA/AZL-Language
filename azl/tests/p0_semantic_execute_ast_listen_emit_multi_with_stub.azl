@@ -1,0 +1,40 @@
+# Gate F103: `::execute_ast` — `listen|ev|emit|inner|with|k1|v1|k2|v2` stub (multi-pair tail; mirrors F97 direct emit). `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p103_stub_multi_tree with { ast: "f103-root", scope: "f103-sc", nodes: "listen|f103_chain|emit|f103_inner|with|f103_k1|F103_ONE|f103_k2|F103_TWO
+emit|f103_chain
+say|F103_TAIL" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC103_INNER"
+      say ::event.data.result
+      say "P0_SEM_F103_OK"
+    }
+    listen for "f103_inner" {
+      say ::event.data.f103_k1
+      say ::event.data.f103_k2
+    }
+    listen for "p103_stub_multi_tree" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F103_VM_ON_BAD"
+        return
+      }
+      say "F103_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say "EX103_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

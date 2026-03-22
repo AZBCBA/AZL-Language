@@ -1,0 +1,43 @@
+# Gate F116: `::execute_ast` — `memory|listen|ev|emit|…|with|k|v` stub (F102-shaped under `memory|`), then `memory|emit|ev` drains; token listener on inner event reads payload; trailing `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p116_memory_listen_with_tree with { ast: "f116-root", scope: "f116-sc", nodes: "import|f116_mod_tag
+say|F116_TOP
+memory|listen|f116_mem|emit|f116_nested|with|msg|F116_PAYLOAD
+memory|emit|f116_mem
+memory|say|F116_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC116_INNER"
+      say ::event.data.result
+      say "P0_SEM_F116_OK"
+    }
+    listen for "f116_nested" {
+      say ::event.data.msg
+    }
+    listen for "p116_memory_listen_with_tree" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F116_VM_ON_BAD"
+        return
+      }
+      say "F116_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX116_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

@@ -6,7 +6,9 @@
  * Usage: azl_interpreter_minimal <file.azl> [entry_component]
  * Env: AZL_COMBINED_PATH, AZL_ENTRY
  *
- * emit ... with { k: v } binds ::event.data.<k> per queued event (see azl/tests/p0_semantic_*.azl, gates F10-F87).
+ * emit ... with { k: v } binds ::event.data.<k> per queued event (see azl/tests/p0_semantic_*.azl, gates F10-F122).
+ * Expression if-conditions: or, && (short-circuit; each && arm is ==/!=/sum; truth is true/1 only), ==, !=, +, -, :: paths.
+ * for-in inside if { } is allowed when g_listener_nesting > 0 (listener context); still forbidden in component init { }.
  * return exits the current listener body (including from inside if { }); return in init skips rest of init.
  */
 
@@ -51,8 +53,113 @@ static int g_nlisteners;
 static QueuedEvent g_event_queue[MAX_EVENTS];
 static int g_queue_head, g_queue_tail;
 
+static void queue_push_event(const char *ev, const PayloadKV *kv, int nkv);
+static void process_events(void);
+static void var_set(const char *k, const char *v);
+
 static int g_listener_nesting = 0;
 static int g_listener_break = 0;
+
+/* execute_ast listen|event|say|… / emit|… / set|… — stub listeners (F99–F102); cleared each execute_ast walk */
+#define MAX_EXECUTE_AST_STUB_LISTENERS 8
+#define EXEC_AST_STUB_SAY 0
+#define EXEC_AST_STUB_EMIT 1
+#define EXEC_AST_STUB_SET 2
+typedef struct {
+  char event[64];
+  int kind; /* EXEC_AST_STUB_SAY, EMIT, or SET */
+  char body[256]; /* say text, bare emit target, or set value */
+  char set_key[64]; /* ::global for SET; empty for say/emit */
+  int emit_npayload; /* 0 = bare emit; else use emit_payload[0..emit_npayload) */
+  PayloadKV emit_payload[MAX_PAYLOAD_KEYS];
+} ExecAstStubListen;
+static ExecAstStubListen g_exec_ast_stubs[MAX_EXECUTE_AST_STUB_LISTENERS];
+static int g_n_exec_ast_stubs;
+
+static void exec_ast_stubs_reset(void) { g_n_exec_ast_stubs = 0; }
+
+static int exec_ast_stub_register(const char *ev, int kind, const char *body) {
+  if (!ev || !ev[0] || !body || !body[0]) return -1;
+  if (kind == EXEC_AST_STUB_EMIT && strchr(body, '|') != NULL) return -1;
+  for (int i = 0; i < g_n_exec_ast_stubs; i++)
+    if (strcmp(g_exec_ast_stubs[i].event, ev) == 0) return 0; /* first wins */
+  if (g_n_exec_ast_stubs >= MAX_EXECUTE_AST_STUB_LISTENERS) return -1;
+  (void)snprintf(g_exec_ast_stubs[g_n_exec_ast_stubs].event,
+                 sizeof(g_exec_ast_stubs[g_n_exec_ast_stubs].event), "%s", ev);
+  g_exec_ast_stubs[g_n_exec_ast_stubs].kind = kind;
+  (void)snprintf(g_exec_ast_stubs[g_n_exec_ast_stubs].body,
+                 sizeof(g_exec_ast_stubs[g_n_exec_ast_stubs].body), "%s", body);
+  g_exec_ast_stubs[g_n_exec_ast_stubs].set_key[0] = '\0';
+  g_exec_ast_stubs[g_n_exec_ast_stubs].emit_npayload = 0;
+  g_n_exec_ast_stubs++;
+  return 0;
+}
+
+static int exec_ast_stub_register_emit_with(const char *ev, const char *target, const PayloadKV *pay, int npay) {
+  if (!ev || !ev[0] || !target || !target[0] || strchr(target, '|') != NULL) return -1;
+  if (!pay || npay <= 0 || npay > MAX_PAYLOAD_KEYS) return -1;
+  for (int i = 0; i < g_n_exec_ast_stubs; i++)
+    if (strcmp(g_exec_ast_stubs[i].event, ev) == 0) return 0;
+  if (g_n_exec_ast_stubs >= MAX_EXECUTE_AST_STUB_LISTENERS) return -1;
+  (void)snprintf(g_exec_ast_stubs[g_n_exec_ast_stubs].event,
+                 sizeof(g_exec_ast_stubs[g_n_exec_ast_stubs].event), "%s", ev);
+  g_exec_ast_stubs[g_n_exec_ast_stubs].kind = EXEC_AST_STUB_EMIT;
+  (void)snprintf(g_exec_ast_stubs[g_n_exec_ast_stubs].body,
+                 sizeof(g_exec_ast_stubs[g_n_exec_ast_stubs].body), "%s", target);
+  g_exec_ast_stubs[g_n_exec_ast_stubs].set_key[0] = '\0';
+  g_exec_ast_stubs[g_n_exec_ast_stubs].emit_npayload = npay;
+  for (int j = 0; j < npay; j++) {
+    (void)snprintf(
+        g_exec_ast_stubs[g_n_exec_ast_stubs].emit_payload[j].key,
+        sizeof(g_exec_ast_stubs[g_n_exec_ast_stubs].emit_payload[j].key), "%.*s",
+        (int)(sizeof(g_exec_ast_stubs[0].emit_payload[0].key) - 1U), pay[j].key);
+    (void)snprintf(g_exec_ast_stubs[g_n_exec_ast_stubs].emit_payload[j].v,
+                   sizeof(g_exec_ast_stubs[g_n_exec_ast_stubs].emit_payload[j].v), "%.*s",
+                   (int)(sizeof(g_exec_ast_stubs[0].emit_payload[0].v) - 1U), pay[j].v);
+  }
+  g_n_exec_ast_stubs++;
+  return 0;
+}
+
+static int exec_ast_stub_register_set(const char *ev, const char *gkey, const char *gval) {
+  if (!ev || !ev[0] || !gkey || gkey[0] != ':' || gkey[1] != ':' || !gval) return -1;
+  for (int i = 0; i < g_n_exec_ast_stubs; i++)
+    if (strcmp(g_exec_ast_stubs[i].event, ev) == 0) return 0;
+  if (g_n_exec_ast_stubs >= MAX_EXECUTE_AST_STUB_LISTENERS) return -1;
+  (void)snprintf(g_exec_ast_stubs[g_n_exec_ast_stubs].event,
+                 sizeof(g_exec_ast_stubs[g_n_exec_ast_stubs].event), "%s", ev);
+  g_exec_ast_stubs[g_n_exec_ast_stubs].kind = EXEC_AST_STUB_SET;
+  (void)snprintf(g_exec_ast_stubs[g_n_exec_ast_stubs].set_key,
+                 sizeof(g_exec_ast_stubs[g_n_exec_ast_stubs].set_key), "%s", gkey);
+  (void)snprintf(g_exec_ast_stubs[g_n_exec_ast_stubs].body,
+                 sizeof(g_exec_ast_stubs[g_n_exec_ast_stubs].body), "%s", gval ? gval : "");
+  g_exec_ast_stubs[g_n_exec_ast_stubs].emit_npayload = 0;
+  g_n_exec_ast_stubs++;
+  return 0;
+}
+
+static int exec_ast_stub_dispatch(const char *ev) {
+  if (!ev || !ev[0]) return 0;
+  for (int i = 0; i < g_n_exec_ast_stubs; i++) {
+    if (strcmp(g_exec_ast_stubs[i].event, ev) != 0) continue;
+    if (g_exec_ast_stubs[i].kind == EXEC_AST_STUB_EMIT) {
+      char evn[64];
+      (void)snprintf(evn, sizeof(evn), "%s", g_exec_ast_stubs[i].body);
+      int nk = g_exec_ast_stubs[i].emit_npayload;
+      const PayloadKV *pkv = (nk > 0) ? g_exec_ast_stubs[i].emit_payload : NULL;
+      queue_push_event(evn, pkv, nk);
+      process_events();
+    } else if (g_exec_ast_stubs[i].kind == EXEC_AST_STUB_SET) {
+      var_set(g_exec_ast_stubs[i].set_key, g_exec_ast_stubs[i].body);
+    } else {
+      fputs(g_exec_ast_stubs[i].body, stdout);
+      fputc('\n', stdout);
+      fflush(stdout);
+    }
+    return 1;
+  }
+  return 0;
+}
 
 static void skip_whitespace_and_comments(const char **p) {
   for (;;) {
@@ -106,6 +213,14 @@ static int tokenize(void) {
       char *s = malloc(3);
       if (!s) return -1;
       s[0] = '!'; s[1] = '='; s[2] = '\0';
+      g_tok[g_ntok++] = s;
+      p += 2;
+      continue;
+    }
+    if (*p == '&' && p[1] == '&') {
+      char *s = malloc(3);
+      if (!s) return -1;
+      s[0] = '&'; s[1] = '&'; s[2] = '\0';
       g_tok[g_ntok++] = s;
       p += 2;
       continue;
@@ -275,7 +390,6 @@ static void exec_link(int *i);
 static void run_linked_component(const char *link_target);
 static void exec_if(int *i);
 static int eval_expr(int *i, char *out, size_t outsz);
-static void process_events(void);
 static void exec_listen(int *i);
 static void exec_block_impl(int start, int end, int preserve_listener_break_exit);
 
@@ -421,6 +535,7 @@ static int push_obj_value_uint_str(const char *vt) {
 
 /* Parse `{ type: "…", value: "…", line: N, column: M }` for .push → tz|…|…|…|… */
 static int parse_push_tz_object(int *i, char *seg, size_t seg_sz) {
+  if (!seg || seg_sz == 0) return -1;
   if (*i >= g_ntok || strcmp(g_tok[*i], "{") != 0) return -1;
   (*i)++;
   char ty[96] = {0}, vl[96] = {0}, ln[48] = {0}, col[48] = {0};
@@ -497,7 +612,17 @@ static int parse_push_tz_object(int *i, char *seg, size_t seg_sz) {
   tz_esc_field_c(vl, ev, sizeof(ev));
   tz_esc_field_c(ln, el, sizeof(el));
   tz_esc_field_c(col, ec, sizeof(ec));
-  (void)snprintf(seg, seg_sz, "tz|%s|%s|%s|%s", et, ev, el, ec);
+  /* Worst-case escaped row can exceed seg (Var.v is 256); format into scratch to avoid
+   * -Wformat-truncation, then copy — matches Python joined[:255] truncation at var_set. */
+  char enc[512];
+  int nw = snprintf(enc, sizeof(enc), "tz|%s|%s|%s|%s", et, ev, el, ec);
+  if (nw < 0 || (size_t)nw >= sizeof(enc))
+    return -1;
+  size_t take = (size_t)nw;
+  if (take >= seg_sz)
+    take = seg_sz - 1U;
+  memcpy(seg, enc, take);
+  seg[take] = '\0';
   return 0;
 }
 
@@ -527,6 +652,8 @@ static int values_eq(int l_nullish, const char *l, int r_nullish, const char *r)
   return strcmp(l, r) == 0;
 }
 
+static int cond_is_true(const char *s);
+
 static int eval_primary(int *i, char *out, size_t outsz, int *nullish);
 static int eval_sum(int *i, char *out, size_t outsz, int *nullish_out);
 
@@ -550,15 +677,44 @@ static int eval_eq(int *i, char *out, size_t outsz, int *nullish_out) {
   return 0;
 }
 
+static int eval_and(int *i, char *out, size_t outsz, int *nullish_out) {
+  char acc[256];
+  int acc_n = 0;
+  if (eval_eq(i, acc, sizeof(acc), &acc_n) != 0) return -1;
+  while (*i < g_ntok && strcmp(g_tok[*i], "&&") == 0) {
+    (*i)++;
+    if (!cond_is_true(acc)) {
+      char dummy[256];
+      int dn = 0;
+      if (eval_eq(i, dummy, sizeof(dummy), &dn) != 0) return -1;
+      while (*i < g_ntok && strcmp(g_tok[*i], "&&") == 0) {
+        (*i)++;
+        if (eval_eq(i, dummy, sizeof(dummy), &dn) != 0) return -1;
+      }
+      (void)snprintf(out, outsz, "false");
+      *nullish_out = 0;
+      return 0;
+    }
+    char next[256];
+    int nn = 0;
+    if (eval_eq(i, next, sizeof(next), &nn) != 0) return -1;
+    (void)snprintf(acc, sizeof(acc), "%s", next);
+    acc_n = nn;
+  }
+  (void)snprintf(out, outsz, "%s", acc);
+  *nullish_out = acc_n;
+  return 0;
+}
+
 static int eval_or(int *i, char *out, size_t outsz) {
   char acc[256];
   int acc_nullish = 0;
-  if (eval_eq(i, acc, sizeof(acc), &acc_nullish) != 0) return -1;
+  if (eval_and(i, acc, sizeof(acc), &acc_nullish) != 0) return -1;
   while (*i < g_ntok && strcmp(g_tok[*i], "or") == 0) {
     (*i)++;
     char next[256];
     int nn = 0;
-    if (eval_eq(i, next, sizeof(next), &nn) != 0) return -1;
+    if (eval_and(i, next, sizeof(next), &nn) != 0) return -1;
     int use_right = (acc_nullish || acc[0] == '\0');
     if (use_right) {
       (void)snprintf(acc, sizeof(acc), "%s", next);
@@ -918,6 +1074,330 @@ static int lhs_is_var_push_call(const char *k, char *base_out, size_t base_sz) {
   return bl >= 3U ? 1 : 0;
 }
 
+/* Spine builtins: ::vm_compile_ast(::ast) sets ::vc.ok / ::vc.error / ::vc.bytecode (mirrors azl_interpreter.azl execute VM branch). */
+static void builtin_vm_compile_ast_apply(const char *ast_in) {
+  var_set("::vc.ok", "false");
+  var_set("::vc.error", "");
+  var_set("::vc.bytecode", "");
+  const char *a = ast_in ? ast_in : "";
+  if (strcmp(a, "F90_VM_OK") == 0) {
+    var_set("::vc.ok", "true");
+    var_set("::vc.bytecode", "BC");
+  } else if (strcmp(a, "F91_VM_BAD") == 0) {
+    var_set("::vc.ok", "false");
+    var_set("::vc.error", "compile_failed");
+  } else if (strcmp(a, "F92_VM_EMPTY") == 0) {
+    var_set("::vc.ok", "true");
+    var_set("::vc.bytecode", "");
+  } else {
+    var_set("::vc.ok", "false");
+    var_set("::vc.error", "unknown_ast");
+  }
+}
+
+static int rhs_vm_compile_ast_consume(int *i, char *ast_out, size_t ast_sz) {
+  ast_out[0] = '\0';
+  if (*i >= g_ntok) return -1;
+  const char *a = g_tok[*i];
+  if (a && a[0] == ':' && a[1] == ':') {
+    const char *vv = var_get(a);
+    (void)snprintf(ast_out, ast_sz, "%s", vv ? vv : "");
+    (*i)++;
+    return 0;
+  }
+  if (a && strlen(a) >= 2U && (a[0] == '"' || a[0] == '\'')) {
+    if (unescape_azl_string_token(a, ast_out, ast_sz) < 0) return -1;
+    (*i)++;
+    return 0;
+  }
+  return -1;
+}
+
+static int rhs_vm_run_bytecode_consume(int *i, char *bc_out, size_t bc_sz) {
+  bc_out[0] = '\0';
+  if (*i >= g_ntok) return -1;
+  const char *a = g_tok[*i];
+  if (a && a[0] == ':' && a[1] == ':') {
+    const char *vv = var_get(a);
+    (void)snprintf(bc_out, bc_sz, "%s", vv ? vv : "");
+    (*i)++;
+    return 0;
+  }
+  return -1;
+}
+
+static void builtin_vm_run_bytecode_into(char *val, size_t valsz, const char *bc) {
+  if (!bc || !bc[0]) {
+    (void)snprintf(val, valsz, "vm_run_empty");
+    return;
+  }
+  if (strcmp(bc, "BC") == 0)
+    (void)snprintf(val, valsz, "P0_VM_EXEC_OK");
+  else
+    (void)snprintf(val, valsz, "vm_run:%s", bc);
+}
+
+/* After `(` — read ::astBase, ,, ::scopeVar, ). Caller positions *i at first arg. */
+static int rhs_execute_ast_two_vars(int *i, char *ast_base, size_t ast_sz, char *scope_var, size_t scope_sz) {
+  ast_base[0] = '\0';
+  scope_var[0] = '\0';
+  if (*i >= g_ntok || !g_tok[*i] || g_tok[*i][0] != ':' || g_tok[*i][1] != ':') return -1;
+  (void)snprintf(ast_base, ast_sz, "%s", g_tok[*i]);
+  (*i)++;
+  if (*i >= g_ntok || strcmp(g_tok[*i], ",") != 0) return -1;
+  (*i)++;
+  if (*i >= g_ntok || !g_tok[*i] || g_tok[*i][0] != ':' || g_tok[*i][1] != ':') return -1;
+  (void)snprintf(scope_var, scope_sz, "%s", g_tok[*i]);
+  (*i)++;
+  if (*i >= g_ntok || strcmp(g_tok[*i], ")") != 0) return -1;
+  (*i)++;
+  return 0;
+}
+
+/*
+ * Parse execute_ast tail after "|with|": repeating key|value|key|value (F96 one pair, F97 many).
+ * Returns count in [1, max_out] or 0 on failure.
+ */
+static int execute_ast_parse_with_pairs(const char *pay, PayloadKV *out, int max_out) {
+  const char *r = pay ? pay : "";
+  int n = 0;
+  while (n < max_out && r[0]) {
+    const char *sep1 = strchr(r, '|');
+    if (!sep1 || sep1 == r) return 0;
+    char kbuf[48];
+    size_t kl = (size_t)(sep1 - r);
+    if (kl >= sizeof(kbuf)) kl = sizeof(kbuf) - 1U;
+    memcpy(kbuf, r, kl);
+    kbuf[kl] = '\0';
+    if (!payload_key_ok(kbuf)) return 0;
+    r = sep1 + 1;
+    const char *sep2 = strchr(r, '|');
+    if (!sep2) {
+      (void)snprintf(out[n].key, sizeof(out[n].key), "%s", kbuf);
+      (void)snprintf(out[n].v, sizeof(out[n].v), "%s", r);
+      n++;
+      break;
+    }
+    char vbuf[256];
+    size_t vl = (size_t)(sep2 - r);
+    if (vl >= sizeof(vbuf)) vl = sizeof(vbuf) - 1U;
+    memcpy(vbuf, r, vl);
+    vbuf[vl] = '\0';
+    (void)snprintf(out[n].key, sizeof(out[n].key), "%s", kbuf);
+    (void)snprintf(out[n].v, sizeof(out[n].v), "%s", vbuf);
+    n++;
+    r = sep2 + 1;
+  }
+  return n > 0 ? n : 0;
+}
+
+/* execute_ast line: emit|eventName or emit|eventName|with|k|v(|k|v)* */
+static void execute_ast_emit_line(const char *after_emit, char *result, size_t rsz) {
+  const char *p = after_emit ? after_emit : "";
+  const char *with = strstr(p, "|with|");
+  if (with) {
+    size_t evlen = (size_t)(with - p);
+    if (evlen == 0U || evlen + 1U >= 64U) return;
+    char evn[64];
+    memcpy(evn, p, evlen);
+    evn[evlen] = '\0';
+    const char *pay = with + 6; /* "|with|" is 6 chars */
+    PayloadKV payload[MAX_PAYLOAD_KEYS];
+    int np = execute_ast_parse_with_pairs(pay, payload, MAX_PAYLOAD_KEYS);
+    if (np <= 0) return;
+    queue_push_event(evn, payload, np);
+    process_events();
+    (void)snprintf(result, rsz, "Emitted: %.120s", evn);
+    return;
+  }
+  char evn[64];
+  size_t e = 0;
+  for (; p[e] && p[e] != '|' && e + 1U < sizeof(evn); e++)
+    evn[e] = p[e];
+  evn[e] = '\0';
+  if (!evn[0]) return;
+  queue_push_event(evn, NULL, 0);
+  process_events();
+  (void)snprintf(result, rsz, "Emitted: %.120s", evn);
+}
+
+/* set|::global|value — mirrors execute_set return string shape (no 💾 say in minimal stub). */
+static void execute_ast_set_line(const char *after_set, char *result, size_t rsz) {
+  const char *p = after_set ? after_set : "";
+  const char *sep = strchr(p, '|');
+  if (!sep || sep == p) return;
+  char keybuf[96];
+  size_t kl = (size_t)(sep - p);
+  if (kl >= sizeof(keybuf)) kl = sizeof(keybuf) - 1U;
+  memcpy(keybuf, p, kl);
+  keybuf[kl] = '\0';
+  if (keybuf[0] != ':' || keybuf[1] != ':') return;
+  const char *val = sep + 1;
+  char vbuf[256];
+  (void)snprintf(vbuf, sizeof(vbuf), "%s", val ? val : "");
+  var_set(keybuf, vbuf);
+  (void)snprintf(result, rsz, "Set %s = %.150s", keybuf, vbuf);
+}
+
+static void execute_ast_listen_line(const char *after_listen, char *result, size_t rsz);
+
+/* memory|set|::k|v, memory|say|text, memory|emit|…, memory|listen|… — stub memory rows (F104–F124; F115+ = memory|listen|… same stub table as listen|). */
+static void execute_ast_memory_line(const char *after_mem, char *result, size_t rsz) {
+  const char *p = after_mem ? after_mem : "";
+  if (strncmp(p, "listen|", 7U) == 0) {
+    execute_ast_listen_line(p + 7, result, rsz);
+  } else if (strncmp(p, "set|", 4U) == 0) {
+    execute_ast_set_line(p + 4, result, rsz);
+  } else if (strncmp(p, "say|", 4U) == 0) {
+    const char *pay = p + 4;
+    fputs(pay, stdout);
+    fputc('\n', stdout);
+    fflush(stdout);
+    (void)snprintf(result, rsz, "Said: %.200s", pay);
+  } else if (strncmp(p, "emit|", 5U) == 0) {
+    execute_ast_emit_line(p + 5, result, rsz);
+  }
+}
+
+/* execute_ast component|name — run linked component init/listeners (F99). */
+static void execute_ast_component_line(const char *after_comp, char *result, size_t rsz) {
+  const char *p = after_comp ? after_comp : "";
+  if (!p[0]) return;
+  run_linked_component(p);
+  (void)snprintf(result, rsz, "Component: %.120s", p);
+}
+
+/* execute_ast listen|event|say|payload — stub listener (F99); dispatch if no token listener matches. */
+static void execute_ast_listen_line(const char *after_listen, char *result, size_t rsz) {
+  const char *p = after_listen ? after_listen : "";
+  const char *e1 = strchr(p, '|');
+  if (!e1 || e1 == p) return;
+  char evn[64];
+  size_t el = (size_t)(e1 - p);
+  if (el >= sizeof(evn)) el = sizeof(evn) - 1U;
+  memcpy(evn, p, el);
+  evn[el] = '\0';
+  const char *q = e1 + 1;
+  if (strncmp(q, "say|", 4U) == 0) {
+    const char *pay = q + 4;
+    if (!pay[0]) return;
+    if (exec_ast_stub_register(evn, EXEC_AST_STUB_SAY, pay) != 0) return;
+  } else if (strncmp(q, "emit|", 5U) == 0) {
+    const char *tail = q + 5;
+    if (!tail[0]) return;
+    const char *ww = strstr(tail, "|with|");
+    if (ww) {
+      size_t innl = (size_t)(ww - tail);
+      if (innl == 0U || innl + 1U >= 64U) return;
+      char inn[64];
+      memcpy(inn, tail, innl);
+      inn[innl] = '\0';
+      if (strchr(inn, '|') != NULL) return;
+      const char *pay = ww + 6; /* strlen("|with|") == 6 */
+      PayloadKV payload[MAX_PAYLOAD_KEYS];
+      int np = execute_ast_parse_with_pairs(pay, payload, MAX_PAYLOAD_KEYS);
+      if (np <= 0) return;
+      if (exec_ast_stub_register_emit_with(evn, inn, payload, np) != 0) return;
+    } else {
+      if (strchr(tail, '|') != NULL) return;
+      if (exec_ast_stub_register(evn, EXEC_AST_STUB_EMIT, tail) != 0) return;
+    }
+  } else if (strncmp(q, "set|", 4U) == 0) {
+    const char *rest = q + 4;
+    const char *sep = strchr(rest, '|');
+    if (!sep || sep == rest) return;
+    if (rest[0] != ':' || rest[1] != ':') return;
+    char keybuf[64];
+    size_t kl = (size_t)(sep - rest);
+    if (kl >= sizeof(keybuf)) kl = sizeof(keybuf) - 1U;
+    memcpy(keybuf, rest, kl);
+    keybuf[kl] = '\0';
+    const char *val = sep + 1;
+    if (exec_ast_stub_register_set(evn, keybuf, val) != 0) return;
+  } else
+    return;
+  (void)snprintf(result, rsz, "Listen: %.120s", evn);
+}
+
+/* Shallow import stub (mirrors preloop resolve_module_now for import nodes; F98). */
+static void execute_ast_import_line(const char *after_import) {
+  const char *p = after_import ? after_import : "";
+  if (!p[0]) return;
+  var_set("::p0_exec_import_last", p);
+}
+
+/* Shallow link: same as `link ::target` init side-effect (F98 preloop). */
+static void execute_ast_link_line(const char *after_link) {
+  const char *p = after_link ? after_link : "";
+  if (!p[0]) return;
+  run_linked_component(p);
+}
+
+static void builtin_execute_ast_into(char *val, size_t valsz, const char *ast_base) {
+  char nodes_key[160];
+  if (!ast_base || !ast_base[0] || strlen(ast_base) + 7U >= sizeof(nodes_key)) {
+    (void)snprintf(val, valsz, "execute_ast_bad_base");
+    return;
+  }
+  (void)snprintf(nodes_key, sizeof(nodes_key), "%s.nodes", ast_base);
+  const char *nodes0 = var_get(nodes_key);
+  char result[256];
+  (void)snprintf(result, sizeof(result), "Execution completed");
+  if (!nodes0 || !nodes0[0]) {
+    (void)snprintf(val, valsz, "%s", result);
+    return;
+  }
+  exec_ast_stubs_reset();
+  char buf1[512], buf2[512];
+  (void)snprintf(buf1, sizeof(buf1), "%s", nodes0);
+  (void)snprintf(buf2, sizeof(buf2), "%s", nodes0);
+  char *save1 = NULL;
+  for (char *line = strtok_r(buf1, "\n", &save1); line; line = strtok_r(NULL, "\n", &save1)) {
+    const char *haltv = var_get("::halted");
+    if (haltv && strcmp(haltv, "true") == 0) {
+      (void)snprintf(result, sizeof(result), "Execution halted due to error");
+      (void)snprintf(val, valsz, "%s", result);
+      return;
+    }
+    while (*line == ' ' || *line == '\t') line++;
+    if (!line[0]) continue;
+    if (strncmp(line, "import|", 7U) == 0)
+      execute_ast_import_line(line + 7);
+    else if (strncmp(line, "link|", 5U) == 0)
+      execute_ast_link_line(line + 5);
+  }
+  char *save2 = NULL;
+  for (char *line = strtok_r(buf2, "\n", &save2); line; line = strtok_r(NULL, "\n", &save2)) {
+    const char *haltv = var_get("::halted");
+    if (haltv && strcmp(haltv, "true") == 0) {
+      (void)snprintf(result, sizeof(result), "Execution halted due to error");
+      break;
+    }
+    while (*line == ' ' || *line == '\t') line++;
+    if (!line[0]) continue;
+    if (strncmp(line, "import|", 7U) == 0) continue;
+    if (strncmp(line, "link|", 5U) == 0) continue;
+    if (strncmp(line, "say|", 4U) == 0) {
+      const char *pay = line + 4;
+      fputs(pay, stdout);
+      fputc('\n', stdout);
+      fflush(stdout);
+      (void)snprintf(result, sizeof(result), "Said: %.200s", pay);
+    } else if (strncmp(line, "emit|", 5U) == 0) {
+      execute_ast_emit_line(line + 5, result, sizeof(result));
+    } else if (strncmp(line, "set|", 4U) == 0) {
+      execute_ast_set_line(line + 4, result, sizeof(result));
+    } else if (strncmp(line, "component|", 10U) == 0) {
+      execute_ast_component_line(line + 10, result, sizeof(result));
+    } else if (strncmp(line, "memory|", 7U) == 0) {
+      execute_ast_memory_line(line + 7, result, sizeof(result));
+    } else if (strncmp(line, "listen|", 7U) == 0) {
+      execute_ast_listen_line(line + 7, result, sizeof(result));
+    }
+  }
+  (void)snprintf(val, valsz, "%s", result);
+}
+
 /* Execute set ::var = value */
 static void exec_set(int *i) {
   (*i)++;
@@ -1071,6 +1551,65 @@ static void exec_set(int *i) {
     (*i)++;
     const char *srct = var_get(split_base);
     split_join_newlines(srct, delimbuf, val, sizeof(val));
+    var_set(k, val);
+    return;
+  }
+  if (v && strcmp(v, "::vm_compile_ast") == 0) {
+    (*i)++;
+    if (*i >= g_ntok || strcmp(g_tok[*i], "(") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: vm_compile_ast missing (\n");
+      exit(5);
+    }
+    (*i)++;
+    char astb[256];
+    if (rhs_vm_compile_ast_consume(i, astb, sizeof(astb)) != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: vm_compile_ast bad arg\n");
+      exit(5);
+    }
+    if (*i >= g_ntok || strcmp(g_tok[*i], ")") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: vm_compile_ast missing )\n");
+      exit(5);
+    }
+    (*i)++;
+    builtin_vm_compile_ast_apply(astb);
+    var_set(k, "vm_compile_done");
+    return;
+  }
+  if (v && strcmp(v, "::vm_run_bytecode_program") == 0) {
+    (*i)++;
+    if (*i >= g_ntok || strcmp(g_tok[*i], "(") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: vm_run_bytecode_program missing (\n");
+      exit(5);
+    }
+    (*i)++;
+    char bcb[256];
+    if (rhs_vm_run_bytecode_consume(i, bcb, sizeof(bcb)) != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: vm_run_bytecode_program bad arg\n");
+      exit(5);
+    }
+    if (*i >= g_ntok || strcmp(g_tok[*i], ")") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: vm_run_bytecode_program missing )\n");
+      exit(5);
+    }
+    (*i)++;
+    builtin_vm_run_bytecode_into(val, sizeof(val), bcb);
+    var_set(k, val);
+    return;
+  }
+  if (v && strcmp(v, "::execute_ast") == 0) {
+    (*i)++;
+    if (*i >= g_ntok || strcmp(g_tok[*i], "(") != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: execute_ast missing (\n");
+      exit(5);
+    }
+    (*i)++;
+    char astb[96], scp[96];
+    if (rhs_execute_ast_two_vars(i, astb, sizeof(astb), scp, sizeof(scp)) != 0) {
+      fprintf(stderr, "azl_interpreter_minimal: execute_ast bad args\n");
+      exit(5);
+    }
+    (void)scp;
+    builtin_execute_ast_into(val, sizeof(val), astb);
     var_set(k, val);
     return;
   }
@@ -1289,12 +1828,16 @@ static void process_events(void) {
   QueuedEvent qe;
   while (queue_pop_event(&qe)) {
     apply_event_payload(&qe);
+    int matched = 0;
     for (int j = 0; j < g_nlisteners; j++) {
       if (strcmp(g_listeners[j].event, qe.ev) == 0) {
         exec_block(g_listeners[j].block_start, g_listeners[j].block_end);
+        matched = 1;
         break;
       }
     }
+    if (!matched)
+      (void)exec_ast_stub_dispatch(qe.ev);
     clear_event_payload(&qe);
   }
 }
@@ -1327,8 +1870,11 @@ static void exec_init_block(int *i) {
     else if (depth == 1 && strcmp(t, "set") == 0) exec_set(i);
     else if (depth == 1 && strcmp(t, "if") == 0) exec_if(i);
     else if (depth == 1 && strcmp(t, "for") == 0) {
-      fprintf(stderr, "azl_interpreter_minimal: for-in not allowed in init\n");
-      exit(5);
+      if (g_listener_nesting > 0) exec_for_in(i);
+      else {
+        fprintf(stderr, "azl_interpreter_minimal: for-in not allowed in init\n");
+        exit(5);
+      }
     } else if (depth == 1 && strcmp(t, "listen") == 0) exec_listen(i);
     else if (depth == 1 && strcmp(t, "emit") == 0) { exec_emit(i); process_events(); }
     else if (depth == 1 && strcmp(t, "link") == 0) exec_link(i);

@@ -1,0 +1,40 @@
+# Gate F115: `::execute_ast` — `memory|listen|ev|say|…` registers the same stub table as top-level `listen|`, then `memory|emit|ev` drains; trailing `memory|say|…` + import preloop for harness markers. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p115_memory_listen_tree with { ast: "f115-root", scope: "f115-sc", nodes: "import|f115_mod_tag
+say|F115_TOP
+memory|listen|f115_mem_inner|say|F115_LISTEN_CB
+memory|emit|f115_mem_inner
+memory|say|F115_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC115_INNER"
+      say ::event.data.result
+      say "P0_SEM_F115_OK"
+    }
+    listen for "p115_memory_listen_tree" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F115_VM_ON_BAD"
+        return
+      }
+      say "F115_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX115_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

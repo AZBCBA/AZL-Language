@@ -1,0 +1,43 @@
+# Gate F99: `::execute_ast` — `component|name` (linked init) + `listen|ev|say|payload` stub (dispatched when no token listener matches). `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p99.side {
+  init {
+    say "P99_COMP_INIT"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p99_exec_tree with { ast: "f99-root", scope: "f99-sc", nodes: "component|p99.side
+listen|f99_stub|say|P99_LISTEN_CB
+emit|f99_stub
+say|F99_TAIL" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC99_INNER"
+      say ::event.data.result
+      say "P0_SEM_F99_OK"
+    }
+    listen for "p99_exec_tree" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F99_VM_ON_BAD"
+        return
+      }
+      say "F99_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say "EX99_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

@@ -1,0 +1,45 @@
+# Gate F98: `::execute_ast` — shallow preloop `import|module` + `link|::component` (all `import|/`link|` before `say|/`emit|/`set|`; mirrors `listen for "execute"` ~134–139 + `resolve_module_now` stub). `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p98.linked {
+  init {
+    say "P98_LINK_SID"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p98_exec_tree with { ast: "f98-root", scope: "f98-sc", nodes: "say|F98_PRE
+link|::p98.linked
+import|p98_mod_name
+say|F98_POST" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC98_INNER"
+      say ::event.data.result
+      say "P0_SEM_F98_OK"
+    }
+    listen for "p98_exec_tree" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F98_VM_ON_BAD"
+        return
+      }
+      say "F98_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX98_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

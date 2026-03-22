@@ -205,7 +205,7 @@ Writes **`.azl/benchmarks/azl_full_coverage_report_*.md`**: promoted doc pieces,
 
 ### Native gates (`scripts/check_azl_native_gates.sh`)
 
-Semantic parity slices **F5–F87** map to the rows below (**F9** stdout mismatch = **59**, intentionally **not** **`verify_native_runtime_live.sh`** **69**; **F10** = **111–113**; **F11** = **114–116**; **F12** = **117–119**; **F13** = **120–122**; **F14** = **123–125**; **F15** = **126–128**; **F16** = **129–131**; **F17** = **132–134**; **F18** = **135–137**; **F19** = **138–140**; **F20** = **141–143**; **F21** = **144–146**; **F22** = **147–149**; **F23** = **150–152**; **F24** = **153–155**; **F25** = **156–158**; **F26** = **159–161**; **F27** = **162–164**; **F28** = **165–167**; **F29** = **168–170**; **F30** = **171–173**; **F31** = **174–176**; **F32** = **177–179**; **F33** = **180–182**; **F34** = **183–185**; **F35** = **186–188**; **F36** = **189–191**; **F37** = **192–194**; **F38** = **195–197**; **F39** = **198–200**; **F40** = **201–203**; **F41** = **204–206**; **F42** = **207–209**; **F43** = **210–212**; **F44** = **213–215**; **F45** = **216–218**; **F46** = **219–221**; **F47** = **222–224**; **F48** = **225–227**; **F49** = **228–230**; **F50** = **231–233**; **F51** = **234–236**; **F52** = **237–239**; **F53** = **240–242**; **F54** = **243–245**; **F55** = **246–248**; **F56** = **249–251**; **F57** = **252–254**; **F58** = **255–257**; **F59** = **258–260**; **F60** = **261–263**; **F61** = **264–266**; **F62** = **267–269**; **F63** = **270** / **272** / **273** (Python failure uses **272**, not **271** — **271** is **`CODEC_DECOMPRESS_FAILED`** in literal codec harness); **F64** = **274–276**; **F65** = **277–279**; **F66** = **280–282**; **F67** = **283–285**; **F68** = **291–293**; **F69** = **294–296**; **F70** = **297–299**; **F71** = **311–313**; **F72** = **314–316**; **F73** = **317–319**; **F74** = **323–325**; **F75** = **326–328**; **F76** = **329–331**; **F77** = **332–334**; **F78** = **335–337**; **F79** = **338–340**; **F80** = **341–343**; **F81** = **344–346**; **F82** = **347–349**; **F83** = **350–352**; **F84** = **353–355**; **F85** = **356–358**; **F86** = **359–361**; **F87** = **362–364**).
+Semantic parity slices **F5–F124** map to the rows below (**F9** stdout mismatch = **59**, intentionally **not** **`verify_native_runtime_live.sh`** **69**; **F10** = **111–113**; **F11** = **114–116**; **F12** = **117–119**; **F13** = **120–122**; **F14** = **123–125**; **F15** = **126–128**; **F16** = **129–131**; **F17** = **132–134**; **F18** = **135–137**; **F19** = **138–140**; **F20** = **141–143**; **F21** = **144–146**; **F22** = **147–149**; **F23** = **150–152**; **F24** = **153–155**; **F25** = **156–158**; **F26** = **159–161**; **F27** = **162–164**; **F28** = **165–167**; **F29** = **168–170**; **F30** = **171–173**; **F31** = **174–176**; **F32** = **177–179**; **F33** = **180–182**; **F34** = **183–185**; **F35** = **186–188**; **F36** = **189–191**; **F37** = **192–194**; **F38** = **195–197**; **F39** = **198–200**; **F40** = **201–203**; **F41** = **204–206**; **F42** = **207–209**; **F43** = **210–212**; **F44** = **213–215**; **F45** = **216–218**; **F46** = **219–221**; **F47** = **222–224**; **F48** = **225–227**; **F49** = **228–230**; **F50** = **231–233**; **F51** = **234–236**; **F52** = **237–239**; **F53** = **240–242**; **F54** = **243–245**; **F55** = **246–248**; **F56** = **249–251**; **F57** = **252–254**; **F58** = **255–257**; **F59** = **258–260**; **F60** = **261–263**; **F61** = **264–266**; **F62** = **267–269**; **F63** = **270** / **272** / **273** (Python failure uses **272**, not **271** — **271** is **`CODEC_DECOMPRESS_FAILED`** in literal codec harness); **F64** = **274–276**; **F65** = **277–279**; **F66** = **280–282**; **F67** = **283–285**; **F68** = **291–293**; **F69** = **294–296**; **F70** = **297–299**; **F71** = **311–313**; **F72** = **314–316**; **F73** = **317–319**; **F74** = **323–325**; **F75** = **326–328**; **F76** = **329–331**; **F77** = **332–334**; **F78** = **335–337**; **F79** = **338–340**; **F80** = **341–343**; **F81** = **344–346**; **F82** = **347–349**; **F83** = **350–352**; **F84** = **353–355**; **F85** = **356–358**; **F86** = **359–361**; **F87** = **362–364**; **F88** = **365–367**; **F89** = **368–370**; **F90** = **371–373**; **F91** = **374–376**; **F92** = **377–379**; **F93** = **380–382**; **F94** = **383–385**; **F95** = **386–388**; **F96** = **389–391**; **F97** = **392–394**; **F98** = **395–397**; **F99** = **398–400**; **F100** = **401–403**; **F101** = **404–406**; **F102** = **407–409**; **F103** = **410–412**; **F104** = **413–415**; **F105** = **416–418**; **F106** = **419–421**; **F107** = **422–424**; **F108** = **425–427**; **F109** = **428–430**; **F110** = **431–433**; **F111** = **434–436**; **F112** = **437–439**; **F113** = **440–442**; **F114** = **443–445**; **F115** = **446–448**; **F116** = **449–451**; **F117** = **452–454**; **F118** = **455–457**; **F119** = **458–460**; **F120** = **461–463**; **F121** = **464–466**; **F122** = **467–469**; **F123** = **470–472**; **F124** = **473–475**).
 
 **Gate 0** runs **`self_check_release_helpers.sh`** — its exits **40–58** propagate unchanged.
 
@@ -483,6 +483,117 @@ Semantic parity slices **F5–F87** map to the rows below (**F9** stdout mismatc
 | **362** | C minimal **`p0_semantic_execute_use_vm_env_off`** failed, wrong stdout, or missing **`P0_SEM_USE_VM_OFF_OK`** — requires **`AZL_USE_VM`** unset (**F87**) |
 | **363** | Python spine host **`p0_semantic_execute_use_vm_env_off`** failed (**F87**) |
 | **364** | C vs Python **`p0_semantic_execute_use_vm_env_off`** stdout mismatch (**F87**) |
+| **365** | C minimal **`p0_semantic_halt_execution_listener`** failed, wrong stdout order, or missing **`P0_HALT_SIGNAL_OK`** / **`P0_SEM_F88_OK`** (**F88**) |
+| **366** | Python spine host **`p0_semantic_halt_execution_listener`** failed (**F88**) |
+| **367** | C vs Python **`p0_semantic_halt_execution_listener`** stdout mismatch (**F88**) |
+| **368** | C minimal **`p0_semantic_execute_ast_nodes_preloop`** failed, wrong stdout order, or missing **F89** markers (**`P89_PRELOOP_ENTER`** … **`P0_SEM_F89_OK`**) |
+| **369** | Python spine host **`p0_semantic_execute_ast_nodes_preloop`** failed (**F89**) |
+| **370** | C vs Python **`p0_semantic_execute_ast_nodes_preloop`** stdout mismatch (**F89**) |
+| **371** | C minimal **`p0_semantic_execute_vm_path_ok`** failed, wrong stdout, or missing VM ok-path markers — requires **`AZL_USE_VM=1`** (**F90**) |
+| **372** | Python spine host **`p0_semantic_execute_vm_path_ok`** failed (**F90**) |
+| **373** | C vs Python **`p0_semantic_execute_vm_path_ok`** stdout mismatch (**F90**) |
+| **374** | C minimal **`p0_semantic_execute_vm_compile_error`** failed, wrong stdout, or missing compile-error markers — requires **`AZL_USE_VM=1`** (**F91**) |
+| **375** | Python spine host **`p0_semantic_execute_vm_compile_error`** failed (**F91**) |
+| **376** | C vs Python **`p0_semantic_execute_vm_compile_error`** stdout mismatch (**F91**) |
+| **377** | C minimal **`p0_semantic_execute_vm_empty_bytecode`** failed, wrong stdout, or missing empty-bytecode markers — requires **`AZL_USE_VM=1`** (**F92**) |
+| **378** | Python spine host **`p0_semantic_execute_vm_empty_bytecode`** failed (**F92**) |
+| **379** | C vs Python **`p0_semantic_execute_vm_empty_bytecode`** stdout mismatch (**F92**) |
+| **380** | C minimal **`p0_semantic_execute_ast_tree_walk`** failed, wrong stdout, or missing **`execute_ast`** markers — requires **`AZL_USE_VM` unset** (**F93**) |
+| **381** | Python spine host **`p0_semantic_execute_ast_tree_walk`** failed (**F93**) |
+| **382** | C vs Python **`p0_semantic_execute_ast_tree_walk`** stdout mismatch (**F93**) |
+| **383** | C minimal **`p0_semantic_execute_ast_emit_step`** failed, wrong stdout, or missing **`emit|`** markers — requires **`AZL_USE_VM` unset** (**F94**) |
+| **384** | Python spine host **`p0_semantic_execute_ast_emit_step`** failed (**F94**) |
+| **385** | C vs Python **`p0_semantic_execute_ast_emit_step`** stdout mismatch (**F94**) |
+| **386** | C minimal **`p0_semantic_execute_ast_set_step`** failed, wrong stdout, or missing **`set|`** markers — requires **`AZL_USE_VM` unset** (**F95**) |
+| **387** | Python spine host **`p0_semantic_execute_ast_set_step`** failed (**F95**) |
+| **388** | C vs Python **`p0_semantic_execute_ast_set_step`** stdout mismatch (**F95**) |
+| **389** | C minimal **`p0_semantic_execute_ast_emit_with_step`** failed, wrong stdout, or missing **`emit|…|with|…`** markers — requires **`AZL_USE_VM` unset** (**F96**) |
+| **390** | Python spine host **`p0_semantic_execute_ast_emit_with_step`** failed (**F96**) |
+| **391** | C vs Python **`p0_semantic_execute_ast_emit_with_step`** stdout mismatch (**F96**) |
+| **392** | C minimal **`p0_semantic_execute_ast_emit_multi_with_step`** failed, wrong stdout, or missing multi-**`emit|…|with|…`** markers — requires **`AZL_USE_VM` unset** (**F97**) |
+| **393** | Python spine host **`p0_semantic_execute_ast_emit_multi_with_step`** failed (**F97**) |
+| **394** | C vs Python **`p0_semantic_execute_ast_emit_multi_with_step`** stdout mismatch (**F97**) |
+| **395** | C minimal **`p0_semantic_execute_ast_import_link_preloop`** failed, wrong stdout, or missing **`import|/`link|`** preloop markers — requires **`AZL_USE_VM` unset** (**F98**) |
+| **396** | Python spine host **`p0_semantic_execute_ast_import_link_preloop`** failed (**F98**) |
+| **397** | C vs Python **`p0_semantic_execute_ast_import_link_preloop`** stdout mismatch (**F98**) |
+| **398** | C minimal **`p0_semantic_execute_ast_component_listen_step`** failed, wrong stdout, or missing **`component|/`listen|`** markers — requires **`AZL_USE_VM` unset** (**F99**) |
+| **399** | Python spine host **`p0_semantic_execute_ast_component_listen_step`** failed (**F99**) |
+| **400** | C vs Python **`p0_semantic_execute_ast_component_listen_step`** stdout mismatch (**F99**) |
+| **401** | C minimal **`p0_semantic_execute_ast_listen_emit_stub`** failed, wrong stdout, or missing **`listen|…|emit|…`** stub markers — requires **`AZL_USE_VM` unset** (**F100**) |
+| **402** | Python spine host **`p0_semantic_execute_ast_listen_emit_stub`** failed (**F100**) |
+| **403** | C vs Python **`p0_semantic_execute_ast_listen_emit_stub`** stdout mismatch (**F100**) |
+| **404** | C minimal **`p0_semantic_execute_ast_listen_set_stub`** failed, wrong stdout, or missing **`listen|…|set|::…|…`** stub markers — requires **`AZL_USE_VM` unset** (**F101**) |
+| **405** | Python spine host **`p0_semantic_execute_ast_listen_set_stub`** failed (**F101**) |
+| **406** | C vs Python **`p0_semantic_execute_ast_listen_set_stub`** stdout mismatch (**F101**) |
+| **407** | C minimal **`p0_semantic_execute_ast_listen_emit_with_stub`** failed, wrong stdout, or missing **`listen|…|emit|…|with|…`** stub markers — requires **`AZL_USE_VM` unset** (**F102**) |
+| **408** | Python spine host **`p0_semantic_execute_ast_listen_emit_with_stub`** failed (**F102**) |
+| **409** | C vs Python **`p0_semantic_execute_ast_listen_emit_with_stub`** stdout mismatch (**F102**) |
+| **410** | C minimal **`p0_semantic_execute_ast_listen_emit_multi_with_stub`** failed, wrong stdout, or missing multi-**`listen|…|emit|…|with|…`** stub markers — requires **`AZL_USE_VM` unset** (**F103**) |
+| **411** | Python spine host **`p0_semantic_execute_ast_listen_emit_multi_with_stub`** failed (**F103**) |
+| **412** | C vs Python **`p0_semantic_execute_ast_listen_emit_multi_with_stub`** stdout mismatch (**F103**) |
+| **413** | C minimal **`p0_semantic_execute_ast_memory_set_step`** failed, wrong stdout, or missing **`memory|set|…`** / **`memory|say|…`** stub markers — requires **`AZL_USE_VM` unset** (**F104**) |
+| **414** | Python spine host **`p0_semantic_execute_ast_memory_set_step`** failed (**F104**) |
+| **415** | C vs Python **`p0_semantic_execute_ast_memory_set_step`** stdout mismatch (**F104**) |
+| **416** | C minimal **`p0_semantic_execute_ast_memory_emit_step`** failed, wrong stdout, or missing **`memory|emit|…`** stub markers — requires **`AZL_USE_VM` unset** (**F105**) |
+| **417** | Python spine host **`p0_semantic_execute_ast_memory_emit_step`** failed (**F105**) |
+| **418** | C vs Python **`p0_semantic_execute_ast_memory_emit_step`** stdout mismatch (**F105**) |
+| **419** | C minimal **`p0_semantic_execute_ast_memory_emit_with_step`** failed, wrong stdout, or missing **`memory|emit|…|with|…`** stub markers — requires **`AZL_USE_VM` unset** (**F106**) |
+| **420** | Python spine host **`p0_semantic_execute_ast_memory_emit_with_step`** failed (**F106**) |
+| **421** | C vs Python **`p0_semantic_execute_ast_memory_emit_with_step`** stdout mismatch (**F106**) |
+| **422** | C minimal **`p0_semantic_execute_ast_memory_emit_multi_with_step`** failed, wrong stdout, or missing multi-**`memory|emit|…|with|…`** stub markers — requires **`AZL_USE_VM` unset** (**F107**) |
+| **423** | Python spine host **`p0_semantic_execute_ast_memory_emit_multi_with_step`** failed (**F107**) |
+| **424** | C vs Python **`p0_semantic_execute_ast_memory_emit_multi_with_step`** stdout mismatch (**F107**) |
+| **425** | C minimal **`p0_semantic_execute_ast_memory_multi_row_order`** failed, wrong stdout, or missing multi-**`memory|say|…`** order markers — requires **`AZL_USE_VM` unset** (**F108**) |
+| **426** | Python spine host **`p0_semantic_execute_ast_memory_multi_row_order`** failed (**F108**) |
+| **427** | C vs Python **`p0_semantic_execute_ast_memory_multi_row_order`** stdout mismatch (**F108**) |
+| **428** | C minimal **`p0_semantic_execute_ast_memory_mixed_order`** failed, wrong stdout, or missing mixed **`memory|set|…`** / **`memory|emit|…`** / **`memory|say|…`** markers — requires **`AZL_USE_VM` unset** (**F109**) |
+| **429** | Python spine host **`p0_semantic_execute_ast_memory_mixed_order`** failed (**F109**) |
+| **430** | C vs Python **`p0_semantic_execute_ast_memory_mixed_order`** stdout mismatch (**F109**) |
+| **431** | C minimal **`p0_semantic_execute_ast_memory_mixed_emit_with_order`** failed, wrong stdout, or missing mixed **`memory|set|…`** / **`memory|emit|…|with|…`** / **`memory|say|…`** markers — requires **`AZL_USE_VM` unset** (**F110**) |
+| **432** | Python spine host **`p0_semantic_execute_ast_memory_mixed_emit_with_order`** failed (**F110**) |
+| **433** | C vs Python **`p0_semantic_execute_ast_memory_mixed_emit_with_order`** stdout mismatch (**F110**) |
+| **434** | C minimal **`p0_semantic_execute_ast_memory_mixed_emit_multi_with_order`** failed, wrong stdout, or missing mixed **`memory|set|…`** / multi-**`memory|emit|…|with|…`** / **`memory|say|…`** markers — requires **`AZL_USE_VM` unset** (**F111**) |
+| **435** | Python spine host **`p0_semantic_execute_ast_memory_mixed_emit_multi_with_order`** failed (**F111**) |
+| **436** | C vs Python **`p0_semantic_execute_ast_memory_mixed_emit_multi_with_order`** stdout mismatch (**F111**) |
+| **437** | C minimal **`p0_semantic_execute_ast_preloop_then_memory_say`** failed, wrong stdout, or missing preloop + **`memory|say|…`** markers — requires **`AZL_USE_VM` unset** (**F112**) |
+| **438** | Python spine host **`p0_semantic_execute_ast_preloop_then_memory_say`** failed (**F112**) |
+| **439** | C vs Python **`p0_semantic_execute_ast_preloop_then_memory_say`** stdout mismatch (**F112**) |
+| **440** | C minimal **`p0_semantic_execute_ast_preloop_say_then_memory_say`** failed, wrong stdout, or missing preloop + **`say|`** + **`memory|say|…`** markers — requires **`AZL_USE_VM` unset** (**F113**) |
+| **441** | Python spine host **`p0_semantic_execute_ast_preloop_say_then_memory_say`** failed (**F113**) |
+| **442** | C vs Python **`p0_semantic_execute_ast_preloop_say_then_memory_say`** stdout mismatch (**F113**) |
+| **443** | C minimal **`p0_semantic_execute_ast_preloop_emit_then_memory_say`** failed, wrong stdout, or missing preloop + **`emit|…|with|…`** + **`memory|say|…`** markers — requires **`AZL_USE_VM` unset** (**F114**) |
+| **444** | Python spine host **`p0_semantic_execute_ast_preloop_emit_then_memory_say`** failed (**F114**) |
+| **445** | C vs Python **`p0_semantic_execute_ast_preloop_emit_then_memory_say`** stdout mismatch (**F114**) |
+| **446** | C minimal **`p0_semantic_execute_ast_memory_listen_emit_say`** failed, wrong stdout, or missing **`memory|listen|…`** + **`memory|emit|…`** + **`memory|say|…`** markers — requires **`AZL_USE_VM` unset** (**F115**) |
+| **447** | Python spine host **`p0_semantic_execute_ast_memory_listen_emit_say`** failed (**F115**) |
+| **448** | C vs Python **`p0_semantic_execute_ast_memory_listen_emit_say`** stdout mismatch (**F115**) |
+| **449** | C minimal **`p0_semantic_execute_ast_memory_listen_emit_with_say`** failed, wrong stdout, or missing **`memory|listen|…|emit|…|with|…`** + **`memory|emit|…`** + **`memory|say|…`** markers — requires **`AZL_USE_VM` unset** (**F116**) |
+| **450** | Python spine host **`p0_semantic_execute_ast_memory_listen_emit_with_say`** failed (**F116**) |
+| **451** | C vs Python **`p0_semantic_execute_ast_memory_listen_emit_with_say`** stdout mismatch (**F116**) |
+| **452** | C minimal **`p0_semantic_execute_ast_memory_listen_emit_multi_with_say`** failed, wrong stdout, or missing multi-**`memory|listen|…|emit|…|with|…`** + **`memory|emit|…`** + **`memory|say|…`** markers — requires **`AZL_USE_VM` unset** (**F117**) |
+| **453** | Python spine host **`p0_semantic_execute_ast_memory_listen_emit_multi_with_say`** failed (**F117**) |
+| **454** | C vs Python **`p0_semantic_execute_ast_memory_listen_emit_multi_with_say`** stdout mismatch (**F117**) |
+| **455** | C minimal **`p0_semantic_execute_ast_preloop_memory_listen_emit_multi_with_say`** failed, wrong stdout, or missing preloop + multi-**`memory|listen|…|emit|…|with|…`** + **`memory|emit|…`** + **`memory|say|…`** markers — requires **`AZL_USE_VM` unset** (**F118**) |
+| **456** | Python spine host **`p0_semantic_execute_ast_preloop_memory_listen_emit_multi_with_say`** failed (**F118**) |
+| **457** | C vs Python **`p0_semantic_execute_ast_preloop_memory_listen_emit_multi_with_say`** stdout mismatch (**F118**) |
+| **458** | C minimal **`p0_semantic_execute_ast_memory_listen_stack_say`** failed, wrong stdout, or missing stacked **`memory|listen|…|say|…`** + dual **`memory|emit|…`** + **`memory|say|…`** markers — requires **`AZL_USE_VM` unset** (**F119**) |
+| **459** | Python spine host **`p0_semantic_execute_ast_memory_listen_stack_say`** failed (**F119**) |
+| **460** | C vs Python **`p0_semantic_execute_ast_memory_listen_stack_say`** stdout mismatch (**F119**) |
+| **461** | C minimal **`p0_semantic_execute_ast_preloop_memory_listen_stack_say`** failed, wrong stdout, or missing preloop + stacked **`memory|listen|…|say|…`** + dual **`memory|emit|…`** + **`memory|say|…`** markers — requires **`AZL_USE_VM` unset** (**F120**) |
+| **462** | Python spine host **`p0_semantic_execute_ast_preloop_memory_listen_stack_say`** failed (**F120**) |
+| **463** | C vs Python **`p0_semantic_execute_ast_preloop_memory_listen_stack_say`** stdout mismatch (**F120**) |
+| **464** | C minimal **`p0_semantic_execute_ast_preloop_say_then_memory_listen_stack_say`** failed, wrong stdout, or missing preloop + **`say|`** + stacked **`memory|listen|…`** markers — requires **`AZL_USE_VM` unset** (**F121**) |
+| **465** | Python spine host **`p0_semantic_execute_ast_preloop_say_then_memory_listen_stack_say`** failed (**F121**) |
+| **466** | C vs Python **`p0_semantic_execute_ast_preloop_say_then_memory_listen_stack_say`** stdout mismatch (**F121**) |
+| **467** | C minimal **`p0_semantic_execute_ast_preloop_emit_then_memory_listen_stack_say`** failed, wrong stdout, or missing preloop + **`emit|…|with|…`** + stacked **`memory|listen|…`** markers — requires **`AZL_USE_VM` unset** (**F122**) |
+| **468** | Python spine host **`p0_semantic_execute_ast_preloop_emit_then_memory_listen_stack_say`** failed (**F122**) |
+| **469** | C vs Python **`p0_semantic_execute_ast_preloop_emit_then_memory_listen_stack_say`** stdout mismatch (**F122**) |
+| **470** | C minimal **`p0_semantic_execute_ast_preloop_component_memory_set_listen_stack`** failed, wrong stdout, or missing preloop + **`component|`** + dual **`memory|set|…`** + stacked **`memory|listen|…`** markers — requires **`AZL_USE_VM` unset** (**F123**) |
+| **471** | Python spine host **`p0_semantic_execute_ast_preloop_component_memory_set_listen_stack`** failed (**F123**) |
+| **472** | C vs Python **`p0_semantic_execute_ast_preloop_component_memory_set_listen_stack`** stdout mismatch (**F123**) |
+| **473** | C minimal **`p0_semantic_execute_ast_preloop_two_component_memory_say`** failed, wrong stdout, or missing preloop + dual **`component|`** + **`memory|say|…`** interleave markers — requires **`AZL_USE_VM` unset** (**F124**) |
+| **474** | Python spine host **`p0_semantic_execute_ast_preloop_two_component_memory_say`** failed (**F124**) |
+| **475** | C vs Python **`p0_semantic_execute_ast_preloop_two_component_memory_say`** stdout mismatch (**F124**) |
 | **97** | Semantic spine owner probe failed ( **`verify_semantic_spine_owner_contract.sh`**: bad **`--semantic-owner`** exit or missing host) |
 | **98** | Semantic spine owner line mismatch (expected **`AZL_SEMANTIC_OWNER=minimal_runtime_python`**) |
 | **99** | **`azl_azl_interpreter_runtime.sh`** no longer **`exec python3`** spine host (C must not own semantic spine) |

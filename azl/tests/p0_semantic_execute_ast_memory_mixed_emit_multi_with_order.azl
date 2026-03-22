@@ -1,0 +1,41 @@
+# Gate F111: `::execute_ast` — `memory|set|…` then `memory|emit|…|with|k1|v1|k2|v2` then `memory|say|…` (F110 + F107-shaped multi-pair). `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p111_memory_mixed_emit_multi with { ast: "f111-root", scope: "f111-sc", nodes: "memory|set|::f111_slot|F111_CELL
+memory|emit|f111_inner|with|f111_k1|F111_ONE|f111_k2|F111_TWO
+memory|say|F111_AFTER" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC111_INNER"
+      say ::event.data.result
+      say "P0_SEM_F111_OK"
+    }
+    listen for "f111_inner" {
+      say ::event.data.f111_k1
+      say ::event.data.f111_k2
+    }
+    listen for "p111_memory_mixed_emit_multi" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F111_VM_ON_BAD"
+        return
+      }
+      say "F111_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::f111_slot
+      say "EX111_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

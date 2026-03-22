@@ -1,0 +1,49 @@
+# Gate F120: `::execute_ast` — preloop `import|` + `link|` (F112) then F119-shaped stacked `memory|listen|…|say|…` + dual `memory|emit|…` + `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p120.linked {
+  init {
+    say "P120_LINK_SID"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p120_preloop_listen_stack with { ast: "f120-root", scope: "f120-sc", nodes: "import|f120_mod_tag
+link|::p120.linked
+say|F120_TOP
+memory|listen|f120_e1|say|F120_STUB_ONE
+memory|listen|f120_e2|say|F120_STUB_TWO
+memory|emit|f120_e1
+memory|emit|f120_e2
+memory|say|F120_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC120_INNER"
+      say ::event.data.result
+      say "P0_SEM_F120_OK"
+    }
+    listen for "p120_preloop_listen_stack" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F120_VM_ON_BAD"
+        return
+      }
+      say "F120_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX120_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

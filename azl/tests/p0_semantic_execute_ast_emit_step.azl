@@ -1,0 +1,38 @@
+# Gate F94: `::execute_ast` — `emit|event` step queues bare emit and drains listeners (mirrors `azl_interpreter.azl` ~761–762 + `execute_emit`). Requires `AZL_USE_VM` unset; `listen for "f94_inner"` registered before starter emit (same component `behavior` as F82/F93 ordering).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p94_emit_tree with { ast: "f94-root", scope: "f94-sc", nodes: "say|F94_A
+emit|f94_inner" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC94_INNER"
+      say ::event.data.result
+      say "P0_SEM_F94_OK"
+    }
+    listen for "f94_inner" {
+      say "F94_INNER_BODY"
+    }
+    listen for "p94_emit_tree" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F94_VM_ON_BAD"
+        return
+      }
+      say "F94_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say "EX94_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

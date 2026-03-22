@@ -1,0 +1,44 @@
+# Gate F100: `::execute_ast` — `listen|ev|emit|inner` stub queues inner event (nested stub dispatch). `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p100.side {
+  init {
+    say "P100_COMP_INIT"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p100_exec_tree with { ast: "f100-root", scope: "f100-sc", nodes: "component|p100.side
+listen|f100_inner|say|F100_INNER_CB
+listen|f100_chain|emit|f100_inner
+emit|f100_chain
+say|F100_TAIL" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC100_INNER"
+      say ::event.data.result
+      say "P0_SEM_F100_OK"
+    }
+    listen for "p100_exec_tree" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F100_VM_ON_BAD"
+        return
+      }
+      say "F100_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say "EX100_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

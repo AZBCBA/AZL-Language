@@ -1,0 +1,52 @@
+# Gate F122: `::execute_ast` — preloop `import|` + `link|` (F112) then top-level `emit|…|with|…` (F114-shaped) before stacked `memory|listen|…|say|…` + dual `memory|emit|…` + `memory|say|…` (F119). `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p122.linked {
+  init {
+    say "P122_LINK_SID"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p122_preloop_emit_listen_stack with { ast: "f122-root", scope: "f122-sc", nodes: "import|f122_mod_tag
+link|::p122.linked
+emit|f122_bridge|with|note|F122_FROM_EMIT
+memory|listen|f122_e1|say|F122_STUB_ONE
+memory|listen|f122_e2|say|F122_STUB_TWO
+memory|emit|f122_e1
+memory|emit|f122_e2
+memory|say|F122_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC122_INNER"
+      say ::event.data.result
+      say "P0_SEM_F122_OK"
+    }
+    listen for "f122_bridge" {
+      say ::event.data.note
+    }
+    listen for "p122_preloop_emit_listen_stack" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F122_VM_ON_BAD"
+        return
+      }
+      say "F122_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX122_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

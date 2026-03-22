@@ -1,0 +1,35 @@
+# Gate F91: `AZL_USE_VM=1` — `::vc.ok != true` → `emit execute_complete` with `vm_compile_error:` + `::vc.error` (~144–147). Runner MUST set `AZL_USE_VM=1`. Magic ast `F91_VM_BAD`.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p91_vm_ce with { ast: "F91_VM_BAD" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC91_INNER"
+      say ::event.data.result
+      say "P0_SEM_F91_VM_OK"
+    }
+    listen for "p91_vm_ce" {
+      set ::ast = ::event.data.ast
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        set ::_vmc = ::vm_compile_ast(::ast)
+        if (::vc.ok != true) {
+          set ::out = "vm_compile_error:" + ::vc.error
+          say "F91_COMPILE_FAIL"
+          emit execute_complete with { result: ::out }
+        } else {
+          say "F91_SHOULD_FAIL_BAD"
+        }
+      } else {
+        say "USE_VM_OFF_BAD"
+      }
+    }
+  }
+}

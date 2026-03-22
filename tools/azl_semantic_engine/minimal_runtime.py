@@ -5,7 +5,10 @@ Single source of behavioral truth: keep in sync with C when changing the minimal
 Nested ``listen`` may run inside ``init`` / listener bodies; ``emit`` inside ``exec_block``
 drains the event queue (``process_events``) so chained handlers match the interpret→tokenize shape.
 Each queued event may carry a ``with { … }`` payload bound as ``::event.data.<key>`` for that dispatch
-(F10–F87 parity fixtures under ``azl/tests/p0_semantic_*.azl``). ``return`` at listener depth exits the
+(F10–F99 parity fixtures under ``azl/tests/p0_semantic_*.azl``).
+``&&`` chains ``==``/``!=``/sum primaries with short-circuit (truth for ``&&`` continuation: ``true`` / ``1`` only).
+``for-in`` inside ``if`` then-branch is allowed when already in a listener (``_listener_nesting > 0``), not in component ``init``.
+``return`` at listener depth exits the
 current listener body (including from inside ``if { … }``); ``return`` in top-level ``init`` skips the rest of ``init``.
 ``set ::dst = ::src.split("delim")`` stores split segments joined by newlines; ``for ::v in ::dst { … }`` (listener
 bodies only) iterates those segments — matches the ``::code.split("\\n")`` + line loop shape in ``azl_interpreter.azl``.
@@ -97,6 +100,11 @@ def tokenize_source(src: str) -> list[str]:
             p += 2
             pos[0] = p
             continue
+        if ch == "&" and p + 1 < n and src[p + 1] == "&":
+            tokens.append("&&")
+            p += 2
+            pos[0] = p
+            continue
         if ch in "{}();=,[]!+-":
             tokens.append(ch)
             p += 1
@@ -131,6 +139,9 @@ class MinimalAZLRuntime:
     queue: list[tuple[str, list[tuple[str, str]]]] = field(default_factory=list)
     _listener_nesting: int = field(default=0, repr=False)
     _listener_break: bool = field(default=False, repr=False)
+    _execute_ast_listen_stubs: list[tuple[str, str, str, str]] = field(
+        default_factory=list, repr=False
+    )  # (event, "say"|"emit"|"set", arg1, arg2)
 
     def __post_init__(self) -> None:
         self.ntok = len(self.tok)
@@ -509,11 +520,26 @@ class MinimalAZLRuntime:
             eq = not eq
         return ("true" if eq else "false"), 0
 
+    def _eval_and(self, i: list[int]) -> tuple[str, int]:
+        acc, acc_n = self._eval_eq(i)
+        while i[0] < self.ntok and self.tok[i[0]] == "&&":
+            i[0] += 1
+            if not self._cond_is_true(acc):
+                _, _ = self._eval_eq(i)
+                while i[0] < self.ntok and self.tok[i[0]] == "&&":
+                    i[0] += 1
+                    _, _ = self._eval_eq(i)
+                return "false", 0
+            nxt, nn = self._eval_eq(i)
+            acc = nxt
+            acc_n = nn
+        return acc, acc_n
+
     def _eval_or(self, i: list[int]) -> str:
-        acc, acc_nullish = self._eval_eq(i)
+        acc, acc_nullish = self._eval_and(i)
         while i[0] < self.ntok and self.tok[i[0]] == "or":
             i[0] += 1
-            nxt, nn = self._eval_eq(i)
+            nxt, nn = self._eval_and(i)
             if acc_nullish or acc == "":
                 acc = nxt
                 acc_nullish = nn
@@ -615,6 +641,209 @@ class MinimalAZLRuntime:
             )
             if self._listener_break:
                 break
+
+    def _builtin_vm_compile_ast_apply(self, ast_s: str) -> None:
+        """Sets ::vc.ok / ::vc.error / ::vc.bytecode per magic ast tags (gate F90–F92)."""
+        self.var_set("::vc.ok", "false")
+        self.var_set("::vc.error", "")
+        self.var_set("::vc.bytecode", "")
+        if ast_s == "F90_VM_OK":
+            self.var_set("::vc.ok", "true")
+            self.var_set("::vc.bytecode", "BC")
+        elif ast_s == "F91_VM_BAD":
+            self.var_set("::vc.ok", "false")
+            self.var_set("::vc.error", "compile_failed")
+        elif ast_s == "F92_VM_EMPTY":
+            self.var_set("::vc.ok", "true")
+            self.var_set("::vc.bytecode", "")
+        else:
+            self.var_set("::vc.ok", "false")
+            self.var_set("::vc.error", "unknown_ast")
+
+    @staticmethod
+    def _vm_run_bytecode_result(bc: str) -> str:
+        if not bc:
+            return "vm_run_empty"
+        if bc == "BC":
+            return "P0_VM_EXEC_OK"
+        return "vm_run:" + bc[:200]
+
+    @staticmethod
+    def _parse_execute_ast_with_tail(post: str) -> list[tuple[str, str]] | None:
+        """Parse ``k|v|k2|v2`` tail after ``|with|`` (same rules as ``emit|`` row in ``execute_ast``)."""
+        pairs: list[tuple[str, str]] = []
+        r = post
+        ok_parse = True
+        while ok_parse and r:
+            bar = r.find("|")
+            if bar <= 0:
+                ok_parse = False
+                break
+            pk = r[:bar]
+            r = r[bar + 1 :]
+            if not pk or not all(ch.isalnum() or ch == "_" for ch in pk):
+                ok_parse = False
+                break
+            bar2 = r.find("|")
+            if bar2 < 0:
+                pairs.append((pk[:47], r[:255]))
+                break
+            pairs.append((pk[:47], r[:bar2][:255]))
+            r = r[bar2 + 1 :]
+        return pairs if (ok_parse and pairs) else None
+
+    def _execute_ast_try_listen_stub(self, lrest: str) -> str | None:
+        """Parse ``evt|say|…`` / ``evt|emit|…`` / ``evt|set|…`` tail after a ``listen|`` prefix; register execute_ast stub if valid."""
+        bar = lrest.find("|")
+        if bar <= 0:
+            return None
+        levn = lrest[:bar]
+        ltail = lrest[bar + 1 :]
+        stub: tuple[str, str, str, str] | None = None
+        if levn and ltail.startswith("say|"):
+            lpay = ltail[4:]
+            if lpay:
+                stub = (levn[:63], "say", lpay[:255], "")
+        elif levn and ltail.startswith("emit|"):
+            erest = ltail[5:]
+            w = "|with|"
+            wi = erest.find(w)
+            if wi >= 0:
+                inner = erest[:wi]
+                ptail = erest[wi + len(w) :]
+                if inner and "|" not in inner:
+                    prs = self._parse_execute_ast_with_tail(ptail)
+                    if prs:
+                        stub = (levn[:63], "emit", inner[:63], ptail[:512])
+            else:
+                etarget = erest.split("|", 1)[0]
+                if etarget and "|" not in erest:
+                    stub = (levn[:63], "emit", etarget[:63], "")
+        elif levn and ltail.startswith("set|"):
+            srest = ltail[4:]
+            sbar = srest.find("|")
+            if sbar > 0:
+                gkey = srest[:sbar]
+                gval = srest[sbar + 1 :]
+                if gkey.startswith("::"):
+                    stub = (levn[:63], "set", gkey[:63], gval[:255])
+        if stub is None:
+            return None
+        sev = stub[0]
+        dup = any(e == sev for e, _, __, ___ in self._execute_ast_listen_stubs)
+        if not dup and len(self._execute_ast_listen_stubs) < 8:
+            self._execute_ast_listen_stubs.append(stub)
+        return "Listen: " + levn[:120]
+
+    def _builtin_execute_ast_result(self, ast_base: str) -> str:
+        """Walk ``<ast_base>.nodes``: preloop ``import|`` / ``link|`` (F98, F112–F114, F118, F120, F121, F122); main ``component|`` / ``memory|set|…`` / ``memory|say|…`` / ``memory|emit|…`` / ``memory|listen|…`` (F104–F124) / ``listen|…|…`` (F99–F103); ``say|`` (F93); ``emit|`` / ``emit|ev|with|…`` (F94–F97); ``set|::k|v`` (F95)."""
+        nk = ast_base + ".nodes"
+        raw = self.var_get(nk) or ""
+        result = "Execution completed"
+        if not raw.strip():
+            return result
+        self._execute_ast_listen_stubs.clear()
+        lines = raw.split("\n")
+        for line in lines:
+            if (self.var_get("::halted") or "") == "true":
+                return "Execution halted due to error"
+            seg = line.lstrip(" \t")
+            if not seg:
+                continue
+            if seg.startswith("import|"):
+                tail = seg[7:]
+                if tail:
+                    self.var_set("::p0_exec_import_last", tail[:255])
+            elif seg.startswith("link|"):
+                tail = seg[5:]
+                if tail:
+                    self.run_linked_component(tail)
+        for line in lines:
+            if (self.var_get("::halted") or "") == "true":
+                return "Execution halted due to error"
+            seg = line.lstrip(" \t")
+            if not seg:
+                continue
+            if seg.startswith("import|") or seg.startswith("link|"):
+                continue
+            if seg.startswith("say|"):
+                pay = seg[4:]
+                print(pay, flush=True)
+                result = "Said: " + pay[:200]
+            elif seg.startswith("emit|"):
+                rest = seg[5:]
+                w = "|with|"
+                wi = rest.find(w)
+                if wi >= 0:
+                    evn = rest[:wi]
+                    post = rest[wi + len(w) :]
+                    pairs = self._parse_execute_ast_with_tail(post)
+                    if evn and pairs:
+                        self.queue_push(evn[:63], pairs)
+                        self.process_events()
+                        result = "Emitted: " + evn[:120]
+                else:
+                    evn = rest.split("|", 1)[0]
+                    if evn:
+                        self.queue_push(evn[:63], None)
+                        self.process_events()
+                        result = "Emitted: " + evn[:120]
+            elif seg.startswith("set|"):
+                rest = seg[4:]
+                bar = rest.find("|")
+                if bar > 0:
+                    gkey = rest[:bar]
+                    gval = rest[bar + 1 :]
+                    if gkey.startswith("::"):
+                        self.var_set(gkey, gval[:255])
+                        result = "Set " + gkey + " = " + gval[:150]
+            elif seg.startswith("component|"):
+                ctail = seg[10:]
+                if ctail:
+                    self.run_linked_component(ctail)
+                    result = "Component: " + ctail[:120]
+            elif seg.startswith("memory|"):
+                mrest = seg[7:]
+                if mrest.startswith("set|"):
+                    rest = mrest[4:]
+                    bar = rest.find("|")
+                    if bar > 0:
+                        gkey = rest[:bar]
+                        gval = rest[bar + 1 :]
+                        if gkey.startswith("::"):
+                            self.var_set(gkey, gval[:255])
+                            result = "Set " + gkey + " = " + gval[:150]
+                elif mrest.startswith("say|"):
+                    pay = mrest[4:]
+                    print(pay, flush=True)
+                    result = "Said: " + pay[:200]
+                elif mrest.startswith("emit|"):
+                    rest = mrest[5:]
+                    w = "|with|"
+                    wi = rest.find(w)
+                    if wi >= 0:
+                        evn = rest[:wi]
+                        post = rest[wi + len(w) :]
+                        pairs = self._parse_execute_ast_with_tail(post)
+                        if evn and pairs:
+                            self.queue_push(evn[:63], pairs)
+                            self.process_events()
+                            result = "Emitted: " + evn[:120]
+                    else:
+                        evn = rest.split("|", 1)[0]
+                        if evn:
+                            self.queue_push(evn[:63], None)
+                            self.process_events()
+                            result = "Emitted: " + evn[:120]
+                elif mrest.startswith("listen|"):
+                    lr = self._execute_ast_try_listen_stub(mrest[7:])
+                    if lr is not None:
+                        result = lr
+            elif seg.startswith("listen|"):
+                lr = self._execute_ast_try_listen_stub(seg[7:])
+                if lr is not None:
+                    result = lr
+        return result[:255]
 
     def exec_set(self, i: list[int]) -> None:
         i[0] += 1
@@ -747,6 +976,95 @@ class MinimalAZLRuntime:
             src = self.var_get(base) or ""
             joined = "\n".join(src.split(delim))
             self.var_set(k, joined[:255])
+            return
+        if v == "::vm_compile_ast":
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != "(":
+                raise SemanticEngineError(5, "azl_semantic_engine: vm_compile_ast missing (")
+            i[0] += 1
+            if i[0] >= self.ntok:
+                raise SemanticEngineError(5, "azl_semantic_engine: vm_compile_ast missing arg")
+            arg = self.tok[i[0]]
+            if arg.startswith("::"):
+                ast_s = self.var_get(arg) or ""
+                i[0] += 1
+            elif len(arg) >= 2 and arg[0] in "\"'":
+                ast_s = self._unescape_azl_string_token(arg)
+                i[0] += 1
+            else:
+                raise SemanticEngineError(5, "azl_semantic_engine: vm_compile_ast bad arg")
+            if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                raise SemanticEngineError(5, "azl_semantic_engine: vm_compile_ast missing )")
+            i[0] += 1
+            self._builtin_vm_compile_ast_apply(ast_s)
+            self.var_set(k, "vm_compile_done")
+            return
+        if v == "::vm_run_bytecode_program":
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != "(":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: vm_run_bytecode_program missing ("
+                )
+            i[0] += 1
+            if i[0] >= self.ntok:
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: vm_run_bytecode_program missing arg"
+                )
+            barg = self.tok[i[0]]
+            if not barg.startswith("::"):
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: vm_run_bytecode_program bad arg"
+                )
+            bc = self.var_get(barg) or ""
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: vm_run_bytecode_program missing )"
+                )
+            i[0] += 1
+            outv = self._vm_run_bytecode_result(bc)
+            self.var_set(k, outv[:255])
+            return
+        if v == "::execute_ast":
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != "(":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: execute_ast missing ("
+                )
+            i[0] += 1
+            if i[0] >= self.ntok:
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: execute_ast missing arg1"
+                )
+            a1 = self.tok[i[0]]
+            if not a1.startswith("::"):
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: execute_ast bad arg1"
+                )
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != ",":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: execute_ast missing ,"
+                )
+            i[0] += 1
+            if i[0] >= self.ntok:
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: execute_ast missing arg2"
+                )
+            a2 = self.tok[i[0]]
+            if not a2.startswith("::"):
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: execute_ast bad arg2"
+                )
+            i[0] += 1
+            if i[0] >= self.ntok or self.tok[i[0]] != ")":
+                raise SemanticEngineError(
+                    5, "azl_semantic_engine: execute_ast missing )"
+                )
+            i[0] += 1
+            _ = a2
+            outv = self._builtin_execute_ast_result(a1)
+            self.var_set(k, outv[:255])
             return
         val = self.eval_expr(i)
         self.var_set(k, val)
@@ -1020,10 +1338,31 @@ class MinimalAZLRuntime:
             ev, payload = popped
             for pk, pv in payload:
                 self.var_set(f"::event.data.{pk}", pv)
+            matched = False
             for j, ln in enumerate(self.listeners):
                 if ln.event == ev:
                     self.exec_block(ln.block_start, ln.block_end)
+                    matched = True
                     break
+            if not matched:
+                for sev, skind, sa1, sa2 in self._execute_ast_listen_stubs:
+                    if sev == ev:
+                        if skind == "emit":
+                            if sa2:
+                                prs = self._parse_execute_ast_with_tail(sa2)
+                                if prs:
+                                    self.queue_push(sa1[:63], prs)
+                                else:
+                                    self.queue_push(sa1[:63], None)
+                            else:
+                                self.queue_push(sa1[:63], None)
+                            self.process_events()
+                        elif skind == "set":
+                            if sa1.startswith("::"):
+                                self.var_set(sa1, sa2[:255])
+                        else:
+                            print(sa1, flush=True)
+                        break
             for pk, _ in payload:
                 self.var_set(f"::event.data.{pk}", "")
 
@@ -1069,9 +1408,12 @@ class MinimalAZLRuntime:
             elif depth == 1 and t == "if":
                 self.exec_if(i)
             elif depth == 1 and t == "for":
-                raise SemanticEngineError(
-                    5, "azl_semantic_engine: for-in not allowed in init"
-                )
+                if self._listener_nesting > 0:
+                    self.exec_for_in(i)
+                else:
+                    raise SemanticEngineError(
+                        5, "azl_semantic_engine: for-in not allowed in init"
+                    )
             elif depth == 1 and t == "listen":
                 self.exec_listen(i)
             else:

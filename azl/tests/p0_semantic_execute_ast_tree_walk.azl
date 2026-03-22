@@ -1,0 +1,35 @@
+# Gate F93: non-VM `::execute_ast(::ast, ::scope)` — reads `::ast.nodes` newline steps (`say|TEXT` → stdout + return `Said: TEXT` last); mirrors `azl_interpreter.azl` ~159–162, ~750–768 when `AZL_USE_VM` is off. Gate runner leaves `AZL_USE_VM` unset (same as F86/F87/F89).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p93_execute_ast with { ast: "f93-root", scope: "f93-scope", nodes: "say|F93_LINE_A
+say|F93_LINE_B" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC93_INNER"
+      say ::event.data.result
+      say "P0_SEM_F93_OK"
+    }
+    listen for "p93_execute_ast" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F93_USE_VM_ON_BAD"
+        return
+      }
+      say "TREE_BRANCH"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say "EX93_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

@@ -1,0 +1,35 @@
+# Gate F89: pre-exec shallow pass over AST nodes — `if (::ast != null && ::ast.nodes != null) { for ::n in ::ast.nodes { say ::n } }` (mirrors `azl_interpreter.azl` ~134–139 import/link resolution loop shape). Full AZL uses object-truthy `if ::ast && ::ast.nodes`; minimal stores flat `::ast` + `::ast.nodes` and uses `!= null` + new `&&` for the combined guard.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p89_execute with { ast: "root", scope: "scope-f89", nodes: "import
+link" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC89_INNER"
+      say ::event.data.result
+      say "P0_SEM_F89_OK"
+    }
+    listen for "p89_execute" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      if (::ast != null && ::ast.nodes != null) {
+        say "P89_PRELOOP_ENTER"
+        for ::n in ::ast.nodes {
+          say ::n
+        }
+        say "P89_PRELOOP_DONE"
+      }
+      set ::result = "p89-tw"
+      say "EXEC_F89"
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

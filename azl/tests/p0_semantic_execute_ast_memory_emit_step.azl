@@ -1,0 +1,38 @@
+# Gate F105: `::execute_ast` — `memory|emit|event` queues + drains like top-level `emit|` (F94), scoped as a stub memory-section row. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p105_memory_emit_tree with { ast: "f105-root", scope: "f105-sc", nodes: "say|F105_A
+memory|emit|f105_inner" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC105_INNER"
+      say ::event.data.result
+      say "P0_SEM_F105_OK"
+    }
+    listen for "f105_inner" {
+      say "F105_INNER_BODY"
+    }
+    listen for "p105_memory_emit_tree" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F105_VM_ON_BAD"
+        return
+      }
+      say "F105_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say "EX105_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

@@ -1,0 +1,36 @@
+# Gate F108: `::execute_ast` — consecutive `memory|say|…` rows preserve source order vs a trailing top-level `say|` in the same `.nodes` walk. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p108_memory_multi_row with { ast: "f108-root", scope: "f108-sc", nodes: "memory|say|F108_M1
+memory|say|F108_M2
+say|F108_TAIL" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC108_INNER"
+      say ::event.data.result
+      say "P0_SEM_F108_OK"
+    }
+    listen for "p108_memory_multi_row" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F108_VM_ON_BAD"
+        return
+      }
+      say "F108_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say "EX108_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

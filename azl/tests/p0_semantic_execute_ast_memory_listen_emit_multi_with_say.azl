@@ -1,0 +1,44 @@
+# Gate F117: `::execute_ast` — `memory|listen|ev|emit|inner|with|k1|v1|k2|v2` (F103-shaped under `memory|`), then `memory|emit|ev` drains; token listener on inner reads both payload keys; trailing `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p117_memory_listen_multi_tree with { ast: "f117-root", scope: "f117-sc", nodes: "import|f117_mod_tag
+say|F117_TOP
+memory|listen|f117_mem|emit|f117_nested|with|f117_k1|F117_ONE|f117_k2|F117_TWO
+memory|emit|f117_mem
+memory|say|F117_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC117_INNER"
+      say ::event.data.result
+      say "P0_SEM_F117_OK"
+    }
+    listen for "f117_nested" {
+      say ::event.data.f117_k1
+      say ::event.data.f117_k2
+    }
+    listen for "p117_memory_listen_multi_tree" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F117_VM_ON_BAD"
+        return
+      }
+      say "F117_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX117_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+# Gate F97: `::execute_ast` — `emit|event|with|k1|v1|k2|v2` (multi-key pipe tail; F96 is one pair). `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p97_emit_multi_tree with { ast: "f97-root", scope: "f97-sc", nodes: "say|F97_A
+emit|f97_inner|with|f97_k1|F97_ONE|f97_k2|F97_TWO" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC97_INNER"
+      say ::event.data.result
+      say "P0_SEM_F97_OK"
+    }
+    listen for "f97_inner" {
+      say ::event.data.f97_k1
+      say ::event.data.f97_k2
+    }
+    listen for "p97_emit_multi_tree" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F97_VM_ON_BAD"
+        return
+      }
+      say "F97_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say "EX97_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

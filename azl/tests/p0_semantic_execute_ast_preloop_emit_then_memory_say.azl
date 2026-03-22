@@ -1,0 +1,48 @@
+# Gate F114: `::execute_ast` — preloop `import|` + `link|` then main-loop `emit|…|with|…` then `memory|say|…` (ordering: emit between F98 preloop and memory). `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p114.linked {
+  init {
+    say "P114_LINK_SID"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p114_preloop_emit_memory with { ast: "f114-root", scope: "f114-sc", nodes: "import|f114_mod_tag
+link|::p114.linked
+emit|f114_pre_mem|with|line|F114_PL_LINE
+memory|say|F114_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC114_INNER"
+      say ::event.data.result
+      say "P0_SEM_F114_OK"
+    }
+    listen for "f114_pre_mem" {
+      say ::event.data.line
+    }
+    listen for "p114_preloop_emit_memory" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F114_VM_ON_BAD"
+        return
+      }
+      say "F114_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX114_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

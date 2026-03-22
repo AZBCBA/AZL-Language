@@ -1,0 +1,57 @@
+# Gate F123: `::execute_ast` — preloop `import|` + `link|` (F112) then `component|` (F99) then two `memory|set|…` before F119-shaped stacked `memory|listen|…|say|…` + dual `memory|emit|…` + `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p123.linked {
+  init {
+    say "P123_LINK_SID"
+  }
+}
+
+component ::p123.side {
+  init {
+    say "P123_COMP"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p123_preloop_comp_mem_stack with { ast: "f123-root", scope: "f123-sc", nodes: "import|f123_mod_tag
+link|::p123.linked
+component|p123.side
+memory|set|::p123_acc|acc_first
+memory|set|::p123_acc|acc_second
+memory|listen|f123_e1|say|F123_ONE
+memory|listen|f123_e2|say|F123_TWO
+memory|emit|f123_e1
+memory|emit|f123_e2
+memory|say|F123_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC123_INNER"
+      say ::event.data.result
+      say "P0_SEM_F123_OK"
+    }
+    listen for "p123_preloop_comp_mem_stack" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F123_VM_ON_BAD"
+        return
+      }
+      say "F123_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX123_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

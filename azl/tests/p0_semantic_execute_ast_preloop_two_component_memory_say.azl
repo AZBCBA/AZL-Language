@@ -1,0 +1,59 @@
+# Gate F124: `::execute_ast` — preloop `import|` + `link|` then **`component|`** ×2 with **`memory|say|…`** between (source order). `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p124.linked {
+  init {
+    say "P124_LINK_SID"
+  }
+}
+
+component ::p124.alpha {
+  init {
+    say "P124_ALPHA"
+  }
+}
+
+component ::p124.beta {
+  init {
+    say "P124_BETA"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p124_two_comp_mid with { ast: "f124-root", scope: "f124-sc", nodes: "import|f124_mod_tag
+link|::p124.linked
+component|p124.alpha
+memory|say|F124_MID
+component|p124.beta
+memory|say|F124_END" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC124_INNER"
+      say ::event.data.result
+      say "P0_SEM_F124_OK"
+    }
+    listen for "p124_two_comp_mid" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F124_VM_ON_BAD"
+        return
+      }
+      say "F124_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX124_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

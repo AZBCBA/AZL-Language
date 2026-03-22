@@ -1,0 +1,23 @@
+# Gate F88: `listen for "halt_execution"` — starter listener `emit halt_execution with { … }`, halt body `set ::halted = true` (mirrors `azl_interpreter.azl` ~167–170; ASCII markers replace emoji `say`).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    set ::halted = false
+    emit p88_halt_boot with { }
+  }
+  behavior {
+    listen for "p88_halt_boot" {
+      emit halt_execution with { reason: "p88_gate" }
+    }
+    listen for "halt_execution" {
+      say "P0_HALT_SIGNAL_OK"
+      set ::halted = true
+      say "P0_SEM_F88_OK"
+    }
+  }
+}

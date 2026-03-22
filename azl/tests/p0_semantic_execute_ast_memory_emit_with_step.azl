@@ -1,0 +1,38 @@
+# Gate F106: `::execute_ast` — `memory|emit|event|with|key|value` (F96-shaped payload under `memory|` prefix). `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p106_memory_emit_with_tree with { ast: "f106-root", scope: "f106-sc", nodes: "say|F106_A
+memory|emit|f106_inner|with|f106_slot|F106_PAYLOAD" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC106_INNER"
+      say ::event.data.result
+      say "P0_SEM_F106_OK"
+    }
+    listen for "f106_inner" {
+      say ::event.data.f106_slot
+    }
+    listen for "p106_memory_emit_with_tree" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F106_VM_ON_BAD"
+        return
+      }
+      say "F106_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say "EX106_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}
