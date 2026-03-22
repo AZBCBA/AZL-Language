@@ -384,6 +384,59 @@ class MinimalAZLRuntime:
         if j >= n:
             return None
         t0, v0 = pairs[j]
+        if t0 == "identifier" and v0 == "if":
+            j = self._skip_eol_pairs(pairs, j + 1)
+            if j >= n or pairs[j] != ("paren", "("):
+                return None
+            j = self._skip_eol_pairs(pairs, j + 1)
+            if j >= n or pairs[j][0] != "identifier":
+                return None
+            cond = pairs[j][1]
+            if cond in ("true", "1"):
+                truthy = True
+            elif cond in ("false", "0"):
+                truthy = False
+            else:
+                return None
+            j += 1
+            j = self._skip_eol_pairs(pairs, j)
+            if j >= n or pairs[j] != ("paren", ")"):
+                return None
+            j = self._skip_eol_pairs(pairs, j + 1)
+            if j >= n or pairs[j] != ("brace", "{"):
+                return None
+            jb_open = j
+            close = self._pair_brace_close_index(pairs, jb_open)
+            if close is None:
+                return None
+            jb_close = close
+            if truthy:
+                ji = self._skip_eol_pairs(pairs, jb_open + 1)
+                if ji >= jb_close:
+                    return None
+                if pairs[ji] != ("identifier", "say"):
+                    return None
+                ji = self._skip_eol_pairs(pairs, ji + 1)
+                parts: list[str] = []
+                while ji < jb_close:
+                    t2, v2 = pairs[ji]
+                    if t2 == "eol":
+                        if not parts:
+                            ji += 1
+                            continue
+                        ji += 1
+                        continue
+                    if t2 in ("identifier", "string"):
+                        parts.append(v2)
+                        ji += 1
+                        continue
+                    return None
+                if not parts:
+                    return None
+                msg = " ".join(parts)[:199]
+                seg = ("listen|" + evn + "|say|" + msg)[:255]
+                return (seg, jb_close + 1)
+            return ("", jb_close + 1)
         if t0 == "identifier" and v0 == "say":
             j = self._skip_eol_pairs(pairs, j + 1)
             parts: list[str] = []
@@ -551,7 +604,8 @@ class MinimalAZLRuntime:
     ) -> str | None:
         """If ``pairs`` is exactly the supported component slice, return tab-separated spine text.
 
-        Structured execution slice (not full AST): one ``listen`` whose body is one or more
+        Structured execution slice (not full AST): one or more ``listen for`` blocks (``bh\\tseg``
+        ends each block so same-event listeners register separately), each body one or more
         ``say`` / ``set`` / ``emit`` statements, plus ``init`` and ``memory`` as before.
         """
         n = len(pairs)
@@ -694,6 +748,9 @@ class MinimalAZLRuntime:
                 return None
             if n_bh_here == 0:
                 return None
+            # End of one ``listen for`` block: delimiter so the executor registers a separate
+            # synthetic listener even when the next block uses the same event name (same-event fan-out).
+            bh_lines.append("bh\tseg")
             j = skip_e(l_close + 1)
             while j < b_close and pairs[j][0] == "eol":
                 j = skip_e(j + 1)
@@ -1212,7 +1269,8 @@ class MinimalAZLRuntime:
                         inner_failed = True
                         break
                     line, j2 = parsed_ln
-                    inner_lines.append(line)
+                    if line:
+                        inner_lines.append(line)
                     j = j2
                 if inner_failed or not inner_lines:
                     i += 1
@@ -2060,6 +2118,14 @@ class MinimalAZLRuntime:
         bh_toks: list[str] = []
         cur_ev: str | None = None
         for parts in bh:
+            if len(parts) >= 2 and parts[0] == "bh" and parts[1] == "seg":
+                if cur_ev is not None and bh_toks:
+                    self.register_listener(
+                        cur_ev, 0, 0, synthetic_toks=bh_toks
+                    )
+                bh_toks = []
+                cur_ev = None
+                continue
             if len(parts) < 5 or parts[1] != "listen":
                 return "execute_spine_bad_behavior"
             ev = parts[2][:63]
@@ -2959,16 +3025,25 @@ class MinimalAZLRuntime:
             for pk, pv in payload:
                 self.var_set(f"::event.data.{pk}", pv)
             matched = False
+            seen_non_synthetic = False
             for j, ln in enumerate(self.listeners):
-                if ln.event == ev:
-                    if ln.synthetic_toks is not None:
-                        self._exec_with_tok_swap(
-                            ln.synthetic_toks, 0, len(ln.synthetic_toks)
-                        )
-                    else:
-                        self.exec_block(ln.block_start, ln.block_end)
+                if ln.event != ev:
+                    continue
+                if ln.synthetic_toks is not None:
+                    # ``spine_component_v1``: every synthetic body for this event runs in registration order
+                    # (same-event multi-listener fan-out vs merged rows).
+                    self._exec_with_tok_swap(
+                        ln.synthetic_toks, 0, len(ln.synthetic_toks)
+                    )
                     matched = True
-                    break
+                elif not seen_non_synthetic:
+                    # Token-stream listeners: only the first match per dispatch. The interpreter registers
+                    # nested ``listen`` targets repeatedly across ``interpret`` cycles; fanning all out would
+                    # re-run stale handlers (unbounded work). In-file ``emit_event_resolved`` still walks the
+                    # full ``::listeners[event]`` list for the semantic definition.
+                    self.exec_block(ln.block_start, ln.block_end)
+                    seen_non_synthetic = True
+                    matched = True
             if not matched:
                 for sev, skind, sa1, sa2 in self._execute_ast_listen_stubs:
                     if sev == ev:

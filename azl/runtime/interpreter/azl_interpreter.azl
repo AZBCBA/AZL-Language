@@ -1119,9 +1119,9 @@ component ::azl.interpreter {
       if ::listeners && ::listeners[ev_name] {
         set ::actions = ::listeners[ev_name]
         set ::prev_comp = ( ::azl.security ? ::azl.security.current_component : "" )
-        # In-file tree: every listener entry for ``ev_name`` runs. Python ``minimal_runtime.process_events`` may
-        # dispatch only the first matching registration for an event (spine harness contract); do not claim
-        # identical multi-listener fan-out across carriers from this loop alone.
+        # In-file tree: every listener entry for ``ev_name`` runs. Python ``minimal_runtime.process_events``
+        # fans out all **synthetic** (``spine_component_v1``) registrations for an event; token-stream listeners
+        # use the first match per dispatch so nested ``listen`` churn does not multiply handlers.
         for ::listener in ::actions {
           set ::target_owner = (::listener.owner || ::prev_comp)
           if ::azl.security { ::azl.security.set_current(::target_owner) }
