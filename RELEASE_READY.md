@@ -40,7 +40,7 @@ See **`docs/PROJECT_COMPLETION_STATEMENT.md`** (Tier A vs Tier B roadmap).
 2. `bash scripts/check_azl_native_gates.sh` — **gate 0** runs **`scripts/self_check_release_helpers.sh`** (release helper **`bash -n`**, **`azl_release_tag_policy`** invariants, **`release/native/manifest.json`** via **`jq`** + **`gates[]` / `github_release`** paths on disk; needs **`rg`** + **`jq`**).
 3. `bash scripts/verify_azl_interpreter_semantic_spine_smoke.sh` — Tier B **P0.1b**: real **`azl_interpreter.azl`** **`init`** on Python spine (stub **`::azl.security`**; **`docs/ERROR_SYSTEM.md`** **286–290**).
 
-4. `bash scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh` — Tier B **P0.1c**: stub + **`azl/tests/harness/azl_interpreter_semantic_spine_behavior_entry.azl`** + interpreter; **four** **`emit interpret`** + in-file cache hits + multi-line depth **`say`** (**548–559**).
+4. `bash scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh` — Tier B **P0.1c**: stub + **`azl/tests/harness/azl_interpreter_semantic_spine_behavior_entry.azl`** + interpreter; **five** **`emit interpret`** + in-file cache hits + multi-line depth **`say`** (**548–560**).
 
 5. `bash scripts/enforce_legacy_entrypoint_blocklist.sh`
 6. `bash scripts/verify_native_runtime_live.sh` (minimal bundle — fast C-engine HTTP contract before the long suite)

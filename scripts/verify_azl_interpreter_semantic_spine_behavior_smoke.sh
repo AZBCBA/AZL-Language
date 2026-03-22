@@ -3,12 +3,12 @@
 # Concatenates stub ::azl.security + behavior-entry harness + azl/runtime/interpreter/azl_interpreter.azl,
 # runs tools/azl_runtime_spine_host.py with AZL_ENTRY=azl.spine.behavior.entry, asserts the full in-file chain:
 # interpret → tokenize → parse → execute (say line) → execute_complete listener (Interpretation complete:).
-# Harness: two interpret emits (same code) so the second pass hits in-file tok_cache + ast_cache; third/fourth
-# emits run multi-line embedded code (two then three say statements) for more azl_interpreter.azl surface.
+# Harness: two interpret emits (same code) so the second pass hits in-file tok_cache + ast_cache; third–fifth
+# emits run multi-line embedded code (two, three, then four say statements) for more azl_interpreter.azl surface.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–559).
+# See docs/ERROR_SYSTEM.md (exits 548–560).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -93,8 +93,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=4)}' "$out"; then
-  err "stdout expected >=4 \"Interpretation complete:\" lines (harness four emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=5)}' "$out"; then
+  err "stdout expected >=5 \"Interpretation complete:\" lines (harness five emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -112,6 +112,11 @@ if ! rg -q 'AZL_SPINE_TRIPLE_1' "$out" || ! rg -q 'AZL_SPINE_TRIPLE_2' "$out" ||
   err "stdout missing fourth-interpret three-line say markers AZL_SPINE_TRIPLE_1 / _2 / _3"
   cat "$out" >&2 || true
   exit 559
+fi
+if ! rg -q 'Q5a' "$out" || ! rg -q 'Q5b' "$out" || ! rg -q 'Q5c' "$out" || ! rg -q 'Q5d' "$out"; then
+  err "stdout missing fifth-interpret four-line say markers Q5a / Q5b / Q5c / Q5d (compact: spine ::ast.nodes Var.v 255-byte budget)"
+  cat "$out" >&2 || true
+  exit 560
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"

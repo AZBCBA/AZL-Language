@@ -6,7 +6,7 @@
 #   1) enforce_canonical_stack
 #   2) check_azl_native_gates  (gate 0: self_check_release_helpers + jq/manifest; includes gate H — P0 tokenizer + brace balance)
 #   3) verify_azl_interpreter_semantic_spine_smoke  (Tier B P0.1: real azl_interpreter.azl + stub ::azl.security on Python spine; init only)
-#   4) verify_azl_interpreter_semantic_spine_behavior_smoke  (Tier B P0.1: stub + behavior-entry harness + interpreter; interpret→tokenize→parse→execute bridge)
+#   4) verify_azl_interpreter_semantic_spine_behavior_smoke  (Tier B P0.1c: stub + behavior-entry harness + interpreter; five emit interpret + cache hits + multi-line say depth; ERROR_SYSTEM 548–560)
 #   5) enforce_legacy_entrypoint_blocklist
 #   6) verify_native_runtime_live  (minimal bundle — fast C-engine HTTP contract before long suite)
 #   7) run_all_tests  (scripts/run_tests.sh includes enterprise HTTP + qlha3 + grammar; see run_tests.sh)
