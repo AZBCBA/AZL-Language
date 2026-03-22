@@ -370,8 +370,10 @@ class MinimalAZLRuntime:
             while j < n:
                 t2, v2 = pairs[j]
                 if t2 == "eol":
-                    j += 1
-                    continue
+                    if not ev_parts:
+                        j += 1
+                        continue
+                    break
                 if t2 == "brace" and v2 == "}":
                     break
                 if t2 == "identifier" and v2 == "with":
@@ -407,6 +409,10 @@ class MinimalAZLRuntime:
                         return (seg, j + 1)
                     return None
                 return None
+            if j < n and pairs[j][0] == "eol":
+                j += 1
+                seg = ("listen|" + evn + "|emit|" + inner_ev)[:255]
+                return (seg, j)
             if j >= n or pairs[j] != ("brace", "}"):
                 return None
             seg = ("listen|" + evn + "|emit|" + inner_ev)[:255]

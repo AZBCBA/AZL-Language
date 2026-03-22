@@ -1,0 +1,30 @@
+# Gate F167: ::parse_tokens — listen { say … ; emit … ; } → listen|…|say|… then listen|…|emit|… (bare emit ends at eol)
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f167_parse with { }
+  }
+  behavior {
+    listen for "f167_parse" {
+      set ::tokens = []
+      set ::l1 = "listen for f167 { say F167_SAY"
+      set ::l2 = "emit F167_EMIT"
+      set ::l3 = "}"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::l1, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l2, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 2, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l3, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 3, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F167_OK"
+    }
+  }
+}

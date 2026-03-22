@@ -5127,6 +5127,31 @@ if [ "$F166_C_OUT" != "$F166_PY_OUT" ]; then
   exit 614
 fi
 
+echo "[gate] F167: C vs Python — ::parse_tokens listen { say … ; emit … ; } (bare emit at eol)"
+F167EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_say_emit.azl"
+F167_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F167EX" boot.entry 2>&1)"
+f167_c_rc=$?
+if [ "$f167_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_tokens_listen_say_emit exited $f167_c_rc: $F167_C_OUT"
+  exit 615
+fi
+if ! printf '%s\n' "$F167_C_OUT" | awk 'NR==1{if($0!="listen|f167|say|F167_SAY")exit 1} NR==2{if($0!="listen|f167|emit|F167_EMIT")exit 1} NR==3{if($0!="P0_SEM_F167_OK")exit 1} END{if(NR!=3)exit 1}'; then
+  echo "ERROR: expected F167 parse_tokens stdout (3 lines), got: $F167_C_OUT"
+  exit 615
+fi
+F167_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F167EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f167_py_rc=$?
+if [ "$f167_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_tokens_listen_say_emit exited $f167_py_rc: $F167_PY_OUT"
+  exit 616
+fi
+if [ "$F167_C_OUT" != "$F167_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_tokens_listen_say_emit" >&2
+  echo "C:  $F167_C_OUT" >&2
+  echo "Py: $F167_PY_OUT" >&2
+  exit 617
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

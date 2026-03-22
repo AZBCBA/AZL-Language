@@ -1713,8 +1713,11 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
     int with_idx = -1;
     while (j < np) {
       if (strcmp(pairs[j].typ, "eol") == 0) {
-        j++;
-        continue;
+        if (ev_inner[0] == '\0') {
+          j++;
+          continue;
+        }
+        break;
       }
       if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) {
         break;
@@ -1763,6 +1766,13 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
         return -1;
       }
       return -1;
+    }
+    if (j < np && strcmp(pairs[j].typ, "eol") == 0) {
+      j++;
+      (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|emit|%.119s", evn, ev_inner);
+      if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+      *j_out = j;
+      return 0;
     }
     if (j >= np || strcmp(pairs[j].typ, "brace") != 0 || strcmp(pairs[j].val, "}") != 0) return -1;
     (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|emit|%.119s", evn, ev_inner);
