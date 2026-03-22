@@ -1051,6 +1051,22 @@ static void skip_braced_block(int *i) {
   }
 }
 
+/* *i at `{`: run init statements inside or skip the whole braced block (if/else/otherwise). */
+static void exec_or_skip_braced(int *i, int execute) {
+  if (*i >= g_ntok || strcmp(g_tok[*i], "{") != 0) return;
+  if (execute) {
+    (*i)++;
+    exec_init_block(i);
+    if (*i < g_ntok && strcmp(g_tok[*i], "}") == 0) (*i)++;
+  } else {
+    skip_braced_block(i);
+  }
+}
+
+static int tok_is_if_alternate_branch(const char *t) {
+  return t && (strcmp(t, "else") == 0 || strcmp(t, "otherwise") == 0);
+}
+
 static void exec_if(int *i) {
   (*i)++;
   char cond[256] = {0};
@@ -1063,26 +1079,14 @@ static void exec_if(int *i) {
     exit(5);
   }
   int took_then = cond_is_true(cond) ? 1 : 0;
-  if (took_then) {
-    (*i)++;
-    exec_init_block(i);
-    if (*i < g_ntok && strcmp(g_tok[*i], "}") == 0) (*i)++;
-  } else {
-    skip_braced_block(i);
-  }
-  if (*i < g_ntok && strcmp(g_tok[*i], "else") == 0) {
+  exec_or_skip_braced(i, took_then);
+  if (*i < g_ntok && tok_is_if_alternate_branch(g_tok[*i])) {
     (*i)++;
     if (*i >= g_ntok || strcmp(g_tok[*i], "{") != 0) {
       mini_expr_error("else missing {");
       exit(5);
     }
-    if (took_then) {
-      skip_braced_block(i);
-    } else {
-      (*i)++;
-      exec_init_block(i);
-      if (*i < g_ntok && strcmp(g_tok[*i], "}") == 0) (*i)++;
-    }
+    exec_or_skip_braced(i, !took_then);
   }
 }
 
