@@ -4,7 +4,7 @@
 
 **Continuity for AI/humans (read first in a new session):** [AI_MAINTAINER_CONTINUITY_HANDOFF.md](AI_MAINTAINER_CONTINUITY_HANDOFF.md). **Repo root:** [../AGENTS.md](../AGENTS.md). **Cursor:** `.cursor/rules/azl-continuity.mdc` (**alwaysApply**).
 
-**How to use:** Before starting a new initiative, check **§ Consensus** and **§ Phases**. When scope changes, **edit this file** and cross-link gates in **[ERROR_SYSTEM.md](ERROR_SYSTEM.md)** and verification scripts (native parity **`scripts/check_azl_native_gates.sh`** through **F2–F148** on **`azl/tests/p0_semantic_*.azl`** as of 2026-03-22). **Semantic spine sequencing** (vertical slices toward self-host, not feature sprawl): **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** § **P0.1 — Long-term execution order** + **[TIER_B_BACKLOG.md](TIER_B_BACKLOG.md)** § **P0.1 execution checklist**.
+**How to use:** Before starting a new initiative, check **§ Consensus** and **§ Phases**. When scope changes, **edit this file** and cross-link gates in **[ERROR_SYSTEM.md](ERROR_SYSTEM.md)** and verification scripts (native parity **`scripts/check_azl_native_gates.sh`** through **F2–F160** on **`azl/tests/p0_semantic_*.azl`** as of 2026-03-22). **Semantic spine sequencing** (vertical slices toward self-host, not feature sprawl): **[PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md)** § **P0.1 — Long-term execution order** + **[TIER_B_BACKLOG.md](TIER_B_BACKLOG.md)** § **P0.1 execution checklist**.
 
 **Last updated:** 2026-03-21
 
