@@ -29,7 +29,7 @@
 2. **`check_azl_native_gates.sh`**  
 3. **`verify_azl_interpreter_semantic_spine_smoke.sh`** — real **`azl/runtime/interpreter/azl_interpreter.azl`** on Python semantic spine (stub **`::azl.security`**; **`init`** only)
 
-4. **`verify_azl_interpreter_semantic_spine_behavior_smoke.sh`** — stub + harness + interpreter; **`emit interpret`** through tokenize/parse/execute/**execute_complete** (**ERROR_SYSTEM** **548–555**)  
+4. **`verify_azl_interpreter_semantic_spine_behavior_smoke.sh`** — stub + harness + interpreter; **two** **`emit interpret`** (cache round-trip); **ERROR_SYSTEM** **548–557**  
 5. **`enforce_legacy_entrypoint_blocklist.sh`**  
 6. **`verify_native_runtime_live.sh`**  
 7. **`run_all_tests.sh`** (includes enterprise HTTP, LHA3/quantum verify, grammar, VM, azlpack, LSP, …)
