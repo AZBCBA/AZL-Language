@@ -1,0 +1,62 @@
+# Gate F129: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **bare** **`memory|emit|ev`** (no `|with|`, queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p129.linked {
+  init {
+    say "P129_LINK_SID"
+  }
+}
+
+component ::p129.a {
+  init {
+    say "P129_A"
+  }
+}
+
+component ::p129.b {
+  init {
+    say "P129_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p129_comp_bare_emit_comp with { ast: "f129-root", scope: "f129-sc", nodes: "import|f129_mod_tag
+link|::p129.linked
+component|p129.a
+memory|emit|f129_bare
+component|p129.b
+memory|say|F129_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC129_INNER"
+      say ::event.data.result
+      say "P0_SEM_F129_OK"
+    }
+    listen for "f129_bare" {
+      say "F129_BARE_DRAIN"
+    }
+    listen for "p129_comp_bare_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F129_VM_ON_BAD"
+        return
+      }
+      say "F129_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX129_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}
