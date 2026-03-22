@@ -1,0 +1,30 @@
+# Gate F179: ::parse_tokens — listen { set … ; emit "EV" with { k: v } ; } (quoted event name)
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f179_parse with { }
+  }
+  behavior {
+    listen for "f179_parse" {
+      set ::tokens = []
+      set ::l1 = "listen for f179 { set ::g179 = V179"
+      set ::l2 = "emit \"E179Q\" with { k179: v179 }"
+      set ::l3 = "}"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::l1, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l2, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 2, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l3, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 3, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F179_OK"
+    }
+  }
+}

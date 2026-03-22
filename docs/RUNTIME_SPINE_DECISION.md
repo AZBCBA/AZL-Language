@@ -2,7 +2,7 @@
 
 **Purpose:** One place to read **how native execution is supposed to work** and **what is true today**. Contributors should use this doc instead of inferring architecture only from shell defaults.
 
-**Last updated:** 2026-03-23
+**Last updated:** 2026-03-24
 
 ---
 
@@ -22,6 +22,10 @@
 | 2 | **`AZL_SPINE_EXEC_OWNER=minimal_runtime_python`** | **Today’s exec carrier** on the **semantic launcher path only** — Python `minimal_runtime` steps **`.azl`** sources. Not “Python defines AZL,” not a statement that the **default** enterprise child has left **C minimal**, and **not** a fake owner flip toward target state. |
 
 **G2 does not:** change default spine policy, assert full in-file semantic coverage, or claim **C minimal** has been retired from the default path.
+
+### `minimal_runtime` / C-minimal contract: env vars (non-exhaustive)
+
+Interpreter-shaped fixtures read the real process environment via **`::internal.env("…")`** (Python **`os.environ`**, C **`getenv`**). Common keys exercised by parity gates: **`AZL_USE_VM`** (**`"1"`** selects the VM branch — **F90–F92**; unset or other keeps the tree-walk path — **F87**, **F93–F148**), **`AZL_STRICT`** (strict/halt shaping in **F3** / init-shaped slices). When adding behavior, grep for **`env("`** in `azl_interpreter.azl` and extend fixtures or docs in lockstep.
 
 ---
 

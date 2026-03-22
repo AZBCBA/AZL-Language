@@ -1,0 +1,30 @@
+# Gate F175: ::parse_tokens — listen { emit … ; set … ; } (order regression vs F171)
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f175_parse with { }
+  }
+  behavior {
+    listen for "f175_parse" {
+      set ::tokens = []
+      set ::l1 = "listen for f175 { emit E175"
+      set ::l2 = "set ::g175 = V175"
+      set ::l3 = "}"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::l1, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l2, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 2, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l3, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 3, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F175_OK"
+    }
+  }
+}
