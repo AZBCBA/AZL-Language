@@ -32,7 +32,7 @@
 | Tokenizer + `{`/`}` balance on real interpreter file | Gate **H** — `scripts/verify_p0_interpreter_tokenizer_boundary.sh` |
 | Spine resolver + error surface | Gate **G** — `scripts/verify_runtime_spine_contract.sh` |
 | Real interpreter source on Python spine (**`init`**) | **`scripts/verify_azl_interpreter_semantic_spine_smoke.sh`** (step **3** of **`run_full_repo_verification.sh`**) + **`azl/tests/stubs/azl_security_for_interpreter_spine.azl`** — P0.1b; exits **286–290** in [ERROR_SYSTEM.md](ERROR_SYSTEM.md) |
-| Real interpreter **interpret** pipeline (eight **`emit interpret`**, **≥4** **`(cache hit)`**, multi-line **`say`**, duplicate **`AZL_S6_ONLY`**, **`AZL_S8_MARK`**) | **`scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh`** (step **4**) + harness **`azl/tests/harness/azl_interpreter_semantic_spine_behavior_entry.azl`** — P0.1c; exits **548–562** in [ERROR_SYSTEM.md](ERROR_SYSTEM.md) |
+| Real interpreter **interpret** pipeline (nine **`emit interpret`**, **≥4** **`(cache hit)`**, multi-line **`say`**, duplicate **`AZL_S6_ONLY`**, **`AZL_S8_MARK`**, **`AZL_SPINE_P9_SET_LINE`**) | **`scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh`** (step **4**) + harness **`azl/tests/harness/azl_interpreter_semantic_spine_behavior_entry.azl`** — P0.1c; exits **548–562**, **611** in [ERROR_SYSTEM.md](ERROR_SYSTEM.md) |
 | **P0.1 long-term sequencing** (vertical slices: tokenize → parse → execute) | [PROJECT_COMPLETION_ROADMAP.md](PROJECT_COMPLETION_ROADMAP.md) § **P0.1**; sprint checklist [TIER_B_BACKLOG.md](TIER_B_BACKLOG.md) § **P0.1 execution checklist** |
 
 Source of truth for current vs target: [RUNTIME_SPINE_DECISION.md](RUNTIME_SPINE_DECISION.md).

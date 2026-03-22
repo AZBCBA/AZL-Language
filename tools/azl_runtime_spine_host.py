@@ -16,7 +16,7 @@ sets AZL_COMBINED_PATH and AZL_ENTRY=azl.interpreter, and asserts clean `init` (
 
 P0.1c (release): `scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh` adds
 `azl/tests/harness/azl_interpreter_semantic_spine_behavior_entry.azl`, uses AZL_ENTRY=azl.spine.behavior.entry,
-and asserts eight interpret passes + execute_complete + >=4 in-file (cache hit) lines (two duplicate-code pairs) + multi-line embedded say depth + duplicate AZL_S6_ONLY + AZL_S8_MARK literal pass (ERROR_SYSTEM.md exits 548–562).
+and asserts nine interpret passes + execute_complete + >=4 in-file (cache hit) lines (two duplicate-code pairs) + multi-line embedded say depth + duplicate AZL_S6_ONLY + AZL_S8_MARK literal pass + set+say P9 marker (ERROR_SYSTEM.md exits 548–562, 611).
 
 Exit codes:
   71 — ERR_AZL_COMBINED_PATH_INVALID
