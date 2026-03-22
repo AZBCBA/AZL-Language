@@ -1241,7 +1241,7 @@ static void execute_ast_set_line(const char *after_set, char *result, size_t rsz
 
 static void execute_ast_listen_line(const char *after_listen, char *result, size_t rsz);
 
-/* memory|set|::k|v, memory|say|text, memory|emit|…, memory|listen|… — stub memory rows (F104–F129; F115+ = memory|listen|… same stub table as listen|). */
+/* memory|set|::k|v, memory|say|text, memory|emit|…, memory|listen|… — stub memory rows (F104–F130; F115+ = memory|listen|… same stub table as listen|). */
 static void execute_ast_memory_line(const char *after_mem, char *result, size_t rsz) {
   const char *p = after_mem ? after_mem : "";
   if (strncmp(p, "listen|", 7U) == 0) {

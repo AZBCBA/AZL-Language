@@ -1,0 +1,66 @@
+# Gate F130: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **two** bare **`memory|emit|ev`** rows (no `|with|`, FIFO queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p130.linked {
+  init {
+    say "P130_LINK_SID"
+  }
+}
+
+component ::p130.a {
+  init {
+    say "P130_A"
+  }
+}
+
+component ::p130.b {
+  init {
+    say "P130_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p130_comp_dual_bare_emit_comp with { ast: "f130-root", scope: "f130-sc", nodes: "import|f130_mod_tag
+link|::p130.linked
+component|p130.a
+memory|emit|f130_e1
+memory|emit|f130_e2
+component|p130.b
+memory|say|F130_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC130_INNER"
+      say ::event.data.result
+      say "P0_SEM_F130_OK"
+    }
+    listen for "f130_e1" {
+      say "F130_BARE_1"
+    }
+    listen for "f130_e2" {
+      say "F130_BARE_2"
+    }
+    listen for "p130_comp_dual_bare_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F130_VM_ON_BAD"
+        return
+      }
+      say "F130_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX130_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}
