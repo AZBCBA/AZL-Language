@@ -10,6 +10,7 @@
 #   - sixth emit interpret (single-line literal say) — another full interpret→tokenize→parse→execute after smoke5; stdout marker AZL_S6_ONLY.
 #   - seventh emit interpret (same code as sixth) — second tok_cache + ast_cache round-trip on AZL_S6_ONLY source (mirrors smoke/smoke2).
 #   - eighth emit interpret (single-line literal say, new code) — distinct marker AZL_S8_MARK; cache miss on tok/ast for this snippet.
+#   - ninth emit interpret (set global then say) — exercises ::execute_ast set|… row on real interpret→parse→execute chain (not covered by say-only smokes).
 
 component ::azl.spine.behavior.entry {
   init {
@@ -30,6 +31,8 @@ say Q5d", component_name: "smoke5" }
     emit interpret with { code: "say 'AZL_S6_ONLY'", component_name: "smoke6" }
     emit interpret with { code: "say 'AZL_S6_ONLY'", component_name: "smoke7" }
     emit interpret with { code: "say 'AZL_S8_MARK'", component_name: "smoke8" }
+    emit interpret with { code: "set ::azl_spine_p9 = 1
+say AZL_SPINE_P9_SET_LINE", component_name: "smoke9" }
     say "AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT"
   }
 }
