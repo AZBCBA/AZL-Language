@@ -7,7 +7,8 @@
 #   - fourth emit interpret (three-line user code) — deeper parse loop + three say executes;
 #   - fifth emit interpret (four-line user code) — deeper parse loop + four say executes;
 #     markers Q5a–Q5d are intentionally short: semantic spine Var.v / ::ast.nodes budget is 255 bytes (see minimal_runtime ::parse_tokens).
-#   - sixth emit interpret (single-line literal say) — another full interpret→tokenize→parse→execute after smoke5; distinct stdout marker AZL_S6_ONLY.
+#   - sixth emit interpret (single-line literal say) — another full interpret→tokenize→parse→execute after smoke5; stdout marker AZL_S6_ONLY.
+#   - seventh emit interpret (same code as sixth) — second tok_cache + ast_cache round-trip on AZL_S6_ONLY source (mirrors smoke/smoke2).
 
 component ::azl.spine.behavior.entry {
   init {
@@ -26,6 +27,7 @@ say Q5b
 say Q5c
 say Q5d", component_name: "smoke5" }
     emit interpret with { code: "say 'AZL_S6_ONLY'", component_name: "smoke6" }
+    emit interpret with { code: "say 'AZL_S6_ONLY'", component_name: "smoke7" }
     say "AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT"
   }
 }

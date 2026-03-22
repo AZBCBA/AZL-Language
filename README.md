@@ -60,7 +60,7 @@ bash scripts/verify_enterprise_native_http_live.sh
 
 **Strength bar (gates + live capabilities in one command):** `bash scripts/verify_azl_strength_bar.sh` — see [docs/AZL_DOCUMENTATION_CANON.md](docs/AZL_DOCUMENTATION_CANON.md) §1.7.
 
-**Full verification (release order + all tests):** `bash scripts/run_full_repo_verification.sh` — eight steps (**0–7**), including **`scripts/verify_azl_interpreter_semantic_spine_smoke.sh`** (**`init`**, P0.1b) and **`scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh`** (P0.1c: **six** **`emit interpret`** + cache + multi-line embedded **`say`** + **`AZL_S6_ONLY`**; [ERROR_SYSTEM.md](docs/ERROR_SYSTEM.md) exits **548–561**); set `RUN_OPTIONAL_BENCHES=0` to skip LLM benches.
+**Full verification (release order + all tests):** `bash scripts/run_full_repo_verification.sh` — eight steps (**0–7**), including **`scripts/verify_azl_interpreter_semantic_spine_smoke.sh`** (**`init`**, P0.1b) and **`scripts/verify_azl_interpreter_semantic_spine_behavior_smoke.sh`** (P0.1c: **seven** **`emit interpret`**, **≥4** **`(cache hit)`**, duplicate **`AZL_S6_ONLY`**; [ERROR_SYSTEM.md](docs/ERROR_SYSTEM.md) exits **548–561**); set `RUN_OPTIONAL_BENCHES=0` to skip LLM benches.
 
 Release profile details: `RELEASE_READY.md` and `release/native/manifest.json`.
 

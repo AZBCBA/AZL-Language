@@ -3,8 +3,8 @@
 # Concatenates stub ::azl.security + behavior-entry harness + azl/runtime/interpreter/azl_interpreter.azl,
 # runs tools/azl_runtime_spine_host.py with AZL_ENTRY=azl.spine.behavior.entry, asserts the full in-file chain:
 # interpret → tokenize → parse → execute (say line) → execute_complete listener (Interpretation complete:).
-# Harness: two interpret emits (same code) so the second pass hits in-file tok_cache + ast_cache; third–fifth
-# emits run multi-line embedded say depth; sixth is another single-line literal say (smoke6) for an extra full interpret round.
+# Harness: smoke/smoke2 same code → cache hits; third–fifth multi-line embedded say depth; smoke6 literal AZL_S6_ONLY;
+# smoke7 repeats smoke6 code → second pair of (cache hit) lines on that snippet.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
@@ -93,13 +93,13 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=6)}' "$out"; then
-  err "stdout expected >=6 \"Interpretation complete:\" lines (harness six emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=7)}' "$out"; then
+  err "stdout expected >=7 \"Interpretation complete:\" lines (harness seven emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
-if ! awk '/\(cache hit\)/{n++} END{exit !(n>=2)}' "$out"; then
-  err "stdout expected >=2 in-file \"(cache hit)\" lines (tokenize + parse cache on second interpret)"
+if ! awk '/\(cache hit\)/{n++} END{exit !(n>=4)}' "$out"; then
+  err "stdout expected >=4 in-file \"(cache hit)\" lines (smoke2 + smoke7: tokenize + parse cache per duplicate code)"
   cat "$out" >&2 || true
   exit 557
 fi
@@ -118,8 +118,8 @@ if ! rg -q 'Q5a' "$out" || ! rg -q 'Q5b' "$out" || ! rg -q 'Q5c' "$out" || ! rg 
   cat "$out" >&2 || true
   exit 560
 fi
-if ! rg -q 'AZL_S6_ONLY' "$out"; then
-  err "stdout missing sixth-interpret literal say marker AZL_S6_ONLY"
+if ! awk '/AZL_S6_ONLY/{n++} END{exit !(n>=2)}' "$out"; then
+  err "stdout expected >=2 lines containing AZL_S6_ONLY (sixth + seventh interpret same code)"
   cat "$out" >&2 || true
   exit 561
 fi
