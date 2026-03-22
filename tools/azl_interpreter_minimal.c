@@ -27,6 +27,10 @@
 #define MAX_PAYLOAD_KEYS 8
 /* Var string values (tz concat buffers, ::tokens); larger than execute_ast row cap (255). */
 #define AZL_MINIMAL_VAR_CAP 2048
+/* Worst listen|…|emit|…|with|… chunk < 400 chars + NUL; use for C minimal parse buffers. */
+#define AZL_LISTEN_CHUNK_NEED 400U
+#define AZL_LISTEN_CHUNK_CAP 432U
+#define AZL_EMIT_CHUNK_CAP 384U
 
 typedef struct { char key[48]; char v[256]; } PayloadKV;
 typedef struct {
@@ -96,6 +100,20 @@ static char g_exec_ast_fn_say[MAX_EXEC_AST_FN][200];
 static int g_n_exec_ast_fn;
 
 static void exec_ast_fn_reset(void) { g_n_exec_ast_fn = 0; }
+
+/* Copy at most min(max_print, dstsz-1) chars from src (explicit bounds; no snprintf tail warnings). */
+static void azl_fmt_cat_field(char *dst, size_t dstsz, int max_print, const char *src) {
+  if (!dst || dstsz == 0U) return;
+  dst[0] = '\0';
+  if (dstsz == 1U || !src) return;
+  size_t cap = dstsz - 1U;
+  size_t lim = max_print < 0 ? 0U : (size_t)max_print;
+  if (lim > cap) lim = cap;
+  size_t n = 0;
+  while (n < lim && src[n] != '\0') n++;
+  if (n > 0U) memcpy(dst, src, n);
+  dst[n] = '\0';
+}
 
 static void exec_ast_fn_set(const char *name, const char *say_pay) {
   if (!name || !name[0] || !say_pay || !say_pay[0]) return;
@@ -1694,17 +1712,18 @@ spine_bad:
 static void builtin_execute_ast_into(char *val, size_t valsz, const char *ast_base) {
   char nodes_key[160];
   char kem[160];
+  /* Both keys use ast_base + suffix; keep prefix within (sizeof-1-suffix) so snprintf is provably bounded. */
   if (!ast_base || !ast_base[0] || strlen(ast_base) + 7U >= sizeof(nodes_key)) {
     (void)snprintf(val, valsz, "execute_ast_bad_base");
     return;
   }
-  (void)snprintf(kem, sizeof(kem), "%s.exec_model", ast_base);
+  (void)snprintf(kem, sizeof(kem), "%.148s.exec_model", ast_base);
   const char *execm = var_get(kem);
   if (execm && strcmp(execm, "spine_component_v1") == 0) {
     builtin_execute_spine_v1_into(val, valsz, ast_base);
     return;
   }
-  (void)snprintf(nodes_key, sizeof(nodes_key), "%s.nodes", ast_base);
+  (void)snprintf(nodes_key, sizeof(nodes_key), "%.153s.nodes", ast_base);
   const char *nodes0 = var_get(nodes_key);
   char result[256];
   (void)snprintf(result, sizeof(result), "Execution completed");
@@ -1892,9 +1911,10 @@ static void builtin_tokenize_line_c(const char *line_text, const char *line_no_s
     if (olen + (olen ? 1U : 0U) + rlen + 1U >= outcap) break;
     if (olen) {
       out[olen++] = '\n';
-      out[olen] = '\0';
     }
-    (void)snprintf(out + olen, outcap - olen, "%s", row);
+    memcpy(out + olen, row, rlen);
+    olen += rlen;
+    out[olen] = '\0';
   }
 }
 
@@ -2016,6 +2036,8 @@ static int parse_with_brace_payload(ParseTokPair *pairs, int np, int j, int *j_o
 static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const char *evn, char *chunk_out,
                                    size_t chunk_sz, int *j_out) {
   chunk_out[0] = '\0';
+  if (chunk_sz < AZL_LISTEN_CHUNK_NEED)
+    return -1;
   if (j >= np) return -1;
   if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "say") == 0) {
     j = parse_skip_eol(pairs, np, j + 1);
@@ -2046,7 +2068,7 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
         if (ml > 0U && ml + 1U < sizeof(msg)) msg[ml++] = ' ';
         size_t rem = sizeof(msg) - ml - 1U;
         if (rem > 0U) {
-          (void)snprintf(msg + ml, rem, "%.199s", pairs[j].val);
+          azl_fmt_cat_field(msg + ml, rem, 199, pairs[j].val);
           ml = strlen(msg);
           if (ml > 199U) {
             msg[199] = '\0';
@@ -2085,7 +2107,7 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
         if (el > 0U && el + 1U < sizeof(ev_inner)) ev_inner[el++] = ' ';
         size_t rem = sizeof(ev_inner) - el - 1U;
         if (rem > 0U) {
-          (void)snprintf(ev_inner + el, rem, "%.119s", pairs[j].val);
+          azl_fmt_cat_field(ev_inner + el, rem, 119, pairs[j].val);
           el = strlen(ev_inner);
           if (el > 119U) {
             ev_inner[119] = '\0';
@@ -2104,7 +2126,7 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
       if (parse_with_brace_payload(pairs, np, with_idx + 1, &j2, wtail, sizeof(wtail)) != 0) return -1;
       j = j2;
       if (wtail[0]) {
-        (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|emit|%.119s|with|%s", evn, ev_inner, wtail);
+        (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|emit|%.119s|with|%.199s", evn, ev_inner, wtail);
       } else {
         (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|emit|%.119s", evn, ev_inner);
       }
@@ -2155,14 +2177,14 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
           continue;
         }
         j++;
-        (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|set|%s|%.199s", evn, varn, rhs);
+        (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|set|%.79s|%.199s", evn, varn, rhs);
         if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
         *j_out = j;
         return 0;
       }
       if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) {
         if (rhs[0] == '\0') return -1;
-        (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|set|%s|%.199s", evn, varn, rhs);
+        (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|set|%.79s|%.199s", evn, varn, rhs);
         if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
         *j_out = j + 1;
         return 0;
@@ -2171,7 +2193,7 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
         if (rl > 0U && rl + 1U < sizeof(rhs)) rhs[rl++] = ' ';
         size_t rem = sizeof(rhs) - rl - 1U;
         if (rem > 0U) {
-          (void)snprintf(rhs + rl, rem, "%.199s", pairs[j].val);
+          azl_fmt_cat_field(rhs + rl, rem, 199, pairs[j].val);
           rl = strlen(rhs);
           if (rl > 199U) {
             rhs[199] = '\0';
@@ -2509,7 +2531,7 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
           if (ml > 0U && ml + 1U < sizeof(msg)) msg[ml++] = ' ';
           size_t rem = sizeof(msg) - ml - 1U;
           if (rem > 0U) {
-            (void)snprintf(msg + ml, rem, "%.199s", pairs[j].val);
+            azl_fmt_cat_field(msg + ml, rem, 199, pairs[j].val);
             ml = strlen(msg);
             if (ml > 199U) {
               msg[199] = '\0';
@@ -2558,7 +2580,7 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
           if (rl > 0U && rl + 1U < sizeof(rhs)) rhs[rl++] = ' ';
           size_t rem = sizeof(rhs) - rl - 1U;
           if (rem > 0U) {
-            (void)snprintf(rhs + rl, rem, "%.199s", pairs[j].val);
+            azl_fmt_cat_field(rhs + rl, rem, 199, pairs[j].val);
             rl = strlen(rhs);
             if (rl > 199U) {
               rhs[199] = '\0';
@@ -2572,7 +2594,7 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
       }
       if (rhs[0]) {
         char chunk[320];
-        (void)snprintf(chunk, sizeof(chunk), "set|%s|%.199s", varn, rhs);
+        (void)snprintf(chunk, sizeof(chunk), "set|%.79s|%.199s", varn, rhs);
         parse_acc_append(acc, sizeof(acc), chunk);
       }
       i = j;
@@ -2607,7 +2629,7 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
           if (rl2 > 0U && rl2 + 1U < sizeof(rhs_let)) rhs_let[rl2++] = ' ';
           size_t rem = sizeof(rhs_let) - rl2 - 1U;
           if (rem > 0U) {
-            (void)snprintf(rhs_let + rl2, rem, "%.199s", pairs[j].val);
+            azl_fmt_cat_field(rhs_let + rl2, rem, 199, pairs[j].val);
             rl2 = strlen(rhs_let);
             if (rl2 > 199U) {
               rhs_let[199] = '\0';
@@ -2621,7 +2643,7 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
       }
       if (rhs_let[0]) {
         char chunk_let[320];
-        (void)snprintf(chunk_let, sizeof(chunk_let), "let|%s|%.199s", varn_let, rhs_let);
+        (void)snprintf(chunk_let, sizeof(chunk_let), "let|%.79s|%.199s", varn_let, rhs_let);
         parse_acc_append(acc, sizeof(acc), chunk_let);
       }
       i = j;
@@ -2644,7 +2666,7 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
           if (el > 0U && el + 1U < sizeof(ev)) ev[el++] = ' ';
           size_t rem = sizeof(ev) - el - 1U;
           if (rem > 0U) {
-            (void)snprintf(ev + el, rem, "%.119s", pairs[j].val);
+            azl_fmt_cat_field(ev + el, rem, 119, pairs[j].val);
             el = strlen(ev);
             if (el > 119U) {
               ev[119] = '\0';
@@ -2664,9 +2686,9 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
         int j2 = 0;
         char wtail[200];
         if (parse_with_brace_payload(pairs, np, with_idx + 1, &j2, wtail, sizeof(wtail)) == 0) {
-          char chunk[320];
+          char chunk[AZL_EMIT_CHUNK_CAP];
           if (wtail[0]) {
-            (void)snprintf(chunk, sizeof(chunk), "emit|%.119s|with|%s", ev, wtail);
+            (void)snprintf(chunk, sizeof(chunk), "emit|%.119s|with|%.199s", ev, wtail);
             if (strlen(chunk) > 254U) chunk[254] = '\0';
             parse_acc_append(acc, sizeof(acc), chunk);
           } else {
@@ -2743,7 +2765,7 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
             if (ml > 0U && ml + 1U < sizeof(msg)) msg[ml++] = ' ';
             size_t rem = sizeof(msg) - ml - 1U;
             if (rem > 0U) {
-              (void)snprintf(msg + ml, rem, "%.199s", pairs[j].val);
+              azl_fmt_cat_field(msg + ml, rem, 199, pairs[j].val);
               ml = strlen(msg);
               if (ml > 199U) {
                 msg[199] = '\0';
@@ -2792,7 +2814,7 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
             if (rl > 0U && rl + 1U < sizeof(rhs)) rhs[rl++] = ' ';
             size_t rem = sizeof(rhs) - rl - 1U;
             if (rem > 0U) {
-              (void)snprintf(rhs + rl, rem, "%.199s", pairs[j].val);
+              azl_fmt_cat_field(rhs + rl, rem, 199, pairs[j].val);
               rl = strlen(rhs);
               if (rl > 199U) {
                 rhs[199] = '\0';
@@ -2806,7 +2828,7 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
         }
         if (rhs[0]) {
           char chunk[360];
-          (void)snprintf(chunk, sizeof(chunk), "memory|set|%s|%.199s", varn, rhs);
+          (void)snprintf(chunk, sizeof(chunk), "memory|set|%.79s|%.199s", varn, rhs);
           parse_acc_append(acc, sizeof(acc), chunk);
         }
         i = j;
@@ -2829,7 +2851,7 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
             if (el > 0U && el + 1U < sizeof(ev)) ev[el++] = ' ';
             size_t rem = sizeof(ev) - el - 1U;
             if (rem > 0U) {
-              (void)snprintf(ev + el, rem, "%.119s", pairs[j].val);
+              azl_fmt_cat_field(ev + el, rem, 119, pairs[j].val);
               el = strlen(ev);
               if (el > 119U) {
                 ev[119] = '\0';
@@ -2849,9 +2871,9 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
           int j2 = 0;
           char wtail[200];
           if (parse_with_brace_payload(pairs, np, with_idx + 1, &j2, wtail, sizeof(wtail)) == 0) {
-            char chunk[360];
+            char chunk[AZL_EMIT_CHUNK_CAP];
             if (wtail[0]) {
-              (void)snprintf(chunk, sizeof(chunk), "memory|emit|%.119s|with|%s", ev, wtail);
+              (void)snprintf(chunk, sizeof(chunk), "memory|emit|%.119s|with|%.199s", ev, wtail);
               if (strlen(chunk) > 254U) chunk[254] = '\0';
               parse_acc_append(acc, sizeof(acc), chunk);
             } else {
@@ -2905,7 +2927,7 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
         continue;
       }
       j = parse_skip_eol(pairs, np, j + 1);
-      char lchunk[320];
+      char lchunk[AZL_LISTEN_CHUNK_CAP];
       size_t acc_save_len = strlen(acc);
       int jpos = j;
       int stmts = 0;
@@ -2960,7 +2982,7 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
         continue;
       }
       jo = parse_skip_eol(pairs, np, jo + 1);
-      char on_chunk[320];
+      char on_chunk[AZL_LISTEN_CHUNK_CAP];
       int j2on = 0;
       if (parse_listen_inner_body(pairs, np, jo, "__dummy_on__", on_chunk, sizeof(on_chunk), &j2on) != 0) {
         i++;
