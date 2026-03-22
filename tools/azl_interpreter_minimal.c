@@ -1413,7 +1413,7 @@ static void builtin_execute_ast_into(char *val, size_t valsz, const char *ast_ba
   (void)snprintf(val, valsz, "%s", result);
 }
 
-/* --- tz buffer: tokenize_line (per-line) + parse_tokens (say + operand) — parity with minimal_runtime.py --- */
+/* --- tz buffer: tokenize_line (per-line) + parse_tokens (say/set/emit/import/link/component/listen/memory…) — parity with minimal_runtime.py --- */
 
 static int tl_id_char(int c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
@@ -2016,6 +2016,161 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
         i = j + 1;
         continue;
       }
+    }
+    if (strcmp(pairs[i].typ, "identifier") == 0 && strcmp(pairs[i].val, "memory") == 0) {
+      int jm = parse_skip_eol(pairs, np, i + 1);
+      if (jm >= np) {
+        i++;
+        continue;
+      }
+      if (strcmp(pairs[jm].typ, "identifier") != 0) {
+        i++;
+        continue;
+      }
+      if (strcmp(pairs[jm].val, "say") == 0) {
+        int j = parse_skip_eol(pairs, np, jm + 1);
+        char msg[224];
+        msg[0] = '\0';
+        size_t ml = 0;
+        while (j < np) {
+          if (strcmp(pairs[j].typ, "eol") == 0) break;
+          if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) break;
+          if (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0) {
+            if (ml > 0U && ml + 1U < sizeof(msg)) msg[ml++] = ' ';
+            size_t rem = sizeof(msg) - ml - 1U;
+            if (rem > 0U) {
+              (void)snprintf(msg + ml, rem, "%.199s", pairs[j].val);
+              ml = strlen(msg);
+              if (ml > 199U) {
+                msg[199] = '\0';
+                ml = 199U;
+              }
+            }
+            j++;
+            continue;
+          }
+          break;
+        }
+        if (msg[0]) {
+          char chunk[320];
+          (void)snprintf(chunk, sizeof(chunk), "memory|say|%.199s", msg);
+          parse_acc_append(acc, sizeof(acc), chunk);
+          i = j;
+          continue;
+        }
+      }
+      if (strcmp(pairs[jm].val, "set") == 0) {
+        int j = parse_skip_eol(pairs, np, jm + 1);
+        if (j >= np) {
+          i++;
+          continue;
+        }
+        if (strcmp(pairs[j].typ, "identifier") != 0 || pairs[j].val[0] != ':' || pairs[j].val[1] != ':') {
+          i++;
+          continue;
+        }
+        char varn[96];
+        (void)snprintf(varn, sizeof(varn), "%.79s", pairs[j].val);
+        j++;
+        j = parse_skip_eol(pairs, np, j);
+        if (j >= np || strcmp(pairs[j].typ, "operator") != 0 || strcmp(pairs[j].val, "=") != 0) {
+          i++;
+          continue;
+        }
+        j++;
+        char rhs[224];
+        rhs[0] = '\0';
+        size_t rl = 0;
+        while (j < np) {
+          if (strcmp(pairs[j].typ, "eol") == 0) break;
+          if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) break;
+          if (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0) {
+            if (rl > 0U && rl + 1U < sizeof(rhs)) rhs[rl++] = ' ';
+            size_t rem = sizeof(rhs) - rl - 1U;
+            if (rem > 0U) {
+              (void)snprintf(rhs + rl, rem, "%.199s", pairs[j].val);
+              rl = strlen(rhs);
+              if (rl > 199U) {
+                rhs[199] = '\0';
+                rl = 199U;
+              }
+            }
+            j++;
+            continue;
+          }
+          break;
+        }
+        if (rhs[0]) {
+          char chunk[360];
+          (void)snprintf(chunk, sizeof(chunk), "memory|set|%s|%.199s", varn, rhs);
+          parse_acc_append(acc, sizeof(acc), chunk);
+        }
+        i = j;
+        continue;
+      }
+      if (strcmp(pairs[jm].val, "emit") == 0) {
+        int j = parse_skip_eol(pairs, np, jm + 1);
+        char ev[160];
+        ev[0] = '\0';
+        size_t el = 0;
+        int with_idx = -1;
+        while (j < np) {
+          if (strcmp(pairs[j].typ, "eol") == 0) break;
+          if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) break;
+          if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "with") == 0) {
+            with_idx = j;
+            break;
+          }
+          if (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0) {
+            if (el > 0U && el + 1U < sizeof(ev)) ev[el++] = ' ';
+            size_t rem = sizeof(ev) - el - 1U;
+            if (rem > 0U) {
+              (void)snprintf(ev + el, rem, "%.119s", pairs[j].val);
+              el = strlen(ev);
+              if (el > 119U) {
+                ev[119] = '\0';
+                el = 119U;
+              }
+            }
+            j++;
+            continue;
+          }
+          break;
+        }
+        if (!ev[0] || strchr(ev, '|') != NULL) {
+          i++;
+          continue;
+        }
+        if (with_idx >= 0) {
+          int j2 = 0;
+          char wtail[200];
+          if (parse_with_brace_payload(pairs, np, with_idx + 1, &j2, wtail, sizeof(wtail)) == 0) {
+            char chunk[360];
+            if (wtail[0]) {
+              (void)snprintf(chunk, sizeof(chunk), "memory|emit|%.119s|with|%s", ev, wtail);
+              if (strlen(chunk) > 254U) chunk[254] = '\0';
+              parse_acc_append(acc, sizeof(acc), chunk);
+            } else {
+              (void)snprintf(chunk, sizeof(chunk), "memory|emit|%.119s", ev);
+              parse_acc_append(acc, sizeof(acc), chunk);
+            }
+            i = j2;
+            continue;
+          }
+          char chunkb[240];
+          (void)snprintf(chunkb, sizeof(chunkb), "memory|emit|%.119s", ev);
+          parse_acc_append(acc, sizeof(acc), chunkb);
+          i = with_idx + 1;
+          continue;
+        }
+        char chunkc[240];
+        (void)snprintf(chunkc, sizeof(chunkc), "memory|emit|%.119s", ev);
+        parse_acc_append(acc, sizeof(acc), chunkc);
+        i = j;
+        continue;
+      }
+      i++;
+      continue;
     }
     if (strcmp(pairs[i].typ, "identifier") == 0 && strcmp(pairs[i].val, "listen") == 0) {
       int j = parse_skip_eol(pairs, np, i + 1);

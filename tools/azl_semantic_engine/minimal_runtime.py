@@ -556,6 +556,111 @@ class MinimalAZLRuntime:
                         out_lines.append("component|" + cv[:200])
                         i = j + 1
                         continue
+            if typ == "identifier" and val == "memory":
+                jm = self._skip_eol_pairs(pairs, i + 1)
+                if jm >= n:
+                    i += 1
+                    continue
+                tkw, vkw = pairs[jm]
+                if tkw != "identifier":
+                    i += 1
+                    continue
+                if vkw == "say":
+                    j = self._skip_eol_pairs(pairs, jm + 1)
+                    mem_parts: list[str] = []
+                    while j < n:
+                        t2, v2 = pairs[j]
+                        if t2 == "eol" or (t2 == "brace" and v2 == "}"):
+                            break
+                        if t2 in ("identifier", "string"):
+                            mem_parts.append(v2)
+                            j += 1
+                            continue
+                        break
+                    if mem_parts:
+                        out_lines.append(
+                            "memory|say|" + " ".join(mem_parts)[:200]
+                        )
+                        i = j
+                        continue
+                if vkw == "set":
+                    j = self._skip_eol_pairs(pairs, jm + 1)
+                    if j >= n:
+                        i += 1
+                        continue
+                    vt, vv = pairs[j]
+                    if vt != "identifier" or not vv.startswith("::"):
+                        i += 1
+                        continue
+                    var_name = vv[:80]
+                    j += 1
+                    j = self._skip_eol_pairs(pairs, j)
+                    if j >= n or pairs[j] != ("operator", "="):
+                        i += 1
+                        continue
+                    j += 1
+                    rhs_mem: list[str] = []
+                    while j < n:
+                        t2, v2 = pairs[j]
+                        if t2 == "eol" or (t2 == "brace" and v2 == "}"):
+                            break
+                        if t2 in ("identifier", "string"):
+                            rhs_mem.append(v2)
+                            j += 1
+                            continue
+                        break
+                    if rhs_mem:
+                        rhs = " ".join(rhs_mem)[:200]
+                        out_lines.append("memory|set|" + var_name + "|" + rhs)
+                    i = j
+                    continue
+                if vkw == "emit":
+                    j = self._skip_eol_pairs(pairs, jm + 1)
+                    ev_m: list[str] = []
+                    with_m = -1
+                    while j < n:
+                        t2, v2 = pairs[j]
+                        if t2 == "eol" or (t2 == "brace" and v2 == "}"):
+                            break
+                        if t2 == "identifier" and v2 == "with":
+                            with_m = j
+                            break
+                        if t2 in ("identifier", "string"):
+                            ev_m.append(v2)
+                            j += 1
+                            continue
+                        break
+                    if not ev_m:
+                        i += 1
+                        continue
+                    ev = " ".join(ev_m)[:120]
+                    if "|" in ev:
+                        i += 1
+                        continue
+                    if with_m >= 0:
+                        parsed_m = self._parse_with_brace_pairs(
+                            pairs, with_m + 1
+                        )
+                        if parsed_m:
+                            kvs_m, j2m = parsed_m
+                            if kvs_m:
+                                tail_m = "|".join(f"{k}|{v}" for k, v in kvs_m)
+                                seg_m = ("memory|emit|" + ev + "|with|" + tail_m)[
+                                    :255
+                                ]
+                                out_lines.append(seg_m)
+                            else:
+                                out_lines.append(("memory|emit|" + ev)[:255])
+                            i = j2m
+                            continue
+                        out_lines.append(("memory|emit|" + ev)[:255])
+                        i = with_m + 1
+                        continue
+                    out_lines.append(("memory|emit|" + ev)[:255])
+                    i = j
+                    continue
+                i += 1
+                continue
             if typ == "identifier" and val == "listen":
                 j = self._skip_eol_pairs(pairs, i + 1)
                 if j >= n or pairs[j] != ("identifier", "for"):

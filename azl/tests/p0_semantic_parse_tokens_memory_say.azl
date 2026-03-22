@@ -1,0 +1,24 @@
+# Gate F160: ::parse_tokens — `memory say F160_LINE` → `memory|say|F160_LINE` (execute_ast memory row shape).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f160_parse with { }
+  }
+  behavior {
+    listen for "f160_parse" {
+      set ::tokens = []
+      set ::tx = "memory say F160_LINE"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::tx, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F160_OK"
+    }
+  }
+}

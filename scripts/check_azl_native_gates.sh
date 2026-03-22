@@ -4952,6 +4952,31 @@ if [ "$F159_C_OUT" != "$F159_PY_OUT" ]; then
   exit 592
 fi
 
+echo "[gate] F160: C vs Python — ::parse_tokens memory say …"
+F160EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_memory_say.azl"
+F160_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F160EX" boot.entry 2>&1)"
+f160_c_rc=$?
+if [ "$f160_c_rc" -ne 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_tokens_memory_say exited $f160_c_rc: $F160_C_OUT"
+  exit 593
+fi
+if ! printf '%s\n' "$F160_C_OUT" | awk 'NR==1{if($0!="memory|say|F160_LINE")exit 1} NR==2{if($0!="P0_SEM_F160_OK")exit 1} END{if(NR!=2)exit 1}'; then
+  echo "ERROR: expected F160 parse_tokens stdout (2 lines), got: $F160_C_OUT"
+  exit 593
+fi
+F160_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F160EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f160_py_rc=$?
+if [ "$f160_py_rc" -ne 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_tokens_memory_say exited $f160_py_rc: $F160_PY_OUT"
+  exit 594
+fi
+if [ "$F160_C_OUT" != "$F160_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_tokens_memory_say" >&2
+  echo "C:  $F160_C_OUT" >&2
+  echo "Py: $F160_PY_OUT" >&2
+  exit 595
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh
