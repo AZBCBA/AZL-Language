@@ -426,6 +426,145 @@ static int json_extract_int_field(const char *body, const char *field, int *out,
   return 0;
 }
 
+/* Optional policy-routing payload on /api/llm/policy_infer and /api/llm/chat_session JSON bodies.
+ * Not native-bytecode VM; HTTP policy layer only. state_id is always initialized before audit/routing. */
+typedef struct {
+  char state_id_buf[192];
+  int collapsed_flag; /* -1 = field absent; 0/1 = normalized boolean (never compare "0"/"1" strings later) */
+  int have_probs;
+  double prob_action_a;
+  double prob_action_b;
+  double prob_action_c;
+  char selected_behavior[32]; /* "action_a" | "action_b" | "action_c" */
+  int behavior_branch;        /* 0=a, 1=b, 2=c, -1 = no collapse / unknown */
+  int have_reward;
+  double reward_clamped;
+} PolicyRouteInfo;
+
+static double policy_clamp_unit_prob(double x) {
+  if (x != x) return 0.0;
+  if (x < 0.0) return 0.0;
+  if (x > 1.0) return 1.0;
+  return x;
+}
+
+static double policy_clamp_reward_sym(double x) {
+  if (x != x) return 0.0;
+  if (x < -1.0) return -1.0;
+  if (x > 1.0) return 1.0;
+  return x;
+}
+
+/* Parse JSON "is_collapsed": true | false | number — store as int 0/1 only (no string "0"/"1" path). */
+static int policy_parse_is_collapsed_json(const char *body, int *out_flag) {
+  char key[64];
+  (void)snprintf(key, sizeof(key), "\"%s\"", "is_collapsed");
+  const char *k = strstr(body, key);
+  if (!k) return -1;
+  const char *c = strchr(k + strlen(key), ':');
+  if (!c) return -1;
+  c++;
+  while (*c == ' ' || *c == '\t' || *c == '\n' || *c == '\r') c++;
+  if (strncmp(c, "true", 4) == 0 && (c[4] == ',' || c[4] == '}' || isspace((unsigned char)c[4]))) {
+    *out_flag = 1;
+    return 0;
+  }
+  if (strncmp(c, "false", 5) == 0 && (c[5] == ',' || c[5] == '}' || isspace((unsigned char)c[5]))) {
+    *out_flag = 0;
+    return 0;
+  }
+  char *endp = NULL;
+  double v = strtod(c, &endp);
+  if (endp == c) return -1;
+  *out_flag = (v != 0.0);
+  return 0;
+}
+
+static int json_extract_double_field_present(const char *body, const char *field, double *out) {
+  char key[64];
+  (void)snprintf(key, sizeof(key), "\"%s\"", field);
+  const char *k = strstr(body, key);
+  if (!k) return -1;
+  const char *c = strchr(k + strlen(key), ':');
+  if (!c) return -1;
+  c++;
+  while (*c == ' ' || *c == '\t' || *c == '\n' || *c == '\r') c++;
+  char *endp = NULL;
+  double v = strtod(c, &endp);
+  if (endp == c) return -1;
+  *out = v;
+  return 0;
+}
+
+/* Collapse: argmax(prob_action_a, prob_action_b, prob_action_c). Ties: action_a beats b and c; action_b beats c. */
+static void policy_collapse_three_probs(double pa, double pb, double pc, char *out_behavior, size_t outsz) {
+  if (pa >= pb && pa >= pc)
+    (void)snprintf(out_behavior, outsz, "action_a");
+  else if (pb >= pc)
+    (void)snprintf(out_behavior, outsz, "action_b");
+  else
+    (void)snprintf(out_behavior, outsz, "action_c");
+}
+
+/* Exactly one branch slot updated via else-if chain (no fall-through to multiple branches). */
+static int policy_assign_behavior_branch(const char *behavior_name) {
+  if (!behavior_name || !behavior_name[0]) return -1;
+  if (strcmp(behavior_name, "action_a") == 0) return 0;
+  if (strcmp(behavior_name, "action_b") == 0) return 1;
+  if (strcmp(behavior_name, "action_c") == 0) return 2;
+  return -1;
+}
+
+static void policy_route_fill_from_body(PolicyRouteInfo *r, const char *body, const char *session_fallback_id) {
+  memset(r, 0, sizeof(*r));
+  r->collapsed_flag = -1;
+  r->behavior_branch = -1;
+
+  char sid_tmp[192];
+  if (body && json_extract_string_field(body, "state_id", sid_tmp, sizeof(sid_tmp)) == 0) {
+    (void)snprintf(r->state_id_buf, sizeof(r->state_id_buf), "%s", sid_tmp);
+  } else if (session_fallback_id && session_fallback_id[0] != '\0') {
+    (void)snprintf(r->state_id_buf, sizeof(r->state_id_buf), "%s", session_fallback_id);
+  } else {
+    const char *env = getenv("AZL_POLICY_STATE_ID");
+    if (env && env[0] != '\0')
+      (void)snprintf(r->state_id_buf, sizeof(r->state_id_buf), "%s", env);
+    else
+      (void)snprintf(r->state_id_buf, sizeof(r->state_id_buf), "policy_%ld", (long)time(NULL));
+  }
+
+  if (body) {
+    (void)policy_parse_is_collapsed_json(body, &r->collapsed_flag);
+    double pa = 0, pb = 0, pc = 0;
+    if (json_extract_double_field_present(body, "prob_action_a", &pa) == 0 &&
+        json_extract_double_field_present(body, "prob_action_b", &pb) == 0 &&
+        json_extract_double_field_present(body, "prob_action_c", &pc) == 0) {
+      r->prob_action_a = policy_clamp_unit_prob(pa);
+      r->prob_action_b = policy_clamp_unit_prob(pb);
+      r->prob_action_c = policy_clamp_unit_prob(pc);
+      r->have_probs = 1;
+      policy_collapse_three_probs(r->prob_action_a, r->prob_action_b, r->prob_action_c, r->selected_behavior,
+                                  sizeof(r->selected_behavior));
+      /* Single branch index from explicit else-if on behavior name (must match collapse winner string). */
+      r->behavior_branch = policy_assign_behavior_branch(r->selected_behavior);
+    }
+    double rew = 0.0;
+    if (json_extract_double_field_present(body, "reward", &rew) == 0) {
+      r->have_reward = 1;
+      r->reward_clamped = policy_clamp_reward_sym(rew);
+    }
+  }
+
+  if (getenv("AZL_POLICY_DIAG_COLLAPSE") && getenv("AZL_POLICY_DIAG_COLLAPSE")[0] == '1' && r->have_probs) {
+    fprintf(stderr,
+            "native-engine: policy_collapse state_id=%s pa=%.6f pb=%.6f pc=%.6f -> %s branch=%d "
+            "is_collapsed=%s\n",
+            r->state_id_buf, r->prob_action_a, r->prob_action_b, r->prob_action_c, r->selected_behavior,
+            r->behavior_branch, r->collapsed_flag < 0 ? "absent" : (r->collapsed_flag ? "true" : "false"));
+    fflush(stderr);
+  }
+}
+
 static void write_response(int fd, int status, const char *status_text, const char *body);
 
 static void json_escape_text(const char *in, char *out, size_t outsz) {
@@ -603,7 +742,8 @@ static int policy_decide_prompt(const char *prompt, char *reason, size_t reason_
   return 0;
 }
 
-static void policy_audit_append(const char *decision, const char *reason, size_t prompt_chars) {
+static void policy_audit_append(const char *decision, const char *reason, size_t prompt_chars,
+                                const PolicyRouteInfo *route) {
   ensure_azl_dir();
   const char *sd = azl_state_dir();
   if (mkdir_p_path(sd) != 0) {
@@ -615,10 +755,36 @@ static void policy_audit_append(const char *decision, const char *reason, size_t
   if (!af) return;
   char esc_reason[256];
   json_escape_text(reason, esc_reason, sizeof(esc_reason));
+  if (!route) {
+    fprintf(af,
+            "{\"ts\":%ld,\"path\":\"/api/llm/policy_infer\",\"decision\":\"%s\",\"reason\":\"%s\","
+            "\"prompt_chars\":%zu}\n",
+            (long)time(NULL), decision, esc_reason, prompt_chars);
+    fclose(af);
+    return;
+  }
+  char esc_sid[256];
+  char esc_sel[64];
+  json_escape_text(route->state_id_buf, esc_sid, sizeof(esc_sid));
+  json_escape_text(route->have_probs ? route->selected_behavior : "", esc_sel, sizeof(esc_sel));
+
   fprintf(af,
           "{\"ts\":%ld,\"path\":\"/api/llm/policy_infer\",\"decision\":\"%s\",\"reason\":\"%s\","
-          "\"prompt_chars\":%zu}\n",
-          (long)time(NULL), decision, esc_reason, prompt_chars);
+          "\"prompt_chars\":%zu,\"state_id\":\"%s\"",
+          (long)time(NULL), decision, esc_reason, prompt_chars, esc_sid);
+  fprintf(af, ",\"is_collapsed\":");
+  if (route->collapsed_flag < 0)
+    fprintf(af, "null");
+  else
+    fprintf(af, "%s", route->collapsed_flag ? "true" : "false");
+  if (route->have_probs) {
+    fprintf(af,
+            ",\"prob_action_a\":%.9g,\"prob_action_b\":%.9g,\"prob_action_c\":%.9g,"
+            "\"selected_behavior\":\"%s\",\"behavior_branch\":%d",
+            route->prob_action_a, route->prob_action_b, route->prob_action_c, esc_sel, route->behavior_branch);
+  }
+  if (route->have_reward) fprintf(af, ",\"reward\":%.9g", route->reward_clamped);
+  fprintf(af, "}\n");
   fclose(af);
 }
 
@@ -789,9 +955,10 @@ static int gguf_infer_text(const char *prompt, int n_predict, char *out, size_t 
 }
 
 static int policy_infer_text(const char *prompt, int n_predict, char *out, size_t outsz, char *backend,
-                             size_t backend_sz, char *reason, size_t reason_sz, char *err, size_t err_sz) {
+                             size_t backend_sz, char *reason, size_t reason_sz, char *err, size_t err_sz,
+                             const PolicyRouteInfo *route) {
   int blocked = policy_decide_prompt(prompt, reason, reason_sz);
-  policy_audit_append(blocked ? "blocked" : "allowed", reason, strlen(prompt));
+  policy_audit_append(blocked ? "blocked" : "allowed", reason, strlen(prompt), route);
   if (blocked) return -10;
   return gguf_infer_text(prompt, n_predict, out, outsz, backend, backend_sz, err, err_sz);
 }
@@ -956,22 +1123,25 @@ static void handle_policy_infer(int cfd, const char *req, ssize_t n, EngineState
   memcpy(body_copy, body_start, body_len);
   body_copy[body_len] = '\0';
 
+  PolicyRouteInfo route;
+  policy_route_fill_from_body(&route, body_copy, NULL);
+
   char prompt[12288] = {0};
   if (json_extract_string_field(body_copy, "prompt", prompt, sizeof(prompt)) != 0) {
     free(body_copy);
     write_response(cfd, 400, "Bad Request", "{\"ok\":false,\"error\":\"missing_prompt_json\"}");
     return;
   }
+  int n_predict = 64;
+  (void)json_extract_int_field(body_copy, "n_predict", &n_predict, 64);
   free(body_copy);
 
-  int n_predict = 64;
-  (void)json_extract_int_field(body_start, "n_predict", &n_predict, 64);
   char out[GGUF_READ_MAX + 1];
   char backend[32];
   char reason[256];
   char err[512];
   int pr = policy_infer_text(prompt, n_predict, out, sizeof(out), backend, sizeof(backend), reason,
-                             sizeof(reason), err, sizeof(err));
+                             sizeof(reason), err, sizeof(err), &route);
   if (pr == -10) {
     char esc_reason[256];
     json_escape_text(reason, esc_reason, sizeof(esc_reason));
@@ -1002,16 +1172,38 @@ static void handle_policy_infer(int cfd, const char *req, ssize_t n, EngineState
   json_escape_text(out, esc_text, esc_cap);
   char esc_reason[256];
   json_escape_text(reason, esc_reason, sizeof(esc_reason));
-  size_t resp_cap = strlen(esc_text) + 512;
+  size_t resp_cap = strlen(esc_text) + 900;
   char *resp = malloc(resp_cap);
   if (!resp) {
     free(esc_text);
     write_response(cfd, 500, "Internal Server Error", "{\"ok\":false,\"error\":\"oom\"}");
     return;
   }
-  (void)snprintf(resp, resp_cap,
-                 "{\"ok\":true,\"backend\":\"%s\",\"policy\":\"allowed\",\"reason\":\"%s\",\"text\":\"%s\"}",
-                 backend, esc_reason, esc_text);
+  if (route.have_probs) {
+    char esid[256];
+    char esel[64];
+    json_escape_text(route.state_id_buf, esid, sizeof(esid));
+    json_escape_text(route.selected_behavior, esel, sizeof(esel));
+    if (route.have_reward) {
+      (void)snprintf(resp, resp_cap,
+                     "{\"ok\":true,\"backend\":\"%s\",\"policy\":\"allowed\",\"reason\":\"%s\",\"text\":\"%s\","
+                     "\"state_id\":\"%s\",\"selected_behavior\":\"%s\",\"behavior_branch\":%d,"
+                     "\"prob_action_a\":%.9g,\"prob_action_b\":%.9g,\"prob_action_c\":%.9g,\"reward\":%.9g}",
+                     backend, esc_reason, esc_text, esid, esel, route.behavior_branch, route.prob_action_a,
+                     route.prob_action_b, route.prob_action_c, route.reward_clamped);
+    } else {
+      (void)snprintf(resp, resp_cap,
+                     "{\"ok\":true,\"backend\":\"%s\",\"policy\":\"allowed\",\"reason\":\"%s\",\"text\":\"%s\","
+                     "\"state_id\":\"%s\",\"selected_behavior\":\"%s\",\"behavior_branch\":%d,"
+                     "\"prob_action_a\":%.9g,\"prob_action_b\":%.9g,\"prob_action_c\":%.9g}",
+                     backend, esc_reason, esc_text, esid, esel, route.behavior_branch, route.prob_action_a,
+                     route.prob_action_b, route.prob_action_c);
+    }
+  } else {
+    (void)snprintf(resp, resp_cap,
+                   "{\"ok\":true,\"backend\":\"%s\",\"policy\":\"allowed\",\"reason\":\"%s\",\"text\":\"%s\"}",
+                   backend, esc_reason, esc_text);
+  }
   free(esc_text);
   write_response(cfd, 200, "OK", resp);
   free(resp);
@@ -1059,6 +1251,8 @@ static void handle_chat_session(int cfd, const char *req, ssize_t n, EngineState
   if (n_predict < 1) n_predict = 1;
   if (n_predict > 2048) n_predict = 2048;
   int reset = request_json_has_true_flag(body_copy, "reset");
+  PolicyRouteInfo route;
+  policy_route_fill_from_body(&route, body_copy, sid);
   free(body_copy);
 
   ChatSession *sess = chat_session_get_or_create(sid);
@@ -1112,7 +1306,7 @@ static void handle_chat_session(int cfd, const char *req, ssize_t n, EngineState
   char reason[256];
   char err[512];
   int ir = policy_infer_text(prompt, n_predict, answer, sizeof(answer), backend, sizeof(backend), reason,
-                             sizeof(reason), err, sizeof(err));
+                             sizeof(reason), err, sizeof(err), &route);
   if (ir == -10) {
     char esc_reason[256];
     json_escape_text(reason, esc_reason, sizeof(esc_reason));
