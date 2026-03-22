@@ -277,7 +277,9 @@ static int parse_one_code_obj(J *j, AzlBytecodeInstr *ins) {
   j->i++;
   char opname[32] = {0};
   uint32_t ev = 0, ky = 0, vl = 0;
+  uint32_t slot = 0, target = 0, false_idx = 0, true_idx = 0;
   int have_ev = 0, have_ky = 0, have_vl = 0;
+  int have_slot = 0, have_target = 0, have_false_idx = 0, have_true_idx = 0;
   while (j->i < j->n) {
     j_skip_ws(j);
     if (j->s[j->i] == '}') {
@@ -307,6 +309,22 @@ static int parse_one_code_obj(J *j, AzlBytecodeInstr *ins) {
       if (j_parse_uint(j, &vl) != 0)
         return -1;
       have_vl = 1;
+    } else if (strcmp(kbuf, "slot") == 0) {
+      if (j_parse_uint(j, &slot) != 0)
+        return -1;
+      have_slot = 1;
+    } else if (strcmp(kbuf, "target") == 0) {
+      if (j_parse_uint(j, &target) != 0)
+        return -1;
+      have_target = 1;
+    } else if (strcmp(kbuf, "false_idx") == 0) {
+      if (j_parse_uint(j, &false_idx) != 0)
+        return -1;
+      have_false_idx = 1;
+    } else if (strcmp(kbuf, "true_idx") == 0) {
+      if (j_parse_uint(j, &true_idx) != 0)
+        return -1;
+      have_true_idx = 1;
     } else if (strcmp(kbuf, "a") == 0) {
       if (j_parse_uint(j, &ev) != 0)
         return -1;
@@ -352,6 +370,33 @@ static int parse_one_code_obj(J *j, AzlBytecodeInstr *ins) {
     if (!have_ev)
       return -1;
     ins->a = ev;
+  } else if (strcmp(opname, "store_var") == 0) {
+    ins->op = AZL_OP_STORE_VAR;
+    if (!have_slot)
+      return -1;
+    ins->a = slot;
+  } else if (strcmp(opname, "load_var") == 0) {
+    ins->op = AZL_OP_LOAD_VAR;
+    if (!have_slot)
+      return -1;
+    ins->a = slot;
+  } else if (strcmp(opname, "jump") == 0) {
+    ins->op = AZL_OP_JUMP;
+    if (!have_target)
+      return -1;
+    ins->a = target;
+  } else if (strcmp(opname, "jump_if_false") == 0) {
+    ins->op = AZL_OP_JUMP_IF_FALSE;
+    if (!have_target || !have_false_idx)
+      return -1;
+    ins->a = target;
+    ins->b = false_idx;
+  } else if (strcmp(opname, "eq") == 0) {
+    ins->op = AZL_OP_EQ;
+    if (!have_true_idx || !have_false_idx)
+      return -1;
+    ins->a = true_idx;
+    ins->b = false_idx;
   } else
     return -1;
   return 0;

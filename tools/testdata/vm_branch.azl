@@ -1,0 +1,5 @@
+# Native compiler branch demo: variables + if — expect emit "success" when status matches
+set status = "ok"
+if ( status == "ok" ) {
+  emit "success" { "result": "yes" }
+}

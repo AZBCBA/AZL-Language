@@ -74,6 +74,19 @@ static void native_compile_hello_sink(AzlEngine *eng, const AzlEvent *ev, void *
   }
 }
 
+/* Branch demos: emit "success" { "result": "..." } */
+static void native_compile_success_sink(AzlEngine *eng, const AzlEvent *ev, void *ud) {
+  (void)eng;
+  (void)ud;
+  for (const AzlPayloadKV *p = ev->payload; p; p = p->next) {
+    if (p->key && strcmp(p->key, "result") == 0) {
+      printf("%s\n", p->value ? p->value : "");
+      fflush(stdout);
+      return;
+    }
+  }
+}
+
 static const char *getenv_or(const char *k, const char *fallback) {
   const char *v = getenv(k);
   if (v == NULL || v[0] == '\0') return fallback;
@@ -1677,6 +1690,7 @@ int main(int argc, char **argv) {
     }
     if (st.compile_azl_path[0] != '\0') {
       azl_engine_register_listener(st.native_core.eng, "hello", native_compile_hello_sink, NULL);
+      azl_engine_register_listener(st.native_core.eng, "success", native_compile_success_sink, NULL);
       AzlBytecodeProgram bcprog;
       azl_bytecode_program_init_empty(&bcprog);
       char cerr[512];

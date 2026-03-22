@@ -37,7 +37,8 @@ void azl_bytecode_program_destroy(AzlBytecodeProgram *p);
 int azl_bytecode_load_json(const char *json, size_t json_len, AzlBytecodeProgram *out, char *errbuf,
                            size_t errbuf_sz);
 
-/* Execute program: OP_EMIT -> azl_engine_emit; OP_HALT stops; OP_NOP no-op. */
+/* Execute program: operand stack + locals; OP_EMIT -> azl_engine_emit; OP_HALT stops;
+ * OP_JUMP / OP_JUMP_IF_FALSE use instruction indices (pc may equal ncode to stop); OP_EQ needs true/false const indices. */
 AzlErr azl_vm_exec_block(AzlEngine *eng, const AzlBytecodeProgram *prog);
 
 /* Run JSON hello-world bundle test; returns 0 on success. */

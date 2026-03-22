@@ -817,28 +817,116 @@ AzlErr azl_bridge_submit_http(AzlSysproxyBridge *b, const AzlHttpJob *job) {
   return AZL_OK;
 }
 
+#define AZL_VM_STACK_MAX 128
+#define AZL_VM_VAR_MAX 64
+
 static const char *vm_const_get(const AzlBytecodeProgram *p, uint32_t idx) {
   if (!p || idx >= p->nconst)
     return NULL;
   return p->consts[idx];
 }
 
-/* Native VM: flat opcode array -> azl_engine_emit on OP_EMIT (no Python). */
+/* Native VM: operand stack + locals; OP_EMIT -> azl_engine_emit; jumps use instruction indices (pc may equal ncode to stop). */
 AzlErr azl_vm_exec_block(AzlEngine *eng, const AzlBytecodeProgram *prog) {
   if (!eng || !prog || !prog->code)
     return AZL_ERR_INVALID;
-  for (size_t pc = 0; pc < prog->ncode; pc++) {
+
+  uint32_t stack[AZL_VM_STACK_MAX];
+  int sp = 0;
+  uint32_t vars[AZL_VM_VAR_MAX];
+  for (size_t i = 0; i < AZL_VM_VAR_MAX; i++)
+    vars[i] = UINT32_MAX;
+
+#define VM_PUSH(v)                                                                               \
+  do {                                                                                           \
+    if (sp >= AZL_VM_STACK_MAX)                                                                  \
+      return AZL_ERR_INVALID;                                                                    \
+    stack[sp++] = (v);                                                                           \
+  } while (0)
+#define VM_POP(out)                                                                              \
+  do {                                                                                           \
+    if (sp <= 0)                                                                                 \
+      return AZL_ERR_INVALID;                                                                    \
+    (out) = stack[--sp];                                                                         \
+  } while (0)
+
+  size_t pc = 0;
+  while (pc < prog->ncode) {
     const AzlBytecodeInstr *in = &prog->code[pc];
-    switch (in->op) {
-    case AZL_OP_NOP:
-    case AZL_OP_LISTEN:
-      break;
+    switch ((AzlOpcode)in->op) {
     case AZL_OP_HALT:
       return AZL_OK;
-    case AZL_OP_LOAD_CONST:
-      (void)vm_const_get(prog, in->a);
-      break;
+    case AZL_OP_NOP:
+    case AZL_OP_LISTEN:
     case AZL_OP_CALL:
+      pc++;
+      break;
+    case AZL_OP_LOAD_CONST:
+      if (in->a >= prog->nconst)
+        return AZL_ERR_INVALID;
+      VM_PUSH(in->a);
+      pc++;
+      break;
+    case AZL_OP_STORE_VAR:
+      if (in->a >= AZL_VM_VAR_MAX)
+        return AZL_ERR_INVALID;
+      {
+        uint32_t v;
+        VM_POP(v);
+        if (v >= prog->nconst)
+          return AZL_ERR_INVALID;
+        vars[in->a] = v;
+      }
+      pc++;
+      break;
+    case AZL_OP_LOAD_VAR:
+      if (in->a >= AZL_VM_VAR_MAX)
+        return AZL_ERR_INVALID;
+      if (vars[in->a] == UINT32_MAX)
+        return AZL_ERR_INVALID;
+      if (vars[in->a] >= prog->nconst)
+        return AZL_ERR_INVALID;
+      VM_PUSH(vars[in->a]);
+      pc++;
+      break;
+    case AZL_OP_JUMP:
+      if (in->a > prog->ncode)
+        return AZL_ERR_INVALID;
+      pc = (size_t)in->a;
+      break;
+    case AZL_OP_JUMP_IF_FALSE:
+      if (in->a > prog->ncode)
+        return AZL_ERR_INVALID;
+      {
+        uint32_t v;
+        VM_POP(v);
+        const char *sv = vm_const_get(prog, v);
+        const char *sf = vm_const_get(prog, in->b);
+        if (!sv || !sf)
+          return AZL_ERR_INVALID;
+        if (strcmp(sv, sf) == 0)
+          pc = (size_t)in->a;
+        else
+          pc++;
+      }
+      break;
+    case AZL_OP_EQ:
+      if (in->a >= prog->nconst || in->b >= prog->nconst)
+        return AZL_ERR_INVALID;
+      {
+        uint32_t ri, li;
+        VM_POP(ri);
+        VM_POP(li);
+        const char *sl = vm_const_get(prog, li);
+        const char *sr = vm_const_get(prog, ri);
+        if (!sl || !sr)
+          return AZL_ERR_INVALID;
+        if (strcmp(sl, sr) == 0)
+          VM_PUSH(in->a);
+        else
+          VM_PUSH(in->b);
+      }
+      pc++;
       break;
     case AZL_OP_EMIT: {
       const char *ev = vm_const_get(prog, in->a);
@@ -850,12 +938,15 @@ AzlErr azl_vm_exec_block(AzlEngine *eng, const AzlBytecodeProgram *prog) {
       AzlErr r = azl_engine_emit(eng, ev, &kv);
       if (r != AZL_OK)
         return r;
+      pc++;
       break;
     }
     default:
       return AZL_ERR_INVALID;
     }
   }
+#undef VM_POP
+#undef VM_PUSH
   return AZL_OK;
 }
 
