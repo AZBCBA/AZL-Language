@@ -1,0 +1,78 @@
+# Gate F141: `::execute_ast` — preloop `import|` + `link|` then `component|`, then **`with`** + **bare** + **`with`** + **bare** + **`with`** on five **`memory|emit|…`** rows (FIFO queue + drain), then `component|`, then `memory|say|…`. `AZL_USE_VM` unset. **`import|i141`** keeps **`::ast.nodes`** within minimal **255-byte** value bound (longer import tag truncates tail).
+component ::azl.security {
+  init {
+  }
+}
+
+component ::p141.linked {
+  init {
+    say "P141_LINK_SID"
+  }
+}
+
+component ::p141.a {
+  init {
+    say "P141_A"
+  }
+}
+
+component ::p141.b {
+  init {
+    say "P141_B"
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p141_comp_penta_with_bare_with_bare_with_emit_comp with { ast: "f141-root", scope: "f141-sc", nodes: "import|i141
+link|::p141.linked
+component|p141.a
+memory|emit|f141_e1|with|fk141a|F141_PAY_A
+memory|emit|f141_e2
+memory|emit|f141_e3|with|fk141b|F141_PAY_B
+memory|emit|f141_e4
+memory|emit|f141_e5|with|fk141c|F141_PAY_C
+component|p141.b
+memory|say|F141_MEM" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC141_INNER"
+      say ::event.data.result
+      say "P0_SEM_F141_OK"
+    }
+    listen for "f141_e1" {
+      say ::event.data.fk141a
+    }
+    listen for "f141_e2" {
+      say "F141_BARE_2"
+    }
+    listen for "f141_e3" {
+      say ::event.data.fk141b
+    }
+    listen for "f141_e4" {
+      say "F141_BARE_4"
+    }
+    listen for "f141_e5" {
+      say ::event.data.fk141c
+    }
+    listen for "p141_comp_penta_with_bare_with_bare_with_emit_comp" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::p0_exec_import_last = ""
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F141_VM_ON_BAD"
+        return
+      }
+      say "F141_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::p0_exec_import_last
+      say "EX141_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}
