@@ -5202,6 +5202,31 @@ if [ "$F169_C_OUT" != "$F169_PY_OUT" ]; then
   exit 623
 fi
 
+echo "[gate] F170: C vs Python — spine_component_v1 emit with { k: v } + downstream payload"
+F170EX="${ROOT_DIR}/azl/tests/p0_semantic_spine_component_listen_emit_with_payload.azl"
+F170_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F170EX" boot.entry 2>&1)"
+f170_c_rc=$?
+if [ "$f170_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_spine_component_listen_emit_with_payload exited $f170_c_rc: $F170_C_OUT"
+  exit 624
+fi
+if ! printf '%s\n' "$F170_C_OUT" | awk 'NR==1{if($0!="F170_I")exit 1} NR==2{if($0!="F170_S")exit 1} NR==3{if($0!="F170_CELL")exit 1} NR==4{if($0!="F170_M")exit 1} NR==5{if($0!="ready")exit 1} NR==6{if($0!="Said: ::flag170")exit 1} NR==7{if($0!="P0_SEM_F170_OK")exit 1} END{if(NR!=7)exit 1}'; then
+  echo "ERROR: expected F170 stdout (7 lines), got: $F170_C_OUT"
+  exit 624
+fi
+F170_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F170EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f170_py_rc=$?
+if [ "$f170_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_spine_component_listen_emit_with_payload exited $f170_py_rc: $F170_PY_OUT"
+  exit 625
+fi
+if [ "$F170_C_OUT" != "$F170_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_spine_component_listen_emit_with_payload" >&2
+  echo "C:  $F170_C_OUT" >&2
+  echo "Py: $F170_PY_OUT" >&2
+  exit 626
+fi
+
 echo "[gate] G: runtime spine resolver + semantic host error surface"
 chmod +x scripts/azl_resolve_native_runtime_cmd.sh scripts/azl_azl_interpreter_runtime.sh scripts/verify_runtime_spine_contract.sh 2>/dev/null || true
 bash scripts/verify_runtime_spine_contract.sh

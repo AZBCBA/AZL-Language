@@ -1,0 +1,31 @@
+# Gate F170: spine_component_v1 — listener emit … with { k: v }; downstream listener reads ::event.data.*
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f170_spine with { }
+  }
+  behavior {
+    listen for "f170_spine" {
+      set ::tokens = []
+      set ::tx = "component ::Spine170 { behavior { listen for \"E170\" { say 'F170_S' set ::flag170 = ready emit NEXT170 with { pk: 'F170_CELL' } } listen for \"NEXT170\" { say ::event.data.pk } } init { say 'F170_I' emit E170 } memory { say 'F170_M' say ::flag170 } }"
+      set ::ln = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::tx, ::ln))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F170_VM_ON_BAD"
+        return
+      }
+      set ::scope = "spine_scope"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say ::result
+      say "P0_SEM_F170_OK"
+    }
+  }
+}

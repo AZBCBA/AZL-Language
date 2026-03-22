@@ -563,82 +563,117 @@ class MinimalAZLRuntime:
         i_start, i_close = ini
         m_start, m_close = mem
 
-        # behavior: listen for <ev> { one or more of say / set / emit }
-        j = skip_e(b_start)
-        if j >= b_close or pairs[j] != ("identifier", "listen"):
-            return None
-        j = skip_e(j + 1)
-        if j >= b_close or pairs[j] != ("identifier", "for"):
-            return None
-        j = skip_e(j + 1)
-        if j >= b_close:
-            return None
-        et, ev_raw = pairs[j]
-        if et not in ("string", "identifier"):
-            return None
-        evn = ev_raw[:63]
-        if not evn or "|" in evn or "\t" in evn or "\n" in evn:
-            return None
-        j = skip_e(j + 1)
-        if j < b_close and pairs[j] == ("identifier", "then"):
-            j = skip_e(j + 1)
-        if j >= b_close or pairs[j] != ("brace", "{"):
-            return None
-        lb = j
-        l_close = self._pair_brace_close_index(pairs, lb)
-        if l_close is None:
-            return None
+        # behavior: one or more `listen for <ev> { say | set | emit | emit with { k: v } }`
         bh_lines: list[str] = []
-        j = skip_e(lb + 1)
-        while j < l_close:
-            if pairs[j] == ("identifier", "say"):
-                j = skip_e(j + 1)
-                if j >= l_close or pairs[j][0] != "string":
-                    return None
-                bh_say_tok = self._quote_azl_single_from_inner(pairs[j][1][:200])
-                bh_lines.append("bh\tlisten\t" + evn + "\tsay\t" + bh_say_tok)
-                j = skip_e(j + 1)
-                continue
-            if pairs[j] == ("identifier", "set"):
-                j = skip_e(j + 1)
-                if j >= l_close or pairs[j][0] != "identifier":
-                    return None
-                vk = pairs[j][1][:80]
-                if not vk.startswith("::"):
-                    return None
-                j = skip_e(j + 1)
-                if j >= l_close or pairs[j] != ("operator", "="):
-                    return None
-                j = skip_e(j + 1)
-                if j >= l_close or pairs[j][0] != "identifier":
-                    return None
-                val = pairs[j][1][:120]
-                if "|" in val or "\t" in val:
-                    return None
-                bh_lines.append("bh\tlisten\t" + evn + "\tset\t" + vk + "\t" + val)
-                j = skip_e(j + 1)
-                continue
-            if pairs[j] == ("identifier", "emit"):
-                j = skip_e(j + 1)
-                if j >= l_close or pairs[j][0] != "identifier":
-                    return None
-                eev = pairs[j][1][:63]
-                if "|" in eev or "\t" in eev:
-                    return None
-                bh_lines.append("bh\tlisten\t" + evn + "\temit\t" + eev)
-                j = skip_e(j + 1)
-                continue
-            return None
-        while j < l_close and pairs[j][0] == "eol":
+        j = skip_e(b_start)
+        while j < b_close:
+            if j >= b_close or pairs[j] != ("identifier", "listen"):
+                return None
             j = skip_e(j + 1)
-        if j != l_close:
-            return None
+            if j >= b_close or pairs[j] != ("identifier", "for"):
+                return None
+            j = skip_e(j + 1)
+            if j >= b_close:
+                return None
+            et, ev_raw = pairs[j]
+            if et not in ("string", "identifier"):
+                return None
+            evn = ev_raw[:63]
+            if not evn or "|" in evn or "\t" in evn or "\n" in evn:
+                return None
+            j = skip_e(j + 1)
+            if j < b_close and pairs[j] == ("identifier", "then"):
+                j = skip_e(j + 1)
+            if j >= b_close or pairs[j] != ("brace", "{"):
+                return None
+            lb = j
+            l_close = self._pair_brace_close_index(pairs, lb)
+            if l_close is None:
+                return None
+            n_bh_here = 0
+            j = skip_e(lb + 1)
+            while j < l_close:
+                if pairs[j] == ("identifier", "say"):
+                    j = skip_e(j + 1)
+                    if j >= l_close:
+                        return None
+                    st, sv = pairs[j]
+                    if st == "string":
+                        bh_say_tok = self._quote_azl_single_from_inner(sv[:200])
+                        bh_lines.append("bh\tlisten\t" + evn + "\tsay\t" + bh_say_tok)
+                    elif st == "identifier" and sv.startswith("::"):
+                        bh_lines.append("bh\tlisten\t" + evn + "\tsay\t" + sv[:96])
+                    else:
+                        return None
+                    n_bh_here += 1
+                    j = skip_e(j + 1)
+                    continue
+                if pairs[j] == ("identifier", "set"):
+                    j = skip_e(j + 1)
+                    if j >= l_close or pairs[j][0] != "identifier":
+                        return None
+                    vk = pairs[j][1][:80]
+                    if not vk.startswith("::"):
+                        return None
+                    j = skip_e(j + 1)
+                    if j >= l_close or pairs[j] != ("operator", "="):
+                        return None
+                    j = skip_e(j + 1)
+                    if j >= l_close or pairs[j][0] != "identifier":
+                        return None
+                    val = pairs[j][1][:120]
+                    if "|" in val or "\t" in val:
+                        return None
+                    bh_lines.append("bh\tlisten\t" + evn + "\tset\t" + vk + "\t" + val)
+                    n_bh_here += 1
+                    j = skip_e(j + 1)
+                    continue
+                if pairs[j] == ("identifier", "emit"):
+                    j = skip_e(j + 1)
+                    if j >= l_close or pairs[j][0] != "identifier":
+                        return None
+                    eev = pairs[j][1][:63]
+                    if "|" in eev or "\t" in eev:
+                        return None
+                    j = skip_e(j + 1)
+                    if j < l_close and pairs[j] == ("identifier", "with"):
+                        j = skip_e(j + 1)
+                        pr = self._parse_with_brace_pairs(pairs, j)
+                        if pr is None:
+                            return None
+                        kv, j2 = pr
+                        if len(kv) != 1:
+                            return None
+                        pk, pvv = kv[0]
+                        if "|" in pk or "\t" in pk or "|" in pvv or "\t" in pvv:
+                            return None
+                        bh_lines.append(
+                            "bh\tlisten\t"
+                            + evn
+                            + "\temit\t"
+                            + eev
+                            + "\twith\t"
+                            + pk
+                            + "\t"
+                            + pvv[:120]
+                        )
+                        n_bh_here += 1
+                        j = j2
+                        continue
+                    bh_lines.append("bh\tlisten\t" + evn + "\temit\t" + eev)
+                    n_bh_here += 1
+                    continue
+                return None
+            while j < l_close and pairs[j][0] == "eol":
+                j = skip_e(j + 1)
+            if j != l_close:
+                return None
+            if n_bh_here == 0:
+                return None
+            j = skip_e(l_close + 1)
+            while j < b_close and pairs[j][0] == "eol":
+                j = skip_e(j + 1)
         if not bh_lines:
-            return None
-        j = skip_e(l_close + 1)
-        while j < b_close and pairs[j][0] == "eol":
-            j = skip_e(j + 1)
-        if j != b_close:
             return None
 
         init_lines: list[str] = []
@@ -1778,10 +1813,13 @@ class MinimalAZLRuntime:
                 return "execute_spine_bad_behavior"
             ev = parts[2][:63]
             op = parts[3]
-            if cur_ev is None:
-                cur_ev = ev
-            elif ev != cur_ev:
-                return "execute_spine_bad_behavior"
+            if cur_ev is not None and ev != cur_ev:
+                if bh_toks:
+                    self.register_listener(
+                        cur_ev, 0, 0, synthetic_toks=bh_toks
+                    )
+                bh_toks = []
+            cur_ev = ev
             if op == "say":
                 if len(parts) < 5:
                     return "execute_spine_bad_behavior"
@@ -1795,9 +1833,20 @@ class MinimalAZLRuntime:
                     return "execute_spine_bad_behavior"
                 bh_toks.extend(["set", vk, "=", vv])
             elif op == "emit":
-                if len(parts) < 5:
+                if len(parts) >= 8 and parts[5] == "with":
+                    inner_ev = parts[4][:63]
+                    pk = parts[6][:47]
+                    pv = parts[7][:120]
+                    if not self._payload_key_ok(pk):
+                        return "execute_spine_bad_behavior"
+                    esc = self._quote_azl_single_from_inner(pv[:200])
+                    bh_toks.extend(
+                        ["emit", inner_ev, "with", "{", pk + ":", esc, "}"]
+                    )
+                elif len(parts) >= 5:
+                    bh_toks.extend(["emit", parts[4][:63]])
+                else:
                     return "execute_spine_bad_behavior"
-                bh_toks.extend(["emit", parts[4][:63]])
             else:
                 return "execute_spine_bad_behavior"
             out = "Listen: " + ev[:120]
