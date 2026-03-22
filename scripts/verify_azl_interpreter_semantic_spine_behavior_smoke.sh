@@ -13,10 +13,11 @@
 # smoke15 if ( false ) { … } otherwise { say … } — alternate branch; then-body marker must not appear (same if| + host branch).
 # smoke16 if ( false ) { … } otherwise { two says } — ordered multi-statement otherwise; P16_BAD must not appear; P16_A before P16_B on stdout.
 # smoke17 set ::azl_spine_p17 = true then if ( ::azl_spine_p17 ) { … } otherwise { … } — evaluated condition (if| + host execute_ast); P17_IF only; P17_BAD must not appear.
+# smoke18 set ::azl_spine_p18_flag = false then if ( ::azl_spine_p18_flag ) { … } otherwise { … } — evaluated falsey global; P18_ELSE only; P18_BAD must not appear.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–640).
+# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–642).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -103,8 +104,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=17)}' "$out"; then
-  err "stdout expected >=17 \"Interpretation complete:\" lines (harness seventeen emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=18)}' "$out"; then
+  err "stdout expected >=18 \"Interpretation complete:\" lines (harness eighteen emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -216,6 +217,16 @@ if rg -q 'AZL_SPINE_P17_BAD' "$out"; then
   err "stdout must not contain seventeenth-interpret otherwise marker AZL_SPINE_P17_BAD (then-branch must run)"
   cat "$out" >&2 || true
   exit 640
+fi
+if rg -q 'AZL_SPINE_P18_BAD' "$out"; then
+  err "stdout must not contain eighteenth-interpret skipped then-body marker AZL_SPINE_P18_BAD (evaluated falsey ::azl_spine_p18_flag)"
+  cat "$out" >&2 || true
+  exit 641
+fi
+if ! rg -q 'AZL_SPINE_P18_ELSE' "$out"; then
+  err "stdout missing eighteenth-interpret otherwise marker AZL_SPINE_P18_ELSE (set false + if (::azl_spine_p18_flag) on real file path)"
+  cat "$out" >&2 || true
+  exit 642
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"
