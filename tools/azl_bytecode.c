@@ -279,9 +279,11 @@ static int parse_one_code_obj(J *j, AzlBytecodeInstr *ins) {
   uint32_t ev = 0, ky = 0, vl = 0;
   uint32_t slot = 0, target = 0, false_idx = 0, true_idx = 0;
   uint32_t val_slot = 0;
+  uint32_t start_pc = 0, end_pc = 0;
   int have_ev = 0, have_ky = 0, have_vl = 0;
   int have_slot = 0, have_target = 0, have_false_idx = 0, have_true_idx = 0;
   int have_val_slot = 0;
+  int have_start_pc = 0, have_end_pc = 0;
   while (j->i < j->n) {
     j_skip_ws(j);
     if (j->s[j->i] == '}') {
@@ -331,6 +333,14 @@ static int parse_one_code_obj(J *j, AzlBytecodeInstr *ins) {
       if (j_parse_uint(j, &true_idx) != 0)
         return -1;
       have_true_idx = 1;
+    } else if (strcmp(kbuf, "start_pc") == 0) {
+      if (j_parse_uint(j, &start_pc) != 0)
+        return -1;
+      have_start_pc = 1;
+    } else if (strcmp(kbuf, "end_pc") == 0) {
+      if (j_parse_uint(j, &end_pc) != 0)
+        return -1;
+      have_end_pc = 1;
     } else if (strcmp(kbuf, "a") == 0) {
       if (j_parse_uint(j, &ev) != 0)
         return -1;
@@ -378,8 +388,22 @@ static int parse_one_code_obj(J *j, AzlBytecodeInstr *ins) {
     ins->a = ev;
     ins->b = ky;
     ins->c = val_slot;
-  } else if (strcmp(opname, "call") == 0 || strcmp(opname, "listen") == 0) {
+  } else if (strcmp(opname, "call") == 0) {
     return -1;
+  } else if (strcmp(opname, "listener_reg") == 0) {
+    ins->op = AZL_OP_LISTENER_REG;
+    if (!have_ev || !have_start_pc || !have_end_pc)
+      return -1;
+    ins->a = ev;
+    ins->b = start_pc;
+    ins->c = end_pc;
+  } else if (strcmp(opname, "enter_main") == 0) {
+    ins->op = AZL_OP_ENTER_MAIN;
+    if (!have_target)
+      return -1;
+    ins->a = target;
+  } else if (strcmp(opname, "listener_end") == 0) {
+    ins->op = AZL_OP_LISTENER_END;
   } else if (strcmp(opname, "store_var") == 0) {
     ins->op = AZL_OP_STORE_VAR;
     if (!have_slot)

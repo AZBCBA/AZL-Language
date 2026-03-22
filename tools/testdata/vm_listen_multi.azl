@@ -1,0 +1,8 @@
+# Two listeners on the same event; dispatch order matches source registration order.
+listen "e" {
+  emit "trace" { "n": "first" }
+}
+listen "e" {
+  emit "trace" { "n": "second" }
+}
+emit "e" { "x": "y" }

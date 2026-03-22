@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "consts": ["e"],
+  "code": [
+    { "op": "listener_reg", "event": 0, "start_pc": 9, "end_pc": 2 },
+    { "op": "enter_main", "target": 2 },
+    { "op": "halt" }
+  ]
+}

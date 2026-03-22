@@ -1,0 +1,10 @@
+# Handler body: set + if/else branch emits expected payload.
+listen "go" {
+  set x = "yes"
+  if ( x == "yes" ) {
+    emit "branch" { "r": "ok" }
+  } else {
+    emit "branch" { "r": "no" }
+  }
+}
+emit "go" { "k": "v" }

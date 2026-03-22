@@ -1,5 +1,6 @@
 /* Minimal AZL scanner + recursive-descent compiler → AzlBytecodeProgram (no JSON).
- * Supported statements: emit, set, if/else only (listen/for are not compiled here). */
+ * Top-level: optional listen blocks (multi-listener registration), then main statements.
+ * Main + listen handlers: emit, set, if/else only (no loops, no call, no nested listen). */
 #define _GNU_SOURCE
 #include "azl_compiler.h"
 
@@ -166,6 +167,8 @@ static void lex_next(Lex *L, Tok *t) {
       t->k = TK_IF;
     else if (strcmp(t->text, "else") == 0)
       t->k = TK_ELSE;
+    else if (strcmp(t->text, "listen") == 0)
+      t->k = TK_LISTEN;
     else
       t->k = TK_IDENT;
     return;
@@ -324,8 +327,9 @@ static int parse_set_stmt(Parse *p) {
 
 static int parse_stmt(Parse *p);
 static int parse_emit_stmt(Parse *p);
+static int parse_listener_stmt(Parse *p);
 
-static int parse_if_stmt(Parse *p) {
+static int parse_if_stmt_with(Parse *p, int (*inner)(Parse *)) {
   if (parse_expect(p, TK_IF) != 0)
     return -1;
   if (parse_expect(p, TK_LPAREN) != 0)
@@ -347,7 +351,7 @@ static int parse_if_stmt(Parse *p) {
   }
   parse_bump(p);
   while (p->cur.k != TK_RBRACE && p->cur.k != TK_EOF) {
-    if (parse_stmt(p) != 0)
+    if (inner(p) != 0)
       return -1;
   }
   if (parse_expect(p, TK_RBRACE) != 0)
@@ -365,7 +369,7 @@ static int parse_if_stmt(Parse *p) {
     }
     parse_bump(p);
     while (p->cur.k != TK_RBRACE && p->cur.k != TK_EOF) {
-      if (parse_stmt(p) != 0)
+      if (inner(p) != 0)
         return -1;
     }
     if (parse_expect(p, TK_RBRACE) != 0)
@@ -377,7 +381,13 @@ static int parse_if_stmt(Parse *p) {
   return 0;
 }
 
+static int parse_if_stmt(Parse *p) { return parse_if_stmt_with(p, parse_stmt); }
+
 static int parse_stmt(Parse *p) {
+  if (p->cur.k == TK_LISTEN) {
+    parse_err(p, "listen must precede all emit, set, and if statements");
+    return -1;
+  }
   if (p->cur.k == TK_EMIT)
     return parse_emit_stmt(p);
   if (p->cur.k == TK_SET)
@@ -391,6 +401,33 @@ static int parse_stmt(Parse *p) {
   parse_err(p, "unsupported statement (use emit, set, or if)");
   return -1;
 }
+
+static int parse_listener_stmt(Parse *p) {
+  if (p->cur.k == TK_LISTEN) {
+    parse_err(p, "listen not allowed inside listen handler");
+    return -1;
+  }
+  if (p->cur.k == TK_EMIT)
+    return parse_emit_stmt(p);
+  if (p->cur.k == TK_SET)
+    return parse_set_stmt(p);
+  if (p->cur.k == TK_IF)
+    return parse_if_stmt_with(p, parse_listener_stmt);
+  if (p->cur.k == TK_ILLEGAL) {
+    parse_err(p, "illegal token");
+    return -1;
+  }
+  parse_err(p, "unsupported statement in listen handler (emit, set, if only)");
+  return -1;
+}
+
+#define AZL_COMPILE_LISTEN_MAX 32
+
+typedef struct {
+  int event_const;
+  size_t body_start;
+  size_t body_end;
+} ListenSpec;
 
 /* emit STRING { STRING : STRING | IDENT (, …)* } — value is const string or local name (EMIT / EMIT_VAR). */
 static int parse_emit_stmt(Parse *p) {
@@ -468,6 +505,81 @@ static int parse_program(Parse *p) {
   p->cfalse = add_const(p, "false");
   if (p->ctrue < 0 || p->cfalse < 0)
     return -1;
+
+  ListenSpec specs[AZL_COMPILE_LISTEN_MAX];
+  int nspec = 0;
+  while (p->cur.k == TK_LISTEN) {
+    if (nspec >= AZL_COMPILE_LISTEN_MAX) {
+      parse_err(p, "too many listen blocks");
+      return -1;
+    }
+    if (parse_expect(p, TK_LISTEN) != 0)
+      return -1;
+    if (p->cur.k != TK_STRING) {
+      parse_err(p, "expected event string after listen");
+      return -1;
+    }
+    int evc = add_const(p, p->cur.text);
+    if (evc < 0)
+      return -1;
+    parse_bump(p);
+    if (p->cur.k != TK_LBRACE) {
+      parse_err(p, "expected '{' after listen event name");
+      return -1;
+    }
+    specs[nspec].event_const = evc;
+    /* TK_LBRACE: lex.i is already past the `{` byte (see lex_next). */
+    specs[nspec].body_start = p->lex.i;
+    specs[nspec].body_end = 0u;
+    parse_bump(p);
+    int depth = 1;
+    while (depth > 0 && p->cur.k != TK_EOF) {
+      if (p->cur.k == TK_LBRACE) {
+        depth++;
+        parse_bump(p);
+      } else if (p->cur.k == TK_RBRACE) {
+        depth--;
+        /* cur is RBRACE: lex.i already past this `}`; [body_start, lex.i-1) excludes the closer. */
+        if (depth == 0) {
+          if (p->lex.i == 0u) {
+            parse_err(p, "internal: bad listen body span");
+            return -1;
+          }
+          specs[nspec].body_end = p->lex.i - 1u;
+          parse_bump(p);
+          break;
+        }
+        parse_bump(p);
+      } else {
+        parse_bump(p);
+      }
+    }
+    if (depth != 0 || specs[nspec].body_end == 0u) {
+      parse_err(p, "unclosed '{' in listen block");
+      return -1;
+    }
+    nspec++;
+  }
+
+  size_t reg_insn[AZL_COMPILE_LISTEN_MAX];
+  for (int li = 0; li < nspec; li++) {
+    reg_insn[li] = p->out->ncode;
+    AzlBytecodeInstr reg = {AZL_OP_LISTENER_REG, (uint32_t)specs[li].event_const, 0u, 0u};
+    if (add_insn(p, &reg) != 0)
+      return -1;
+  }
+
+  size_t enter_idx = 0;
+  if (nspec > 0) {
+    enter_idx = p->out->ncode;
+    AzlBytecodeInstr ent = {AZL_OP_ENTER_MAIN, 0u, 0u, 0u};
+    if (add_insn(p, &ent) != 0)
+      return -1;
+  }
+  size_t main_start = p->out->ncode;
+  if (nspec > 0)
+    p->out->code[enter_idx].a = (uint32_t)main_start;
+
   while (p->cur.k != TK_EOF) {
     if (parse_stmt(p) != 0)
       return -1;
@@ -475,6 +587,29 @@ static int parse_program(Parse *p) {
   AzlBytecodeInstr halt = {AZL_OP_HALT, 0, 0, 0};
   if (add_insn(p, &halt) != 0)
     return -1;
+
+  Lex saved_lex = p->lex;
+  for (int li = 0; li < nspec; li++) {
+    size_t hstart = p->out->ncode;
+    p->out->code[reg_insn[li]].b = (uint32_t)hstart;
+    p->lex.i = specs[li].body_start;
+    p->lex.n = specs[li].body_end;
+    lex_next(&p->lex, &p->cur);
+    while (p->cur.k != TK_EOF) {
+      if (parse_listener_stmt(p) != 0) {
+        p->lex = saved_lex;
+        return -1;
+      }
+    }
+    AzlBytecodeInstr lend = {AZL_OP_LISTENER_END, 0u, 0u, 0u};
+    if (add_insn(p, &lend) != 0) {
+      p->lex = saved_lex;
+      return -1;
+    }
+    p->out->code[reg_insn[li]].c = (uint32_t)p->out->ncode;
+    p->lex = saved_lex;
+  }
+
   return 0;
 }
 
@@ -672,6 +807,145 @@ static void else_on_failure_no(AzlEngine *eng, const AzlEvent *ev, void *ud) {
     g_else_fail_no = 1;
 }
 
+static int g_listen_out_ok;
+static void listen_on_out(AzlEngine *eng, const AzlEvent *ev, void *ud) {
+  (void)eng;
+  (void)ud;
+  const char *m = cmp_payload(ev, "m");
+  if (m && strcmp(m, "from_handler") == 0)
+    g_listen_out_ok = 1;
+}
+
+static int g_listen_trace_step;
+static void listen_on_trace(AzlEngine *eng, const AzlEvent *ev, void *ud) {
+  (void)eng;
+  (void)ud;
+  const char *n = cmp_payload(ev, "n");
+  if (!n)
+    return;
+  if (g_listen_trace_step == 0 && strcmp(n, "first") == 0)
+    g_listen_trace_step = 1;
+  else if (g_listen_trace_step == 1 && strcmp(n, "second") == 0)
+    g_listen_trace_step = 2;
+}
+
+static int g_listen_bad_seen;
+static void listen_on_bad(AzlEngine *eng, const AzlEvent *ev, void *ud) {
+  (void)eng;
+  (void)ev;
+  (void)ud;
+  g_listen_bad_seen = 1;
+}
+
+static int g_listen_branch_ok;
+static void listen_on_branch(AzlEngine *eng, const AzlEvent *ev, void *ud) {
+  (void)eng;
+  (void)ud;
+  const char *r = cmp_payload(ev, "r");
+  if (r && strcmp(r, "ok") == 0)
+    g_listen_branch_ok = 1;
+}
+
+static int run_compile_fixture_vm(const char *name, AzlEngine *eng) {
+  char path[512];
+  if (resolve_testdata_path(name, path, sizeof(path)) != 0) {
+    fprintf(stderr, "native_listen: missing testdata %s\n", name);
+    return -1;
+  }
+  FILE *fp = fopen(path, "rb");
+  if (!fp)
+    return -1;
+  char bbuf[4096];
+  size_t bn = fread(bbuf, 1, sizeof(bbuf) - 1u, fp);
+  fclose(fp);
+  bbuf[bn] = '\0';
+  AzlBytecodeProgram prog;
+  azl_bytecode_program_init_empty(&prog);
+  char ebuf[256];
+  if (azl_compile_source(bbuf, bn, &prog, ebuf, sizeof(ebuf)) != 0) {
+    fprintf(stderr, "native_listen: compile %s: %s\n", name, ebuf);
+    azl_bytecode_program_destroy(&prog);
+    return -1;
+  }
+  AzlErr xr = azl_vm_exec_block(eng, &prog);
+  azl_bytecode_program_destroy(&prog);
+  if (xr != AZL_OK) {
+    fprintf(stderr, "native_listen: vm_exec %s failed\n", name);
+    return -1;
+  }
+  return 0;
+}
+
+static int native_listen_dispatch_suite(void) {
+  AzlEngine *eng = azl_engine_create((size_t)1u << 16, 1024u, 64u);
+  if (!eng)
+    return -1;
+
+  g_listen_out_ok = 0;
+  azl_engine_register_listener(eng, "out", listen_on_out, NULL);
+  if (run_compile_fixture_vm("vm_listen_single.azl", eng) != 0) {
+    azl_engine_destroy(eng);
+    return -1;
+  }
+  if (!g_listen_out_ok) {
+    fprintf(stderr, "native_listen: single listener did not emit expected out event\n");
+    azl_engine_destroy(eng);
+    return -1;
+  }
+
+  azl_engine_destroy(eng);
+  eng = azl_engine_create((size_t)1u << 16, 1024u, 64u);
+  if (!eng)
+    return -1;
+  g_listen_trace_step = 0;
+  azl_engine_register_listener(eng, "trace", listen_on_trace, NULL);
+  if (run_compile_fixture_vm("vm_listen_multi.azl", eng) != 0) {
+    azl_engine_destroy(eng);
+    return -1;
+  }
+  if (g_listen_trace_step != 2) {
+    fprintf(stderr, "native_listen: multi listener order/want step 2 got %d\n", g_listen_trace_step);
+    azl_engine_destroy(eng);
+    return -1;
+  }
+
+  azl_engine_destroy(eng);
+  eng = azl_engine_create((size_t)1u << 16, 1024u, 64u);
+  if (!eng)
+    return -1;
+  g_listen_bad_seen = 0;
+  azl_engine_register_listener(eng, "bad", listen_on_bad, NULL);
+  if (run_compile_fixture_vm("vm_listen_nomatch.azl", eng) != 0) {
+    azl_engine_destroy(eng);
+    return -1;
+  }
+  if (g_listen_bad_seen) {
+    fprintf(stderr, "native_listen: non-match incorrectly ran handler\n");
+    azl_engine_destroy(eng);
+    return -1;
+  }
+
+  azl_engine_destroy(eng);
+  eng = azl_engine_create((size_t)1u << 16, 1024u, 64u);
+  if (!eng)
+    return -1;
+  g_listen_branch_ok = 0;
+  azl_engine_register_listener(eng, "branch", listen_on_branch, NULL);
+  if (run_compile_fixture_vm("vm_listen_if.azl", eng) != 0) {
+    azl_engine_destroy(eng);
+    return -1;
+  }
+  if (!g_listen_branch_ok) {
+    fprintf(stderr, "native_listen: if-branch handler did not emit r=ok\n");
+    azl_engine_destroy(eng);
+    return -1;
+  }
+
+  azl_engine_destroy(eng);
+  fprintf(stderr, "native_listen_dispatch_suite: ok\n");
+  return 0;
+}
+
 static int expect_else_branch_fixture_ok(void) {
   char path[512];
   if (resolve_testdata_path("vm_branch_else.azl", path, sizeof(path)) != 0) {
@@ -750,6 +1024,16 @@ static int native_vm_negative_and_edge_suite(void) {
     return -1;
 
   if (expect_else_branch_fixture_ok() != 0)
+    return -1;
+
+  if (expect_compile_fail_named("compile_bad_listen_no_string.azl", "expected event string after listen") != 0)
+    return -1;
+  if (expect_compile_fail_named("compile_bad_listen_no_brace.azl", "expected '{' after listen event name") != 0)
+    return -1;
+  if (expect_compile_fail_named("compile_bad_listen_body_stmt.azl", "unsupported statement in listen handler") != 0)
+    return -1;
+
+  if (expect_vm_exec_fail_json_named("vm_bad_listener_reg.json") != 0)
     return -1;
 
   fprintf(stderr, "native_vm_negative_and_edge_suite: ok\n");
@@ -864,10 +1148,14 @@ int azl_compiler_selftest(void) {
     fprintf(stderr, "azl_compiler_selftest: branch did not emit success/result=ok or spurious failure event\n");
     return -1;
   }
+  if (native_listen_dispatch_suite() != 0) {
+    fprintf(stderr, "azl_compiler_selftest: native_listen_dispatch_suite failed\n");
+    return -1;
+  }
   if (native_vm_negative_and_edge_suite() != 0) {
     fprintf(stderr, "azl_compiler_selftest: native_vm_negative_and_edge_suite failed\n");
     return -1;
   }
-  fprintf(stderr, "azl_compiler_selftest: ok (%s, %s, negative+else)\n", used ? used : "?", bused ? bused : "?");
+  fprintf(stderr, "azl_compiler_selftest: ok (%s, %s, listen+negative+else)\n", used ? used : "?", bused ? bused : "?");
   return 0;
 }

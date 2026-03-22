@@ -64,6 +64,10 @@ typedef enum AzlOpcode {
   AZL_OP_JUMP_IF_FALSE = 9,
   AZL_OP_EQ = 10,
   AZL_OP_EMIT_VAR = 11,
+  /* Multi-listener native subset: registration + main entry + handler return (see azl_compiler.c). */
+  AZL_OP_LISTENER_REG = 12,
+  AZL_OP_ENTER_MAIN = 13,
+  AZL_OP_LISTENER_END = 14,
 } AzlOpcode;
 
 /* --- Arena: bump allocator, reset between bursts (zero freelist fragmentation) --- */

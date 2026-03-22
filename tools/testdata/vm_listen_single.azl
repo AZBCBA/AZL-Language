@@ -1,0 +1,5 @@
+# Native listen slice: one handler on "hello" emits observable follow-up event.
+listen "hello" {
+  emit "out" { "m": "from_handler" }
+}
+emit "hello" { "k": "trigger" }

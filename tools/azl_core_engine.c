@@ -826,16 +826,28 @@ static const char *vm_const_get(const AzlBytecodeProgram *p, uint32_t idx) {
   return p->consts[idx];
 }
 
-/* Native VM: operand stack + locals; OP_EMIT -> azl_engine_emit; jumps use instruction indices (pc may equal ncode to stop). */
-AzlErr azl_vm_exec_block(AzlEngine *eng, const AzlBytecodeProgram *prog) {
-  if (!eng || !prog || !prog->code)
+typedef enum AzlVmRunKind { AZL_VM_RUN_MAIN = 0, AZL_VM_RUN_LISTENER = 1 } AzlVmRunKind;
+
+static int vm_jump_tgt_ok(size_t tgt, size_t range_lo, size_t range_hi_excl, size_t ncode) {
+  if (tgt >= ncode)
+    return 0;
+  if (tgt < range_lo || tgt >= range_hi_excl)
+    return 0;
+  return 1;
+}
+
+/* Per-activation operand stack; shared vars across main and listen handlers. */
+static AzlErr azl_vm_exec_loop(AzlEngine *eng, const AzlBytecodeProgram *prog, uint32_t *vars, size_t *pc_io,
+                               size_t range_lo, size_t range_hi_excl, AzlVmRunKind kind) {
+  if (!eng || !prog || !prog->code || !vars || !pc_io)
+    return AZL_ERR_INVALID;
+  if (range_hi_excl > prog->ncode || range_lo > range_hi_excl)
+    return AZL_ERR_INVALID;
+  if (*pc_io < range_lo || *pc_io > range_hi_excl)
     return AZL_ERR_INVALID;
 
   uint32_t stack[AZL_VM_STACK_MAX];
   int sp = 0;
-  uint32_t vars[AZL_VM_VAR_MAX];
-  for (size_t i = 0; i < AZL_VM_VAR_MAX; i++)
-    vars[i] = UINT32_MAX;
 
 #define VM_PUSH(v)                                                                               \
   do {                                                                                           \
@@ -850,17 +862,27 @@ AzlErr azl_vm_exec_block(AzlEngine *eng, const AzlBytecodeProgram *prog) {
     (out) = stack[--sp];                                                                         \
   } while (0)
 
-  size_t pc = 0;
-  while (pc < prog->ncode) {
+  size_t pc = *pc_io;
+  while (pc < range_hi_excl) {
     const AzlBytecodeInstr *in = &prog->code[pc];
     switch ((AzlOpcode)in->op) {
     case AZL_OP_HALT:
+      if (kind == AZL_VM_RUN_LISTENER)
+        return AZL_ERR_INVALID;
+      *pc_io = pc + 1u;
+      return AZL_OK;
+    case AZL_OP_LISTENER_END:
+      if (kind == AZL_VM_RUN_MAIN)
+        return AZL_ERR_INVALID;
+      *pc_io = pc + 1u;
       return AZL_OK;
     case AZL_OP_NOP:
       pc++;
       break;
     case AZL_OP_REJECTED_LEGACY_4:
     case AZL_OP_REJECTED_LEGACY_5:
+    case AZL_OP_LISTENER_REG:
+    case AZL_OP_ENTER_MAIN:
       return AZL_ERR_INVALID;
     case AZL_OP_LOAD_CONST:
       if (in->a >= prog->nconst)
@@ -891,12 +913,12 @@ AzlErr azl_vm_exec_block(AzlEngine *eng, const AzlBytecodeProgram *prog) {
       pc++;
       break;
     case AZL_OP_JUMP:
-      if (in->a > prog->ncode)
+      if (!vm_jump_tgt_ok((size_t)in->a, range_lo, range_hi_excl, prog->ncode))
         return AZL_ERR_INVALID;
       pc = (size_t)in->a;
       break;
     case AZL_OP_JUMP_IF_FALSE:
-      if (in->a > prog->ncode)
+      if (!vm_jump_tgt_ok((size_t)in->a, range_lo, range_hi_excl, prog->ncode))
         return AZL_ERR_INVALID;
       {
         uint32_t v;
@@ -969,7 +991,83 @@ AzlErr azl_vm_exec_block(AzlEngine *eng, const AzlBytecodeProgram *prog) {
   }
 #undef VM_POP
 #undef VM_PUSH
-  return AZL_OK;
+  if (kind == AZL_VM_RUN_LISTENER)
+    return AZL_ERR_INVALID;
+  *pc_io = pc;
+  return AZL_ERR_INVALID;
+}
+
+typedef struct AzlVmListenerUd {
+  const AzlBytecodeProgram *prog;
+  uint32_t *vars;
+  size_t h_start;
+  size_t h_end;
+} AzlVmListenerUd;
+
+static void azl_vm_listener_trampoline(AzlEngine *eng, const AzlEvent *ev, void *ud) {
+  (void)ev;
+  AzlVmListenerUd *L = (AzlVmListenerUd *)ud;
+  if (!L || !L->prog || !L->vars || L->h_start >= L->h_end || L->h_end > L->prog->ncode)
+    return;
+  size_t pc = L->h_start;
+  AzlErr er = azl_vm_exec_loop(eng, L->prog, L->vars, &pc, L->h_start, L->h_end, AZL_VM_RUN_LISTENER);
+  if (er != AZL_OK && eng && eng->err_cb)
+    eng->err_cb(eng, er, "native vm listen handler failed", eng->err_ud);
+}
+
+/* Native VM: OP_EMIT / OP_EMIT_VAR use azl_engine_emit (multi-listener dispatch in engine order). */
+AzlErr azl_vm_exec_block(AzlEngine *eng, const AzlBytecodeProgram *prog) {
+  if (!eng || !prog || !prog->code)
+    return AZL_ERR_INVALID;
+
+  uint32_t vars[AZL_VM_VAR_MAX];
+  for (size_t i = 0; i < AZL_VM_VAR_MAX; i++)
+    vars[i] = UINT32_MAX;
+
+  if (prog->ncode == 0u)
+    return AZL_ERR_INVALID;
+
+  if (prog->code[0].op != AZL_OP_LISTENER_REG) {
+    size_t pc = 0;
+    return azl_vm_exec_loop(eng, prog, vars, &pc, 0u, prog->ncode, AZL_VM_RUN_MAIN);
+  }
+
+  AzlVmListenerUd uds[AZL_MAX_LISTENERS];
+  size_t n_reg = 0;
+  size_t scan = 0;
+  while (scan < prog->ncode && prog->code[scan].op == AZL_OP_LISTENER_REG) {
+    const AzlBytecodeInstr *in = &prog->code[scan];
+    const char *nm = vm_const_get(prog, in->a);
+    if (!nm || !nm[0])
+      return AZL_ERR_INVALID;
+    if (in->b >= in->c || (size_t)in->c > prog->ncode)
+      return AZL_ERR_INVALID;
+    if (n_reg >= AZL_MAX_LISTENERS)
+      return AZL_ERR_QUEUE_FULL;
+    uds[n_reg].prog = prog;
+    uds[n_reg].vars = vars;
+    uds[n_reg].h_start = (size_t)in->b;
+    uds[n_reg].h_end = (size_t)in->c;
+    AzlErr lr = azl_engine_register_listener(eng, nm, azl_vm_listener_trampoline, &uds[n_reg]);
+    if (lr != AZL_OK)
+      return lr;
+    n_reg++;
+    scan++;
+  }
+  if (scan >= prog->ncode || prog->code[scan].op != AZL_OP_ENTER_MAIN)
+    return AZL_ERR_INVALID;
+  size_t main_pc = (size_t)prog->code[scan].a;
+  if (main_pc > prog->ncode)
+    return AZL_ERR_INVALID;
+  size_t main_end = prog->ncode;
+  for (size_t i = 0; i < n_reg; i++) {
+    if (uds[i].h_start < main_end)
+      main_end = uds[i].h_start;
+  }
+  if (main_pc >= main_end)
+    return AZL_ERR_INVALID;
+  size_t mpc = main_pc;
+  return azl_vm_exec_loop(eng, prog, vars, &mpc, main_pc, main_end, AZL_VM_RUN_MAIN);
 }
 
 int azl_bridge_poll(AzlSysproxyBridge *b) {

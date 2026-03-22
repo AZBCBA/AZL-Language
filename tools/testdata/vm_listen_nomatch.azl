@@ -1,0 +1,5 @@
+# Listener on "other" must not run when main emits "hello".
+listen "other" {
+  emit "bad" { "x": "nope" }
+}
+emit "hello" { "k": "v" }

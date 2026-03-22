@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Native core engine: compile tools/azl_core_engine.c + bytecode + compiler selftests.
 # Verifies JSON bytecode (vm_hello_world.json + vm_emit_var.json), AZL compile (vm_hello.azl + vm_branch.azl), VM exec,
-# and native_vm_negative_and_edge_suite inside azl_compiler_selftest:
+# native_listen_dispatch_suite (multi-listener listen/emit), native_vm_negative_and_edge_suite inside azl_compiler_selftest:
 #   (1) compile fail: unknown var in if condition (compile_bad_cond_unknown.azl)
 #   (2) compile fail: unknown var in emit payload (compile_bad_emit_unknown.azl)
 #   (3) compile fail: if missing ')' (compile_bad_if_no_paren.azl)
@@ -12,7 +12,8 @@
 #   (8) vm_exec fail: jump_if_false target out of range (vm_bad_jump_target.json)
 #   (9) vm_exec fail: load_var unset, emit_var unset slot, store_var slot out of range (vm_bad_*.json)
 #   (10) else path: failure event + result=no, success must not fire (vm_branch_else.azl)
-# Native bytecode subset: no call/listen op names in JSON; VM rejects legacy opcode slots 4–5.
+#   (11) listen lane + listen compile failures + vm_bad_listener_reg.json (invalid listener_reg span)
+# Native bytecode subset: no fake "call" op in JSON; listener_reg / enter_main / listener_end are real op names; VM rejects legacy opcode slots 4–5.
 # Exit codes: docs/ERROR_SYSTEM.md — Native core engine selftest (627–632, 903–904).
 set -euo pipefail
 
@@ -59,6 +60,14 @@ for _td in \
   compile_bad_emit_no_rbrace.azl \
   compile_bad_set_no_eq.azl \
   compile_bad_set_no_rhs.azl \
+  vm_listen_single.azl \
+  vm_listen_multi.azl \
+  vm_listen_nomatch.azl \
+  vm_listen_if.azl \
+  compile_bad_listen_no_string.azl \
+  compile_bad_listen_no_brace.azl \
+  compile_bad_listen_body_stmt.azl \
+  vm_bad_listener_reg.json \
   vm_bad_jump_target.json \
   vm_bad_load_unset.json \
   vm_bad_emit_var_unset.json \
@@ -74,6 +83,16 @@ _st=$?
 set -e
 if [ "$_st" -ne 0 ]; then
   err "azl_core_engine_selftest exited $_st"
+  cat "$SELFLOG" >&2 || true
+  exit 630
+fi
+if ! grep -Fq 'native_listen_dispatch_suite: ok' "$SELFLOG"; then
+  err "selftest log missing native_listen_dispatch_suite: ok (listen dispatch suite not run?)"
+  cat "$SELFLOG" >&2 || true
+  exit 630
+fi
+if ! grep -Fq 'native_listen_dispatch_suite: ok' "$SELFLOG"; then
+  err "selftest log missing native_listen_dispatch_suite: ok (listen lane not run?)"
   cat "$SELFLOG" >&2 || true
   exit 630
 fi
