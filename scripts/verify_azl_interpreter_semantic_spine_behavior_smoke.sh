@@ -11,10 +11,11 @@
 # smoke12 on/call — top-level user function + call (registered:* / called:* via execute_ast fn|/call| spine encoding).
 # smoke14 if ( true ) { say … } — ::parse_if_statement / ::execute_if_statement; spine ::parse_tokens emits if| row; host execute_ast branches.
 # smoke15 if ( false ) { … } otherwise { say … } — alternate branch; then-body marker must not appear (same if| + host branch).
+# smoke16 if ( false ) { … } otherwise { two says } — ordered multi-statement otherwise; P16_BAD must not appear; P16_A before P16_B on stdout.
 # Complements verify_azl_interpreter_semantic_spine_smoke.sh (init-only).
 #
 # Prefix ERROR[AZL_INTERPRETER_SEMANTIC_SPINE_BEHAVIOR_SMOKE]: on stderr for script-owned failures.
-# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–634).
+# See docs/ERROR_SYSTEM.md (exits 548–562, 611, 627–638).
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -101,8 +102,8 @@ if ! rg -q 'Interpretation complete:' "$out"; then
   cat "$out" >&2 || true
   exit 555
 fi
-if ! awk '/Interpretation complete:/{n++} END{exit !(n>=15)}' "$out"; then
-  err "stdout expected >=15 \"Interpretation complete:\" lines (harness fifteen emit interpret)"
+if ! awk '/Interpretation complete:/{n++} END{exit !(n>=16)}' "$out"; then
+  err "stdout expected >=16 \"Interpretation complete:\" lines (harness sixteen emit interpret)"
   cat "$out" >&2 || true
   exit 556
 fi
@@ -185,6 +186,25 @@ if ! rg -q 'AZL_SPINE_P15_ELSE' "$out"; then
   err "stdout missing fifteenth-interpret otherwise-branch say marker AZL_SPINE_P15_ELSE (if/false + otherwise on real file path)"
   cat "$out" >&2 || true
   exit 635
+fi
+if rg -q 'AZL_SPINE_P16_BAD' "$out"; then
+  err "stdout must not contain sixteenth-interpret skipped then-body marker AZL_SPINE_P16_BAD"
+  cat "$out" >&2 || true
+  exit 636
+fi
+if ! rg -q 'AZL_SPINE_P16_A' "$out" || ! rg -q 'AZL_SPINE_P16_B' "$out"; then
+  err "stdout missing sixteenth-interpret otherwise markers AZL_SPINE_P16_A and/or AZL_SPINE_P16_B"
+  cat "$out" >&2 || true
+  exit 637
+fi
+if ! awk '
+  /AZL_SPINE_P16_A/ && !a { a = NR }
+  /AZL_SPINE_P16_B/ && !b { b = NR }
+  END { exit !(a && b && a < b) }
+' "$out"; then
+  err "stdout expected AZL_SPINE_P16_A line before AZL_SPINE_P16_B (ordered multi-statement otherwise)"
+  cat "$out" >&2 || true
+  exit 638
 fi
 
 echo "azl-interpreter-semantic-spine-behavior-smoke-ok"
