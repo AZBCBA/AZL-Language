@@ -1,0 +1,42 @@
+# Gate F182: ::parse_tokens — outer listen { nested listen { say … } ; say … } → inner rows then outer rows.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f182_parse with { }
+  }
+  behavior {
+    listen for "f182_parse" {
+      set ::tokens = []
+      set ::l1 = "listen for f182_out {"
+      set ::l2 = "listen for f182_in {"
+      set ::l3 = "say F182_NEST"
+      set ::l4 = "}"
+      set ::l5 = "say F182_OUT"
+      set ::l6 = "}"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::l1, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l2, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 2, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l3, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 3, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l4, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 4, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l5, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 5, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l6, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 6, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      set ::rows = ::ast.nodes.split("\n")
+      for ::rn in ::rows {
+        say ::rn
+      }
+      say "P0_SEM_F182_OK"
+    }
+  }
+}

@@ -2350,6 +2350,56 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
   return -1;
 }
 
+/* Nested ``listen for inner { … }`` inside outer ``listen { … }`` → rows use ``inner`` event (F182). */
+static int parse_listen_inner_nested_listen(ParseTokPair *pairs, int np, int j, char *acc, size_t accap, int *j_out) {
+  if (j >= np || strcmp(pairs[j].typ, "identifier") != 0 || strcmp(pairs[j].val, "listen") != 0) return -1;
+  j = parse_skip_eol(pairs, np, j + 1);
+  if (j >= np || strcmp(pairs[j].typ, "identifier") != 0 || strcmp(pairs[j].val, "for") != 0) return -1;
+  j = parse_skip_eol(pairs, np, j + 1);
+  if (j >= np) return -1;
+  char inner_evn[72];
+  inner_evn[0] = '\0';
+  if (strcmp(pairs[j].typ, "string") == 0 || strcmp(pairs[j].typ, "identifier") == 0)
+    (void)snprintf(inner_evn, sizeof(inner_evn), "%.63s", pairs[j].val);
+  if (!inner_evn[0] || strchr(inner_evn, '|') != NULL) return -1;
+  j = parse_skip_eol(pairs, np, j + 1);
+  if (j < np && strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "then") == 0)
+    j = parse_skip_eol(pairs, np, j + 1);
+  if (j >= np || strcmp(pairs[j].typ, "brace") != 0 || strcmp(pairs[j].val, "{") != 0) return -1;
+  int jb_open = j;
+  int jb_close = pair_brace_close_idx(pairs, np, jb_open);
+  if (jb_close < 0) return -1;
+  size_t acc_before = strlen(acc);
+  int ji = parse_skip_eol(pairs, np, jb_open + 1);
+  int stm = 0;
+  char lchunk[AZL_LISTEN_CHUNK_CAP];
+  while (ji < jb_close) {
+    if (strcmp(pairs[ji].typ, "eol") == 0) {
+      ji++;
+      continue;
+    }
+    int jn = ji;
+    if (parse_listen_inner_nested_listen(pairs, np, ji, acc, accap, &jn) == 0) {
+      ji = jn;
+      stm++;
+      continue;
+    }
+    if (parse_listen_inner_body(pairs, np, ji, inner_evn, lchunk, sizeof(lchunk), &jn) != 0) {
+      acc[acc_before] = '\0';
+      return -1;
+    }
+    parse_acc_append(acc, accap, lchunk);
+    stm++;
+    ji = jn;
+  }
+  if (stm <= 0) {
+    acc[acc_before] = '\0';
+    return -1;
+  }
+  *j_out = jb_close + 1;
+  return 0;
+}
+
 static int tz_buf_to_pairs(const char *buf, ParseTokPair *pairs, int maxp) {
   int np = 0;
   const char *q = buf ? buf : "";
@@ -3088,6 +3138,11 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
           break;
         }
         int j2 = jpos;
+        if (parse_listen_inner_nested_listen(pairs, np, jpos, acc, sizeof(acc), &j2) == 0) {
+          stmts++;
+          jpos = j2;
+          continue;
+        }
         if (parse_listen_inner_body(pairs, np, jpos, evn, lchunk, sizeof(lchunk), &j2) != 0) {
           acc[acc_save_len] = '\0';
           stmts = -1;

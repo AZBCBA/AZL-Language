@@ -581,6 +581,63 @@ class MinimalAZLRuntime:
             return None
         return None
 
+    def _parse_listen_nested_listen_block(
+        self, pairs: list[tuple[str, str]], j: int, n: int
+    ) -> tuple[list[str], int] | None:
+        """``listen for inner_ev { … }`` inside outer ``listen { … }`` → rows use ``inner_ev`` (F182)."""
+        if j >= n or pairs[j] != ("identifier", "listen"):
+            return None
+        j = self._skip_eol_pairs(pairs, j + 1)
+        if j >= n or pairs[j] != ("identifier", "for"):
+            return None
+        j = self._skip_eol_pairs(pairs, j + 1)
+        if j >= n:
+            return None
+        et, ev = pairs[j]
+        if et == "string":
+            evn_in = ev[:63]
+        elif et == "identifier":
+            evn_in = ev[:63]
+        else:
+            return None
+        if not evn_in or "|" in evn_in:
+            return None
+        j = self._skip_eol_pairs(pairs, j + 1)
+        if j < n and pairs[j] == ("identifier", "then"):
+            j = self._skip_eol_pairs(pairs, j + 1)
+        if j >= n or pairs[j] != ("brace", "{"):
+            return None
+        jb_open = j
+        close = self._pair_brace_close_index(pairs, jb_open)
+        if close is None:
+            return None
+        jb_close = close
+        out: list[str] = []
+        ji = self._skip_eol_pairs(pairs, jb_open + 1)
+        any_stmt = False
+        while ji < jb_close:
+            if pairs[ji][0] == "eol":
+                ji += 1
+                continue
+            nested = self._parse_listen_nested_listen_block(pairs, ji, n)
+            if nested is not None:
+                lines, jn = nested
+                out.extend(lines)
+                ji = jn
+                any_stmt = True
+                continue
+            parsed = self._parse_listen_inner_to_row(pairs, ji, n, evn_in)
+            if parsed is None:
+                return None
+            line, jn = parsed
+            if line:
+                out.append(line)
+            ji = jn
+            any_stmt = True
+        if not any_stmt:
+            return None
+        return (out, jb_close + 1)
+
     def _pair_brace_close_index(
         self, pairs: list[tuple[str, str]], open_idx: int
     ) -> int | None:
@@ -599,6 +656,115 @@ class MinimalAZLRuntime:
         if d != 0:
             return None
         return j - 1
+
+    def _spine_if_cond_tokens(
+        self, pairs: list[tuple[str, str]], j: int, lim: int
+    ) -> tuple[list[str] | None, int]:
+        """Collect tokens inside ``if ( … )`` for spine_component_v1 ``ifj`` JSON (matches ``eval_expr``)."""
+        if j >= lim or pairs[j] != ("paren", "("):
+            return None, j
+        depth = 0
+        toks: list[str] = []
+        k = j
+        while k < lim:
+            typ, val = pairs[k]
+            if typ == "paren" and val == "(":
+                depth += 1
+                toks.append("(")
+                k += 1
+            elif typ == "paren" and val == ")":
+                toks.append(")")
+                depth -= 1
+                k += 1
+                if depth == 0:
+                    return toks, k
+                continue
+            elif typ == "identifier":
+                toks.append(val[:120])
+            elif typ == "string":
+                toks.append(self._quote_azl_single_from_inner(val[:200]))
+            elif typ == "operator":
+                toks.append(val)
+            else:
+                return None, k
+            k += 1
+        return None, j
+
+    def _spine_collect_listen_stmts_json(
+        self,
+        pairs: list[tuple[str, str]],
+        j: int,
+        lim: int,
+        skip_e,
+    ) -> list[list[str]] | None:
+        """``say`` / ``set`` / ``emit`` (optional ``with``) only — for ``ifj`` then/else bodies."""
+        stmts: list[list[str]] = []
+        while j < lim:
+            j = skip_e(j)
+            if j >= lim:
+                break
+            if pairs[j] == ("identifier", "say"):
+                j = skip_e(j + 1)
+                if j >= lim:
+                    return None
+                st, sv = pairs[j]
+                if st == "string":
+                    tok = self._quote_azl_single_from_inner(sv[:200])
+                    stmts.append(["say", tok])
+                elif st == "identifier" and sv.startswith("::"):
+                    stmts.append(["say", sv[:96]])
+                else:
+                    return None
+                j = skip_e(j + 1)
+                continue
+            if pairs[j] == ("identifier", "set"):
+                j = skip_e(j + 1)
+                if j >= lim or pairs[j][0] != "identifier":
+                    return None
+                vk = pairs[j][1][:80]
+                if not vk.startswith("::"):
+                    return None
+                j = skip_e(j + 1)
+                if j >= lim or pairs[j] != ("operator", "="):
+                    return None
+                j = skip_e(j + 1)
+                if j >= lim or pairs[j][0] != "identifier":
+                    return None
+                val = pairs[j][1][:120]
+                if "|" in val or "\t" in val:
+                    return None
+                stmts.append(["set", vk, val])
+                j = skip_e(j + 1)
+                continue
+            if pairs[j] == ("identifier", "emit"):
+                j = skip_e(j + 1)
+                if j >= lim or pairs[j][0] != "identifier":
+                    return None
+                eev = pairs[j][1][:63]
+                if "|" in eev or "\t" in eev:
+                    return None
+                j = skip_e(j + 1)
+                if j < lim and pairs[j] == ("identifier", "with"):
+                    j = skip_e(j + 1)
+                    pr = self._parse_with_brace_pairs(pairs, j)
+                    if pr is None:
+                        return None
+                    kv, j2 = pr
+                    if len(kv) != 1:
+                        return None
+                    pk, pvv = kv[0]
+                    if "|" in pk or "\t" in pk or "|" in pvv or "\t" in pvv:
+                        return None
+                    stmts.append(["emit", eev, "with", pk, pvv[:120]])
+                    j = j2
+                    continue
+                stmts.append(["emit", eev])
+                continue
+            return None
+        j = skip_e(j)
+        if j != lim:
+            return None
+        return stmts
 
     @staticmethod
     def _quote_azl_single_from_inner(inner: str) -> str:
@@ -632,7 +798,8 @@ class MinimalAZLRuntime:
 
         Structured execution slice (not full AST): one or more ``listen for`` blocks (``bh\\tseg``
         ends each block so same-event listeners register separately), each body one or more
-        ``say`` / ``set`` / ``emit`` statements, plus ``init`` and ``memory`` as before.
+        ``say`` / ``set`` / ``emit`` / ``if ( … ) { … } else { … }`` statements (``if`` serialized
+        as ``bh\\tlisten\\t<ev>\\tifj\\t<json>``), plus ``init`` and ``memory`` as before.
         """
         n = len(pairs)
 
@@ -766,6 +933,53 @@ class MinimalAZLRuntime:
                         continue
                     bh_lines.append("bh\tlisten\t" + evn + "\temit\t" + eev)
                     n_bh_here += 1
+                    continue
+                if pairs[j] == ("identifier", "if"):
+                    j = skip_e(j + 1)
+                    cond_toks, j = self._spine_if_cond_tokens(pairs, j, l_close)
+                    if cond_toks is None:
+                        return None
+                    if j >= l_close or pairs[j] != ("brace", "{"):
+                        return None
+                    t_open = j
+                    t_close = self._pair_brace_close_index(pairs, t_open)
+                    if t_close is None:
+                        return None
+                    then_stmts = self._spine_collect_listen_stmts_json(
+                        pairs, skip_e(t_open + 1), t_close, skip_e
+                    )
+                    if then_stmts is None:
+                        return None
+                    j = skip_e(t_close + 1)
+                    if j >= l_close:
+                        return None
+                    if pairs[j][0] != "identifier" or pairs[j][1] not in (
+                        "else",
+                        "otherwise",
+                    ):
+                        return None
+                    j = skip_e(j + 1)
+                    if j >= l_close or pairs[j] != ("brace", "{"):
+                        return None
+                    e_open = j
+                    e_close = self._pair_brace_close_index(pairs, e_open)
+                    if e_close is None:
+                        return None
+                    else_stmts = self._spine_collect_listen_stmts_json(
+                        pairs, skip_e(e_open + 1), e_close, skip_e
+                    )
+                    if else_stmts is None:
+                        return None
+                    payload = {"c": cond_toks, "t": then_stmts, "f": else_stmts}
+                    try:
+                        blob = json.dumps(payload, separators=(",", ":"))
+                    except (TypeError, ValueError):
+                        return None
+                    if len(blob) > 8000:
+                        return None
+                    bh_lines.append("bh\tlisten\t" + evn + "\tifj\t" + blob)
+                    n_bh_here += 1
+                    j = skip_e(e_close + 1)
                     continue
                 return None
             while j < l_close and pairs[j][0] == "eol":
@@ -1290,6 +1504,12 @@ class MinimalAZLRuntime:
                     if t_skip == "brace" and v_skip == "}":
                         j += 1
                         break
+                    nested_blk = self._parse_listen_nested_listen_block(pairs, j, n)
+                    if nested_blk is not None:
+                        lines, j2 = nested_blk
+                        inner_lines.extend(lines)
+                        j = j2
+                        continue
                     parsed_ln = self._parse_listen_inner_to_row(pairs, j, n, evn)
                     if parsed_ln is None:
                         inner_failed = True
