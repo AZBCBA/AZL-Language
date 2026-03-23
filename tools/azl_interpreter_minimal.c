@@ -1486,6 +1486,18 @@ static void execute_ast_listen_line(const char *after_listen, char *result, size
     keybuf[kl] = '\0';
     const char *val = sep + 1;
     if (exec_ast_stub_register_set(evn, keybuf, val) != 0) return;
+  } else if (strncmp(q, "let|", 4U) == 0) {
+    const char *rest = q + 4;
+    const char *sep = strchr(rest, '|');
+    if (!sep || sep == rest) return;
+    if (rest[0] != ':' || rest[1] != ':') return;
+    char keybuf[64];
+    size_t kl = (size_t)(sep - rest);
+    if (kl >= sizeof(keybuf)) kl = sizeof(keybuf) - 1U;
+    memcpy(keybuf, rest, kl);
+    keybuf[kl] = '\0';
+    const char *val = sep + 1;
+    if (exec_ast_stub_register_set(evn, keybuf, val) != 0) return;
   } else if (strncmp(q, "return|", 7U) == 0) {
     const char *pay = q + 7;
     if (exec_ast_stub_register_return(evn, pay) != 0) return;
@@ -2062,7 +2074,7 @@ static int parse_with_brace_payload(ParseTokPair *pairs, int np, int j, int *j_o
   return -1;
 }
 
-/* One of say|… / emit|… / set|… / return [payload] inside `listen for ev [then] { … }`; chunk_out ≤254 chars; *j_out after stmt (eol or past `}`). */
+/* One of say|… / emit|… / set|… / let|… / return [payload] inside `listen for ev [then] { … }`; chunk_out ≤254 chars; *j_out after stmt (eol or past `}`). */
 static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const char *evn, char *chunk_out,
                                    size_t chunk_sz, int *j_out) {
   chunk_out[0] = '\0';
@@ -2325,6 +2337,56 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
       if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) {
         if (rhs[0] == '\0') return -1;
         (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|set|%.79s|%.199s", evn, varn, rhs);
+        if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+        *j_out = j + 1;
+        return 0;
+      }
+      if (strcmp(pairs[j].typ, "identifier") == 0 || strcmp(pairs[j].typ, "string") == 0) {
+        if (rl > 0U && rl + 1U < sizeof(rhs)) rhs[rl++] = ' ';
+        size_t rem = sizeof(rhs) - rl - 1U;
+        if (rem > 0U) {
+          azl_fmt_cat_field(rhs + rl, rem, 199, pairs[j].val);
+          rl = strlen(rhs);
+          if (rl > 199U) {
+            rhs[199] = '\0';
+            rl = 199U;
+          }
+        }
+        j++;
+        continue;
+      }
+      return -1;
+    }
+    return -1;
+  }
+  if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "let") == 0) {
+    j = parse_skip_eol(pairs, np, j + 1);
+    if (j >= np || strcmp(pairs[j].typ, "identifier") != 0 || pairs[j].val[0] != ':' || pairs[j].val[1] != ':')
+      return -1;
+    char varn[96];
+    (void)snprintf(varn, sizeof(varn), "%.79s", pairs[j].val);
+    j++;
+    j = parse_skip_eol(pairs, np, j);
+    if (j >= np || strcmp(pairs[j].typ, "operator") != 0 || strcmp(pairs[j].val, "=") != 0) return -1;
+    j++;
+    char rhs[224];
+    rhs[0] = '\0';
+    size_t rl = 0;
+    while (j < np) {
+      if (strcmp(pairs[j].typ, "eol") == 0) {
+        if (rhs[0] == '\0') {
+          j++;
+          continue;
+        }
+        j++;
+        (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|let|%.79s|%.199s", evn, varn, rhs);
+        if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+        *j_out = j;
+        return 0;
+      }
+      if (strcmp(pairs[j].typ, "brace") == 0 && strcmp(pairs[j].val, "}") == 0) {
+        if (rhs[0] == '\0') return -1;
+        (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|let|%.79s|%.199s", evn, varn, rhs);
         if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
         *j_out = j + 1;
         return 0;

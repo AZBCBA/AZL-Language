@@ -5477,6 +5477,31 @@ if [ "$F182_C_OUT" != "$F182_PY_OUT" ]; then
   exit 797
 fi
 
+echo "[gate] F183: C vs Python — parse_tokens listen { let … ; say … }"
+F183EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_let_say.azl"
+F183_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F183EX" boot.entry 2>&1)"
+f183_c_rc=$?
+if [ "$f183_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_tokens_listen_let_say exited $f183_c_rc: $F183_C_OUT"
+  exit 798
+fi
+if ! printf '%s\n' "$F183_C_OUT" | awk 'NR==1{if($0!="listen|f183|let|::lv183|VAL183")exit 1} NR==2{if($0!="listen|f183|say|F183_SAY")exit 1} NR==3{if($0!="P0_SEM_F183_OK")exit 1} END{if(NR!=3)exit 1}'; then
+  echo "ERROR: expected F183 stdout (3 lines), got: $F183_C_OUT"
+  exit 798
+fi
+F183_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F183EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f183_py_rc=$?
+if [ "$f183_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_tokens_listen_let_say exited $f183_py_rc: $F183_PY_OUT"
+  exit 799
+fi
+if [ "$F183_C_OUT" != "$F183_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_tokens_listen_let_say" >&2
+  echo "C:  $F183_C_OUT" >&2
+  echo "Py: $F183_PY_OUT" >&2
+  exit 800
+fi
+
 echo "[gate] F179: C vs Python — parse_tokens listen { set … ; emit \"…\" with { k: v } }"
 F179EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_set_emit_quoted_event.azl"
 F179_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F179EX" boot.entry 2>&1)"

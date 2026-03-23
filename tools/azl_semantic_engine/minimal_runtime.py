@@ -2311,7 +2311,7 @@ class MinimalAZLRuntime:
         return pairs if (ok_parse and pairs) else None
 
     def _execute_ast_try_listen_stub(self, lrest: str) -> str | None:
-        """Parse ``evt|say|…`` / ``evt|emit|…`` / ``evt|set|…`` / ``evt|return[|…]`` tail after a ``listen|`` prefix; register execute_ast stub if valid."""
+        """Parse ``evt|say|…`` / ``evt|emit|…`` / ``evt|set|…`` / ``evt|let|…`` / ``evt|return[|…]`` tail after a ``listen|`` prefix; register execute_ast stub if valid."""
         bar = lrest.find("|")
         if bar <= 0:
             return None
