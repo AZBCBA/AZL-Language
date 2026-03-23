@@ -952,7 +952,7 @@ component ::azl.interpreter {
       
       # PHASE 1: Pre-register listeners from behavior BEFORE init to ensure early emits are caught.
       # Phase E spine bootstrap: Python host ``_execute_spine_component_v1_body`` (``spine_component_v1``) mirrors
-      # this order — register synthetic listener bodies, then run ``init`` (``emit`` drains the event queue there),
+      # this order — register synthetic listener bodies (``say``/``set``/``emit`` and ``if``/``else`` via ``ifj`` rows), then run ``init`` (``emit`` drains the event queue there),
       # then ``memory``. Do not reorder without updating the host.
       if ::component.sections.behavior {
         for ::statement in ::component.sections.behavior.statements {

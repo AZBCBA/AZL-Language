@@ -579,6 +579,42 @@ class MinimalAZLRuntime:
                     continue
                 return None
             return None
+        if t0 == "identifier" and v0 == "let":
+            j = self._skip_eol_pairs(pairs, j + 1)
+            if j >= n:
+                return None
+            vt, vv = pairs[j]
+            if vt != "identifier" or not vv.startswith("::"):
+                return None
+            var_let = vv[:80]
+            j += 1
+            j = self._skip_eol_pairs(pairs, j)
+            if j >= n or pairs[j] != ("operator", "="):
+                return None
+            j += 1
+            rhs_let_parts: list[str] = []
+            while j < n:
+                t2, v2 = pairs[j]
+                if t2 == "eol":
+                    if not rhs_let_parts:
+                        j += 1
+                        continue
+                    j += 1
+                    rhs_l = " ".join(rhs_let_parts)[:200]
+                    seg = ("listen|" + evn + "|let|" + var_let + "|" + rhs_l)[:255]
+                    return (seg, j)
+                if t2 == "brace" and v2 == "}":
+                    if not rhs_let_parts:
+                        return None
+                    rhs_l = " ".join(rhs_let_parts)[:200]
+                    seg = ("listen|" + evn + "|let|" + var_let + "|" + rhs_l)[:255]
+                    return (seg, j + 1)
+                if t2 in ("identifier", "string"):
+                    rhs_let_parts.append(v2)
+                    j += 1
+                    continue
+                return None
+            return None
         return None
 
     def _parse_listen_nested_listen_block(
@@ -672,14 +708,15 @@ class MinimalAZLRuntime:
                 depth += 1
                 toks.append("(")
                 k += 1
-            elif typ == "paren" and val == ")":
+                continue
+            if typ == "paren" and val == ")":
                 toks.append(")")
                 depth -= 1
                 k += 1
                 if depth == 0:
                     return toks, k
                 continue
-            elif typ == "identifier":
+            if typ == "identifier":
                 toks.append(val[:120])
             elif typ == "string":
                 toks.append(self._quote_azl_single_from_inner(val[:200]))
@@ -2308,6 +2345,14 @@ class MinimalAZLRuntime:
                 gval = srest[sbar + 1 :]
                 if gkey.startswith("::"):
                     stub = (levn[:63], "set", gkey[:63], gval[:255])
+        elif levn and ltail.startswith("let|"):
+            srest = ltail[4:]
+            sbar = srest.find("|")
+            if sbar > 0:
+                gkey = srest[:sbar]
+                gval = srest[sbar + 1 :]
+                if gkey.startswith("::"):
+                    stub = (levn[:63], "set", gkey[:63], gval[:255])
         elif levn and ltail.startswith("return|"):
             lpay = ltail[7:]
             stub = (levn[:63], "return", lpay[:255], "")
@@ -2357,6 +2402,36 @@ class MinimalAZLRuntime:
         finally:
             while len(self.listeners) > saved_listener_count:
                 self.listeners.pop()
+
+    def _spine_ifj_body_tokens(self, stmts: list) -> list[str] | None:
+        """Expand ``ifj`` JSON branch stmt lists into synthetic listener tokens."""
+        out: list[str] = []
+        for st in stmts:
+            if not isinstance(st, list) or len(st) < 2:
+                return None
+            k = st[0]
+            if k == "say" and len(st) >= 2:
+                out.extend(["say", str(st[1])[:220]])
+            elif k == "set" and len(st) >= 3:
+                vk = str(st[1])[:80]
+                if not vk.startswith("::"):
+                    return None
+                out.extend(["set", vk, "=", str(st[2])[:MAX_VAR_VALUE_LEN]])
+            elif k == "emit" and len(st) >= 3 and st[2] == "with":
+                if len(st) < 5:
+                    return None
+                inner_ev = str(st[1])[:63]
+                pk = str(st[3])[:47]
+                pv = str(st[4])[:120]
+                if not self._payload_key_ok(pk):
+                    return None
+                esc = self._quote_azl_single_from_inner(pv[:200])
+                out.extend(["emit", inner_ev, "with", "{", pk + ":", esc, "}"])
+            elif k == "emit" and len(st) >= 2:
+                out.extend(["emit", str(st[1])[:63]])
+            else:
+                return None
+        return out
 
     def _execute_spine_component_v1_body(
         self,
@@ -2416,6 +2491,35 @@ class MinimalAZLRuntime:
                     bh_toks.extend(["emit", parts[4][:63]])
                 else:
                     return "execute_spine_bad_behavior"
+            elif op == "ifj":
+                if len(parts) < 5:
+                    return "execute_spine_bad_behavior"
+                blob = "\t".join(parts[4:])
+                try:
+                    obj = json.loads(blob)
+                except json.JSONDecodeError:
+                    return "execute_spine_bad_behavior"
+                c = obj.get("c")
+                t = obj.get("t")
+                f = obj.get("f")
+                if not isinstance(c, list) or not isinstance(t, list) or not isinstance(f, list):
+                    return "execute_spine_bad_behavior"
+                if not c or len(t) > 24 or len(f) > 24:
+                    return "execute_spine_bad_behavior"
+                for x in c:
+                    if not isinstance(x, str) or len(x) > 220:
+                        return "execute_spine_bad_behavior"
+                exp_then = self._spine_ifj_body_tokens(t)
+                exp_else = self._spine_ifj_body_tokens(f)
+                if exp_then is None or exp_else is None:
+                    return "execute_spine_bad_behavior"
+                bh_toks.append("if")
+                bh_toks.extend(x[:220] for x in c)
+                bh_toks.append("{")
+                bh_toks.extend(exp_then)
+                bh_toks.extend(["}", "else", "{"])
+                bh_toks.extend(exp_else)
+                bh_toks.append("}")
             else:
                 return "execute_spine_bad_behavior"
             out = "Listen: " + ev[:120]

@@ -48,6 +48,7 @@
 #   - forty-fifth through fifty-fourth — P45 set+inner == after mutation; P46 five-way plain alternation; P47 expr then expr else then flag; P48 outer then multi-statement inner otherwise; P49 outer otherwise + set + multi-statement then; P50 three-level mixed ==; P51 A then B/C nested otherwise; P52 mutation flip + multi-statement then; P53 outer false inner true + expr else; P54 five-step mixed finale.
 #   - fifty-fifth emit interpret — embedded ``spine_component_v1`` slice: two ``listen for`` blocks (multi-statement listener A: say + set + emit; listener B: say global + say final); init emits first event; chained emit runs second listener; memory re-reads persisted ``::azl_spine_p55_flag`` (stdout order **AZL_SPINE_P55_*** markers + **p55_chain_ok**); must **not** emit **AZL_SPINE_P55_BAD**.
 #   - fifty-sixth emit interpret — same-event multi-listener fan-out: two ``listen for 'p56_same'`` (L1: **P56_A** + **set**; L2: **P56_B** + **say** global + **P56_C**); third ``listen for 'p56_other'`` must not run (**AZL_SPINE_P56_BAD_OTHER** absent); **P56_INIT** then emit **p56_same**; **memory** **P56_MEM** + re-read **p56_from_L1**.
+#   - fifty-seventh emit interpret — **Phase E** ``spine_component_v1``: same-event fan-out (**p57_same** L1 set **ready** then L2 branches on **::azl_spine_p57_seen**, true path **emit p57_next**); L3 on **p57_next**; wrong-event listener must not run; **memory** re-read **ready**; stdout **P57_INIT**→**A**→**B**→**C**→**D**→**P57_MEM**→**ready**; no **P57_BAD_***.
 
 component ::azl.spine.behavior.entry {
   init {
@@ -337,6 +338,38 @@ if ( false ) { say 'AZL_SPINE_P54_BAD5' } otherwise { say 'AZL_SPINE_P54_E' }", 
     say ::azl_spine_p56_seen
   }
 }", component_name: "smoke56" }
+    emit interpret with { code: "component ::SpineP57 {
+  behavior {
+    listen for 'p57_same' {
+      say 'AZL_SPINE_P57_A'
+      set ::azl_spine_p57_seen = ready
+    }
+    listen for 'p57_same' {
+      say 'AZL_SPINE_P57_B'
+      if ( ::azl_spine_p57_seen == 'ready' ) {
+        say 'AZL_SPINE_P57_C'
+        emit p57_next
+      } otherwise {
+        say 'AZL_SPINE_P57_BAD_BRANCH'
+      }
+    }
+    listen for 'p57_next' {
+      say 'AZL_SPINE_P57_D'
+    }
+    listen for 'p57_wrong' {
+      say 'AZL_SPINE_P57_BAD_OTHER'
+      say 'AZL_SPINE_P57_BAD_TOKEN'
+    }
+  }
+  init {
+    say 'AZL_SPINE_P57_INIT'
+    emit p57_same
+  }
+  memory {
+    say 'AZL_SPINE_P57_MEM'
+    say ::azl_spine_p57_seen
+  }
+}", component_name: "smoke57" }
     say "AZL_SPINE_BEHAVIOR_ENTRY_POST_EMIT"
   }
 }
