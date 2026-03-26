@@ -5802,6 +5802,56 @@ if [ "$F195_C_OUT" != "$F195_PY_OUT" ]; then
   exit 836
 fi
 
+echo "[gate] F196: C vs Python — parse_tokens listen { dual call with identifier args }"
+F196EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_dual_call_ident.azl"
+F196_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F196EX" boot.entry 2>&1)"
+f196_c_rc=$?
+if [ "$f196_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_tokens_listen_dual_call_ident exited $f196_c_rc: $F196_C_OUT"
+  exit 837
+fi
+if ! printf '%s\n' "$F196_C_OUT" | awk 'NR==1{if($0!="listen|f196|call|f196_a|::F196_A")exit 1} NR==2{if($0!="listen|f196|call|f196_b|::F196_B")exit 1} NR==3{if($0!="P0_SEM_F196_OK")exit 1} END{if(NR!=3)exit 1}'; then
+  echo "ERROR: expected F196 stdout (3 lines), got: $F196_C_OUT"
+  exit 837
+fi
+F196_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F196EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f196_py_rc=$?
+if [ "$f196_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_tokens_listen_dual_call_ident exited $f196_py_rc: $F196_PY_OUT"
+  exit 838
+fi
+if [ "$F196_C_OUT" != "$F196_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_tokens_listen_dual_call_ident" >&2
+  echo "C:  $F196_C_OUT" >&2
+  echo "Py: $F196_PY_OUT" >&2
+  exit 839
+fi
+
+echo "[gate] F197: C vs Python — parse_tokens two top-level calls with identifier args"
+F197EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_dual_top_call_ident.azl"
+F197_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F197EX" boot.entry 2>&1)"
+f197_c_rc=$?
+if [ "$f197_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_tokens_dual_top_call_ident exited $f197_c_rc: $F197_C_OUT"
+  exit 840
+fi
+if ! printf '%s\n' "$F197_C_OUT" | awk 'NR==1{if($0!="call|f197_a|::F197_A")exit 1} NR==2{if($0!="call|f197_b|::F197_B")exit 1} NR==3{if($0!="P0_SEM_F197_OK")exit 1} END{if(NR!=3)exit 1}'; then
+  echo "ERROR: expected F197 stdout (3 lines), got: $F197_C_OUT"
+  exit 840
+fi
+F197_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F197EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f197_py_rc=$?
+if [ "$f197_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_tokens_dual_top_call_ident exited $f197_py_rc: $F197_PY_OUT"
+  exit 841
+fi
+if [ "$F197_C_OUT" != "$F197_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_tokens_dual_top_call_ident" >&2
+  echo "C:  $F197_C_OUT" >&2
+  echo "Py: $F197_PY_OUT" >&2
+  exit 842
+fi
+
 echo "[gate] F179: C vs Python — parse_tokens listen { set … ; emit \"…\" with { k: v } }"
 F179EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_set_emit_quoted_event.azl"
 F179_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F179EX" boot.entry 2>&1)"
