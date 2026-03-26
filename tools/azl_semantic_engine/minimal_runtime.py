@@ -489,6 +489,18 @@ class MinimalAZLRuntime:
                 if j < n and pairs[j] == ("paren", ")"):
                     seg = ("listen|" + evn + "|call|" + v0[:63])[:255]
                     return (seg, j + 1)
+                if j < n and pairs[j][0] == "string":
+                    arg_s = pairs[j][1][:199]
+                    if "|" in arg_s:
+                        return None
+                    j += 1
+                    j = self._skip_eol_pairs(pairs, j)
+                    if j < n and pairs[j] == ("paren", ")"):
+                        seg = (
+                            "listen|" + evn + "|call|" + v0[:63] + "|" + arg_s
+                        )[:255]
+                        return (seg, j + 1)
+                return None
         if t0 == "identifier" and v0 == "say":
             j = self._skip_eol_pairs(pairs, j + 1)
             parts: list[str] = []
@@ -2380,9 +2392,21 @@ class MinimalAZLRuntime:
                 if gkey.startswith("::"):
                     stub = (levn[:63], "set", gkey[:63], gval[:255])
         elif levn and ltail.startswith("call|"):
-            ctail = ltail[5:].split("|", 1)[0][:63]
-            if ctail and "|" not in ltail[5:]:
-                stub = (levn[:63], "call", ctail, "")
+            rest = ltail[5:]
+            bar = rest.find("|")
+            if bar < 0:
+                fname = rest[:63]
+                if fname and "|" not in rest:
+                    stub = (levn[:63], "call", fname, "")
+                else:
+                    stub = None
+            else:
+                fname = rest[:bar][:63]
+                arg = rest[bar + 1 :][:63]
+                if fname and "|" not in fname and "|" not in arg:
+                    stub = (levn[:63], "call", fname, arg)
+                else:
+                    stub = None
         elif levn and ltail.startswith("return|"):
             lpay = ltail[7:]
             stub = (levn[:63], "return", lpay[:255], "")
@@ -3456,6 +3480,8 @@ class MinimalAZLRuntime:
                                 cpay = fr.get(sa1)
                                 if cpay:
                                     print(cpay, flush=True)
+                                if sa2:
+                                    print(sa2, flush=True)
                         else:
                             print(sa1, flush=True)
                         break

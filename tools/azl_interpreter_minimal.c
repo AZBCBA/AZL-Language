@@ -216,8 +216,9 @@ static int exec_ast_stub_register_return(const char *ev, const char *pay) {
   return 0;
 }
 
-static int exec_ast_stub_register_call(const char *ev, const char *fname) {
+static int exec_ast_stub_register_call(const char *ev, const char *fname, const char *arg_opt) {
   if (!ev || !ev[0] || !fname || !fname[0] || strchr(fname, '|') != NULL) return -1;
+  if (arg_opt && arg_opt[0] && strchr(arg_opt, '|') != NULL) return -1;
   for (int i = 0; i < g_n_exec_ast_stubs; i++)
     if (strcmp(g_exec_ast_stubs[i].event, ev) == 0) return 0;
   if (g_n_exec_ast_stubs >= MAX_EXECUTE_AST_STUB_LISTENERS) return -1;
@@ -225,7 +226,11 @@ static int exec_ast_stub_register_call(const char *ev, const char *fname) {
                  sizeof(g_exec_ast_stubs[g_n_exec_ast_stubs].event), "%s", ev);
   g_exec_ast_stubs[g_n_exec_ast_stubs].kind = EXEC_AST_STUB_CALL;
   (void)snprintf(g_exec_ast_stubs[g_n_exec_ast_stubs].body, sizeof(g_exec_ast_stubs[0].body), "%.63s", fname);
-  g_exec_ast_stubs[g_n_exec_ast_stubs].set_key[0] = '\0';
+  if (arg_opt && arg_opt[0])
+    (void)snprintf(g_exec_ast_stubs[g_n_exec_ast_stubs].set_key, sizeof(g_exec_ast_stubs[0].set_key), "%.63s",
+                   arg_opt);
+  else
+    g_exec_ast_stubs[g_n_exec_ast_stubs].set_key[0] = '\0';
   g_exec_ast_stubs[g_n_exec_ast_stubs].emit_npayload = 0;
   g_n_exec_ast_stubs++;
   return 0;
@@ -249,8 +254,12 @@ static int exec_ast_stub_dispatch(const char *ev) {
       if (pay && pay[0]) {
         fputs(pay, stdout);
         fputc('\n', stdout);
-        fflush(stdout);
       }
+      if (g_exec_ast_stubs[i].set_key[0]) {
+        fputs(g_exec_ast_stubs[i].set_key, stdout);
+        fputc('\n', stdout);
+      }
+      fflush(stdout);
     } else if (g_exec_ast_stubs[i].kind == EXEC_AST_STUB_RETURN) {
       if (g_exec_ast_stubs[i].body[0]) {
         fputs(g_exec_ast_stubs[i].body, stdout);
@@ -1527,9 +1536,22 @@ static void execute_ast_listen_line(const char *after_listen, char *result, size
   } else if (strcmp(q, "return") == 0) {
     if (exec_ast_stub_register_return(evn, "") != 0) return;
   } else if (strncmp(q, "call|", 5U) == 0) {
-    const char *fname = q + 5;
-    if (!fname[0] || strchr(fname, '|') != NULL) return;
-    if (exec_ast_stub_register_call(evn, fname) != 0) return;
+    const char *rest = q + 5;
+    const char *sep = strchr(rest, '|');
+    if (!sep) {
+      if (!rest[0]) return;
+      if (exec_ast_stub_register_call(evn, rest, NULL) != 0) return;
+    } else {
+      char fname[64];
+      size_t fl = (size_t)(sep - rest);
+      if (fl == 0U || fl >= sizeof(fname)) return;
+      memcpy(fname, rest, fl);
+      fname[fl] = '\0';
+      if (strchr(fname, '|') != NULL) return;
+      const char *arg = sep + 1;
+      if (strchr(arg, '|') != NULL) return;
+      if (exec_ast_stub_register_call(evn, fname, arg) != 0) return;
+    }
   } else
     return;
   (void)snprintf(result, rsz, "Listen: %.120s", evn);
@@ -2237,6 +2259,22 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
           *j_out = jn + 1;
           return 0;
         }
+        if (jn < np && strcmp(pairs[jn].typ, "string") == 0) {
+          const char *arg_raw = pairs[jn].val;
+          if (arg_raw && strchr(arg_raw, '|') != NULL) return -1;
+          char argu[200];
+          argu[0] = '\0';
+          if (arg_raw)
+            (void)snprintf(argu, sizeof(argu), "%.199s", arg_raw);
+          jn++;
+          jn = parse_skip_eol(pairs, np, jn);
+          if (jn >= np || strcmp(pairs[jn].typ, "paren") != 0 || strcmp(pairs[jn].val, ")") != 0) return -1;
+          (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|call|%.63s|%.199s", evn, vk, argu);
+          if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+          *j_out = jn + 1;
+          return 0;
+        }
+        return -1;
       }
     }
   }
