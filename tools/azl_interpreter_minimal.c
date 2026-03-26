@@ -1580,6 +1580,7 @@ static void execute_ast_call_line(const char *after_call, char *result, size_t r
   name[0] = '\0';
   const char *p = after_call ? after_call : "";
   const char *bar = strchr(p, '|');
+  const char *arg = NULL;
   if (bar) {
     size_t nl = (size_t)(bar - p);
     if (nl >= sizeof(name)) nl = sizeof(name) - 1U;
@@ -1587,6 +1588,8 @@ static void execute_ast_call_line(const char *after_call, char *result, size_t r
       memcpy(name, p, nl);
       name[nl] = '\0';
     }
+    arg = bar + 1;
+    if (arg && strchr(arg, '|') != NULL) return;
   } else
     (void)snprintf(name, sizeof(name), "%.63s", p);
   if (!name[0]) return;
@@ -1597,6 +1600,10 @@ static void execute_ast_call_line(const char *after_call, char *result, size_t r
   }
   fputs(pay, stdout);
   fputc('\n', stdout);
+  if (arg && arg[0]) {
+    fputs(arg, stdout);
+    fputc('\n', stdout);
+  }
   fflush(stdout);
   (void)snprintf(result, rsz, "called:%.120s", name);
 }
@@ -3360,6 +3367,28 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
           if (jc < np && strcmp(pairs[jc].typ, "paren") == 0 && strcmp(pairs[jc].val, ")") == 0) {
             char ccall[96];
             (void)snprintf(ccall, sizeof(ccall), "call|%.63s", vk);
+            parse_acc_append(acc, sizeof(acc), ccall);
+            i = jc + 1;
+            continue;
+          }
+          if (jc < np && strcmp(pairs[jc].typ, "string") == 0) {
+            const char *arg_raw = pairs[jc].val;
+            if (arg_raw && strchr(arg_raw, '|') != NULL) {
+              i++;
+              continue;
+            }
+            char argu[200];
+            argu[0] = '\0';
+            if (arg_raw)
+              (void)snprintf(argu, sizeof(argu), "%.199s", arg_raw);
+            jc++;
+            jc = parse_skip_eol(pairs, np, jc);
+            if (jc >= np || strcmp(pairs[jc].typ, "paren") != 0 || strcmp(pairs[jc].val, ")") != 0) {
+              i++;
+              continue;
+            }
+            char ccall[320];
+            (void)snprintf(ccall, sizeof(ccall), "call|%.63s|%.199s", vk, argu);
             parse_acc_append(acc, sizeof(acc), ccall);
             i = jc + 1;
             continue;

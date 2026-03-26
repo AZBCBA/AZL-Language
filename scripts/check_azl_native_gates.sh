@@ -5602,6 +5602,56 @@ if [ "$F187_C_OUT" != "$F187_PY_OUT" ]; then
   exit 812
 fi
 
+echo "[gate] F188: C vs Python — parse_tokens top-level name ( '…' ) → call|…|payload"
+F188EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_top_call_string_arg.azl"
+F188_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F188EX" boot.entry 2>&1)"
+f188_c_rc=$?
+if [ "$f188_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_tokens_top_call_string_arg exited $f188_c_rc: $F188_C_OUT"
+  exit 813
+fi
+if ! printf '%s\n' "$F188_C_OUT" | awk 'NR==1{if($0!="call|f188_fn|F188_MARK")exit 1} NR==2{if($0!="P0_SEM_F188_OK")exit 1} END{if(NR!=2)exit 1}'; then
+  echo "ERROR: expected F188 stdout (2 lines), got: $F188_C_OUT"
+  exit 813
+fi
+F188_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F188EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f188_py_rc=$?
+if [ "$f188_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_tokens_top_call_string_arg exited $f188_py_rc: $F188_PY_OUT"
+  exit 814
+fi
+if [ "$F188_C_OUT" != "$F188_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_tokens_top_call_string_arg" >&2
+  echo "C:  $F188_C_OUT" >&2
+  echo "Py: $F188_PY_OUT" >&2
+  exit 815
+fi
+
+echo "[gate] F189: C vs Python — execute_ast top-level call|fn|arg + emit drain"
+F189EX="${ROOT_DIR}/azl/tests/p0_semantic_execute_ast_top_call_arg_stub.azl"
+F189_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F189EX" boot.entry 2>&1)"
+f189_c_rc=$?
+if [ "$f189_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_ast_top_call_arg_stub exited $f189_c_rc: $F189_C_OUT"
+  exit 816
+fi
+if ! printf '%s\n' "$F189_C_OUT" | awk 'NR==1{if($0!="F189_TREE")exit 1} NR==2{if($0!="F189_CB")exit 1} NR==3{if($0!="F189_ARG")exit 1} NR==4{if($0!="F189_TAIL")exit 1} NR==5{if($0!="EX189_POST")exit 1} NR==6{if($0!="Said: F189_TAIL")exit 1} NR==7{if($0!="EC189_INNER")exit 1} NR==8{if($0!="Said: F189_TAIL")exit 1} NR==9{if($0!="P0_SEM_F189_OK")exit 1} END{if(NR!=9)exit 1}'; then
+  echo "ERROR: expected F189 execute_ast top-level call|…|arg stdout (9 lines), got: $F189_C_OUT"
+  exit 816
+fi
+F189_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F189EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f189_py_rc=$?
+if [ "$f189_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_ast_top_call_arg_stub exited $f189_py_rc: $F189_PY_OUT"
+  exit 817
+fi
+if [ "$F189_C_OUT" != "$F189_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_ast_top_call_arg_stub" >&2
+  echo "C:  $F189_C_OUT" >&2
+  echo "Py: $F189_PY_OUT" >&2
+  exit 818
+fi
+
 echo "[gate] F179: C vs Python — parse_tokens listen { set … ; emit \"…\" with { k: v } }"
 F179EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_set_emit_quoted_event.azl"
 F179_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F179EX" boot.entry 2>&1)"

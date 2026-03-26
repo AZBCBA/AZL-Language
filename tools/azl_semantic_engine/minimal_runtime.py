@@ -1656,6 +1656,19 @@ class MinimalAZLRuntime:
                         out_lines.append(("call|" + val[:63])[:255])
                         i = j + 1
                         continue
+                    if j < n and pairs[j][0] == "string":
+                        arg_s = pairs[j][1][:199]
+                        if "|" in arg_s:
+                            i += 1
+                            continue
+                        j += 1
+                        j = self._skip_eol_pairs(pairs, j)
+                        if j < n and pairs[j] == ("paren", ")"):
+                            out_lines.append(
+                                ("call|" + val[:63] + "|" + arg_s)[:255]
+                            )
+                            i = j + 1
+                            continue
             i += 1
         return out_lines
 
@@ -2754,12 +2767,23 @@ class MinimalAZLRuntime:
                     fn_reg[trip[0][:63]] = trip[2][:200]
                     result = "registered:" + trip[0][:120]
             elif seg.startswith("call|"):
-                cname = seg[5:].split("|", 1)[0][:63]
+                rest = seg[5:]
+                b = rest.find("|")
+                if b < 0:
+                    cname = rest[:63]
+                    carg = ""
+                else:
+                    cname = rest[:b][:63]
+                    carg = rest[b + 1 :][:255]
+                if not cname or "|" in cname or (carg and "|" in carg):
+                    continue
                 cpay = fn_reg.get(cname)
                 if cpay is None:
                     result = "fn_not_found"
                 else:
                     print(cpay, flush=True)
+                    if carg:
+                        print(carg, flush=True)
                     result = "called:" + cname[:120]
         return result
 
