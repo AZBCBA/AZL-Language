@@ -1,0 +1,27 @@
+# Gate F195: ::parse_tokens — two top-level `name ( '…' )` → two call|…|payload rows
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f195_parse with { }
+  }
+  behavior {
+    listen for "f195_parse" {
+      set ::tokens = []
+      set ::l1 = "f195_a ( 'F195_A' )"
+      set ::l2 = "f195_b ( 'F195_B' )"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::l1, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l2, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 2, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F195_OK"
+    }
+  }
+}

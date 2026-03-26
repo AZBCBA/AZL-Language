@@ -1,0 +1,33 @@
+# Gate F194: ::parse_tokens — listen { name ( '…' ) ; name ( '…' ) } → two listen|…|call|…|payload rows
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f194_parse with { }
+  }
+  behavior {
+    listen for "f194_parse" {
+      set ::tokens = []
+      set ::l1 = "listen for f194 {"
+      set ::l2 = "f194_a ( 'F194_A' )"
+      set ::l3 = "f194_b ( 'F194_B' )"
+      set ::l4 = "}"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::l1, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l2, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 2, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l3, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 3, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l4, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 4, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F194_OK"
+    }
+  }
+}
