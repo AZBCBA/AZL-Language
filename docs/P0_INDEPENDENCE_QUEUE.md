@@ -24,7 +24,7 @@
 - [ ] 9. Document which `azl_interpreter.azl` lines each P0.1c extension covers — **open** (incremental doc per extension).
 - [x] 10. New spine failures typed — **process** (ERROR_SYSTEM + scripts; no silent success in gates).
 - [x] 11. Keep `make verify` steps 3–4 authoritative — **wired** in `run_full_repo_verification.sh`.
-- [x] 12. Refresh roadmap/TIER_B F-gate ranges when the suite moves — **done** through **F199** (2026-03-24).
+- [x] 12. Refresh roadmap/TIER_B F-gate ranges when the suite moves — **done** through **F200** (2026-03-24).
 
 ## B. C↔Python parity gates (13–35)
 
@@ -56,6 +56,7 @@
 - [x] **F197** — dual top-level **`call`** with **identifier** payload — shipped (**840–842**).
 - [x] **F198** — listen-inner **`call`** then **`say`** — shipped (**843–845**).
 - [x] **F199** — top-level **`call`** then **`say`** — shipped (**846–848**).
+- [x] **F200** — top-level **`say`** then **`call`** — shipped (**849–851**).
 - [x] 23. Var/row buffers audited for F173–F180 shapes — **no cap increase required** (same as F171/F172).
 - [x] 24. `build_azl_interpreter_minimal.sh` strict defaults — shipped earlier; **override** via **`AZL_MINIMAL_CFLAGS`**.
 - [x] 25. New F blocks mirror C → Python → diff — **pattern used** for F173–F180.
@@ -66,7 +67,7 @@
 - [x] 30. F87 / F90–F92 — **unchanged** this batch.
 - [ ] 31. Extend F93–F148 only with new node kinds — **open** (next execute_ast slices).
 - [x] 32. Gate H — **runs** in native gates; refresh counts if interpreter file shifts.
-- [x] 33. Byte-identical stdout — **F173–F199** match (incl. **F181**–**F199** blocks).
+- [x] 33. Byte-identical stdout — **F173–F200** match (incl. **F181**–**F200** blocks).
 - [x] 34. CI clean build + Werror minimal — **default** `AZL_MINIMAL_CFLAGS` on `build_azl_interpreter_minimal.sh`.
 - [ ] 35. Retire F gates in one PR when deprecating — **N/A** (none retired).
 
@@ -105,4 +106,4 @@
 
 - [ ] 88. Spec + 3–5 tests per [AZL_ENGINEERING_REALITY_AUDIT.md](AZL_ENGINEERING_REALITY_AUDIT.md) — **open** (research/product track).
 
-**Last updated:** 2026-03-24 (F173–F199 incl. **F198**/**F199** **`call`**+**`say`** mix, **F196**/**F197**/**F194**/**F195**/**F192**/**F193** dual **`call`** rows, **F190**/**F191**, **F188**/**F189**, **F186**/**F187**, **F184**/**F185**, **F183** **`let`**, **F182** nested **`listen`**, **F181** **`return`** stub).
+**Last updated:** 2026-03-24 (F173–F200 incl. **F200** top **`say`** then **`call`**, **F198**/**F199** **`call`**+**`say`** mix, **F196**/**F197**/**F194**/**F195**/**F192**/**F193** dual **`call`** rows, **F190**/**F191**, **F188**/**F189**, **F186**/**F187**, **F184**/**F185**, **F183** **`let`**, **F182** nested **`listen`**, **F181** **`return`** stub).

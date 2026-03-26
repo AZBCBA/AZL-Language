@@ -1,0 +1,27 @@
+# Gate F200: ::parse_tokens — top-level `say …` then `name ( )` → say|… then call|…
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f200_parse with { }
+  }
+  behavior {
+    listen for "f200_parse" {
+      set ::tokens = []
+      set ::l1 = "say F200_MARK"
+      set ::l2 = "f200_fn ( )"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::l1, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l2, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 2, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F200_OK"
+    }
+  }
+}
