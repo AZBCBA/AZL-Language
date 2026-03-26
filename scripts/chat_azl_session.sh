@@ -7,9 +7,33 @@ set -euo pipefail
 #   AZL_CHAT_BASE_URL=http://127.0.0.1:18270 AZL_CHAT_TOKEN=... bash scripts/chat_azl_session.sh
 #   AZL_CHAT_SESSION_ID=my-session bash scripts/chat_azl_session.sh
 
-PORT="${AZL_CHAT_PORT:-${AZL_BUILD_API_PORT:-8080}}"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+_lc_env="${ROOT}/.azl/live_chat.env"
+
+# Port: AZL_CHAT_PORT / AZL_BUILD_API_PORT override; else PORT= in .azl/live_chat.env; else 8080.
+if [[ -n "${AZL_CHAT_PORT:-}" ]]; then
+  PORT="${AZL_CHAT_PORT}"
+elif [[ -n "${AZL_BUILD_API_PORT:-}" ]]; then
+  PORT="${AZL_BUILD_API_PORT}"
+elif [[ -f "${_lc_env}" ]]; then
+  PORT="$(grep -E '^PORT=' "${_lc_env}" | head -1 | cut -d= -f2- || true)"
+  PORT="${PORT:-8080}"
+else
+  PORT="8080"
+fi
 BASE_URL="${AZL_CHAT_BASE_URL:-http://127.0.0.1:${PORT}}"
-TOKEN="${AZL_CHAT_TOKEN:-${AZL_API_TOKEN:-azl_live_chat_token_2026}}"
+
+# Token: AZL_CHAT_TOKEN / AZL_API_TOKEN, or TOKEN= in .azl/live_chat.env (no weak default).
+TOKEN="${AZL_CHAT_TOKEN:-${AZL_API_TOKEN:-}}"
+if [[ -z "${TOKEN}" ]]; then
+  if [[ -f "${_lc_env}" ]]; then
+    TOKEN="$(grep -E '^TOKEN=' "${_lc_env}" | head -1 | cut -d= -f2- || true)"
+  fi
+fi
+if [[ -z "${TOKEN}" ]]; then
+  echo "ERROR: Set AZL_CHAT_TOKEN or AZL_API_TOKEN, or add TOKEN= to .azl/live_chat.env" >&2
+  exit 2
+fi
 SESSION_ID="${AZL_CHAT_SESSION_ID:-user-$(date +%s)}"
 N_PREDICT="${AZL_CHAT_N_PREDICT:-512}"
 

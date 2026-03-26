@@ -23,10 +23,19 @@ if [[ ! -f "${GGUF}" ]]; then
   exit 23
 fi
 
-LLAMA_CLI_BIN="${AZL_LLAMA_CLI:-/tmp/llama-cpp-azl-verify/build-cli/bin/llama-completion}"
-if [[ ! -x "${LLAMA_CLI_BIN}" ]]; then
-  echo "ERROR: llama CLI binary missing: ${LLAMA_CLI_BIN}" >&2
-  echo "Build it with:" >&2
+LLAMA_CLI_BIN=""
+if [[ -n "${AZL_LLAMA_CLI:-}" && -x "${AZL_LLAMA_CLI}" ]]; then
+  LLAMA_CLI_BIN="${AZL_LLAMA_CLI}"
+elif [[ -x "/tmp/llama-cpp-azl-verify/build-cli/bin/llama-completion" ]]; then
+  LLAMA_CLI_BIN="/tmp/llama-cpp-azl-verify/build-cli/bin/llama-completion"
+elif command -v llama-completion >/dev/null 2>&1; then
+  LLAMA_CLI_BIN="$(command -v llama-completion)"
+elif command -v llama-cli >/dev/null 2>&1; then
+  LLAMA_CLI_BIN="$(command -v llama-cli)"
+fi
+if [[ -z "${LLAMA_CLI_BIN}" || ! -x "${LLAMA_CLI_BIN}" ]]; then
+  echo "ERROR: llama CLI binary not found (need llama-completion or llama-cli on PATH, or AZL_LLAMA_CLI)." >&2
+  echo "Build example:" >&2
   echo "  cmake -S /tmp/llama-cpp-azl-verify -B /tmp/llama-cpp-azl-verify/build-cli -DCMAKE_BUILD_TYPE=Release -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TESTS=OFF" >&2
   echo "  cmake --build /tmp/llama-cpp-azl-verify/build-cli -j\$(nproc)" >&2
   exit 24
