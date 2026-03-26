@@ -1,0 +1,30 @@
+# Gate F190: ::parse_tokens — listen { name ( ::id ) } → listen|…|call|…|::id
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f190_parse with { }
+  }
+  behavior {
+    listen for "f190_parse" {
+      set ::tokens = []
+      set ::l1 = "listen for f190 {"
+      set ::l2 = "f190_fn ( ::F190_ID )"
+      set ::l3 = "}"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::l1, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l2, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 2, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l3, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 3, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F190_OK"
+    }
+  }
+}

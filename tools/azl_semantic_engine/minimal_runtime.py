@@ -500,6 +500,17 @@ class MinimalAZLRuntime:
                             "listen|" + evn + "|call|" + v0[:63] + "|" + arg_s
                         )[:255]
                         return (seg, j + 1)
+                if j < n and pairs[j][0] == "identifier":
+                    arg_id = pairs[j][1][:199]
+                    if "|" in arg_id:
+                        return None
+                    j += 1
+                    j = self._skip_eol_pairs(pairs, j)
+                    if j < n and pairs[j] == ("paren", ")"):
+                        seg = (
+                            "listen|" + evn + "|call|" + v0[:63] + "|" + arg_id
+                        )[:255]
+                        return (seg, j + 1)
                 return None
         if t0 == "identifier" and v0 == "say":
             j = self._skip_eol_pairs(pairs, j + 1)
@@ -1666,6 +1677,19 @@ class MinimalAZLRuntime:
                         if j < n and pairs[j] == ("paren", ")"):
                             out_lines.append(
                                 ("call|" + val[:63] + "|" + arg_s)[:255]
+                            )
+                            i = j + 1
+                            continue
+                    if j < n and pairs[j][0] == "identifier":
+                        arg_id = pairs[j][1][:199]
+                        if "|" in arg_id:
+                            i += 1
+                            continue
+                        j += 1
+                        j = self._skip_eol_pairs(pairs, j)
+                        if j < n and pairs[j] == ("paren", ")"):
+                            out_lines.append(
+                                ("call|" + val[:63] + "|" + arg_id)[:255]
                             )
                             i = j + 1
                             continue

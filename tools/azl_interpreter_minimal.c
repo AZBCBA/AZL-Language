@@ -2281,6 +2281,19 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
           *j_out = jn + 1;
           return 0;
         }
+        if (jn < np && strcmp(pairs[jn].typ, "identifier") == 0) {
+          const char *idv = pairs[jn].val;
+          if (!idv || strchr(idv, '|') != NULL) return -1;
+          char argu[200];
+          (void)snprintf(argu, sizeof(argu), "%.199s", idv);
+          jn++;
+          jn = parse_skip_eol(pairs, np, jn);
+          if (jn >= np || strcmp(pairs[jn].typ, "paren") != 0 || strcmp(pairs[jn].val, ")") != 0) return -1;
+          (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|call|%.63s|%.199s", evn, vk, argu);
+          if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+          *j_out = jn + 1;
+          return 0;
+        }
         return -1;
       }
     }
@@ -3381,6 +3394,26 @@ static void builtin_parse_tokens_nodes(const char *buf, char *nodes_out, size_t 
             argu[0] = '\0';
             if (arg_raw)
               (void)snprintf(argu, sizeof(argu), "%.199s", arg_raw);
+            jc++;
+            jc = parse_skip_eol(pairs, np, jc);
+            if (jc >= np || strcmp(pairs[jc].typ, "paren") != 0 || strcmp(pairs[jc].val, ")") != 0) {
+              i++;
+              continue;
+            }
+            char ccall[320];
+            (void)snprintf(ccall, sizeof(ccall), "call|%.63s|%.199s", vk, argu);
+            parse_acc_append(acc, sizeof(acc), ccall);
+            i = jc + 1;
+            continue;
+          }
+          if (jc < np && strcmp(pairs[jc].typ, "identifier") == 0) {
+            const char *idv = pairs[jc].val;
+            if (!idv || strchr(idv, '|') != NULL) {
+              i++;
+              continue;
+            }
+            char argu[200];
+            (void)snprintf(argu, sizeof(argu), "%.199s", idv);
             jc++;
             jc = parse_skip_eol(pairs, np, jc);
             if (jc >= np || strcmp(pairs[jc].typ, "paren") != 0 || strcmp(pairs[jc].val, ")") != 0) {

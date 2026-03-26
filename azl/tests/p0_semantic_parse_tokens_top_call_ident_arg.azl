@@ -1,0 +1,24 @@
+# Gate F191: ::parse_tokens — top-level `name ( ::id )` → `call|name|::id`
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f191_parse with { }
+  }
+  behavior {
+    listen for "f191_parse" {
+      set ::tokens = []
+      set ::tx = "f191_fn ( ::F191_ID )"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::tx, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F191_OK"
+    }
+  }
+}
