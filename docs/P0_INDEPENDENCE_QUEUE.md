@@ -24,7 +24,7 @@
 - [ ] 9. Document which `azl_interpreter.azl` lines each P0.1c extension covers — **open** (incremental doc per extension).
 - [x] 10. New spine failures typed — **process** (ERROR_SYSTEM + scripts; no silent success in gates).
 - [x] 11. Keep `make verify` steps 3–4 authoritative — **wired** in `run_full_repo_verification.sh`.
-- [x] 12. Refresh roadmap/TIER_B F-gate ranges when the suite moves — **done** through **F191** (2026-03-24).
+- [x] 12. Refresh roadmap/TIER_B F-gate ranges when the suite moves — **done** through **F193** (2026-03-24).
 
 ## B. C↔Python parity gates (13–35)
 
@@ -48,6 +48,8 @@
 - [x] **F189** — **`execute_ast`** top-level **`call|fn|arg`** (fn body + arg lines) — shipped (**816–818**).
 - [x] **F190** — listen-inner **`call|…|…`** with **identifier** arg — shipped (**819–821**).
 - [x] **F191** — top-level **`call|…|…`** with **identifier** arg — shipped (**822–824**).
+- [x] **F192** — **`listen { … }`** with **two** empty **`call`** statements — shipped (**825–827**).
+- [x] **F193** — **two** top-level empty **`call`** rows — shipped (**828–830**).
 - [x] 23. Var/row buffers audited for F173–F180 shapes — **no cap increase required** (same as F171/F172).
 - [x] 24. `build_azl_interpreter_minimal.sh` strict defaults — shipped earlier; **override** via **`AZL_MINIMAL_CFLAGS`**.
 - [x] 25. New F blocks mirror C → Python → diff — **pattern used** for F173–F180.
@@ -97,4 +99,4 @@
 
 - [ ] 88. Spec + 3–5 tests per [AZL_ENGINEERING_REALITY_AUDIT.md](AZL_ENGINEERING_REALITY_AUDIT.md) — **open** (research/product track).
 
-**Last updated:** 2026-03-24 (F173–F191 incl. **F190**/**F191** **`call`** **identifier** args, **F188**/**F189** top-level string **`call`**, **F186**/**F187** listen-inner string **`call`**, **F184**/**F185**, **F183** **`let`**, **F182** nested **`listen`**, **F181** **`return`** stub).
+**Last updated:** 2026-03-24 (F173–F193 incl. **F192**/**F193** dual **`call`** parse, **F190**/**F191** identifier **`call`** args, **F188**/**F189**, **F186**/**F187**, **F184**/**F185**, **F183** **`let`**, **F182** nested **`listen`**, **F181** **`return`** stub).

@@ -1,0 +1,27 @@
+# Gate F193: ::parse_tokens — two top-level `name ( )` rows → two call|… lines
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f193_parse with { }
+  }
+  behavior {
+    listen for "f193_parse" {
+      set ::tokens = []
+      set ::l1 = "f193_a ( )"
+      set ::l2 = "f193_b ( )"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::l1, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l2, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 2, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F193_OK"
+    }
+  }
+}
