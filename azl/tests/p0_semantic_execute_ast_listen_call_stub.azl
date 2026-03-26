@@ -1,0 +1,37 @@
+# Gate F185: `::execute_ast` — `listen|ev|call|fn` stub dispatches like top-level `call|` (fn registry). `AZL_USE_VM` unset.
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit p185_exec_tree with { ast: "f185-root", scope: "f185-sc", nodes: "fn|f185_fn|say|F185_CALL_CB
+listen|f185_ev|call|f185_fn
+emit|f185_ev
+say|F185_TAIL" }
+  }
+  behavior {
+    listen for "execute_complete" {
+      say "EC185_INNER"
+      say ::event.data.result
+      say "P0_SEM_F185_OK"
+    }
+    listen for "p185_exec_tree" {
+      set ::ast = ::event.data.ast
+      set ::scope = ::event.data.scope
+      set ::ast.nodes = ::event.data.nodes
+      set ::use_vm = ((::internal.env("AZL_USE_VM") or "") == "1")
+      if (::use_vm) {
+        say "F185_VM_ON_BAD"
+        return
+      }
+      say "F185_TREE"
+      set ::result = ::execute_ast(::ast, ::scope)
+      say "EX185_POST"
+      say ::result
+      emit execute_complete with { result: ::result }
+    }
+  }
+}

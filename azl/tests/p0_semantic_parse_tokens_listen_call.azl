@@ -1,0 +1,30 @@
+# Gate F184: ::parse_tokens — listen { name ( ) } → listen|…|call|name
+component ::azl.security {
+  init {
+  }
+}
+
+component ::boot.entry {
+  init {
+    link ::azl.security
+    emit f184_parse with { }
+  }
+  behavior {
+    listen for "f184_parse" {
+      set ::tokens = []
+      set ::l1 = "listen for f184 {"
+      set ::l2 = "f184_fn ( )"
+      set ::l3 = "}"
+      set ::nx = "1"
+      set ::tokens = ::tokens.concat(::tokenize_line(::l1, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 1, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l2, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 2, column: 0 })
+      set ::tokens = ::tokens.concat(::tokenize_line(::l3, ::nx))
+      set ::tokens.push({ type: "eol", value: ";", line: 3, column: 0 })
+      set ::_p = ::parse_tokens(::tokens)
+      say ::ast.nodes
+      say "P0_SEM_F184_OK"
+    }
+  }
+}

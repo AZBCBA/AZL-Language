@@ -380,7 +380,7 @@ class MinimalAZLRuntime:
     def _parse_listen_inner_to_row(
         self, pairs: list[tuple[str, str]], j: int, n: int, evn: str
     ) -> tuple[str, int] | None:
-        """Parse one statement inside ``listen … { … }`` → say / emit / set / return rows."""
+        """Parse one statement inside ``listen … { … }`` → say / emit / set / let / call / return rows."""
         if j >= n:
             return None
         t0, v0 = pairs[j]
@@ -463,6 +463,32 @@ class MinimalAZLRuntime:
                 seg = ("listen|" + evn + "|say|" + msg)[:255]
                 return (seg, jb_close + 1)
             return ("", jb_close + 1)
+        if t0 == "identifier" and v0 not in (
+            "say",
+            "set",
+            "let",
+            "emit",
+            "if",
+            "return",
+            "listen",
+            "import",
+            "link",
+            "component",
+            "memory",
+            "on",
+            "for",
+            "then",
+            "with",
+            "else",
+            "otherwise",
+        ):
+            j = self._skip_eol_pairs(pairs, j + 1)
+            if j < n and pairs[j] == ("paren", "("):
+                j += 1
+                j = self._skip_eol_pairs(pairs, j)
+                if j < n and pairs[j] == ("paren", ")"):
+                    seg = ("listen|" + evn + "|call|" + v0[:63])[:255]
+                    return (seg, j + 1)
         if t0 == "identifier" and v0 == "say":
             j = self._skip_eol_pairs(pairs, j + 1)
             parts: list[str] = []
@@ -2353,6 +2379,10 @@ class MinimalAZLRuntime:
                 gval = srest[sbar + 1 :]
                 if gkey.startswith("::"):
                     stub = (levn[:63], "set", gkey[:63], gval[:255])
+        elif levn and ltail.startswith("call|"):
+            ctail = ltail[5:].split("|", 1)[0][:63]
+            if ctail and "|" not in ltail[5:]:
+                stub = (levn[:63], "call", ctail, "")
         elif levn and ltail.startswith("return|"):
             lpay = ltail[7:]
             stub = (levn[:63], "return", lpay[:255], "")
@@ -2721,6 +2751,7 @@ class MinimalAZLRuntime:
             return result
         self._execute_ast_listen_stubs.clear()
         fn_reg: dict[str, str] = {}
+        self._execute_ast_fn_reg = fn_reg
         lines = raw.split("\n")
         for line in lines:
             if (self.var_get("::halted") or "") == "true":
@@ -3419,6 +3450,12 @@ class MinimalAZLRuntime:
                         elif skind == "return":
                             if sa1:
                                 print(sa1, flush=True)
+                        elif skind == "call":
+                            fr = getattr(self, "_execute_ast_fn_reg", None)
+                            if isinstance(fr, dict):
+                                cpay = fr.get(sa1)
+                                if cpay:
+                                    print(cpay, flush=True)
                         else:
                             print(sa1, flush=True)
                         break

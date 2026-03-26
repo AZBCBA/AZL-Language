@@ -5502,6 +5502,56 @@ if [ "$F183_C_OUT" != "$F183_PY_OUT" ]; then
   exit 800
 fi
 
+echo "[gate] F184: C vs Python — parse_tokens listen { name ( ) } → listen|…|call|…"
+F184EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_call.azl"
+F184_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F184EX" boot.entry 2>&1)"
+f184_c_rc=$?
+if [ "$f184_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_parse_tokens_listen_call exited $f184_c_rc: $F184_C_OUT"
+  exit 801
+fi
+if ! printf '%s\n' "$F184_C_OUT" | awk 'NR==1{if($0!="listen|f184|call|f184_fn")exit 1} NR==2{if($0!="P0_SEM_F184_OK")exit 1} END{if(NR!=2)exit 1}'; then
+  echo "ERROR: expected F184 stdout (2 lines), got: $F184_C_OUT"
+  exit 801
+fi
+F184_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F184EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f184_py_rc=$?
+if [ "$f184_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_parse_tokens_listen_call exited $f184_py_rc: $F184_PY_OUT"
+  exit 802
+fi
+if [ "$F184_C_OUT" != "$F184_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_parse_tokens_listen_call" >&2
+  echo "C:  $F184_C_OUT" >&2
+  echo "Py: $F184_PY_OUT" >&2
+  exit 803
+fi
+
+echo "[gate] F185: C vs Python — execute_ast listen|…|call|fn stub + emit drain"
+F185EX="${ROOT_DIR}/azl/tests/p0_semantic_execute_ast_listen_call_stub.azl"
+F185_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F185EX" boot.entry 2>&1)"
+f185_c_rc=$?
+if [ "$f185_c_rc" != 0 ]; then
+  echo "ERROR: azl-interpreter-minimal p0_semantic_execute_ast_listen_call_stub exited $f185_c_rc: $F185_C_OUT"
+  exit 804
+fi
+if ! printf '%s\n' "$F185_C_OUT" | awk 'NR==1{if($0!="F185_TREE")exit 1} NR==2{if($0!="F185_CALL_CB")exit 1} NR==3{if($0!="F185_TAIL")exit 1} NR==4{if($0!="EX185_POST")exit 1} NR==5{if($0!="Said: F185_TAIL")exit 1} NR==6{if($0!="EC185_INNER")exit 1} NR==7{if($0!="Said: F185_TAIL")exit 1} NR==8{if($0!="P0_SEM_F185_OK")exit 1} END{if(NR!=8)exit 1}'; then
+  echo "ERROR: expected F185 execute_ast listen|call stub stdout (8 lines), got: $F185_C_OUT"
+  exit 804
+fi
+F185_PY_OUT="$(unset AZL_INTERPRETER_DAEMON; env -u AZL_USE_VM AZL_COMBINED_PATH="$F185EX" AZL_ENTRY='boot.entry' python3 "${ROOT_DIR}/tools/azl_runtime_spine_host.py" 2>&1)"
+f185_py_rc=$?
+if [ "$f185_py_rc" != 0 ]; then
+  echo "ERROR: Python spine host p0_semantic_execute_ast_listen_call_stub exited $f185_py_rc: $F185_PY_OUT"
+  exit 805
+fi
+if [ "$F185_C_OUT" != "$F185_PY_OUT" ]; then
+  echo "ERROR: C vs Python output mismatch on p0_semantic_execute_ast_listen_call_stub" >&2
+  echo "C:  $F185_C_OUT" >&2
+  echo "Py: $F185_PY_OUT" >&2
+  exit 806
+fi
+
 echo "[gate] F179: C vs Python — parse_tokens listen { set … ; emit \"…\" with { k: v } }"
 F179EX="${ROOT_DIR}/azl/tests/p0_semantic_parse_tokens_listen_set_emit_quoted_event.azl"
 F179_C_OUT="$(env -u AZL_USE_VM "$MINI_BIN" "$F179EX" boot.entry 2>&1)"

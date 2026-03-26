@@ -82,9 +82,10 @@ static int g_listener_break = 0;
 #define EXEC_AST_STUB_EMIT 1
 #define EXEC_AST_STUB_SET 2
 #define EXEC_AST_STUB_RETURN 3
+#define EXEC_AST_STUB_CALL 4
 typedef struct {
   char event[64];
-  int kind; /* EXEC_AST_STUB_SAY, EMIT, SET, or RETURN */
+  int kind; /* EXEC_AST_STUB_SAY, EMIT, SET, RETURN, or CALL */
   char body[256]; /* say text, bare emit target, set value, or optional return payload */
   char set_key[64]; /* ::global for SET; empty for say/emit */
   int emit_npayload; /* 0 = bare emit; else use emit_payload[0..emit_npayload) */
@@ -215,6 +216,21 @@ static int exec_ast_stub_register_return(const char *ev, const char *pay) {
   return 0;
 }
 
+static int exec_ast_stub_register_call(const char *ev, const char *fname) {
+  if (!ev || !ev[0] || !fname || !fname[0] || strchr(fname, '|') != NULL) return -1;
+  for (int i = 0; i < g_n_exec_ast_stubs; i++)
+    if (strcmp(g_exec_ast_stubs[i].event, ev) == 0) return 0;
+  if (g_n_exec_ast_stubs >= MAX_EXECUTE_AST_STUB_LISTENERS) return -1;
+  (void)snprintf(g_exec_ast_stubs[g_n_exec_ast_stubs].event,
+                 sizeof(g_exec_ast_stubs[g_n_exec_ast_stubs].event), "%s", ev);
+  g_exec_ast_stubs[g_n_exec_ast_stubs].kind = EXEC_AST_STUB_CALL;
+  (void)snprintf(g_exec_ast_stubs[g_n_exec_ast_stubs].body, sizeof(g_exec_ast_stubs[0].body), "%.63s", fname);
+  g_exec_ast_stubs[g_n_exec_ast_stubs].set_key[0] = '\0';
+  g_exec_ast_stubs[g_n_exec_ast_stubs].emit_npayload = 0;
+  g_n_exec_ast_stubs++;
+  return 0;
+}
+
 static int exec_ast_stub_dispatch(const char *ev) {
   if (!ev || !ev[0]) return 0;
   for (int i = 0; i < g_n_exec_ast_stubs; i++) {
@@ -228,6 +244,13 @@ static int exec_ast_stub_dispatch(const char *ev) {
       process_events();
     } else if (g_exec_ast_stubs[i].kind == EXEC_AST_STUB_SET) {
       var_set(g_exec_ast_stubs[i].set_key, g_exec_ast_stubs[i].body);
+    } else if (g_exec_ast_stubs[i].kind == EXEC_AST_STUB_CALL) {
+      const char *pay = exec_ast_fn_get(g_exec_ast_stubs[i].body);
+      if (pay && pay[0]) {
+        fputs(pay, stdout);
+        fputc('\n', stdout);
+        fflush(stdout);
+      }
     } else if (g_exec_ast_stubs[i].kind == EXEC_AST_STUB_RETURN) {
       if (g_exec_ast_stubs[i].body[0]) {
         fputs(g_exec_ast_stubs[i].body, stdout);
@@ -1503,6 +1526,10 @@ static void execute_ast_listen_line(const char *after_listen, char *result, size
     if (exec_ast_stub_register_return(evn, pay) != 0) return;
   } else if (strcmp(q, "return") == 0) {
     if (exec_ast_stub_register_return(evn, "") != 0) return;
+  } else if (strncmp(q, "call|", 5U) == 0) {
+    const char *fname = q + 5;
+    if (!fname[0] || strchr(fname, '|') != NULL) return;
+    if (exec_ast_stub_register_call(evn, fname) != 0) return;
   } else
     return;
   (void)snprintf(result, rsz, "Listen: %.120s", evn);
@@ -2190,6 +2217,28 @@ static int parse_listen_inner_body(ParseTokPair *pairs, int np, int j, const cha
     chunk_out[0] = '\0';
     *j_out = jb_close + 1;
     return 0;
+  }
+  /* bare name ( ) → listen|ev|call|name (F184); must precede generic say. */
+  if (strcmp(pairs[j].typ, "identifier") == 0) {
+    const char *vk = pairs[j].val;
+    if (strcmp(vk, "say") != 0 && strcmp(vk, "set") != 0 && strcmp(vk, "let") != 0 &&
+        strcmp(vk, "emit") != 0 && strcmp(vk, "if") != 0 && strcmp(vk, "return") != 0 &&
+        strcmp(vk, "listen") != 0 && strcmp(vk, "import") != 0 && strcmp(vk, "link") != 0 &&
+        strcmp(vk, "component") != 0 && strcmp(vk, "memory") != 0 && strcmp(vk, "on") != 0 &&
+        strcmp(vk, "for") != 0 && strcmp(vk, "then") != 0 && strcmp(vk, "with") != 0 &&
+        strcmp(vk, "else") != 0 && strcmp(vk, "otherwise") != 0) {
+      int jn = parse_skip_eol(pairs, np, j + 1);
+      if (jn < np && strcmp(pairs[jn].typ, "paren") == 0 && strcmp(pairs[jn].val, "(") == 0) {
+        jn++;
+        jn = parse_skip_eol(pairs, np, jn);
+        if (jn < np && strcmp(pairs[jn].typ, "paren") == 0 && strcmp(pairs[jn].val, ")") == 0) {
+          (void)snprintf(chunk_out, chunk_sz, "listen|%.63s|call|%.63s", evn, vk);
+          if (strlen(chunk_out) > 254U) chunk_out[254] = '\0';
+          *j_out = jn + 1;
+          return 0;
+        }
+      }
+    }
   }
   if (strcmp(pairs[j].typ, "identifier") == 0 && strcmp(pairs[j].val, "say") == 0) {
     j = parse_skip_eol(pairs, np, j + 1);
